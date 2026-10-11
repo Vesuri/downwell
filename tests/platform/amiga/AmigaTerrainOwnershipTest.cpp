@@ -411,7 +411,34 @@ int main(int argc,char** argv){
     }
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
-    for(unsigned consumer=0;consumer<6;++consumer){
+    for(const auto position:{std::pair<int,int>{0,0},{1,17},{-2147483647-1,-2147483647-1},
+            {2147483647-240,2147483647-176},{2147483647-239,0},{0,2147483647-175}}){
+        // Collision geometry has a smaller coordinate domain than published
+        // binary32 builtins. Compare ordinary coordinates with the full owner;
+        // extremes with the retained birth-position conversion itself.
+        const bool ordinary=position.first>=-512&&position.first<512&&position.second>=0&&position.second<8192;
+        bool referenceResult=false;
+        for(bool external:{false,true}){
+            if(!external&&!ordinary)continue;
+            auto owner=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,
+                Ownership::nativeScenery,true,true,!external);
+            if(external)require(owner->declareExternalCollisionBackend(),"box coordinate scene admission");
+            auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),nullptr);
+            require(owner->attach(*world),"box coordinate owner attaches");
+            const int none=0;world->configureBreakables(&none,&none,0);
+            const bool result=world->appendGeneratedBreakable(position.first,position.second,{16,171,0});
+            if(!external)referenceResult=result;
+            else if(ordinary)require(result==referenceResult,"bankless box coordinate admission equals full collision birth");
+            downwell::RunnerImageValue x,y;
+            const bool published=position.first<=2147483647-240&&position.second<=2147483647-176&&
+                x.assignInteger(position.first+240)&&y.assignInteger(position.second+176)&&
+                downwell::RunnerSpatialSplit::valid(x)&&downwell::RunnerSpatialSplit::valid(y);
+            require(result==published,
+                "box integer-offset overflow admission is unchanged");
+        }
+    }
+    for(unsigned consumer=0;consumer<8;++consumer){
         auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
         require(guarded->declareExternalCollisionBackend(),"external collision admission");
         bool accepted=false;
@@ -424,8 +451,12 @@ int main(int argc,char** argv){
             accepted=guarded->collectCollisionPairs(*pairs,false);
         }else if(consumer==3)accepted=guarded->queueCollision({});
         else if(consumer==4){downwell::RunnerImageValue x,y;accepted=guarded->nativePublishedPosition({0,1},x,y);}
-        else {downwell::GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
+        else if(consumer==5){downwell::GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
             accepted=guarded->nativePublishedSprite({View::enemyBase,1},sprite,flags);}
+        else if(consumer==6){downwell::GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
+            accepted=guarded->nativePublishedSprite({View::breakableBase,1},sprite,flags);}
+        else {downwell::RunnerImageValue x,y;
+            accepted=guarded->nativePublishedPosition({View::breakableBase,1},x,y);}
         require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
     }
     // End Step must consume the bullet's published binary32 state, including
@@ -454,6 +485,10 @@ int main(int argc,char** argv){
         }
     }
     {
+        auto genericBoxes=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,
+            Ownership::nativeScenery,false,true,false);
+        require(!genericBoxes->declareExternalCollisionBackend()&&!genericBoxes->valid(),
+            "bankless external scene requires native box ownership");
         auto unneeded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery);
         require(!unneeded->declareExternalCollisionBackend()&&!unneeded->valid(),
             "external backend rejects unnecessary collision backing");

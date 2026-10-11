@@ -79,21 +79,23 @@ these family-local handles.
 
 Full-service native actor publication retains position, sprite/mask IDs, binary32
 scale/angle/image index, timeline/cached frame, cached bounds and spatial/appearance flags per
-non-terrain collision slot inside the ordinary-memory collision owner.
-Terrain slots are excluded from that array; their coordinates remain
-run-owned. This storage does not allocate Chip RAM or another spatial index:
+non-terrain collision slot in ordinary memory. Box slots belong to the optional
+collision bank, not the always-resident owner. Terrain slots are excluded from
+both arrays; their coordinates remain run-owned. This storage does not allocate
+Chip RAM or another spatial index:
 native publication borrows the otherwise unused reference owner's journal/tree
 allocation, without attaching generic lifetime/property records there.
 Collision-enabled native scenes explicitly supply `NativeCollisionStorage`:
 two dirty queues (each two 16-bit links per shared slot plus counters), one
 unsigned slot per shared identity for animated-mask retention, and prepared
-sprite/terrain collision geometry. This is borrowed
+sprite/terrain collision geometry, and 512 box publication records. This is borrowed
 ordinary-memory backing, not part of every owner, not Chip memory and not an
 allocation fallback. The caller must keep it alive until after its owner.
 Missing backing fails on collision-service use. External-backend admission
 rejects a supplied bank rather than retaining an unnecessary scene dependency.
 Terrain geometry and lifetime identities remain in their run owner.
-On the 68000 this bank is 69,466 bytes, including 21,894 bytes of prepared
+On the 68000 this bank is 100,186 bytes, including 30,720 bytes of box records
+and 21,894 bytes of prepared
 geometry. Full-service reference owners carry the same geometry in their
 explicit `ReferenceStorage`. Guarded external-backend owners neither reserve
 nor prepare it; they retain only a four-byte geometry pointer. Required sprite
@@ -101,7 +103,10 @@ metadata, object defaults and terrain Create plans remain available. Startup
 and contact-profile verifiers assert null bank and geometry pointers, and the
 preparation-count gate distinguishes terrain Create plans from optional
 collision birth bounds. Query-enabled fixtures verify the full-service path.
-This does not reduce Chip usage or remove the separate actor-position array.
+The native owner is 1,043,240 bytes. Moving box records into the explicit bank
+removes 30,720 bytes from an external-backend scene; full-service native totals
+are unchanged because that scene admits the bank. This does not reduce Chip
+usage or remove the remaining actor-position array.
 
 ## Measuring transient Chip residency
 
@@ -255,8 +260,13 @@ must not silently return an empty collision result. Full collision services
 remain the default for reference owners and explicit query fixtures. The guard
 suppresses generic actor/terrain collision geometry, index membership and
 spatial/collision queue maintenance.
-Breakable births retain position, appearance and family preparation without
-constructing generic cached geometry. Registration, activation, layers, live
+External-backend admission requires native box ownership. Breakable births
+retain authoritative integer coordinates, artwork and family preparation,
+without constructing unused binary32 position/appearance mirrors or generic
+cached geometry. The original integer-offset overflow admission is retained.
+Direct box mirror reads fail terminally, as do scenes attempting this admission
+without native boxes. Full-service births retain the original publication path
+and its caller-supplied records. Registration, activation, layers, live
 sprite setters and terrain lifetime/registration publication remain synchronous.
 Player, enemy and bullet position setters retain lifetime/ownership validation,
 but do not maintain the excluded backend's coordinate mirror. Player/enemy

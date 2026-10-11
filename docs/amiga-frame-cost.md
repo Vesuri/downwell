@@ -3,7 +3,8 @@
 ## External collision-backend execution boundary
 
 The guarded native backend omits generic actor/terrain collision geometry,
-index membership and collision-queue maintenance; it retains source position/appearance publication,
+index membership, collision-queue maintenance and unobserved box publication
+mirrors; authoritative native records retain position and artwork. It retains
 family preparation, registration and event order. The source/full-service path
 remains available to collision-enabled scenes. This is not another queue encoding.
 

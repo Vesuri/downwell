@@ -70,6 +70,16 @@ public:
         true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates,
         RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree,JournalStorage>>;
 #endif
+    // Generic published collision builtins, not native artwork coordinates.
+    struct NativePosition {
+        RunnerImageValue x,y;
+        Owner::Sprite sprite;
+        Owner::Box bounds{};
+        // +0x180 caches special-sprite frame count, not the collision frame.
+        // Ordinary sprites bypass its getter path (runner-image-fields.md).
+        RunnerImageValue timeline{},cachedFrame{0xbf800000u};
+        std::uint32_t appearanceFlags=8u;
+    };
     struct CollisionGeometryStorage {
         PreparedSpriteGeometry<741> sprites;
         PreparedTerrainBirthBounds terrain;
@@ -83,9 +93,12 @@ public:
     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
     // Caller-owned backing for collision-enabled native scenes only.
     struct NativeCollisionStorage {
+        static_assert(View::terrainBase-View::breakableBase==GameplayWorld::breakableCapacity,
+            "box collision lease matches its identity domain");
         NativeDirtyQueue spatial,collision;
         unsigned retained[View::capacity]{};
         CollisionGeometryStorage geometry;
+        NativePosition boxes[GameplayWorld::breakableCapacity]{};
     };
     bool hasNativeCollisionStorage()const{return nativeCollisionStorage_!=nullptr;}
     bool hasPreparedCollisionGeometry()const{return geometry_!=nullptr;}
@@ -96,7 +109,7 @@ public:
     // collision passes also belong to the external backend. Only before births.
     // No generic geometry/queue consumer may be enabled after this admission.
     bool declareExternalCollisionBackend(){
-        if(!native_||nativeCollisionStorage_||!owner_.declareNoSpatialQueries())return check(false);
+        if(!native_||!nativeBoxes_||nativeCollisionStorage_||!owner_.declareNoSpatialQueries())return check(false);
         collisionConsumersAdmitted_=false;return true;
     }
 private:
@@ -112,16 +125,9 @@ private:
     }
     // Published binary32 setters are not the actors' integer drawing positions.
     // Terrain owns immutable coordinates in runs, not duplicate slot records.
-    struct NativePosition {
-        RunnerImageValue x,y;
-        Owner::Sprite sprite;
-        Owner::Box bounds{};
-        // +0x180 caches special-sprite frame count, not the collision frame.
-        // Ordinary sprites bypass its getter path (runner-image-fields.md).
-        RunnerImageValue timeline{},cachedFrame{0xbf800000u};
-        std::uint32_t appearanceFlags=8u;
-    };
-    NativePosition nativePositions_[View::capacity-(View::timeFieldBase-View::terrainBase)]{};
+    // Native boxes have authoritative immutable coordinates and presentation.
+    // Their generic mirrors belong to the optional full-collision lease.
+    NativePosition nativePositions_[View::capacity-(View::timeFieldBase-View::breakableBase)]{};
     struct NativeWallQuery {
         InstanceHandle handle;Owner::State state;Owner::Sprite sprite;
         int dx=0,dy=0,cacheX=0,cacheY=0;
@@ -166,11 +172,15 @@ private:
     }
     NativePosition* nativePosition(unsigned slot){
         if(slot>=View::capacity||(slot>=View::terrainBase&&slot<View::timeFieldBase))return nullptr;
-        return &nativePositions_[slot<View::terrainBase?slot:slot-(View::timeFieldBase-View::terrainBase)];
+        if(slot>=View::breakableBase&&slot<View::terrainBase)
+            return nativeCollisionStorage_?&nativeCollisionStorage_->boxes[slot-View::breakableBase]:nullptr;
+        return &nativePositions_[slot<View::breakableBase?slot:slot-(View::timeFieldBase-View::breakableBase)];
     }
     const NativePosition* nativePosition(unsigned slot)const{
         if(slot>=View::capacity||(slot>=View::terrainBase&&slot<View::timeFieldBase))return nullptr;
-        return &nativePositions_[slot<View::terrainBase?slot:slot-(View::timeFieldBase-View::terrainBase)];
+        if(slot>=View::breakableBase&&slot<View::terrainBase)
+            return nativeCollisionStorage_?&nativeCollisionStorage_->boxes[slot-View::breakableBase]:nullptr;
+        return &nativePositions_[slot<View::breakableBase?slot:slot-(View::timeFieldBase-View::breakableBase)];
     }
     static constexpr unsigned drawCapacity=2+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
         GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+64+32+32+32+32;
@@ -454,7 +464,10 @@ private:
     bool eligibilityFlags(InstanceHandle h,std::uint32_t& out)const{
         if(native_){
             bool actor=table_.flags(h,out);
-            if(!actor)if(const auto* b=nativeBox(h)){out=nativeBoxFlags_|(b->destroyRequested?1u:0u);actor=true;}
+            if(!actor)if(const auto* b=nativeBox(h)){
+                out=nativeBoxFlags_|(b->destroyRequested?1u:0u);actor=true;
+                if(!collisionConsumersAdmitted_){out=(out&~0xc208u)|8u;return true;}
+            }
             if(!actor&&nativeField(h)){out=nativeFieldFlags_;actor=true;}
             if(actor){
                 const auto* state=nativePosition(h.slot);if(!state)return false;
@@ -613,10 +626,13 @@ private:
         state->appearanceFlags=flags&0xc208u;return check(okay);
     }
     bool publishNativeBoxBirth(InstanceHandle h,const GameplayWorld::Breakable& r){
+        if(!collisionConsumersAdmitted_){
+            // Preserve the integer-offset admission of birthPosition without
+            // constructing binary32 copies that this scene cannot observe.
+            return check(r.x<=0x7fffffff-240&&r.y<=0x7fffffff-176)&&nativeBirthQueues(h.slot,92);
+        }
         auto* state=nativePosition(h.slot);
         if(!state)return check(false);
-        if(!collisionConsumersAdmitted_)return boxes_.birthPosition(r,*state)&&
-            boxes_.nativeAppearance(h,r)&&nativeBirthQueues(h.slot,92);
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         return boxes_.birthPosition(r,*state)&&boxes_.nativeAppearance(h,r)&&
             nativeBirthQueues(h.slot,92)&&refreshNativeActor(h,true);
@@ -1765,14 +1781,14 @@ public:
     }
     bool nativePublishedPosition(InstanceHandle h,RunnerImageValue& x,RunnerImageValue& y){
         if(!collisionConsumersAdmitted_&&
-           (h.slot<View::breakableBase||(h.slot>=View::bulletBase&&h.slot<View::scriptEffectBase)))
+           (h.slot<View::terrainBase||(h.slot>=View::bulletBase&&h.slot<View::scriptEffectBase)))
             return check(false);
         if(!native_||!valid()||!table_.contains(h))return false;
         const auto* position=nativePosition(h.slot);if(!position)return false;
         x=position->x;y=position->y;return true;
     }
     bool nativePublishedSprite(InstanceHandle h,Owner::Sprite& sprite,std::uint32_t& flags){
-        if(!collisionConsumersAdmitted_&&h.slot>=View::enemyBase&&h.slot<View::breakableBase)return check(false);
+        if(!collisionConsumersAdmitted_&&h.slot>=View::enemyBase&&h.slot<View::terrainBase)return check(false);
         if(!native_||!valid()||!eligibilityFlags(h,flags))return false;
         const auto* state=nativePosition(h.slot);if(!state)return false;
         sprite=state->sprite;return true;
