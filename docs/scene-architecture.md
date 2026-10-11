@@ -119,6 +119,17 @@ throughout. The table resides in ordinary executable memory, not Chip RAM.
 
 ## Gameplay presentation boundaries
 
+Terrain raster pixels are a gameplay-only ordinary-memory lease (1,081,344
+bytes), not embedded in the startup BSS. Bind before terrain preparation;
+retire the raster view before releasing the allocation. Front-end scenes and
+upgrade selection hold no raster pixel lease. Re-entry acquires fresh storage
+and invalidates readiness, borrowed initial rows and shop revision state.
+The existing clean-row contract requires initially zero pixels; clearing occurs
+once at allocation, not during ordinary frames. Allocation cannot fall back to
+Chip RAM and failure prevents gameplay publication with return code 20.
+The host fixture caps the owner object's size; native startup and clear/re-entry
+checks assert residency at their respective scene boundaries.
+
 - `AmigaGameplayGeneration`: synchronous builder registration and generation
   damage. Game state and RNG effects remain in core.
 - `AmigaTerrainPainter`: fresh terrain composition, with explicit data, artwork

@@ -23,6 +23,9 @@ public:
     bool acquireGameCatalogue(ULONG bytes);
     void releaseGameCatalogue();
     UBYTE* gameCatalogue() const { return gameCatalogue_; }
+    bool acquireTerrainRaster(ULONG bytes);
+    void releaseTerrainRaster();
+    UBYTE* terrainRaster() const { return terrainRaster_; }
 
     UBYTE* game() const { return game_; }
     UBYTE* hud() const { return hud_; }
@@ -59,6 +62,8 @@ private:
     ULONG gameAssetBytes_;
     UBYTE* gameCatalogue_;
     ULONG gameCatalogueBytes_;
+    UBYTE* terrainRaster_;
+    ULONG terrainRasterBytes_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG menuPlaneBytes_;

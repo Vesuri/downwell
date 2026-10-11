@@ -6,6 +6,10 @@ commands
 silent
 printf "Clear phase=%lu frames=%lu choices=%lu failures=%lu reentries=%lu\n", gDownwellClearPhase, gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures, gDownwellClearReentries
 printf "Gameplay tick=%lu field frames=%lu pixel failures=%lu\n", gDownwellClearTick, gDownwellClearFieldFrames, gDownwellGameBufferFailures
+if gDownwellUpgradeSourceBytes != 0 && gDownwellTerrainRasterResidentBytes != 0
+    printf "Gameplay raster retained during upgrade presentation\n"
+    quit 1
+end
 if gDownwellClearFailures != 0
     dump binary memory .run/clear-actual-hud.bin gDownwellClearActualHud gDownwellClearActualHud+27264
     dump binary memory .run/clear-expected-hud.bin gDownwellClearExpectedHud gDownwellClearExpectedHud+27264
@@ -30,6 +34,10 @@ if gDownwellClearReentries != 2 || gDownwellClearGameplayUpdates != 60
 end
 if gDownwellUpgradeSourceBytes != 0
     printf "Upgrade source still resident after returning to gameplay\n"
+    quit 1
+end
+if gDownwellTerrainRasterResidentBytes != 1081344
+    printf "Gameplay raster not reacquired after upgrade departure\n"
     quit 1
 end
 if gDownwellClearCursorMasks[0] != 7 || gDownwellClearCursorMasks[1] != 7

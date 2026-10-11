@@ -7,7 +7,8 @@ class Bitmap;
 // Fast-RAM raster for the left room, well and right room. Transfer only
 // exposed/invalidated spans into the Chip-RAM circular backing/display rings.
 class AmigaTerrainRaster {
-    UWORD pixels_[3][8192][2][AmigaGameplayRows::terrainWords];
+    using PixelColumn = UWORD[8192][2][AmigaGameplayRows::terrainWords];
+    PixelColumn* pixels_=nullptr;
     // Bit 0: repaint required. Bit 1: current pixels belong to the immutable
     // initial-room dictionary, not pixels_. Writes replace a complete row.
     unsigned char dirty_[3][8192]{};
@@ -15,6 +16,19 @@ class AmigaTerrainRaster {
     unsigned shopRevision_[downwell::ShopWorld::capacity]{};
 public:
     static constexpr unsigned rows = 8192, words = AmigaGameplayRows::terrainWords;
+    static constexpr unsigned storageBytes = 3*sizeof(PixelColumn);
+    // Borrow gameplay-only ordinary memory. A live lease cannot be replaced;
+    // retirement invalidates every cached/borrowed row before storage is freed.
+    bool bindStorage(void* storage,unsigned bytes){
+        if(!storage||bytes!=storageBytes||pixels_)return false;
+        pixels_=static_cast<PixelColumn*>(storage);
+        initial_=nullptr;ready=false;
+        for(auto& column:dirty_)for(auto& row:column)row=0;
+        for(auto& revision:shopRevision_)revision=0;
+        return true;
+    }
+    void releaseStorage(){ready=false;initial_=nullptr;pixels_=nullptr;}
+    bool hasStorage()const{return pixels_!=nullptr;}
     static constexpr unsigned x = AmigaGameplayRows::terrainX;
     static constexpr unsigned stagePaintRows = 16;
     enum StagePaint { stageFailed=0, stageInBacking=1, stageInCache=2 };
@@ -32,7 +46,7 @@ public:
         return (dirty_[column][y]&2)?initial_->row(column,y,scratch):&pixels_[column][y][0][0];
     }
     bool borrowInitial(const AmigaInitialTerrain& initial){
-        if(!initial.rows()||initial.rows()>rows)return false;
+        if(!pixels_||!initial.rows()||initial.rows()>rows)return false;
         initial_=&initial;
         for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initial.rows();++y)dirty_[c][y]|=2;
         return true;

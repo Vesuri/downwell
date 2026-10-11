@@ -22,6 +22,10 @@ if gDownwellGameArtResidentBytes != 0 || gDownwellGameArtLoads != 0 || gDownwell
     quit 1
 end
 downwell-chip-snapshot
+if gDownwellTerrainRasterResidentBytes != 0
+    printf "Gameplay terrain raster unexpectedly resident during normal startup\n"
+    quit 1
+end
 if $chip_changes == 0 || $chip_minimum > gDownwellStartupChipRemaining
     printf "CHIP_AUDIT_ERROR: watcher missed startup allocations\n"
     quit 1

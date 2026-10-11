@@ -27,6 +27,7 @@ volatile unsigned gDownwellGamePlaneResidentBytes, gDownwellGamePlaneLoads, gDow
     gDownwellGamePlaneExpectedBytes;
 volatile unsigned gDownwellGameArtResidentBytes, gDownwellGameArtLoads, gDownwellGameArtReleases,
     gDownwellGameArtPreparations, gDownwellGameArtExpectedBytes;
+volatile unsigned gDownwellTerrainRasterResidentBytes;
 __attribute__((noinline, used)) void downwellGamePlanesReady(){ __asm__ volatile("" ::: "memory"); }
 }
 #ifdef DOWNWELL_PLANE_BANK_VERIFY
@@ -2174,6 +2175,17 @@ __attribute__((noinline)) static int runDownwell(void) {
     static_assert(DOWNWELL_GAME_BANK_BYTES<=DOWNWELL_GAME_BANK_BUDGET,"Gameplay art admission budget");
     gDownwellGameArtExpectedBytes=DOWNWELL_GAME_BANK_BYTES;
     bool gameBankCavern=false;
+    const auto releaseTerrainRaster=[&](){
+        terrainRaster.releaseStorage();memory.releaseTerrainRaster();
+        gDownwellTerrainRasterResidentBytes=0;
+    };
+    const auto acquireTerrainRaster=[&](){
+        if(terrainRaster.hasStorage())return memory.terrainRaster()!=nullptr;
+        if(!memory.acquireTerrainRaster(AmigaTerrainRaster::storageBytes)||
+           !terrainRaster.bindStorage(memory.terrainRaster(),AmigaTerrainRaster::storageBytes))return false;
+        gDownwellTerrainRasterResidentBytes=AmigaTerrainRaster::storageBytes;
+        return true;
+    };
     const auto releaseGameplayArt=[&](){
         amigaBlitterReleaseGamePlanes();
 #ifdef DOWNWELL_TERRAIN_BATCH
@@ -2186,6 +2198,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         AmigaGameplayActors::releaseDamageText();
         hudText.release();
         activeGamePack=activeGamePackEnd=nullptr;
+        releaseTerrainRaster();
         memory.releaseGameAssets();memory.releaseGameCatalogue();
         gDownwellGamePlaneResidentBytes=gDownwellGameArtResidentBytes=0;
     };
@@ -2196,7 +2209,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         // These explicit full-catalogue pixel oracles include later-area art.
         cavern=false;
 #endif
-        if(gDownwellGameArtResidentBytes&&gameBankCavern==cavern)return memory.gameAssets()&&activeGamePack;
+        if(gDownwellGameArtResidentBytes&&gameBankCavern==cavern)
+            return memory.gameAssets()&&activeGamePack&&acquireTerrainRaster();
         if(gDownwellGameArtResidentBytes){
             AmigaHardware::blitterDrain();
             releaseGameplayArt();
@@ -2208,7 +2222,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         gDownwellGamePlaneExpectedBytes=gamePackBytes;
         if(!memory.acquireGameCatalogue(cpuBytes))return false;
         activeGamePack=memory.gameCatalogue();activeGamePackEnd=activeGamePack+cpuBytes;
-        bool good=platform.loadFile(cavern?"PROGDIR:Downwell.cavern":"PROGDIR:Downwell.game",memory.gameCatalogue(),cpuBytes)==LONG(cpuBytes)&&
+        bool good=acquireTerrainRaster()&&
+            platform.loadFile(cavern?"PROGDIR:Downwell.cavern":"PROGDIR:Downwell.game",memory.gameCatalogue(),cpuBytes)==LONG(cpuBytes)&&
             effectAssets.bind(activeGamePack,cpuBytes)&&
             effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)&&
             AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd);
@@ -3303,6 +3318,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     overlayBank.release();
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
+                    releaseTerrainRaster();
                     if (!upgradeSource.acquire()) { exitCode = 20; break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,

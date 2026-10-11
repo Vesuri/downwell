@@ -57,6 +57,11 @@ if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
         quit 1
     end
     printf "Gameplay CPU art: one entry load/preparation, %lu resident bytes\n", gDownwellGameArtResidentBytes
+    if gDownwellTerrainRasterResidentBytes != 1081344
+        printf "Gameplay terrain raster lease missing or wrong size\n"
+        quit 1
+    end
+    printf "Gameplay terrain raster: %lu ordinary-memory bytes\n", gDownwellTerrainRasterResidentBytes
     if gDownwellTransientLoads != 0 || gDownwellUpgradeSourceBytes != 0 || gDownwellResultsAssetBytes != 0 || gDownwellShopAssetBytes != 0
         printf "Unrelated transient scene work on the contact tape\n"
         quit 1

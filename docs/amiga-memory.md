@@ -91,20 +91,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,129,244 bytes**, SHA-256
-`0c0b1d1568637634420554b8f50334dd399aa9d7409f188d288a6812ecd80928`.
+and without reference-only collision masks is **2,132,076 bytes**, SHA-256
+`70b22e253d28bc5611ed2b7aeca7601de097dbd5c858287d1052d45afdc1de32`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,371,696 | Yes |
+| Machine code (`.text`) | 1,373,290 | Yes |
 | Read-only data (`.rodata`) | 675,032 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 4,572,432 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 3,491,096 | No; allocated at load |
 
-Initialized payload totals 2,080,926 bytes. Hunk relocation and container
-records account for the remaining 48,318 bytes. Stripping cannot remove
+Initialized payload totals 2,082,520 bytes. Hunk relocation and container
+records account for the remaining 49,556 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
@@ -126,9 +126,18 @@ remove collision bounds metadata or change the shipping collision algorithm.
 Future live precise-mask events need scene-owned mask dependencies, not a
 restoration of the complete reference catalogue to every executable.
 
-The largest BSS owners are collision storage (2,619,994 bytes) and the
-full-height CPU terrain raster (1,105,958 bytes). Initialized payload plus
-BSS already approaches 8 MB before dynamic graphics allocations. A small
+The largest BSS owner is collision storage (2,619,994 bytes). Terrain raster
+pixels now require a separate 1,081,344-byte ordinary-memory gameplay lease;
+only row validity, shop revisions and binding state remain in the static owner.
+The lease is absent during normal startup and front-end scenes, and is released
+before upgrade selection, then reacquired for gameplay. The allocation is
+`MEMF_FAST | MEMF_CLEAR`: untouched clean rows preserve the former zero-filled
+BSS contract. No clearing or allocation occurs in ordinary gameplay frames.
+Static BSS falls by 1,081,336 bytes, but peak gameplay memory is essentially
+unchanged: this is scene residency, not a smaller raster representation.
+`tmp/raster-lease-startup-gdb.log` verifies no raster residency at startup and
+126,840 Chip bytes free. Initialized payload plus BSS exceeds 5 MB even before
+the gameplay raster and dynamic graphics allocations. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.
 Moving data to sidecar files changes file size, not residency, unless its
 lifetime or representation also changes. The shared DMA plane atlas below

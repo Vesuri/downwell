@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 static unsigned copiedRows;
+static_assert(sizeof(AmigaTerrainRaster)<32*1024,
+    "Terrain pixels must remain a gameplay lease, not embedded startup storage");
 void AmigaHardware::blitterDrain() {}
 void AmigaHardware::setBlitterNasty(bool) {}
 void Bitmap::copy(const Bitmap& source,uint16_t x,uint16_t y,uint16_t sx,uint16_t sy,uint16_t w,uint16_t h,uint16_t) {
@@ -34,6 +36,9 @@ int main() {
         assert(initial.bind(pack.data(),pack.size()));
         auto borrowed=std::make_unique<AmigaTerrainRaster>();
         auto materialized=std::make_unique<AmigaTerrainRaster>();
+        std::vector<UWORD> borrowedPixels(AmigaTerrainRaster::storageBytes/2),materializedPixels(borrowedPixels.size());
+        assert(borrowed->bindStorage(borrowedPixels.data(),AmigaTerrainRaster::storageBytes));
+        assert(materialized->bindStorage(materializedPixels.data(),AmigaTerrainRaster::storageBytes));
         for(unsigned c=0;c<3;++c){
             std::fill_n(borrowed->writeRows(c,0,320),320*22,0xdead);
             std::fill_n(materialized->writeRows(c,0,320),320*22,0xdead);
@@ -92,6 +97,18 @@ int main() {
         std::printf("Borrowed initial raster: %u exact transfers, replacement and reborrow lifecycle\n",comparisons);
     }
     auto raster=std::make_unique<AmigaTerrainRaster>();
+    std::vector<UWORD> pixels(AmigaTerrainRaster::storageBytes/2,0xdead);
+    assert(!raster->hasStorage()&&!raster->ready);
+    assert(!raster->bindStorage(nullptr,AmigaTerrainRaster::storageBytes));
+    assert(!raster->bindStorage(pixels.data(),AmigaTerrainRaster::storageBytes-2));
+    assert(raster->bindStorage(pixels.data(),AmigaTerrainRaster::storageBytes));
+    assert(!raster->bindStorage(pixels.data(),AmigaTerrainRaster::storageBytes));
+    raster->ready=true;raster->setDirty(1,100,true);
+    raster->releaseStorage();
+    assert(!raster->ready&&!raster->hasStorage());
+    assert(raster->bindStorage(pixels.data(),AmigaTerrainRaster::storageBytes));
+    assert(!raster->ready&&!raster->dirty(1,100));
+    assert(pixels.front()==0xdead&&pixels.back()==0xdead); // No pointless pixel clearing.
     unsigned cases=0;
     unsigned partitions=0;
     for(unsigned column=0;column<3;++column)for(unsigned mask=0;mask<256;++mask){
