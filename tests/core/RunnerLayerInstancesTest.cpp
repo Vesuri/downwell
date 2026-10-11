@@ -336,12 +336,12 @@ void lifetimeDepthIntegration(){
     RunnerLayerLifetimes<4,8,0> full(fullLayers,fullRegistry,fullIds);
     require(!full.birth({0,1},1,{},false)&&!full.succeeded(),"lifetime capacity fails terminally");
 }
-void lifetimeRoomInitialization(){
-    using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4>;
+template<bool Indexed=true> void lifetimeRoomInitialization(){
+    using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4,false,false,R::Layers,Indexed>;
     for(unsigned flags=0;flags<8;++flags){
         R copyRegistry;R::Layers copyLayers;RunnerLayerIds copyIds;
         Owner copyOwner(copyLayers,copyRegistry,copyIds);
-        const Owner::State input{{2,0x12345678u},0xabcdef12u,
+        const typename Owner::State input{{2,0x12345678u},0xabcdef12u,
             {{0x80000000u},-60000,bool(flags&1),bool(flags&2)},bool(flags&4)};
         require(copyOwner.adopt(input),"adopt all combinations of lifetime flags");
         const auto* output=copyOwner.resolve(input.handle);
@@ -357,8 +357,8 @@ void lifetimeRoomInitialization(){
     unsigned fixed=4;require(layers.insertAfterEquals(17,10,false,fixed)&&registry.reserve(layers,fixed,100),
         "room lifetime placeholder");
     Owner owner(layers,registry,catalog);
-    Owner::State survivor{{2,7},100,{{0x41280000u},99,true,false},true}; // 10.5
-    Owner::State fallback{{0,3},512,{{0x41a40000u},17,false,false},false}; // 20.5
+    typename Owner::State survivor{{2,7},100,{{0x41280000u},99,true,false},true}; // 10.5
+    typename Owner::State fallback{{0,3},512,{{0x41a40000u},17,false,false},false}; // 20.5
     require(owner.adopt(survivor)&&owner.adopt(fallback)&&registry.find(survivor.handle)==R::End,
         "adoption preserves fields without attaching or running Create");
     require(owner.initializeRoom([&](auto visit){
@@ -382,8 +382,8 @@ void lifetimeRoomInitialization(){
     require(duplicate.adopt(survivor)&&!duplicate.birth({1,1},100,{},false)&&!duplicate.resolve({1,1}),
         "birth cannot duplicate an adopted source identity before initialization");
 }
-void roomUninitialization(){
-    using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4>;
+template<bool Indexed=true> void roomUninitialization(){
+    using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4,false,false,R::Layers,Indexed>;
     R registry;R::Layers layers;RunnerLayerIds catalog;Owner owner(layers,registry,catalog);
     unsigned layer=4;require(layers.insertAfterEquals(17,10,false,layer)&&registry.reserve(layers,layer,100),"exit seed");
     require(owner.birth({0,1},100,{},false)&&owner.writeDepth({0,1},MotionBinary64::fromInteger(15)),"pending exit setter");
@@ -622,7 +622,20 @@ void retainedLifetimeIntegration(){
         "actor and retained retirement dispose only their own empty layers");
     require(logicalCapacityFailure<true>()==logicalCapacityFailure<false>(),"logical/physical capacity failure witnesses");
 }
-int main(){retainedLifetimeIntegration();permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
+template<bool Indexed> void numberedSourceRetirement(){
+    using R=RunnerLayerInstances<4,8>;
+    using Owner=RunnerLayerLifetimes<4,8,512,false,false,R::Layers,Indexed>;
+    R registry;R::Layers layers;RunnerLayerIds ids;Owner owner(layers,registry,ids);
+    require(owner.adopt({{511,1},71,{},{}})&&owner.adopt({{1,2},72,{},{}})&&
+        owner.adopt({{400,3},73,{},{}}),"sparse numbered owners");
+    require(owner.retire({1,2})&&owner.adopt({{2,4},72,{},{}}),"middle source retirement and ID reuse");
+    require(owner.retire({511,1})&&owner.retire({2,4})&&owner.retire({400,3}),
+        "tail, head and last numbered source retirement");
+    require(owner.adopt({{511,5},71,{},{}})&&owner.resolve({511,5}),"reused source slot after empty directory");
+    require(!owner.adopt({{300,6},71,{},{}})&&!owner.resolve({300,6})&&owner.resolve({511,5}),
+        "duplicate failure retains the existing source and no new lifetime");
+}
+int main(){numberedSourceRetirement<true>();numberedSourceRetirement<false>();lifetimeRoomInitialization<false>();roomUninitialization<false>();retainedLifetimeIntegration();permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
     static_assert(sizeof(downwell::RunnerLayerEntry<true>)==12,"derived entry contains only identity fields");
     require(presenceWitness<true>()==presenceWitness<false>(),"derived/explicit presence lifecycle trace");
     require(compactLifetimeWitness<true>()==compactLifetimeWitness<false>(),"compact/full lifetime mutation trace");

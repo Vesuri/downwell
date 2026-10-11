@@ -3,11 +3,13 @@
 #include "RunnerLayerInstances.h"
 #include "RunnerLayerIds.h"
 namespace downwell {
+template<bool Small> struct RunnerLayerSourceLink { using Type=unsigned; };
+template<> struct RunnerLayerSourceLink<true> { using Type=std::uint16_t; };
 // Shared lifetime/depth adapter over a room's element registry. Install before
 // births. Room resource preparation and persistent-state transfer remain the
 // room owner's responsibility. Large owners must not live on the Amiga stack.
 template<unsigned L,unsigned E,unsigned I,bool DirectIdentity=false,bool CompactUnnumbered=false,
-    class LayerStorage=RunnerLayers<L,E>> class RunnerLayerLifetimes {
+    class LayerStorage=RunnerLayers<L,E>,bool IndexedSourceIds=true> class RunnerLayerLifetimes {
 public:
     using Registry=RunnerLayerInstances<L,E,DirectIdentity?I:0,LayerStorage>;
     using Layers=typename Registry::Layers;
@@ -52,14 +54,43 @@ public:
         return adoptState(state);
     }
 private:
+    // Numbered ownership is maintained at birth/retirement, not rediscovered
+    // by scanning every possible family slot for every room instance. This
+    // directory does not order source events or replace layer membership.
+    unsigned findSource(std::uint32_t id)const{
+        if constexpr(IndexedSourceIds){
+            if(id){
+                for(unsigned slot=sourceHead_;slot!=I;slot=sourceNext_[slot])
+                    if(states_[slot].sourceId==id)return slot;
+                return I;
+            }
+        }
+        // Preserve the reference's first-slot rule for unnumbered lookup.
+        for(unsigned slot=0;slot<I;++slot)
+            if(states_[slot].handle.generation&&states_[slot].sourceId==id)return slot;
+        return I;
+    }
+    void publishSource(unsigned slot){
+        if constexpr(IndexedSourceIds)if(states_[slot].sourceId){
+            sourcePrevious_[slot]=I;sourceNext_[slot]=sourceHead_;
+            if(sourceHead_!=I)sourcePrevious_[sourceHead_]=slot;
+            sourceHead_=slot;
+        }
+    }
+    void retireSource(unsigned slot){
+        if constexpr(IndexedSourceIds)if(states_[slot].sourceId){
+            const unsigned before=sourcePrevious_[slot],after=sourceNext_[slot];
+            if(before==I)sourceHead_=after;else sourceNext_[before]=after;
+            if(after!=I)sourcePrevious_[after]=before;
+        }
+    }
     bool adoptState(const State& state){
         DW_PROFILE_SCOPE(profileLayerAdopt);
         const auto h=state.handle;
         if(!succeeded()||h.slot>=I||!h.generation||states_[h.slot].handle.generation||
             !RunnerSpatialSplit::valid(state.depth.depth))return fail();
         if constexpr(CompactUnnumbered)if(compact_[h.slot])return fail();
-        for(unsigned i=0;i<I;++i)
-            if(state.sourceId&&states_[i].handle.generation&&states_[i].sourceId==state.sourceId)return fail();
+        if(state.sourceId&&findSource(state.sourceId)!=I)return fail();
         // Scalar stores avoid bytewise aggregate construction in the 68000
         // compiler. Copy all semantic fields; padding has no stored meaning.
         auto& target=states_[h.slot];
@@ -71,6 +102,7 @@ private:
         target.depth.attached=state.depth.attached;
         target.depth.append=state.depth.append;
         target.inactive=state.inactive;
+        publishSource(h.slot);
         return true;
     }
 public:
@@ -82,9 +114,8 @@ public:
         return registry_.initializeRoom(layers_,
             [&](std::uint32_t id,InstanceHandle& h,RunnerDepthService::Instance*& out){
                 out=nullptr;
-                for(unsigned i=0;i<I;++i)if(states_[i].handle.generation&&states_[i].sourceId==id){
-                    h=states_[i].handle;out=&states_[i].depth;break;
-                }
+                const unsigned slot=findSource(id);
+                if(slot!=I){h=states_[slot].handle;out=&states_[slot].depth;}
                 return true;
             },[&](auto visit){
                 return globals([&](InstanceHandle h){
@@ -204,6 +235,7 @@ public:
         if(state->depth.attached){
             if(!registry_.retire(layers_,state->sourceId,h))return fail();
         }else if(registry_.find(h)!=Registry::End)return fail();
+        retireSource(h.slot);
         states_[h.slot]=State{};return true;
     }
     unsigned pendingDepths()const{return pending_.size();}
@@ -218,9 +250,8 @@ public:
                 return registry_.uninitialize(layers_,e,
                     [&](std::uint32_t id,InstanceHandle& h,RunnerDepthService::Instance*& out){
                         out=nullptr;
-                        for(unsigned i=0;i<I;++i)if(states_[i].handle.generation&&states_[i].sourceId==id){
-                            h=states_[i].handle;out=&states_[i].depth;break;
-                        }
+                        const unsigned slot=findSource(id);
+                        if(slot!=I){h=states_[slot].handle;out=&states_[slot].depth;}
                         return true;
                     });
             });
@@ -230,6 +261,10 @@ private:
     bool fail(){good_=false;return false;}
     Layers& layers_;Registry& registry_;RunnerLayerIds& ids_;
     mutable State states_[I?I:1]{};
+    using SourceLink=typename RunnerLayerSourceLink<(I<65535)>::Type;
+    SourceLink sourceHead_=I;
+    SourceLink sourceNext_[IndexedSourceIds&&I?I:1]{};
+    SourceLink sourcePrevious_[IndexedSourceIds&&I?I:1]{};
     // Enabled only by owners routing all depth/attachment mutations here.
     // 0 = ordinary/absent, 1 = compact active, 2 = compact inactive.
     mutable std::uint8_t compact_[CompactUnnumbered&&I?I:1]{};

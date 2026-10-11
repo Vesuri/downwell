@@ -483,6 +483,20 @@ concurrent generations with the same slot. Direct mode explicitly rejects
 out-of-domain slots and overlapping lifetimes; it is not a transparent option
 for owners lacking the bounded, single-live-lifetime invariant.
 
+Numbered source-ID ownership is a separate lifetime-maintained directory.
+Adoption checks only existing numbered owners for a duplicate, then links the
+new slot after publishing its state. A later attachment failure retains both
+that state and its directory entry, matching the original failure prefix.
+Successful retirement unlinks the entry before clearing its state. Room
+initialization and uninitialization use this same directory for nonzero-ID
+resolution; it never determines event, layer, or global traversal order.
+Source ID zero retains the reference's first-live-slot lookup rule. Compact
+unnumbered actors do not enter the directory. Two slot-link arrays and a head
+require four bytes per possible slot plus a two-byte head in the native domain;
+lookup work depends on live numbered owners, not unrelated family capacity.
+`REFERENCE_ROOM_PREPARE=1` retains the full-slot source scan as well as the
+generic room preparation path. Layer fixtures exercise both source owners.
+
 The direct registry's element payload contains only source ID and lifetime
 handle (12 bytes). Presence is derived from a nonzero source ID or generation:
 serialized placeholders retain their source ID when uninitialized, while

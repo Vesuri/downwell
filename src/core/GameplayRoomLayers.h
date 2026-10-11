@@ -34,7 +34,7 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void,
     Layers layers_;
     Registry registry_;
     RunnerLayerBackgrounds<L,E,B,Layers> backgrounds_;
-    RunnerLayerLifetimes<L,E,I,true,CompactUnnumbered,Layers> lifetimes_{layers_,registry_,ids_};
+    RunnerLayerLifetimes<L,E,I,true,CompactUnnumbered,Layers,!ReferencePrepare> lifetimes_{layers_,registry_,ids_};
     Terrain* terrain_=nullptr;
     unsigned terrainFirst_=0;
     RunnerRetainedLayerRead retainedState(InstanceHandle h)const{
