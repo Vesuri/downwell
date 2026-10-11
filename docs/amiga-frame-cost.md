@@ -1,5 +1,47 @@
 # Amiga gameplay frame-cost audit
 
+## Combat simulation attribution at `f3f5d753`
+
+A bounded 20-field contact capture at marker 1304 reproduces frame 1305 at
+63.26 ms (449,460 cycles). The five complete frames 1305–1309 measure
+63.3, 64.8, 61.9, 58.4 and 59.8 ms. Coverage ends at tick 1309, view Y 2122,
+six enemy slots and health 3; configuration is 512 KiB Chip / 8 MiB Fast.
+This is attribution, not an optimization.
+
+| Inclusive owner, frame 1305 | ms |
+| --- | ---: |
+| Gameplay simulation | 45.44 |
+| Enemy Step (inside simulation) | 18.46 |
+| Walking movement (inside enemy Step) | 7.31 |
+| Walking tile queries (inside walking movement) | 4.10 |
+| Bat behavior (inside enemy Step) | 4.40 |
+| Bat solid collision resolution (inside bat behavior) | 2.14 |
+| Bullet Step (inside simulation) | 4.86 |
+| Room animation (inside simulation) | 3.34 |
+| Alarm dispatch boundary (inside simulation) | 3.16 |
+| Draw collection (outside simulation) | 4.33 |
+| Ammo redraw (outside simulation) | 3.72 |
+| Hardware sprite assignment (outside simulation) | 3.45 |
+
+Parent and child rows must not be added. Movement repeatedly samples solid
+points through the platform callback, including terrain and breakables. A
+whole native occupancy-query boundary is a candidate for removing duplicated
+point work; changes must retain collision decisions, source movement order and
+the portable callback oracle. These numbers do not justify individual setter,
+division-helper or alarm variants. `buildHardwareSpritePart` costs 2.45 ms
+inside sprite assignment but its native branch copies offline DMA words and
+updates headers; runtime pixel conversion is excluded on Amiga.
+
+Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512
+VERIFY_TIMEOUT_SECONDS=180 STRIP=1 TRACE_FRAMES=1304 TRACE_FIELDS=20
+TRACE_OUTPUT=$PWD/tmp/trace/combat-owner-audit bash amiga/profile.sh trace`,
+then `python3 tools/amiga-trace-report.py tmp/trace/combat-owner-audit
+--frames=1305 --top=100 --tree-min=0.5 --causes`.
+Report: `tmp/combat-owner-1305.txt`; driver: `tmp/combat-owner-audit.log`.
+Trace ELF SHA-256:
+`8df3f28913c1b5ba2c0513b75a81ec411e2fc20f2067d0a3561075675f46dc36`.
+The profiling script restored normal `STRIP=1` and passed the native audits.
+
 ## Scene-admitted span publication
 
 The external collision backend no longer maintains generic wall registration:
