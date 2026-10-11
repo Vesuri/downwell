@@ -7444,6 +7444,11 @@ int main(){
         std::vector<int> objectsSeen;
         assert(owner->dispatchActorEndStep([&](InstanceHandle,int object){objectsSeen.push_back(object);return true;}));
         assert((objectsSeen==std::vector<int>{35,120,120,256,266}));
+        for(unsigned repeat=0;repeat<3;++repeat){
+            objectsSeen.clear();
+            assert(owner->dispatchActorEndStep([&](InstanceHandle,int object){objectsSeen.push_back(object);return true;}));
+            assert((objectsSeen==std::vector<int>{35,120,120,256,266}));
+        }
         assert(owner->playerControllers().balloonEndStep(balloon,false));
         unsigned calls=0;
         assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
@@ -7480,6 +7485,9 @@ int main(){
         const auto first=world->enemyHandle(world->enemyAt(0).lifetimeId);
         InstanceHandle newborn;
         std::vector<int> seen;
+        // Warm the unchanged snapshot before the callback that destroys one
+        // actor and births another. Reuse must keep the original cutoff.
+        assert(owner->dispatchActorEndStep([](InstanceHandle,int){return true;}));
         assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
             seen.push_back(object);
             if(object==35)return true;

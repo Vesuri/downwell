@@ -91,20 +91,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,141,540 bytes**, SHA-256
-`2447739db88622127840af64b44e1cd93a4b0e0677f59fd1f8a60672421250bb`.
+and without reference-only collision masks is **2,144,392 bytes**, SHA-256
+`44de42e790f66dd04993005bdb89a5a871e53bc63a3cf3cac2a2225017bcbd6a`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,382,984 | Yes |
+| Machine code (`.text`) | 1,385,742 | Yes |
 | Read-only data (`.rodata`) | 675,032 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 3,491,636 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 3,491,648 | No; allocated at load |
 
-Initialized payload totals 2,092,214 bytes. Hunk relocation and container
-records account for the remaining 49,326 bytes. Stripping cannot remove
+Initialized payload totals 2,094,972 bytes. Hunk relocation, padding and container
+records account for the remaining 49,420 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
@@ -117,6 +117,10 @@ Its selected reconciliation increases the linked Hunk by 15,256 bytes against
 `1335f367`; this is a frame-cost improvement, not a binary-size reduction.
 Normal startup still leaves 126,840 Chip bytes free, with no gameplay art or
 terrain raster resident (`tmp/activation-selection-startup-gdb.log`).
+Retained End Step capture reuses the existing snapshot storage; its player
+handle/revision/validity add 12 ordinary BSS bytes. The Hunk grows 2,852 bytes
+against `5373be79`. Startup Chip usage remains unchanged
+(`tmp/endstep-capture-startup-gdb.log`).
 
 The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to

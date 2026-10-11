@@ -1,5 +1,51 @@
 # Amiga gameplay frame-cost audit
 
+## Retained End Step capture — 2026-10-11
+
+At `5373be79`, a fresh 30-field capture starting at 1300 measures frame 1305
+at 74.7 ms, including **8.09 ms** in actor End Step. The same snapshot is
+rebuilt and sorted even when its membership has not changed. Retaining the
+player/non-box actor snapshot behind the native capture revision reduces
+End Step to **4.13 ms** and the complete frame to **71.0 ms**. Eligibility and
+lifetime reads during execution remain live; box prefixes are not cached.
+
+| Matched frames | Mean before / after, ms | Worst before / after, ms |
+| --- | ---: | ---: |
+| 51–74 | 39.642 / 38.117 | 56.6 / 56.8 |
+| 676–683 | 131.363 / 127.875 | 446.8 / 446.9 |
+| 1301–1314 | 73.436 / 70.114 | 97.2 / 96.9 |
+| 1512–1519 | 81.850 / 80.388 | 223.6 / 223.6 |
+| 1689–1696 | 117.725 / 115.413 | 404.3 / 404.1 |
+
+No matched frame increases by more than 0.3 ms. Frames that rebuild their
+snapshot, including quiet frame 51 (32.1 ms), do not acquire the reuse saving.
+This eliminates repeated capture work; it does not make event execution or
+the remaining gameplay frames fit in 20 ms.
+
+The complete 1,800-update contact tape takes **5,724 PAL fields (15.72 FPS)**,
+versus 5,922 (15.20 FPS) at `5373be79`; the largest gap remains 22 fields at
+676. Coverage remains ticks 0–1799, view Y 39–2749 (maximum 2759), seven enemy
+slots, two damage-number births, final health 2 and no dead samples. The CPU
+art bank still loads/prepares once (221,282 bytes), the gameplay raster lease
+is 1,081,344 bytes, and no upgrade/results/shop banks load. Full-tape evidence:
+`tmp/endstep-capture-fps-gdb.log`.
+
+Reproduce with the contact trace command below and
+`TRACE_FRAMES=50,675,1300,1511,1688 TRACE_FIELDS=100`. Reports:
+`tmp/endstep-capture-report.txt`, `tmp/endstep-capture-before-1305.txt` and
+`tmp/endstep-capture-1305.txt`. Focused baseline ELF SHA-256:
+`2f621bc3713a5c09fb6d4aacb017a1b6b74a641bdc17dfd90770c2aaa8ee15b3`;
+candidate ELF SHA-256:
+`f4831dabcf2541643721d9dfffa1415a1e7a23d78c6484554836c22b055149ff`.
+The three ownership fixtures retain full reference capture and verify repeated
+dispatch, callback destruction/replacement, slot reuse, Retry and deferred
+cleanup. Ten terrain tapes cover 18,000 frames. A warmed snapshot's callback
+cannot admit its newly created actor into the same phase.
+The 64-frame cross-target replay and normal startup with 512 KiB Chip also
+pass; startup leaves 126,840 Chip bytes free. Evidence logs:
+`tmp/endstep-capture-{host,replay,startup,startup-gdb}.log`. All owned emulator
+runs are bounded; the normal non-profile `STRIP=1` build is restored.
+
 ## Activation-stall audit — 2026-10-11
 
 The contact tape's 33-field gap at frame 1512 was not covered by the four

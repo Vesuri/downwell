@@ -380,8 +380,20 @@ a child cannot recover the enclosing owner, and copying a signal never borrows
 the original observer. Replacing an installed observer fails both owners.
 The private spatial/property stores are unused under native ownership and
 validated on setup; guarded operation failures still latch in the owner.
-Drone callbacks expose a mutable `bool&`, so their live status read remains.
+Mutable `bool&` callbacks expose their live status through a scoped borrow,
+including nested callbacks; inactive families are not polled.
 Canonical record, object and generation checks in typed bindings remain too.
+
+Native actor End Step retains its player handle and sorted non-box actor
+snapshot while the instance table's capture revision is unchanged. Birth,
+retirement, activation/exclusion changes, re-registration and sprite-ID changes
+invalidate that revision; movement and image-frame advancement do not. A
+saturated revision always rebuilds. This caches capture only: every event still
+checks current eligibility and lifetime. A callback birth cannot enter the
+current snapshot; it invalidates the next capture. Reference ownership rebuilds
+each time. The native box prefix and the reference box workspace are still
+captured before callbacks on every dispatch. No box or terrain event result is
+cached, and no source phase boundary moves.
 
 Activation/depth mutations publish pending work. Native phase boundaries poll
 failure and service only pending work, without moving reconciliation earlier

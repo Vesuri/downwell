@@ -151,6 +151,9 @@ private:
     void* shopRadioContext_=nullptr;
     bool (*shopRadioDispatch_)(void*,int,bool,bool&)=nullptr;
     bool actorEndStepExecuting_=false;
+    bool actorEndStepCaptured_=false;
+    std::uint32_t actorEndStepRevision_=0;
+    InstanceHandle actorEndStepPlayer_;
     bool combatAlarmPhaseInUse_=false;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
@@ -2347,12 +2350,20 @@ public:
         if(!valid()||!world_||actorEndStepExecuting_||combatAlarmPhaseInUse_)return check(false);
         actorEndStepExecuting_=true;
         struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
-        InstanceHandle player;
+        const auto revision=captureRevision();
+        // Reuse only an unchanged native phase snapshot. Callbacks below
+        // still check current eligibility; mutations invalidate the next
+        // capture, never admit a synchronous birth into this captured phase.
+        const bool reuse=native_&&actorEndStepCaptured_&&revision!=0xffffffffu&&revision==actorEndStepRevision_;
+        InstanceHandle player=actorEndStepPlayer_;
+        if(!reuse){
+        actorEndStepCaptured_=false;player={};
         if(!check(visitRegistered(0,View::enemyBase,[&](InstanceHandle h,int object,std::uint32_t flags){
             if(flags&0x100003u)return true;
             if(object!=35||!resolves(h))return false;
             player=h;return true;
         })))return false;
+        }
         const auto boxes=world_->captureBoxAlarms(); // Stable slots and a phase-wide birth ceiling.
         // Reference box registration can be rebound and callbacks may mutate
         // it. Reuse the inactive alarm workspace for its snapshot; native
@@ -2364,6 +2375,7 @@ public:
                     return (flags&0x100003u)||(object==92&&resolves(h)&&combatAlarmPhase_.append(h.slot,h.generation,object));
                 })))return false;
         }
+        if(!reuse){
         actorEndStepPhase_.clear();
         if(!check(visitRegistered(View::enemyBase,View::breakableBase,
             [&](InstanceHandle h,int object,std::uint32_t flags){
@@ -2386,6 +2398,8 @@ public:
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         actorEndStepPhase_.sort();
+        actorEndStepPlayer_=player;actorEndStepRevision_=revision;actorEndStepCaptured_=native_;
+        }
         // Player 35 precedes boxes 92. Capture ALL families before invoking
         // it: synchronous callbacks must not admit newborns to this phase.
         if(player.generation){
