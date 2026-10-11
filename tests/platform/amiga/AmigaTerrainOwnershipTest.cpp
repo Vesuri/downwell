@@ -370,7 +370,7 @@ int main(int argc,char** argv){
     }
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
-    for(unsigned consumer=0;consumer<5;++consumer){
+    for(unsigned consumer=0;consumer<6;++consumer){
         auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
         require(guarded->declareExternalCollisionBackend(),"external collision admission");
         bool accepted=false;
@@ -382,7 +382,9 @@ int main(int argc,char** argv){
             auto pairs=std::make_unique<downwell::RunnerCollisionPairs<downwell::GameplayCollisionView::capacity,16>>();
             accepted=guarded->collectCollisionPairs(*pairs,false);
         }else if(consumer==3)accepted=guarded->queueCollision({});
-        else {downwell::RunnerImageValue x,y;accepted=guarded->nativePublishedPosition({0,1},x,y);}
+        else if(consumer==4){downwell::RunnerImageValue x,y;accepted=guarded->nativePublishedPosition({0,1},x,y);}
+        else {downwell::GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
+            accepted=guarded->nativePublishedSprite({View::enemyBase,1},sprite,flags);}
         require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
     }
     // End Step must consume the bullet's published binary32 state, including

@@ -45,12 +45,9 @@ behavior, both backend integrations and relevant original-game verification.
      inactive systems do no work; a later family must not add empty per-frame
      scans to world 1. Identify each replaced measured runner walk before
      changing it; do not simply add another full validation pass.
-     Investigate the remaining guarded-backend appearance mirror as a whole:
-     frame 1305 has 3.31 ms of disjoint transform/image-index/walker-sprite
-     publication (an upper bound, not a saving estimate). Separate required
-     sprite membership, Draw admission and reset semantics from unused generic
-     collision appearance. Prove record-owned consumers and reject undeclared
-     mirror reads before removing publication; retain full-service behavior.
+     Replace work at the owning phase/lifecycle boundary, not individual
+     publications. Do not sweep enemy-appearance setter or validation-helper
+     variants (see the rejected-approaches table).
      Use the current actor-event audit; do not start another capture/traversal
      or individual setter optimization without a structural removal.
   3. Add regression fixtures that add unrelated resources/families and verify

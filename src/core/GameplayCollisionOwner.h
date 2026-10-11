@@ -1771,7 +1771,8 @@ public:
         const auto* position=nativePosition(h.slot);if(!position)return false;
         x=position->x;y=position->y;return true;
     }
-    bool nativePublishedSprite(InstanceHandle h,Owner::Sprite& sprite,std::uint32_t& flags)const{
+    bool nativePublishedSprite(InstanceHandle h,Owner::Sprite& sprite,std::uint32_t& flags){
+        if(!collisionConsumersAdmitted_&&h.slot>=View::enemyBase&&h.slot<View::breakableBase)return check(false);
         if(!native_||!valid()||!eligibilityFlags(h,flags))return false;
         const auto* state=nativePosition(h.slot);if(!state)return false;
         sprite=state->sprite;return true;
