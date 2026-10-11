@@ -2026,8 +2026,10 @@ public:
         std::uint32_t sourceId=0);
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
                                 SolidResolver mask = nullptr,WallContactResolver walls = nullptr,
-                                PlatformContactResolver platforms = nullptr) {
+                                PlatformContactResolver platforms = nullptr,
+                                downwell::SolidCornerQuery::Corners corners = nullptr) {
         solidResolver_ = resolver;
+        solidCorners_=corners;
         segmentResolver_ = segment;
         maskResolver_ = mask;
         wallContactResolver_ = walls;
@@ -2763,6 +2765,7 @@ private:
     downwell::CurrencyAccount currencyAccount_;
     Currency* currencyInstances_=nullptr;
     SolidResolver solidResolver_;
+    downwell::SolidCornerQuery::Corners solidCorners_=nullptr;
     SegmentResolver segmentResolver_ = nullptr;
     SolidResolver maskResolver_ = nullptr;
     WallContactResolver wallContactResolver_ = nullptr;

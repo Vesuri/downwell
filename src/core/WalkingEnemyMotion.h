@@ -22,8 +22,7 @@ struct WalkingEnemyMotion {
         const auto b = contactWorldBounds({FixedCollisionMath::round(px) / 5,
             FixedCollisionMath::round(py) / 5, facing, 1, turtle ? 186 : 163});
         // Supported area-one terrain consists of aligned 16x16 cells.
-        return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
-               solid(b.left, b.bottom - 1) || solid(b.right - 1, b.bottom - 1);
+        return solidCorners(solid,b.left,b.top,b.right-1,b.bottom-1);
     }
     template<class Meeting,class Presentation=NoWalkingPresentation>
     bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation={}) {

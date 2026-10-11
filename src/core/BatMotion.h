@@ -85,8 +85,7 @@ template<class Solid>
 bool batMeetsTiles(long x, long y, int facing, Solid solid,int mask=153) {
     const auto b = contactWorldBounds({FixedCollisionMath::round(x) / 5,
         FixedCollisionMath::round(y) / 5, facing, 1, mask});
-    return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
-           solid(b.left, b.bottom - 1) || solid(b.right - 1, b.bottom - 1);
+    return solidCorners(solid,b.left,b.top,b.right-1,b.bottom-1);
 }
 
 // Bat Step calls scrCheckCollisionWith, zeros only the blocked components,

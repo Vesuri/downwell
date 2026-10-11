@@ -1,5 +1,49 @@
 # Amiga gameplay frame-cost audit
 
+## Native corner-query publication
+
+Walking/bat motion now submits its four corner samples to the native occupancy
+backend together. Duplicate cell lookups are eliminated within that query;
+there is no retained cache or additional terrain owner. The point-callback
+oracle retains its order and short-circuit behavior. Source movement and event
+order are unchanged. This targets the 4.10 ms walking tile-query and 2.14 ms
+bat collision boundaries above, not their small arithmetic helpers.
+
+Matched contact windows against `cca9e817` (same code as the later audit):
+
+| First frame | Mean before → after, ms | Worst before → after, ms |
+| ---: | ---: | ---: |
+| 51 | 33.575 → 33.575 | 46.5 → 46.8 |
+| 676 | 107.900 → 107.440 | 245.6 → 244.9 |
+| 1047 | 68.989 → 67.333 | 118.0 → 116.4 |
+| 1305 | 62.290 → 60.320 | 80.8 → 79.0 |
+| 1512 | 61.850 → 61.400 | 142.2 → 141.5 |
+| 1535 | 56.709 → 56.373 | 82.2 → 82.0 |
+| 1689 | 87.000 → 86.543 | 227.9 → 227.3 |
+
+No-input generation frame 163 is 169.4 ms (169.5 before). The uninterrupted
+1,800-update contact tape takes 5,013 PAL fields / 17.95 FPS (5,074 / 17.74
+before); maximum gap is 12 fields at 676, not the acceptance gate. This is
+a modest combat saving, not a restored 20 ms baseline. Reproduction uses the
+span-publication commands below with output directories
+`tmp/trace/corner-query-contact` and `tmp/trace/corner-query-idle`.
+Reports: `tmp/corner-query-report.txt`, `tmp/corner-query-idle-report.txt`,
+`tmp/corner-query-fps.log`. Contact/idle ELF hashes:
+`453ede1ff23e0d3e402ae73905e9347fb901f7cc405b02ef3afef50342149061` /
+`0ed3e9e427782d2fb5db3c9f73877ef4c40f34d526a25c4ad9cf813b6451bff6`.
+
+Tests compare over 40,000 corner queries, bounds, live-box destruction and new
+wall visibility, fallback callback order, and 600 live frames of checkpoints,
+trajectories, destruction counts and RNG against point queries. Bat tests and
+the existing 18,000-frame ownership replay also pass. Two stale scalar-wall
+fixtures now explicitly allocate their oracle backing. Logs:
+`tmp/corner-query-host.log`, `tmp/corner-query-final-host.log`.
+Normal stripped startup still leaves 126,840 Chip bytes free, with no excluded
+reference allocations; owner size remains 904,628 bytes. Executable size is
+1,997,080 bytes (+1,028); normal ELF hash
+`1b2ae9fadf7c9ee3ef773017c5b443290f496ad743afd8cb9e508cd1762016de`.
+Startup evidence: `tmp/corner-query-memory.log`.
+
 ## Combat simulation attribution at `f3f5d753`
 
 A bounded 20-field contact capture at marker 1304 reproduces frame 1305 at

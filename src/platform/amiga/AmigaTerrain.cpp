@@ -788,6 +788,29 @@ bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY) {
     return false;
 }
 
+bool amigaResolveTerrainCorners(void* opaque,int left,int top,int right,int bottom) {
+    const auto& context=*static_cast<const AmigaTerrainCollisionContext*>(opaque);
+    if(!context.index)return amigaResolveTerrainSolid(opaque,left,top)||
+        amigaResolveTerrainSolid(opaque,right,top)||amigaResolveTerrainSolid(opaque,left,bottom)||
+        amigaResolveTerrainSolid(opaque,right,bottom);
+    // The aligned occupancy cell determines both static and live-box contact.
+    // No retained cache: destruction/generation is visible to the next query.
+    const int xs[2]={left+248-AmigaTerrainIndex::minX,right+248-AmigaTerrainIndex::minX};
+    const int ys[2]={top+184,bottom+184};
+    const int columns[2]={xs[0]>>4,xs[1]>>4},rows[2]={ys[0]>>4,ys[1]>>4};
+    for(unsigned y=0;y<2;++y){
+        if((y&&rows[1]==rows[0])||ys[y]<0||ys[y]>=AmigaTerrainIndex::rows*16)continue;
+        for(unsigned x=0;x<2;++x){
+            if((x&&columns[1]==columns[0])||xs[x]<0||xs[x]>=AmigaTerrainIndex::columns*16)continue;
+            const auto cell=context.index->cells[unsigned(rows[y])*AmigaTerrainIndex::columns+unsigned(columns[x])];
+            if(cell&solidCell)return true;
+            if((cell&breakableCell)&&(!context.runtime||context.runtime->breakableActiveAt(
+                columns[x]*16+AmigaTerrainIndex::minX-240,rows[y]*16-176)))return true;
+        }
+    }
+    return false;
+}
+
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
     DW_PROFILE_SCOPE(profileTerrainCollision);
     const AmigaTerrainCollisionContext& context =

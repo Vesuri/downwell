@@ -18,6 +18,48 @@ namespace {
 void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
+void verifyTerrainCorners(){
+    struct Probe{unsigned calls=0;int x[4]{},y[4]{};} probe;
+    downwell::SolidCornerQuery fallback{[](void* p,int x,int y){
+        auto& value=*static_cast<Probe*>(p);const unsigned i=value.calls++;
+        value.x[i]=x;value.y[i]=y;return i==2;
+    },&probe,nullptr};
+    require(downwell::solidCorners(fallback,1,2,3,4)&&probe.calls==3&&
+        probe.x[0]==1&&probe.y[0]==2&&probe.x[1]==3&&probe.y[1]==2&&
+        probe.x[2]==1&&probe.y[2]==4,"point callbacks preserve order and short circuit");
+    static AmigaTerrainIndex index;
+    static AmigaPortRuntime runtime(0);
+    AmigaTerrainCollisionContext context{};context.index=&index;
+    std::mt19937 random(318);
+    for(auto& cell:index.cells)cell=static_cast<unsigned char>(random());
+    const auto compare=[&](int left,int top,int right,int bottom){
+        const bool reference=amigaResolveTerrainSolid(&context,left,top)||
+            amigaResolveTerrainSolid(&context,right,top)||amigaResolveTerrainSolid(&context,left,bottom)||
+            amigaResolveTerrainSolid(&context,right,bottom);
+        require(amigaResolveTerrainCorners(&context,left,top,right,bottom)==reference,
+                "native corner samples match ordered point oracle");
+    };
+    for(unsigned mode=0;mode<2;++mode){
+        context.runtime=mode?&runtime:nullptr;
+        for(unsigned i=0;i<20000;++i){
+            const int x=int(random()%2200)-800,y=int(random()%8600)-300;
+            compare(x,y,x+int(random()%65),y+int(random()%65));
+        }
+        for(int x:{-761,-760,-759,263,264,265,1287,1288,1289})
+            for(int y:{-185,-184,-183,8007,8008,8009})
+                for(int width:{0,1,15,16,17,32})compare(x,y,x+width,y+width);
+    }
+    AmigaTerrainCollisionContext empty{};
+    require(amigaBuildTerrainIndex(empty,index),"corner mutation index");
+    const int x=0,y=0;
+    require(runtime.appendBreakables(&x,&y,1)&&amigaAddTerrainObject(index,92,240,176),"corner live box");
+    require(amigaResolveTerrainCorners(&context,0,0,0,0),"corner sees live box");
+    require(runtime.markBreakableDestroyed({0,runtime.breakableSlot(0).lifetimeId}),"corner destroy box");
+    require(!amigaResolveTerrainCorners(&context,0,0,0,0),"corner immediately sees destruction");
+    require(amigaAddTerrainObject(index,60,240,176),"corner new wall");
+    require(amigaResolveTerrainCorners(&context,0,0,0,0),"corner immediately sees generation");
+    context.index=nullptr;compare(0,0,15,15);
+}
 using Commands = std::vector<downwell::DeferredCreateInstance>;
 void verifyPreparedTerrainRuns(){
     static AmigaTerrainIndex scalar,prepared;
@@ -100,6 +142,8 @@ void verifyWallCollisionLifecycle() {
     } lifecycle;
     const auto binding=Store::Binding::bindDestruction(lifecycle);
     Store store(binding,Store::Presentation::bind(presentation),Store::WallCollision::bind(cache));
+    static Store::Storage backing;
+    require(store.bindStorage(backing),"scalar wall oracle backing");
     require(amigaAddTerrainObject(index,60,240,176) && store.append(60,240,176,true),"live wall birth");
     const auto h=store.handle(0);
     require(store.activation(h,false) && !amigaIndexedWall(index,240,176),"deactivation excludes cache immediately");
@@ -133,6 +177,8 @@ void verifyWallCollisionLifecycle() {
     const auto inactive=store.handle(0);
     require(store.activation(inactive,true) && amigaIndexedWall(index,256,192),"inactive birth enters cache upon activation");
     Store failed(binding, {}, Store::WallCollision::bind(cache));
+    static Store::Storage failedBacking;
+    require(failed.bindStorage(failedBacking),"failed scalar wall oracle backing");
     require(failed.append(60,272,208,true),"missing contribution fixture");
     require(!failed.requestDestroy(failed.handle(0)) && !failed.valid(),"missing contribution is terminal, not a silent miss");
 }
@@ -365,7 +411,8 @@ struct LiveSimulation {
         port.configureGenerationStep(generate, this);
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
         port.configureSolidResolver(amigaResolveTerrainSolid, &collision,
-                                    amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask);
+                                    amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,
+                                    nullptr,nullptr,amigaResolveTerrainCorners);
     }
 };
 void compareRandom(const downwell::GameMakerRandom& a,
@@ -556,6 +603,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
 }
 
 int main(int argc, char** argv) {
+    verifyTerrainCorners();
     verifyPreparedTerrainRuns();
     verifyWallCollisionLifecycle();
     verifyContactMultiplicity();
@@ -646,7 +694,7 @@ int main(int argc, char** argv) {
             require(fast.checkpoint() == reference.checkpoint() &&
                     fast.trajectoryDigest() == reference.trajectoryDigest() &&
                     fast.blocksDestroyed() == reference.blocksDestroyed(),
-                    "indexed bullet terrain preserves live simulation checkpoints");
+                    "indexed segment/corner terrain preserves live simulation checkpoints");
             compareRandom(fast.randomState(), reference.randomState());
         }
         require(fast.player().shots() > 0, "indexed/pixel live comparison exercises firing");

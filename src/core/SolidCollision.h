@@ -4,6 +4,22 @@
 
 namespace downwell {
 
+// Four corner samples, not a filled rectangle. A native occupancy backend may
+// coalesce samples in the same cell; arbitrary callbacks keep source order.
+template<class Solid> bool solidCorners(Solid solid,int left,int top,int right,int bottom) {
+    return solid(left,top)||solid(right,top)||solid(left,bottom)||solid(right,bottom);
+}
+struct SolidCornerQuery {
+    using Point=bool (*)(void*,int,int);
+    using Corners=bool (*)(void*,int,int,int,int);
+    Point point=nullptr;void* context=nullptr;Corners corners=nullptr;
+    bool operator()(int x,int y)const{return point&&point(context,x,y);}
+};
+inline bool solidCorners(SolidCornerQuery solid,int left,int top,int right,int bottom) {
+    return solid.corners?solid.corners(solid.context,left,top,right,bottom):
+        solid(left,top)||solid(right,top)||solid(left,bottom)||solid(right,bottom);
+}
+
 struct SolidCollisionResult {
     int x;
     int y;

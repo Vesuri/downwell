@@ -370,7 +370,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
     generationStep_ = nullptr; generationContext_ = nullptr;
     generationSucceeded_ = true;
-    solidResolver_ = nullptr; solidResolverContext_ = nullptr; wallContactResolver_ = nullptr; platformContactResolver_ = nullptr;
+    solidResolver_ = nullptr; solidCorners_=nullptr; solidResolverContext_ = nullptr; wallContactResolver_ = nullptr; platformContactResolver_ = nullptr;
     segmentResolver_ = nullptr;
     maskResolver_ = nullptr;
     landingResolver_ = nullptr; landingResolverContext_ = nullptr;
@@ -1191,9 +1191,8 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
             turtle ? 64 : 32);
         if(!enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
             [this, &enemy, turtle](long x, long y) {
-                return enemy.walker.meetsTiles(x, y, turtle, [this](int px, int py) {
-                    return solidResolver_(solidResolverContext_, px, py);
-                });
+                return enemy.walker.meetsTiles(x, y, turtle,
+                    downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_});
             },[this,&enemy](int sprite,int scale){
                 enemy.grounded=enemy.walker.grounded;
                 if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,sprite)){
@@ -1222,9 +1221,7 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
             enemy.x, enemy.y, bat.collisionMask, player_.frameStartXFixed(),
             player_.frameStartYFixed(), enemyRandom_,
-            [this](int x, int y) {
-                return solidResolver_(solidResolverContext_, x, y);
-            },[this,&enemy](int scale){
+            downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_},[this,&enemy](int scale){
                 if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
                 enemy.facing=scale;return true;
             });
@@ -1531,7 +1528,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
-    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_,platformContactResolver_);
+    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_,platformContactResolver_,solidCorners_);
     if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
     // camera_get_view_y reads the runner's published cache, not camMain.y.
     // Normal following refreshes before Draw; post-Step refresh is dirty-only.
