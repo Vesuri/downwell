@@ -757,16 +757,22 @@ private:
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayWorld::NativeTerrain::SpanResult constructTerrainSpan(
         const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
-        unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
+        unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer,bool direct=false){
         using Result=GameplayWorld::NativeTerrain::SpanResult;
         completed=0;const unsigned count=cells.count;
         const unsigned slot=View::terrainBase+first.handle.slot;
         const auto* wall=objectDefaults_.get(60);unsigned layerSlot=0;
         if(!valid()||!count||count>GameplayWorld::NativeTerrain::capacity||
-           !nativeTerrainLayerRunActive_||tile!=terrainCreateTile_||
+           (direct?(collisionConsumersAdmitted_||nativeTerrainLayerRunActive_):
+                   (!nativeTerrainLayerRunActive_||tile!=terrainCreateTile_))||
            !nativeTerrainLayersBound_||!wall||terrainRoomCount_||
            !layers_.admitPreparedTerrainSpan(count,wall->creationDepth,layerSlot)||
            !table_.canFreshExternalSpan(slot,count))return Result::unsupported;
+        if(direct){
+            const auto* thin=objectDefaults_.get(93);
+            if(!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)||
+               tile!=terrainTileForArea(world_->runStage().area))return Result::unsupported;
+        }
         if(!collisionConsumersAdmitted_){
             // This backend observes source identities/layers, not generic
             // collision geometry or index membership. Admit the whole source
@@ -780,7 +786,7 @@ private:
                 const int object=kind?93:60;
                 const auto* definition=objectDefaults_.get(object);
                 const auto* objectFlags=families_.flags(unsigned(object));
-                const auto* plan=terrainCreatePlans_[kind];
+                const auto* plan=direct?nativeTerrainCreate_.get(object,tile):terrainCreatePlans_[kind];
                 if(!definition||!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||
                    (definition->initialFlags&0x8000u))return Result::unsupported;
                 flags[kind]=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
@@ -792,7 +798,7 @@ private:
             if(!table_.externalBirthSpan(slot,count,stamp))return Result::unsupported;
             thinRetirementWindow_.appendSpan(cells.y,(present&2u)!=0,
                 first.handle.generation+count-1,count);
-            terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;
+            if(!direct){terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;}
             bool okay=true;
             for(unsigned i=0;i<count;++i){
                 const unsigned current=slot+i,kind=cells.kind(i);
@@ -804,8 +810,12 @@ private:
                 }
                 ++completed;
             }
-            terrainRoomCount_+=completed;
+            if(!direct)terrainRoomCount_+=completed;
             if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
+            // This admitted span has no callbacks or allocation. The native
+            // allocator has reserved fresh identities before entering here;
+            // no observer can see this room membership until it installs them.
+            if(direct&&!room_.bindTerrainSpan(slot,completed,wall->creationDepth))okay=false;
             if(!okay){check(false);return Result::failure;}
             return Result::success;
         }
@@ -1958,6 +1968,10 @@ public:
                 unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
                 return static_cast<GameplayCollisionOwner*>(p)->constructTerrainSpan(first,cells,tile,
                                                                                    completed,stamp,flags,layer);
+            },[](void* p,const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
+                unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
+                return static_cast<GameplayCollisionOwner*>(p)->constructTerrainSpan(first,cells,tile,
+                                                                                   completed,stamp,flags,layer,true);
             }
 #endif
         }))return check(false);

@@ -71,6 +71,9 @@ public:
         bool (*endRun)(void*)=nullptr;
         SpanResult (*constructSpan)(void*,const Identity&,PreparedCells,int,unsigned&,
                                    std::uint32_t&,std::uint32_t*,RunnerRetainedLayerState&)=nullptr;
+        // Complete callback-free admission/publication, with no per-cell run
+        // session. Unsupported must leave every owner untouched.
+        decltype(constructSpan) constructDirectSpan=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         if(!contains(h))return false;
@@ -80,11 +83,12 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
             binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation&&
-            binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun&&binding_.constructSpan==binding.constructSpan;
+            binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun&&binding_.constructSpan==binding.constructSpan&&
+            binding_.constructDirectSpan==binding.constructDirectSpan;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -323,23 +327,34 @@ public:
     // layer or a journal service boundary, keep the scalar birth sequence.
     bool constructPrepared(int tile,bool& effectsSucceeded,PreparedCells cells){
         if(cells.count&&!cells.bytes)return good_=false;
+        if(!good_||publicationRun_||pendingPublication_)return good_=false;
+        if(cells.retained&&cells.count&&binding_.constructDirectSpan){
+            bool admitted=false;
+            publicationRun_=true;
+            const bool okay=appendPreparedCells(cells,tile,effectsSucceeded,true,&admitted);
+            publicationRun_=false;
+            if(admitted||!okay)return okay;
+        }
         return publishRun([&]{
             if(!cells.count)return true;
             return appendPreparedCells(cells,tile,effectsSucceeded);
         });
     }
 private:
-    bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded){
+    bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded,
+                             bool direct=false,bool* admitted=nullptr){
         const unsigned count=cells.count;
         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
         bool contiguous=count<=Capacity-slot;
         if(contiguous)for(unsigned i=0;i<count;++i)if(runs_.occupied(slot+i)){contiguous=false;break;}
-        if(binding_.constructSpan&&contiguous&&canAppend(count)){
+        const auto construct=direct?binding_.constructDirectSpan:binding_.constructSpan;
+        if(construct&&contiguous&&canAppend(count)){
             Order order;unsigned completed=0;std::uint32_t spatial[2]{};
             const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.y,-1,0};
-            const auto result=binding_.constructSpan(binding_.context,first,cells,tile,
+            const auto result=construct(binding_.context,first,cells,tile,
                                                     completed,order.stamp,spatial,order.layer);
             if(result!=SpanResult::unsupported){
+                if(admitted)*admitted=true;
                 if(completed>count)return good_=false;
                 unsigned i=0;
                 if(cells.retained&&completed){
@@ -376,6 +391,7 @@ private:
                 return good_=result==SpanResult::success&&completed==count;
             }
         }
+        if(direct)return true;
         for(unsigned i=0;i<count;++i){
             if(!appendConstructed(cells.object(i),cells.x(i),cells.y,true,0,-1,&effectsSucceeded,tile))return false;
         }

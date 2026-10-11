@@ -1,5 +1,49 @@
 # Amiga gameplay frame-cost audit
 
+## Direct admitted terrain transactions
+
+Retained, callback-free spans in the external collision backend now publish
+through one complete transaction, without entering the generic per-cell run
+session. Native allocation preflights fresh slots and lifetime capacity; the
+owner admits metadata, layer and room capacity before publication. No callback
+observes room publication before native identities are installed. Unsupported
+cases retain the previous session/scalar path; partial failures retain their
+completed lifetime and publication prefix. This does not remove native identity,
+layer, room, activation or platform registration ownership.
+
+The initial estimate included about 13 ms of session-related work in frame 676.
+Required metadata admission remains, so the actual frame saving is 5.4 ms;
+native prepared construction measures 78.79 ms. Against `fa2be1ac`:
+
+| First frame | Mean before → after, ms | Worst before → after, ms |
+| ---: | ---: | ---: |
+| 51 | 33.575 → 33.580 | 46.8 → 46.5 |
+| 676 | 107.440 → 106.320 | 244.9 → 239.5 |
+| 1047 | 67.333 → 67.278 | 116.4 → 116.4 |
+| 1305 | 60.320 → 60.310 | 79.0 → 78.8 |
+| 1512 | 61.400 → 61.170 | 141.5 → 139.3 |
+| 1535 | 56.373 → 56.355 | 82.0 → 82.0 |
+| 1689 | 86.543 → 85.629 | 227.3 → 221.2 |
+
+No-input frame 163 improves 169.4 → 167.5 ms. Full contact tape: 5,010 PAL
+fields / 17.96 FPS versus 5,013 / 17.95, maximum gap 12 at frame 676.
+This shortens generation stalls, not ordinary gameplay. Reproduce with the
+contact/idle commands below, using `tmp/trace/direct-span-contact` and
+`tmp/trace/direct-span-idle`. Reports: `tmp/direct-span-report.txt`,
+`tmp/direct-span-676.txt`, `tmp/direct-span-idle-report.txt`,
+`tmp/direct-span-fps.log`. Contact/idle trace ELF hashes:
+`4a552e69dad590442c3b5979f50ad097d1c3b457c54c52268d4bfa1900f8c4ee` /
+`3312a3c2d789fd9dcedaf135ec72c36d26b79b5aa2dba0a10e3666a829def886`.
+
+Direct/session/scalar transaction tests cover clocks, fields, failed prefixes,
+unsupported fallback and session entry/exit counts; 18,000-frame ownership and
+collision-owner activation/re-entry tests pass (`tmp/direct-span-host.log`).
+Normal STRIP=1 startup retains 126,840 free Chip bytes and absent reference
+allocations (`tmp/direct-span-memory.log`). The stripped executable is
+2,000,800 bytes (+3,720); normal ELF hash
+`d11c45abda3e70e2f2430b5299af9e1c49a7b200f0f2bffb9c3627395610b2af`.
+The terrain binding adds one function pointer, not per-cell storage.
+
 ## Native corner-query publication
 
 Walking/bat motion now submits its four corner samples to the native occupancy

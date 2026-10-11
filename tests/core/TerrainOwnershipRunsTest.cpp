@@ -570,7 +570,7 @@ static void bulkPublicationRuns(){
 static void preparedSpanConstruction(){
     using Native=downwell::NativeTerrainLifetimes<16>;
     struct Observer {
-        Native* live;unsigned next=100,spanCalls=0,spanCells=0;
+        Native* live;unsigned next=100,spanCalls=0,spanCells=0,begins=0,ends=0,directMisses=0;
         downwell::RunnerRegistrationOrder clock{0xfffffffcu,7};int fail=-1;
     };
     auto binding=[](Observer& observer,bool spans){
@@ -582,6 +582,8 @@ static void preparedSpanConstruction(){
             o.live->setLayerState(id.handle.slot,{{o.clock,false},21,2,false});return true;
         };
         b.retire=[](void*,unsigned){return true;};b.mark=b.retire;
+        b.beginRun=[](void* p){++static_cast<Observer*>(p)->begins;return true;};
+        b.endRun=[](void* p){++static_cast<Observer*>(p)->ends;return true;};
         b.create=[](void*,const Native::Identity&,int,std::uint32_t& flags){flags|=0x200u;return true;};
         if(spans)b.constructSpan=[](void* p,const Native::Identity& id,Native::PreparedCells cells,int,unsigned& completed,
             std::uint32_t& stamp,std::uint32_t* flags,downwell::RunnerRetainedLayerState& layer){
@@ -596,9 +598,15 @@ static void preparedSpanConstruction(){
         };
         return b;
     };
-    for(bool retained:{false,true})for(int failure:{-1,0,1,5,11}){
+    for(unsigned direct:{0u,1u,2u})for(bool retained:{false,true})for(int failure:{-1,0,1,5,11}){
         Native scalar,bulk;Observer a{&scalar},b{&bulk};a.fail=b.fail=failure;
-        require(scalar.bind(binding(a,false))&&bulk.bind(binding(b,true)));
+        auto bindings=binding(b,true);
+        if(direct==1)bindings.constructDirectSpan=bindings.constructSpan;
+        if(direct==2)bindings.constructDirectSpan=[](void* p,const Native::Identity&,Native::PreparedCells,int,
+            unsigned&,std::uint32_t&,std::uint32_t*,downwell::RunnerRetainedLayerState&){
+            ++static_cast<Observer*>(p)->directMisses;return Native::SpanResult::unsupported;
+        };
+        require(scalar.bind(binding(a,false))&&bulk.bind(bindings));
         bool af=true,bf=true;
         unsigned char source[24]{};
         for(unsigned i=0;i<12;++i)source[i*2]=32+(i<6?i:11-i)+(i%3==1?128:0);
@@ -607,6 +615,8 @@ static void preparedSpanConstruction(){
         require(expected==actual&&scalar.size()==bulk.size()&&scalar.lastLifetime()==bulk.lastLifetime());
         require(af==bf&&a.next==b.next&&a.clock.low==b.clock.low&&a.clock.high==b.clock.high);
         require(b.spanCalls==1&&b.spanCells==(failure<0?12u:unsigned(failure)));
+        require(a.begins==1&&a.ends==1&&b.begins==(retained&&direct==1?0u:1u)&&b.ends==b.begins);
+        require(b.directMisses==(retained&&direct==2?1u:0u));
         if(actual)for(unsigned i=0;i<scalar.size();++i){
             const auto h=scalar.handle(i);std::uint32_t ap=0,bp=0;int as=0,bs=0;unsigned ai=0,bi=0;bool ac=false,bc=false;
             require(scalar.registrationOrder(h)==bulk.registrationOrder(h));
