@@ -608,6 +608,14 @@ preserving every directory entry and resource/frame ID. This saves 35,136
 bytes. Writable garden sprite DMA records are explicitly excluded from sharing;
 inactive position headers must never alias the displayed sprite.
 
+The hardware-sprite copy cache is valid only within an immutable source-bank
+and destination-buffer lifetime. Gameplay and upgrade source release invalidate
+it before memory can be freed/reused; equal addresses do not imply equal asset
+contents after re-entry. Unchanged live artwork retains header-only updates.
+Any new owner that reuses source or destination storage must call
+`amigaRendererReleaseHardwareSpriteCopies` at that boundary. The host native-cache
+fixture covers same-address bank replacement, destination reuse and copy counts.
+
 Immutable payload placement is an offline operation. The packer removes duplicate
 streams and defers word-aligned substrings. It compares a greedy growing-tail
 layout with disjoint paths selected by descending suffix/prefix overlap;

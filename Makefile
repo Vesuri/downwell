@@ -2469,6 +2469,15 @@ generate-initial-terrain: generate-amiga-game generate-room-pack build/prepare-i
 test: test-amiga-coverage-word
 test-amiga-coverage-word: build/amiga-coverage-word-test
 	./build/amiga-coverage-word-test
+.PHONY: test-amiga-sprite-residency
+test: test-amiga-sprite-residency
+test-amiga-sprite-residency: build/amiga-sprite-residency-test
+	./build/amiga-sprite-residency-test
+
+build/amiga-sprite-residency-test: tests/platform/amiga/AmigaSpriteResidencyTest.cpp src/platform/amiga/AmigaRenderer.c src/platform/amiga/AmigaRenderer.h src/core/ProfileCounters.h
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_TEST_SPRITE_CACHE -DDOWNWELL_PROBES -o $@ tests/platform/amiga/AmigaSpriteResidencyTest.cpp src/platform/amiga/AmigaRenderer.c
+
 build/amiga-coverage-word-test: tests/platform/amiga/AmigaCoverageWordTest.cpp src/platform/amiga/AmigaRenderer.c src/platform/amiga/AmigaRenderer.h src/platform/amiga/AmigaCoverageWordVerification.h
 	@mkdir -p $(@D)
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaCoverageWordTest.cpp src/platform/amiga/AmigaRenderer.c

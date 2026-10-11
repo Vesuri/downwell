@@ -399,6 +399,7 @@ public:
     }
     AmigaTransientBank::View view() const { return bank_.view(TransientOwner::upgrade); }
     void release() {
+        amigaRendererReleaseHardwareSpriteCopies();
         bank_.release();
         if (storage_) FreeMem(storage_, clearBankContract.bytes);
         storage_ = nullptr; gDownwellUpgradeSourceBytes = 0;
@@ -2243,6 +2244,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         return true;
     };
     const auto releaseGameplayArt=[&](){
+        amigaRendererReleaseHardwareSpriteCopies();
         if(gDownwellGameArtResidentBytes)++gDownwellGameArtReleases;
         if(gDownwellGamePlaneResidentBytes)++gDownwellGamePlaneReleases;
         releaseFieldColumns();

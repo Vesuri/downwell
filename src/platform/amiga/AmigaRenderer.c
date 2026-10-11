@@ -1480,6 +1480,22 @@ int amigaRendererCopyChipPack(const UBYTE* pack,const UBYTE* end,UBYTE* destinat
     return 1;
 }
 
+#if defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_TEST_SPRITE_CACHE)
+static struct {
+    UWORD* destination;
+    const UBYTE* source;
+    int height;
+} hardwareSpriteCopies[16];
+#endif
+
+void amigaRendererReleaseHardwareSpriteCopies(void) {
+    /* The source address is a valid content key only within one immutable
+       bank lifetime. Call before releasing either source or destination RAM. */
+#if defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_TEST_SPRITE_CACHE)
+    memset(hardwareSpriteCopies, 0, sizeof hardwareSpriteCopies);
+#endif
+}
+
 static int buildHardwareSpritePart(
     const UBYTE* prepared,
     const UBYTE* pack, const UBYTE* packEnd,
@@ -1539,27 +1555,22 @@ static int buildHardwareSpritePart(
         control[2] = (UBYTE)stopY;
         control[3] = (UBYTE)((startX & 1) | (stopY > 255 ? 2 : 0) | (startY > 255 ? 4 : 0));
         /* Immutable host-converted words. PF2 priority masks horizontal edges. */
-#ifdef DOWNWELL_PLATFORM_AMIGA
+#if defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_TEST_SPRITE_CACHE)
         {
-            static struct {
-                UWORD* destination;
-                const UBYTE* source;
-                int height;
-            } slots[16];
             unsigned slot;
             const UBYTE* source = data + sourceTop * 4;
             for (slot = 0; slot < 16; ++slot)
-                if (!slots[slot].destination || slots[slot].destination == destination)
+                if (!hardwareSpriteCopies[slot].destination || hardwareSpriteCopies[slot].destination == destination)
                     break;
             if (slot < 16) {
-                if (slots[slot].destination == destination &&
-                    slots[slot].source == source && slots[slot].height == visibleHeight) {
+                if (hardwareSpriteCopies[slot].destination == destination &&
+                    hardwareSpriteCopies[slot].source == source && hardwareSpriteCopies[slot].height == visibleHeight) {
                     DW_PROFILE_COUNT(counterSpriteHeaderOnly);
                     return 1; // Only the four-byte position header changed.
                 }
-                slots[slot].destination = destination;
-                slots[slot].source = source;
-                slots[slot].height = visibleHeight;
+                hardwareSpriteCopies[slot].destination = destination;
+                hardwareSpriteCopies[slot].source = source;
+                hardwareSpriteCopies[slot].height = visibleHeight;
             }
         }
 #endif
