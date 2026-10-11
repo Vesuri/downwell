@@ -58,14 +58,18 @@ Terrain slots are excluded from that array; their coordinates remain
 run-owned. This storage does not allocate Chip RAM or another spatial index:
 native publication borrows the otherwise unused reference owner's journal/tree
 allocation, without attaching generic lifetime/property records there.
-The native spatial/collision dirty queues each retain two 16-bit links per
-shared collision slot and two counters. These are ordering links only;
-terrain geometry and lifetime identities remain in the run owner. Both
-queues are ordinary memory, with no per-frame allocation.
-Collision collection also reserves one unsigned slot per shared collision
-identity in the owner for animated-mask retention. This scratch lives in
-ordinary memory rather than the Amiga task stack; it holds ordering keys,
-not copied terrain or actor records.
+Collision-enabled native scenes explicitly supply `NativeCollisionStorage`:
+two dirty queues (each two 16-bit links per shared slot plus counters) and one
+unsigned slot per shared identity for animated-mask retention. This is borrowed
+ordinary-memory backing, not part of every owner, not Chip memory and not an
+allocation fallback. The caller must keep it alive until after its owner.
+Missing backing fails on collision-service use. External-backend admission
+rejects a supplied bank rather than retaining an unnecessary scene dependency.
+Terrain geometry and lifetime identities remain in their run owner.
+On the 68000 this bank is 47,572 bytes; replacing its embedded reservation with
+one four-byte pointer removes 47,568 ordinary resident bytes from the external
+scene owner. Startup and contact-profile verifiers assert a null bank pointer.
+This does not reduce Chip usage or remove the separate actor-position array.
 
 ## Measuring transient Chip residency
 
@@ -187,7 +191,7 @@ of the tree. Native allocation requests `MEMF_FAST`, with no Chip fallback.
 
 Normal Amiga gameplay declares that it has no spatial-index query consumers
 before constructing the player or room. Its implemented collision adapters use
-the terrain grid and family owners. That declaration suppresses the unused
+the terrain grid and family owners. The index-only declaration suppresses the unused
 mutation journal and historical spatial envelope; it retains unique identity
 membership and every synchronous flag, dirty-queue and layer publication.
 Box/line queries and tree-size observations fail terminally under this contract:
@@ -217,8 +221,10 @@ sprite/position setters and terrain identity publication remain synchronous.
 Diagnostic dirty-queue traversal is unavailable under this declaration rather
 than pretending that an unmaintained queue represents source state. Collision
 metadata bits are private to the excluded backend; eligibility/order bits remain
-live. Backing arrays remain reserved for the full-service path: this is an
-execution saving, not a claimed storage reduction. A passing bounded replay
+live. Queue/mask-retention backing is absent for this scene, including startup
+and Retry; the full-service path requires caller-supplied storage. The ordinary
+actor-position array and mutation journal are separate retained structures.
+A passing bounded replay
 establishes coverage only for that workload, not every future scene or consumer.
 
 Query-enabled owners, including the native original-mask verification path,

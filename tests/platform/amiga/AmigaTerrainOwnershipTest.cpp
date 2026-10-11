@@ -44,7 +44,9 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
     const downwell::RoomPack* rooms=nullptr,bool externalCollision=false){
     auto owner=downwell::makeCollisionOwner(objects,sprites,
         downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
-        rooms,ownership);
+        rooms,ownership,true,true,!externalCollision);
+    require(owner->hasNativeCollisionStorage()==(!externalCollision&&
+        (ownership==Ownership::native||ownership==Ownership::nativeScenery)),"scene collision backing admission");
     if(externalCollision)require(owner->declareExternalCollisionBackend(),"cleanup external collision admission");
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
         owner->breakableBinding(),owner->playerBinding());
@@ -129,7 +131,9 @@ struct Scene {
          generation(builder,patterns,objects,index,tiles,lifetimes.get()){
         owner=downwell::makeCollisionOwner(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
-            &rooms,ownership,nativeBoxes,nativeFields);
+            &rooms,ownership,nativeBoxes,nativeFields,!noQueries);
+        require(owner->hasNativeCollisionStorage()==(!noQueries&&
+            (ownership==Ownership::native||ownership==Ownership::nativeScenery)),"replay collision backing admission");
         require(owner->valid(),"owner prepares");
         if(noQueries)require(owner->declareExternalCollisionBackend(),"scene declares external collision backend before births");
         // Exercise both the older occupancy-only backend and the shipping
@@ -364,7 +368,7 @@ int main(int argc,char** argv){
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
     for(unsigned consumer=0;consumer<4;++consumer){
-        auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery);
+        auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
         require(guarded->declareExternalCollisionBackend(),"external collision admission");
         bool accepted=false;
         if(consumer==0){
@@ -376,6 +380,16 @@ int main(int argc,char** argv){
             accepted=guarded->collectCollisionPairs(*pairs,false);
         }else accepted=guarded->queueCollision({});
         require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
+    }
+    {
+        auto unneeded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery);
+        require(!unneeded->declareExternalCollisionBackend()&&!unneeded->valid(),
+            "external backend rejects unnecessary collision backing");
+        auto missing=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
+        require(!missing->flushNativeSpatial()&&!missing->valid(),
+            "full collision service fails without explicit backing");
+        std::cout<<"native collision backing: "<<sizeof(downwell::GameplayCollisionOwner::NativeCollisionStorage)
+            <<" bytes; external scenes retain only a pointer\n";
     }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){

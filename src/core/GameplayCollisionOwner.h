@@ -72,13 +72,20 @@ public:
         Owner::State states[View::capacity]{};
         Owner::Properties properties[View::capacity]{};
     };
+    using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
+    // Caller-owned backing for collision-enabled native scenes only.
+    struct NativeCollisionStorage {
+        NativeDirtyQueue spatial,collision;
+        unsigned retained[View::capacity]{};
+    };
+    bool hasNativeCollisionStorage()const{return nativeCollisionStorage_!=nullptr;}
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
     bool declareNoSpatialQueries(){return owner_.declareNoSpatialQueries();}
     // Stronger than no index queries: direct cached geometry and ordered
     // collision passes also belong to the external backend. Only before births.
-    // Retain maintenance until this consumer boundary has been verified.
+    // No generic geometry/queue consumer may be enabled after this admission.
     bool declareExternalCollisionBackend(){
-        if(!native_||!owner_.declareNoSpatialQueries())return check(false);
+        if(!native_||nativeCollisionStorage_||!owner_.declareNoSpatialQueries())return check(false);
         collisionConsumersAdmitted_=false;return true;
     }
 private:
@@ -109,16 +116,15 @@ private:
         int dx=0,dy=0,cacheX=0,cacheY=0;
     };
     NativeWallQuery* wallQuery_=nullptr; // Borrowed only inside a non-reentrant query.
-    using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
-    NativeDirtyQueue nativeSpatialDirty_,nativeCollisionDirty_;
-    unsigned nativeCollisionRetained_[View::capacity]{};
+    NativeCollisionStorage* nativeCollisionStorage_=nullptr;
     bool nativeDirty(unsigned slot,int object,std::uint32_t flags){
         if(!collisionConsumersAdmitted_)return true;
+        if(!check(nativeCollisionStorage_!=nullptr))return false;
         const auto* objectFlags=families_.flags(unsigned(object));
         if(!objectFlags||slot>=View::capacity)return check(false);
         if(NativeDirtyQueue::shouldQueue(true,*objectFlags,flags)){
-            nativeSpatialDirty_.mark(slot);
-            if(*objectFlags&8u)nativeCollisionDirty_.mark(slot);
+            nativeCollisionStorage_->spatial.mark(slot);
+            if(*objectFlags&8u)nativeCollisionStorage_->collision.mark(slot);
         }
         return true;
     }
@@ -129,11 +135,12 @@ private:
         // during that synchronous binding leave the same queue head.
         if(!defaults||!nativeDirty(slot,object,defaults->initialFlags)||
             !families_.prepareBirth(unsigned(object)))return check(false);
-        if(*families_.flags(unsigned(object))&8u)nativeCollisionDirty_.mark(slot);
+        if(*families_.flags(unsigned(object))&8u)nativeCollisionStorage_->collision.mark(slot);
         return true;
     }
     bool nativeRetireQueues(unsigned slot){
         if(!collisionConsumersAdmitted_)return true;
+        if(!check(nativeCollisionStorage_!=nullptr))return false;
         if(auto* state=nativePosition(slot))if(state->appearanceFlags&0x8000u){
             auto box=state->bounds;
             if(RunnerSpatialSplit::less(box.right,box.left)){const auto v=box.left;box.left=box.right;box.right=v;}
@@ -143,7 +150,7 @@ private:
             })))return false;
             state->appearanceFlags&=~0x8000u;
         }
-        nativeSpatialDirty_.remove(slot);nativeCollisionDirty_.remove(slot);
+        nativeCollisionStorage_->spatial.remove(slot);nativeCollisionStorage_->collision.remove(slot);
         return true;
     }
     NativePosition* nativePosition(unsigned slot){
@@ -785,8 +792,11 @@ private:
             thinRetirementWindow_.append(cells.y,kind!=0,first.handle.generation+i);
             if(!table_.externalBirth(current,order))return false;
             if(!i)stamp=order;
-            if(collisionConsumersAdmitted_&&recipe.queue)nativeSpatialDirty_.mark(current);
-            if(collisionConsumersAdmitted_&&recipe.collision)nativeCollisionDirty_.mark(current);
+            if(collisionConsumersAdmitted_){
+                if(!check(nativeCollisionStorage_!=nullptr))return false;
+                if(recipe.queue)nativeCollisionStorage_->spatial.mark(current);
+                if(recipe.collision)nativeCollisionStorage_->collision.mark(current);
+            }
             if(!table_.registerExternalObject({current,first.handle.generation+i},object,true))return false;
             ++roomCount;
             DW_PROFILE_COUNT(counterSpatialFirstPublication);
@@ -1434,7 +1444,8 @@ public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference,bool nativeBoxes=true,bool nativeFields=true,
-        ReferenceStorage* reference=nullptr):
+        ReferenceStorage* reference=nullptr,NativeCollisionStorage* nativeCollision=nullptr):
+        nativeCollisionStorage_(nativeCollision),
         objects_(objects),sprites_(sprites),layers_(rooms),
         native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         sceneryLayers_(ownership==Ownership::nativeScenery),
@@ -1533,7 +1544,8 @@ public:
         DW_PROFILE_COUNT(counterCollisionDirtyPasses);
         if(!check(collisionConsumersAdmitted_))return false;
         if(!native_||!valid())return false;
-        return check(nativeSpatialDirty_.flush([&](unsigned slot){
+        if(!check(nativeCollisionStorage_!=nullptr))return false;
+        return check(nativeCollisionStorage_->spatial.flush([&](unsigned slot){
             std::uint32_t flags=0;
             if(!eligibilityFlags(handleAt(slot),flags))check(false);
             return flags;
@@ -1559,7 +1571,8 @@ public:
                 PackedSpriteCollision resource;
                 frames=sprites_.collisionSprite(p->sprite.spriteId,p->sprite.maskId,resource)?resource.frameCount:0;return true;
             }));
-        return check(RunnerCollisionCollect::run(pairs,nativeCollisionDirty_,nativeCollisionRetained_,indexAvailable,
+        if(!check(nativeCollisionStorage_!=nullptr))return false;
+        return check(RunnerCollisionCollect::run(pairs,nativeCollisionStorage_->collision,nativeCollisionStorage_->retained,indexAvailable,
             [&]{return flushNativeSpatial();},[&](unsigned slot){return handleAt(slot);},
             [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},
             [&](InstanceHandle h,Owner::Box& bounds){
@@ -1635,7 +1648,8 @@ public:
         if(!check(collisionConsumersAdmitted_))return false;
         if(!valid()||!resolves(h))return check(false);
         const auto* flags=families_.flags(unsigned(objectOf(h)));if(!flags)return check(false);
-        return check(native_?(!(*flags&8u)||nativeCollisionDirty_.mark(h.slot)):owner_.queueCollision(h,*flags));
+        if(native_&&!check(nativeCollisionStorage_!=nullptr))return false;
+        return check(native_?(!(*flags&8u)||nativeCollisionStorage_->collision.mark(h.slot)):owner_.queueCollision(h,*flags));
     }
     template<class Execute> bool dispatchCollisionEvent(RunnerCollisionEventContext& context,
         InstanceHandle self,InstanceHandle other,RunnerCollisionEventContext::RoomState room,Execute execute){
@@ -1678,8 +1692,8 @@ public:
     // complete scene publication and ordered animation/image writes. The
     // ordinary sprite getter has no collision-frame cache to invalidate.
     template<class Visit> bool visitNativeDirty(bool collision,Visit visit)const{
-        if(!native_||!valid()||!collisionConsumersAdmitted_)return false;
-        const auto& queue=collision?nativeCollisionDirty_:nativeSpatialDirty_;
+        if(!native_||!valid()||!collisionConsumersAdmitted_||!nativeCollisionStorage_)return false;
+        const auto& queue=collision?nativeCollisionStorage_->collision:nativeCollisionStorage_->spatial;
         for(unsigned slot=queue.first();slot!=NativeDirtyQueue::End;slot=queue.next(slot)){
             const auto h=handleAt(slot);
             if(!h.generation||!visit(h))return false;
@@ -3907,6 +3921,7 @@ private:
     bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
         DW_PROFILE_COUNT(counterObjectQueryPreparations);
         if(!check(collisionConsumersAdmitted_))return false;
+        if(!check(nativeCollisionStorage_!=nullptr))return false;
         if(!valid()||!world_||!native_)return check(false);
         if(object==82){if(!timeFieldFamily_)return check(false);}
         else if(object==90||object==83){/* No terrain descendants; use every registered subtype. */}
@@ -3986,6 +4001,7 @@ public:
 private:
     bool nativeActorPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,Owner::Result& selected){
+        if(!check(collisionConsumersAdmitted_&&nativeCollisionStorage_))return false;
         if(!valid()||!resolves(self)||!masks.valid())return check(false);
         auto* state=nativePosition(self.slot);RunnerImageValue px,py;std::uint32_t flags;
         if(!state||!px.assign(x)||!py.assign(y)||!eligibilityFlags(self,flags))return check(false);
@@ -4004,7 +4020,7 @@ private:
             [&](bool publish){return refreshNativeActor(self,publish)&&sync();},
             [&](RunnerImageValue nx,RunnerImageValue ny){
                 if(!sync()||!RunnerSpatialPosition::assign(self.slot,state->x,state->y,flags,nx,ny,
-                    false,true,*objectFlags,nativeSpatialDirty_,nativeCollisionDirty_))return false;
+                    false,true,*objectFlags,nativeCollisionStorage_->spatial,nativeCollisionStorage_->collision))return false;
                 state->appearanceFlags=(state->appearanceFlags&~0xc208u)|(flags&0xc208u);return true;
             },[&](auto visit){return nativeQueryMembers(object,[&](unsigned slot){return !eligible(slot,false)||visit(slot);});},
             [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){
@@ -4025,6 +4041,7 @@ public:
 private:
     bool nativeWallPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
+        if(!check(collisionConsumersAdmitted_&&nativeCollisionStorage_))return false;
         NativeWallQuery q;RunnerImageValue px,py;
         if((object!=60&&object!=93)||wallQuery_||!valid()||!world_||!masks.valid()||!View::encode(View::Kind::terrain,local,q.handle)||
             !resolves(q.handle)||objectOf(q.handle)!=60||!px.assign(x)||!py.assign(y)||
@@ -4059,7 +4076,7 @@ private:
             [&](RunnerImageValue nx,RunnerImageValue ny){
                 if(!moved){savedX=q.cacheX;savedY=q.cacheY;moved=true;}
                 if(!offset(nx,ny,q.dx,q.dy)||!sync()||!RunnerSpatialPosition::assign(q.handle.slot,q.state.x,q.state.y,
-                    q.state.flags,nx,ny,false,true,*objectFlags,nativeSpatialDirty_,nativeCollisionDirty_))return false;
+                    q.state.flags,nx,ny,false,true,*objectFlags,nativeCollisionStorage_->spatial,nativeCollisionStorage_->collision))return false;
                 return world_->publishNativeTerrainQueryCache(local,q.cacheX,q.cacheY,(q.state.flags&8u)!=0);
             },[&](auto visit){return nativeTerrainMembers(object,[&](unsigned slot){return !eligible(slot,false)||visit(slot);});},
             [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){

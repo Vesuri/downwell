@@ -20,6 +20,11 @@ if gDownwellInitialRoomPreparations != 0
     quit 1
 end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->nativeCollisionStorage_ != 0
+    printf "Unused collision queue/mask backing resident during startup\n"
+    quit 1
+end
+printf "Startup collision backing: optional_bytes=%lu resident=0 owner_bytes=%lu\n", sizeof(*$owner->nativeCollisionStorage_), sizeof(*$owner)
 if $owner->owner_.index_.tree_.tree_ != 0
     printf "Derived spatial tree unexpectedly resident during normal startup\n"
     quit 1

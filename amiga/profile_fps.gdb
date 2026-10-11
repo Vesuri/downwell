@@ -121,6 +121,11 @@ end
 # and change the very residency/work state this diagnostic is measuring.
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
 set $tree = $owner->owner_.index_.tree_.tree_
+if $owner->nativeCollisionStorage_ != 0
+    printf "External collision backend retained unused queue/mask backing\n"
+    quit 1
+end
+printf "Collision backing: optional_bytes=%lu resident=0\n", sizeof(*$owner->nativeCollisionStorage_)
 if $owner->owner_.index_.queries_ || $owner->owner_.index_.count_ != 0 || $tree != 0
     printf "No-query gameplay maintained a spatial journal or materialized tree\n"
     quit 1
