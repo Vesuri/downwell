@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION = 'generate-amiga-transient-banks/v1'
 # Budgets are deliberately not inferred from payload sizes. Growth must be
 # reviewed against scene peak residency, not silently enlarge an allocation.
-BANKS = {'results': 24576, 'shop': 16384, 'clear': 172032}
+# Upgrade owns the living player's DMA poses (16 KiB allowance), allowing the
+# entire 221282-byte cavern CPU pack and 106574-byte DMA pack to retire.
+BANKS = {'results': 24576, 'shop': 16384, 'clear': 188416}
 
 
 def main():

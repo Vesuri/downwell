@@ -2271,7 +2271,7 @@ generated/amiga-shop.text.h: tools/generate-amiga-hud.py data/language.ini
 	tools/generate-amiga-hud.py --profile shop
 
 build/src/core/Game.o $(GAME_RENDER_TEST_TARGET): generated/amiga-shop.text.h
-generated/amiga-clear.text.h: tools/generate-amiga-hud.py data/language.ini
+generated/amiga-clear.text.h: tools/generate-amiga-hud.py tools/amiga_scene_contract.py data/language.ini
 	tools/generate-amiga-hud.py --profile clear
 
 build/src/core/Game.o $(GAME_RENDER_TEST_TARGET): generated/amiga-clear.text.h
@@ -2656,13 +2656,13 @@ verify-amiga-results: generate-amiga-results
 verify-amiga-hud: generate-amiga-hud
 	tools/generate-amiga-hud.py --check
 
-generate-amiga-game:
+generate-amiga-game: generate-amiga-clear
 	python3 tests/projectile-art-test.py
 	tools/generate-amiga-hud.py --profile game
 	python3 tests/scene-asset-admission-test.py
 
 .PHONY: test-scene-asset-admission
-test-scene-asset-admission: generate-amiga-game
+test-scene-asset-admission: generate-amiga-game generate-amiga-clear
 	python3 tests/scene-asset-admission-test.py
 test: test-scene-asset-admission
 

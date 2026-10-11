@@ -1028,7 +1028,7 @@ $(AMIGA_RESULTS): $(REPO)/tools/generate-amiga-hud.py
 $(AMIGA_SHOP): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
 	$(MAKE) -C $(REPO) generate-amiga-shop
 
-$(AMIGA_CLEAR): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
+$(AMIGA_CLEAR): $(REPO)/tools/generate-amiga-hud.py $(REPO)/tools/amiga_scene_contract.py $(REPO)/data/language.ini
 	$(MAKE) -C $(REPO) generate-amiga-clear
 
 $(ROOM_PACK): $(REPO)/tools/generate-room-pack.py \

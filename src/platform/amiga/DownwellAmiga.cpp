@@ -386,7 +386,11 @@ public:
         if (bank_.view(TransientOwner::upgrade).data) return true;
         if (!storage_) storage_ = static_cast<UBYTE*>(AllocMem(clearBankContract.bytes, MEMF_FAST));
         if (!storage_ || !bank_.load(TransientOwner::upgrade, clearBankContract, storage_,
-                clearBankContract.bytes, readTransientBank, validateTransientBank)) {
+                clearBankContract.bytes, readTransientBank, [](const UBYTE* data,unsigned bytes){
+                    // Validate the full directory, including the CPU-resident
+                    // player DMA streams excluded from the Chip-only subset.
+                    return amigaRendererChipPackBytes(data,data+bytes)!=0;
+                })) {
             release(); return false;
         }
         gDownwellUpgradeSourceBytes = clearBankContract.bytes;
@@ -2236,6 +2240,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         return true;
     };
     const auto releaseGameplayArt=[&](){
+        if(gDownwellGameArtResidentBytes)++gDownwellGameArtReleases;
+        if(gDownwellGamePlaneResidentBytes)++gDownwellGamePlaneReleases;
         releaseFieldColumns();
         amigaBlitterReleaseGamePlanes();
 #ifdef DOWNWELL_TERRAIN_BATCH
@@ -2795,8 +2801,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     releaseGameplayArt();
-                    ++gDownwellGamePlaneReleases;
-                    ++gDownwellGameArtReleases;
                     frontPack = frontPackEnd = nullptr;
                     gameplayScene.invalidate();
                 }
@@ -3382,8 +3386,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     overlayBank.release();
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
-                    releaseTerrainRaster();
-                    releaseFieldColumns();
+                    releaseGameplayArt();
                     if (!upgradeSource.acquire()) { exitCode = 20; break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
@@ -3447,12 +3450,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                     sprite.hide();
                 }
                 const unsigned playerId = port.player().spriteId(), playerFrame = port.player().spriteFrame();
-                const unsigned parts = amigaRendererHardwareSpritePartCount(activeGamePack, activeGamePackEnd, playerId, playerFrame);
+                const auto playerArt = upgradeSource.view();
+                const unsigned parts = amigaRendererHardwareSpritePartCount(playerArt.data, playerArt.data + playerArt.bytes, playerId, playerFrame);
                 bool ready = parts > 0 && parts <= 8;
                 for (unsigned part = 0; ready && part < parts; ++part) {
                     Sprite& sprite = part == 0 ? playerSprites[back] :
                         actorSpriteAt(bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back], part - 1);
-                    ready = amigaRendererBuildHardwareSpritePart(activeGamePack, activeGamePackEnd, playerId, playerFrame, part,
+                    ready = amigaRendererBuildHardwareSpritePart(playerArt.data, playerArt.data + playerArt.bytes, playerId, playerFrame, part,
                         frame.playerX, frame.playerY, port.player().facing() < 0, sprite.data(), playerSpriteHeight) != 0;
                 }
                 DW_PROFILE_PHASE(profileClearCopper);

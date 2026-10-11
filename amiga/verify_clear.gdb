@@ -6,8 +6,8 @@ commands
 silent
 printf "Clear phase=%lu frames=%lu choices=%lu failures=%lu reentries=%lu\n", gDownwellClearPhase, gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures, gDownwellClearReentries
 printf "Gameplay tick=%lu field frames=%lu pixel failures=%lu\n", gDownwellClearTick, gDownwellClearFieldFrames, gDownwellGameBufferFailures
-if gDownwellUpgradeSourceBytes != 0 && (gDownwellTerrainRasterResidentBytes != 0 || gDownwellFieldColumnResidentBytes != 0)
-    printf "Gameplay raster or field columns retained during upgrade presentation\n"
+if gDownwellUpgradeSourceBytes != 0 && (gDownwellTerrainRasterResidentBytes != 0 || gDownwellFieldColumnResidentBytes != 0 || gDownwellGameArtResidentBytes != 0 || gDownwellGamePlaneResidentBytes != 0)
+    printf "Gameplay resources retained during upgrade presentation\n"
     quit 1
 end
 if gDownwellClearFailures != 0
@@ -42,6 +42,10 @@ if gDownwellTerrainRasterResidentBytes != 1081344
 end
 if gDownwellFieldColumnResidentBytes != 70816 || gDownwellFieldColumnLoads != 3
     printf "Gameplay field columns did not reacquire across both upgrade departures\n"
+    quit 1
+end
+if gDownwellGameArtLoads != 3 || gDownwellGameArtReleases != 2 || gDownwellGameArtPreparations != 3 || gDownwellGameArtResidentBytes != gDownwellGameArtExpectedBytes || gDownwellGamePlaneLoads != 3 || gDownwellGamePlaneReleases != 2 || gDownwellGamePlaneResidentBytes != gDownwellGamePlaneExpectedBytes
+    printf "Gameplay art did not retire and reacquire across both upgrade departures\n"
     quit 1
 end
 if gDownwellClearCursorMasks[0] != 7 || gDownwellClearCursorMasks[1] != 7

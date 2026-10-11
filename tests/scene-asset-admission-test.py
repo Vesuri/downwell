@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-from amiga_scene_contract import GAME_IDS, CAVERN_IDS, CAVERN_ROOTS, BANK_BUDGETS, require_budget
+from amiga_scene_contract import GAME_IDS, CAVERN_IDS, CAVERN_ROOTS, UPGRADE_PLAYER_IDS, BANK_BUDGETS, require_budget
 
 spec = importlib.util.spec_from_file_location('amiga_hud', ROOT / 'tools/generate-amiga-hud.py')
 hud = importlib.util.module_from_spec(spec)
@@ -42,7 +42,7 @@ class Admission(unittest.TestCase):
         extended = GAME_IDS | frozenset(range(10000, 20000))
         self.assertEqual([i for i in sorted(extended) if i in CAVERN_IDS], baseline)
 
-    def test_cavern_payloads_match_full_reference(self):
+    def test_cavern_and_upgrade_player_payloads_match_full_reference(self):
         def records(path):
             data = path.read_bytes()
             count = struct.unpack_from('>I', data, 8)[0]
@@ -55,6 +55,23 @@ class Admission(unittest.TestCase):
         cavern = records(ROOT / 'generated/amiga-cavern.dwap')
         self.assertEqual(cavern, {key: value for key, value in full.items() if key[0] in CAVERN_IDS})
         self.assertLess(len(cavern), len(full))
+        clear = records(ROOT / 'generated/amiga-clear.dwap')
+        dma_ids = {63000 + ident for ident in UPGRADE_PLAYER_IDS}
+        self.assertEqual({key: value for key, value in clear.items() if key[0] in dma_ids},
+                         {key: value for key, value in full.items() if key[0] in dma_ids})
+        self.assertTrue(all(any(key[0] == ident for key in clear) for ident in dma_ids))
+        self.assertFalse(any(key[0] in UPGRADE_PLAYER_IDS for key in clear))
+
+    def test_upgrade_player_dependency_does_not_follow_game_catalogue(self):
+        selection = dict(hud.SELECTIONS['clear'])
+        for ident in range(10000, 11000):
+            hud.SELECTIONS['game'][ident] = None
+        try:
+            self.assertEqual(hud.SELECTIONS['clear'], selection)
+            self.assertEqual(UPGRADE_PLAYER_IDS, {1, 3, 15, 27, 31, 37})
+        finally:
+            for ident in range(10000, 11000):
+                del hud.SELECTIONS['game'][ident]
 
     def test_existing_ownership_and_shared_dependencies(self):
         records = [record(696), record(369), record(43), record(51, 7),

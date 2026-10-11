@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image
 # This exporter is also loaded by path by the host pixel-oracle tests.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from amiga_scene_contract import GAME_IDS, CAVERN_IDS, BANK_BUDGETS, VERSION as SCENE_CONTRACT_VERSION, require_budget
+from amiga_scene_contract import GAME_IDS, CAVERN_IDS, UPGRADE_PLAYER_IDS, BANK_BUDGETS, VERSION as SCENE_CONTRACT_VERSION, require_budget
 
 
 MAGIC = b"DWAP"
@@ -27,6 +27,7 @@ RECORD = struct.Struct(">HHhhHHHHII")
 # Exact resources needed by the first native HUD and gameplay milestones.
 SELECTIONS = {
     "clear": {
+        **{ident: None for ident in sorted(UPGRADE_PLAYER_IDS)},
         # Result Draw uses the current and incoming area border columns.
         **{ident: [7, 13] for ident in (51, 74, 72, 70, 55)},
         # scrUpgrades' resource IDs, frame 0 as drawn by Result Draw.
@@ -1017,12 +1018,14 @@ def build_records(manifest, extracted, profile, language_path=None):
         encoded.append((dict(id=65006, originX=160, originY=0, width=320, height=80),
                         0, dma_width, planar))
 
-    # Gameplay DMA words, including mirrored multi-channel actors, are host work.
-    if profile == "game":
+    # Gameplay and upgrade player DMA words share the identical offline encoder.
+    if profile in ("game", "clear"):
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
                   485, 486, 487, 496, 497, 602, 603, 707)
+        if profile == "clear":
+            actors = UPGRADE_PLAYER_IDS
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:
                 continue
@@ -1058,6 +1061,9 @@ def build_records(manifest, extracted, profile, language_path=None):
                     hardware.append((metadata, frame_index * 8 + flip * 4 + part,
                                      16, bytes(stream)))
         encoded.extend(hardware)
+        if profile == "clear":
+            # Selection needs only the prepared DMA streams, not player BOBs.
+            encoded = [r for r in encoded if r[0]["id"] not in UPGRADE_PLAYER_IDS]
 
     # Style carousel: independently writable headers for each lock and both
     # presentation slots. The art is already cropped; retain its exact anchor.
@@ -1423,12 +1429,13 @@ def main():
     if args.profile in ("shop", "clear"):
         labels = shop_texts(args.language) if args.profile == "shop" else clear_texts(args.language)
         provenance = json.dumps({
-            "schemaVersion": 1, "generator": f"generate-amiga-hud.py/{args.profile}-v{4 if args.profile == 'clear' else 1}",
+            "schemaVersion": 1, "generator": f"generate-amiga-hud.py/{args.profile}-v{5 if args.profile == 'clear' else 1}",
             "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
             "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
             "packSha256": digest, "language": "english",
             "textAssetIds": sorted(labels),
-            **({"outlinedTextFrame": 1, "diagonalHeadingFrames": [0, 2, 3, 4, 5, 6, 7],
+            **({"playerDmaSourceIds": sorted(UPGRADE_PLAYER_IDS),
+                "outlinedTextFrame": 1, "diagonalHeadingFrames": [0, 2, 3, 4, 5, 6, 7],
                 "borderStripFrames": [263, 269], "borderStripPeriod": 16,
                 "borderStripBlockRows": 128, "borderStripRepetitions": 9}
                if args.profile == "clear" else {}),

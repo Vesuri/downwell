@@ -39,9 +39,6 @@ behavior, both backend integrations and relevant original-game verification.
      undeclared resources rather than falling back to all assets. Apply the
      same dependency declarations to SDL texture/audio residency. Prove peak
      ordinary/Chip memory and unload/re-entry with growing unrelated content.
-     Upgrade presentation still reads the player's frames from `activeGamePack`;
-     isolate that shared dependency before evicting the remaining cavern
-     catalogue during selection. Do not remove the pack with that reader live.
   2. Make phase dispatch depend on live, eligible family membership and scene
      ownership, not the catalogue of implemented families. Preserve event/RNG
      order, synchronous births, activation and captured-phase cutoffs. Assert

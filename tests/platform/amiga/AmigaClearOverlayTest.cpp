@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
     std::ifstream input(argv[1], std::ios::binary);
     std::vector<UBYTE> pack{std::istreambuf_iterator<char>(input), {}};
     require(pack.size() > 20, "clear pack loaded");
+    const auto chipBytes=amigaRendererChipPackBytes(pack.data(),pack.data()+pack.size());
+    require(chipBytes>0 && chipBytes<pack.size(), "upgrade includes validated CPU-only player streams");
     std::vector<UBYTE> game(downwellGameRingBytes), hud[2], reference(downwellLayerBytes);
     AmigaClearOverlay caches[2];
     AmigaClearOverlay outlinedCaches[2];

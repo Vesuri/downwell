@@ -8,6 +8,10 @@ Do not infer admission from SELECTIONS or from the output of an exporter.
 """
 VERSION = 'amiga-scene-admission/v1'
 
+# PlayerMotion::spriteId(false): selection retains the living entry pose.
+# Admit its offline DMA records explicitly, never the gameplay catalogue.
+UPGRADE_PLAYER_IDS = frozenset({1, 3, 15, 27, 31, 37})
+
 GAME_IDS = frozenset({
     0, 1, 3, 12, 15, 27, 31, 37, 51, 76, 84, 85, 91, 92, 96, 101, 102,
     115, 116, 117, 127, 133, 134, 139, 143, 147, 149, 150, 151, 152,

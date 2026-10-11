@@ -356,7 +356,8 @@ splits its records, unchanged, into the following banks:
   union additions. The exporter checks fixed 224 KiB CPU/105 KiB DMA ceilings
   and retained payloads against the full pack. Scene retirement drains
   DMA and invalidates every borrowed CPU/DMA view before release;
-  same-bank Retry/upgrade handoffs retain the lease. Full-catalogue replay
+  upgrade entry releases the lease and next-level entry reacquires it.
+  Full-catalogue replay
   and plane pixel oracles explicitly retain the full reference bank.
 - `amiga-boot.dwap` (`Downwell.boot`), the publisher logo, controls, credits
   text and dither fade. Startup composes it into the splash cache, then
@@ -376,6 +377,26 @@ shipping executables. The generated transient-bank contracts have explicit
 growth budgets; their source hashes are in `amiga-transient-banks.json`.
 Retained pixel buffers have independent lifetimes: releasing source art must
 not erase a still-visible scene, and repurposing DMA storage requires retirement.
+
+The upgrade source is 185,152 bytes, including 15,600 bytes of player DMA
+records for the six living poses returned by `PlayerMotion::spriteId(false)`.
+These use the same offline encoder as gameplay, with byte-for-byte checks;
+no planar player copies are retained. `UPGRADE_PLAYER_IDS` is independent of
+future gameplay catalogue growth. The reviewed source ceiling is 184 KiB.
+Shops/results retain their stricter planar-only validation; upgrade validates
+the full directory including CPU-only sprite streams.
+
+After retiring all gameplay DMA, upgrade entry invalidates borrowed actor,
+effect, terrain-batch and HUD views and frees the 221,282-byte CPU catalogue
+and 106,574-byte Chip plane allocation. It also releases terrain backing and
+CPU field columns. Selection never reads `activeGamePack`. Next-level entry
+retires selection DMA, releases its source, then reloads/rebinds gameplay.
+Relative to retaining cavern art, this saves 205,682 ordinary bytes and 106,574
+Chip bytes during selection; gameplay residency is unchanged. Fixed shared
+scene storage and other embedded tables are not included in these savings.
+The native clear fixture requires zero gameplay leases during both selections
+and three loads/two releases on return to the third level. Host admission tests
+also grow the unrelated gameplay catalogue without growing selection.
 
 The front bank puts its complete directory and all live garden/style payloads
 in a 64,936-byte prefix. Within it, all style-readable resources and the
