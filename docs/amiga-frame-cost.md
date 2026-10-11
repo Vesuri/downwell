@@ -145,28 +145,33 @@ Unprepared families, missing layers, source observers, journal pressure and
 unsupported geometry retain the scalar constructor. A terminal failure still
 publishes only the completed prefix, not an atomic all-or-nothing batch.
 
-Current four windows, with the cavern asset bank and single-admission journal:
+Current four windows, with the cavern asset bank, single-admission journal and
+sparse executable Draw chain:
 
 | Frames | Mean ms | Worst ms (frame) |
 | --- | ---: | ---: |
-| 51–74 | 41.37 | 63.4 (54) |
-| 676–683 | 134.09 | 465.9 (676) |
-| 1301–1314 | 74.96 | 104.1 (1314) |
-| 1689–1696 | 121.14 | 415.6 (1689) |
+| 51–74 | 40.17 | 57.6 (54) |
+| 676–683 | 133.43 | 460.3 (676) |
+| 1301–1314 | 74.13 | 98.4 (1314) |
+| 1689–1696 | 118.99 | 410.2 (1689) |
 
-Against `2be39f73`, the generation stalls save 56.3/64.8 ms; no matched frame
-is more than 0.3 ms slower. Independent 35-field captures confirm 465.9/415.8 ms.
-Frame 51 remains 32.5 ms and frame 1304 is 96.2 ms. These are still
-unacceptable gameplay stalls, not 50 FPS.
-The 1,800-frame contact tape takes 6,250 PAL fields (14.40 FPS), versus 6,265
-at `2be39f73`, with the same maximum gap of 34 fields at frame 1512. Coverage
+Against `f4b4433a`, Draw collection at frame 54 falls from 11.5 to 5.6 ms:
+rebuilding actor order no longer walks non-drawing placeholders/scenery.
+Full-frame 54 falls from 63.4 to 57.6 ms, frame 60 from 54.2 to 48.4 ms,
+and frame 1304 from 96.2 to 90.4 ms. Independent eight-field captures confirm
+57.5/90.4 ms at 54/1304. Generation frames 676/1689 save 5.6/5.4 ms through
+the same Draw-chain change, not faster constructors. No matched frame is more
+than 0.4 ms slower. Frame 51 remains 32.6 ms. These are still unacceptable
+gameplay stalls, not 50 FPS. The full 1,800-update tape takes 6,179 PAL fields
+(14.57 FPS), versus 6,250 at `f4b4433a`; its maximum gap is 33 fields at 1512.
+Coverage
 remains ticks 0–1799, view Y 39–2749 (maximum 2759), seven enemy slots,
 final health 2 and no dead samples. Gameplay art loads/prepares once.
 
 Trace ELF SHA-256:
-`05bebfd7e34eca667285774fbc607315e6b0e7e9551894c622644ee62962f3d4`.
-Reports: `tmp/journal-span-fps-gdb.log`, `tmp/journal-span-report.txt` and
-`tmp/journal-span-confirm-report.txt`. Reproduce using the preceding contact command
+`7f36534a49d839e6f12ea2fcc7b32fae57e5a09df83abd2d54681f0329e07722`.
+Reports: `tmp/sparse-draw-fps-gdb.log`, `tmp/sparse-draw-report.txt` and
+`tmp/sparse-draw-confirm-report.txt`. Reproduce using the preceding contact command
 with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
 
 ### Remaining early-game dispatch cost — `f4b4433a`

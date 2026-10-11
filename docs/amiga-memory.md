@@ -91,21 +91,24 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,126,196 bytes**, SHA-256
-`5a63e20bc691e9471f9ea61c1edc4fe33e5a3d0db2a9e5d0d0857fbd73ae212c`.
+and without reference-only collision masks is **2,128,268 bytes**, SHA-256
+`4c0e0a0b6d8e943ea608e2528843bbec60863544e2d82703faf717230ad4ac74`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,368,694 | Yes |
+| Machine code (`.text`) | 1,370,734 | Yes |
 | Read-only data (`.rodata`) | 675,032 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 4,563,864 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 4,572,432 | No; allocated at load |
 
-Initialized payload totals 2,077,924 bytes. Hunk relocation and container
-records account for the remaining 48,272 bytes. Stripping cannot remove
+Initialized payload totals 2,079,964 bytes. Hunk relocation and container
+records account for the remaining 48,304 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
+The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
+Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
+startup still leaves 126,840 bytes free (`tmp/sparse-draw-startup-gdb.log`).
 
 The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to
@@ -120,7 +123,7 @@ remove collision bounds metadata or change the shipping collision algorithm.
 Future live precise-mask events need scene-owned mask dependencies, not a
 restoration of the complete reference catalogue to every executable.
 
-The largest BSS owners are collision storage (2,611,428 bytes) and the
+The largest BSS owners are collision storage (2,619,994 bytes) and the
 full-height CPU terrain raster (1,105,958 bytes). Initialized payload plus
 BSS already approaches 8 MB before dynamic graphics allocations. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.

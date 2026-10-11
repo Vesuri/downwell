@@ -245,6 +245,17 @@ inactive-tail ordering. Registration, exclusions and sprite changes publish
 prepared Draw eligibility. Inactive nodes remain as layer cutoffs; scenery-only
 population leases and unborn serialized placeholders are not drawable nodes.
 
+The projection retains full ordering links for mutation and a separate sparse
+chain for execution. Only `draw` and `endLayer` actions enter that chain;
+`skip` nodes cannot add work to an ordinary refill. Predecessor discovery and
+chain updates happen on admission, action changes, removal or relinking, not
+on every traversal. Inactive barriers must remain even though they paint no
+pixels. A callback hiding its own node follows the full successor links so a
+newly activated successor is still seen; a newly inserted head is not visited
+retroactively. `visitOrderedReference` retains the full-chain oracle for the
+mutation and cutoff fixtures. This projection does not cache Draw results or
+discard source lifecycle ownership.
+
 Each actor token names a prepared family and generation handle, not a borrowed
 record pointer. Enemy compaction therefore cannot invalidate it. Collectors
 reuse the flat actor/depth array until this prepared list changes. A refill

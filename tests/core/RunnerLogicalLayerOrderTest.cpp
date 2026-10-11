@@ -282,12 +282,68 @@ static void nativeRunPrefixes(){
         }));REQUIRE(observed==prefix);
     }
 }
-int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();
+static void sparsePreparedDraw(){
+    using List=RunnerPreparedDrawList<3,512>;
+    List list;
+    unsigned layer[512];
+    for(unsigned i=0;i<512;++i){layer[i]=i%3;REQUIRE(list.attach(layer[i],i,List::End));}
+    unsigned random=12345;
+    const auto compare=[&](){
+        for(unsigned l=0;l<3;++l){
+            std::vector<unsigned> a,b,aa,bb;
+            REQUIRE(list.visitOrdered(l,[&](unsigned e){aa.push_back(e);return true;},
+                [&](unsigned t){a.push_back(t);return true;}));
+            REQUIRE(list.visitOrderedReference(l,[&](unsigned e){bb.push_back(e);return true;},
+                [&](unsigned t){b.push_back(t);return true;}));
+            REQUIRE(a==b&&aa==bb);
+        }
+    };
+    for(unsigned n=0;n<10000;++n){
+        random=random*1664525u+1013904223u;
+        const unsigned e=(random>>8)%512,op=random%5;
+        if(op<3)REQUIRE(list.publish(e,random%65536,op==0?List::skip:op==1?List::draw:List::endLayer));
+        else if(op==3){
+            REQUIRE(list.detach(layer[e],e));layer[e]=(layer[e]+1)%3;
+            REQUIRE(list.attach(layer[e],e,List::End));
+        }else REQUIRE(list.reposition(layer[e],e,List::End));
+        compare();
+        if(n%101==0){
+            list.beginRelink();
+            for(unsigned i=0;i<512;++i)REQUIRE(list.prependExisting(layer[i],i));
+            compare();
+        }
+    }
+    // Mutations from an executing Draw must see a newly activated successor,
+    // but not a newly inserted head. Include removing/hiding the current slot.
+    for(unsigned mode=0;mode<4;++mode){
+        const auto run=[&](bool reference){
+            List live;std::vector<unsigned> out;
+            for(unsigned i=0;i<4;++i)REQUIRE(live.attach(0,i,List::End));
+            REQUIRE(live.publish(3,3,List::draw)&&live.publish(0,0,List::draw));
+            const auto draw=[&](unsigned token){
+                out.push_back(token);
+                if(token==3){
+                    REQUIRE(live.publish(2,2,List::draw));
+                    if(mode==0)REQUIRE(live.publish(3,3,List::skip));
+                    if(mode==1)REQUIRE(live.detach(0,3));
+                    if(mode==2)REQUIRE(live.publish(2,2,List::endLayer));
+                    REQUIRE(live.attach(0,4,List::End)&&live.publish(4,4,List::endLayer));
+                }
+                return true;
+            };
+            const auto before=[](unsigned){return true;};
+            REQUIRE(reference?live.visitOrderedReference(0,before,draw):live.visitOrdered(0,before,draw));
+            return out;
+        };
+        REQUIRE(run(false)==run(true));
+    }
+}
+int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();sparsePreparedDraw();
     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));
     REQUIRE(drawMutation(true,false)==std::vector<unsigned>({3}));
     REQUIRE(drawMutation(true,true,true)==drawMutation(false,true));
     REQUIRE(drawMutation(true,false,true)==drawMutation(false,false));
-    std::puts("Logical retained layer order: 2304 merges, 10000 mutations, 256 prepared cutoffs, failed publication prefixes and live Draw cutoffs passed");
+    std::puts("Logical retained layer order: 2304 merges, 10000 mutations, 256 prepared cutoffs, 10000 sparse-chain mutations, failed publication prefixes and live Draw cutoffs passed");
 }
