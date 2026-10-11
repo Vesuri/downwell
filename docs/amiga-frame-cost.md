@@ -169,6 +169,46 @@ Reports: `tmp/journal-span-fps-gdb.log`, `tmp/journal-span-report.txt` and
 `tmp/journal-span-confirm-report.txt`. Reproduce using the preceding contact command
 with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
 
+### Remaining early-game dispatch cost — `f4b4433a`
+
+A fresh six-field capture starting at frame 50 confirms frame 51 at **32.56
+ms** (frame 52: 32.9 ms). This is before enemy births: the capture ends at
+tick 52, view Y 106, zero allocated enemy slots and health 4. It does not
+establish later combat coverage. The historical comparable frame below was
+19.2 ms; the early regression is therefore not resolved by the generation
+or residency changes.
+
+| Inclusive boundary, frame 51 | ms |
+| --- | ---: |
+| Entire gameplay Step | 22.21 |
+| Actor End Step capture/dispatch/execution | 4.28 |
+| Bullet Step and published-position update | 3.82 |
+| Draw collection | 3.04 |
+| Player movement | 2.70 |
+| Room animation callback | 2.02 |
+| Bullet position publication, inside Bullet Step | 1.81 |
+| Dither Above Begin Step | 1.69 |
+| Captured alarm dispatch | 1.48 |
+| Bullet retirement, inside Actor End Step | 0.81 |
+
+Parent/child rows overlap. In particular, another arithmetic or bullet
+retirement helper change cannot remove the remaining dispatch cost. The
+retained generic End Step adapter captures lifetimes before callbacks,
+checks live eligibility afterwards and preserves player/box/actor order.
+The player's event updates `playerHit`; out-of-view destruction can run
+callbacks and reread published positions. Absence of enemies alone is not
+a certificate that this phase is empty. Any phase-elision replacement must
+account for these effects at the owning lifecycle boundary rather than
+introducing another full-room proof scan.
+
+Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512
+VERIFY_TIMEOUT_SECONDS=90 STRIP=1 TRACE_FIELDS=6 TRACE_FRAMES=50
+TRACE_OUTPUT=$PWD/tmp/trace/early-current bash amiga/profile.sh trace`, then
+`python3 tools/amiga-trace-report.py tmp/trace/early-current --frames=51
+--causes --tree-min 1`. Report: `tmp/early-current-frame51.txt`; driver log:
+`tmp/early-current-trace.log`. Trace ELF SHA-256:
+`c1c2d1c92f5ede0b1fb4f82b9c5a43e597896c86aeb04ef4b4826eee20438d45`.
+
 ## Historical pre-integration audit
 
 ### Early-game regression comparison
