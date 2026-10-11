@@ -758,7 +758,7 @@ Reference: [scene architecture](scene-architecture.md).
   allocation measurement justifies a different budget.
   Keep the 68000 CPU target; do not silently increase emulator Chip RAM
   to make memory checks pass.
-- The HUD pack and cover masks are still linked into the
+- The entry cover mask and effect stamps are still linked into the
   executable, so ordinary memory holds them beside any Chip copy. Give them
   scene/level dependency contracts and bounded file residency; merely moving
   every bank to a permanently loaded sidecar does not reduce memory.

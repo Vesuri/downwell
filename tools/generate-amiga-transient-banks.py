@@ -5,13 +5,14 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'generate-amiga-transient-banks/v3'
+VERSION = 'generate-amiga-transient-banks/v4'
 # Budgets are deliberately not inferred from payload sizes. Growth must be
 # reviewed against scene peak residency, not silently enlarge an allocation.
 # Upgrade owns the living player's DMA poses (16 KiB allowance), allowing the
 # entire 221282-byte cavern CPU pack and 106574-byte DMA pack to retire.
 BANKS = {'results': 24576, 'shop': 16384, 'clear': 188416,
-         'patterns': 72 * 1024, 'exitmask': 31104, 'selectionmask': 14256}
+         'patterns': 72 * 1024, 'exitmask': 31104, 'selectionmask': 14256,
+         'hud': 16 * 1024}
 
 
 def bank_path(name):

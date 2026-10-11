@@ -153,7 +153,19 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 ## Executable size versus runtime memory
 
-The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
+The shipping HUD source is `Downwell.hud`, with an explicit 16 KiB maximum
+in the transient-bank manifest. Gameplay entry reads it directly into the
+reserved Chip HUD-art region after the previous display has retired; there is
+no always-resident CPU source or temporary ordinary-memory upload allocation.
+Startup/style do not load it. Level handoffs retain that region, while garden
+and fresh style ownership invalidate its binding before reuse. Read or format
+failure returns 20 before admission. Shipping linkage rejects `amiga_hud_pack`;
+verification builds retain independent linked bytes and compare the actual
+file-loaded region across re-entry. `REFERENCE_ENTRY_ASSETS=1` retains the
+old linked-copy oracle. Prepared HUD renderers still validate their source
+records on first binding; file loading alone does not certify their artwork.
+
+A historical `STRIP=1` size audit with admitted room payloads, scene-loaded gameplay art
 and large-field pixels, and without reference-only collision masks is
 **2,008,404 bytes**, SHA-256
 `9a6ec6bd2e583d27e1a1305b169be2e8a21c9c9e208bb92e8bbaa291a3c21d31`.

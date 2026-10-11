@@ -26,6 +26,14 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_hud_is_packaged_as_scene_data(self):
+        for script in ('run.sh', 'verify_startup.sh', 'verify_replay.sh'):
+            text = (ROOT / 'amiga' / script).read_text()
+            self.assertIn('patterns exitmask selectionmask hud; do', text)
+        makefile = (ROOT / 'amiga/Makefile').read_text()
+        self.assertIn('$(OUT).hud: $(AMIGA_HUD)', makefile)
+        self.assertIn('HUD source must be scene-loaded, not linked', makefile)
+
     def test_external_collision_contract_matches_reference_selection(self):
         makefile = (ROOT / 'amiga/Makefile').read_text()
         begin = makefile.index('# This is the scene ownership contract')
@@ -70,6 +78,7 @@ class Admission(unittest.TestCase):
         contract = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(contract)
         self.assertEqual(contract.BANKS['patterns'], 72 * 1024)
+        self.assertEqual(contract.BANKS['hud'], 16 * 1024)
         with tempfile.TemporaryDirectory(prefix='downwell-pattern-budget-') as directory:
             root = Path(directory)
             # Synthetic payloads only: this tests the size/ownership boundary,
@@ -91,6 +100,10 @@ class Admission(unittest.TestCase):
             (root / 'generated/downwell-builder-patterns.dwbp').write_bytes(
                 bytes(contract.BANKS['patterns'] + 1))
             with self.assertRaisesRegex(SystemExit, 'exceeds explicit'):
+                contract.main()
+            (root / 'generated/downwell-builder-patterns.dwbp').write_bytes(b'fixture')
+            (root / 'generated/amiga-hud.dwap').write_bytes(bytes(contract.BANKS['hud'] + 1))
+            with self.assertRaisesRegex(SystemExit, 'hud:.*exceeds explicit'):
                 contract.main()
 
     def test_rejected_elf_cannot_bypass_audit_on_retry(self):

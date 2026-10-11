@@ -566,7 +566,7 @@ REFERENCE_COLLISION_MASK_INPUT := $(REPO)/generated/downwell-sprite-masks.dwsm
 endif
 # Pixel verifiers retain linked source bytes as an independent load oracle.
 # Shipping/profiling executables must never link these transient scene banks.
-ifneq ($(findstring VERIFY,$(CFLAGS)),)
+ifneq ($(strip $(findstring VERIFY,$(CFLAGS)) $(filter 1,$(REFERENCE_ENTRY_ASSETS))),)
 CPPFLAGS += -DDOWNWELL_REFERENCE_SCENE_BANKS
 ASFLAGS += --defsym DOWNWELL_REFERENCE_SCENE_BANKS=1
 endif
@@ -612,7 +612,11 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud
+
+$(OUT).hud: $(AMIGA_HUD)
+	@mkdir -p $(@D)
+	cp $< $@
 
 $(OUT).exitmask: $(AMIGA_EXIT_MASK)
 	@mkdir -p $(@D)
@@ -660,7 +664,7 @@ $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
@@ -1131,6 +1135,8 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit: $(OUT).elf
+	@if [ -z '$(findstring DOWNWELL_REFERENCE_SCENE_BANKS,$(CPPFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_hud_pack'; then \
+		echo "*** HUD source must be scene-loaded, not linked"; exit 1; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_selection_mask'; then \
 		echo "*** selection mask must be scene-loaded, not linked"; exit 1; fi
 	@if [ '$(EXIT_WIPE_VERIFY)' != 1 ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_exit_mask'; then \
@@ -1147,7 +1153,7 @@ audit: $(OUT).elf
 	@if [ -z '$(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_collision_masks'; then \
 		echo "*** reference-only collision masks linked into shipping executable"; exit 1; \
 	else echo "Collision-mask ownership linkage audit: clean"; fi
-	@if [ -z '$(findstring VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_(results|shop|clear)_pack'; then \
+	@if [ -z '$(findstring DOWNWELL_REFERENCE_SCENE_BANKS,$(CPPFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_(results|shop|clear)_pack'; then \
 		echo "*** transient scene art linked into shipping executable"; exit 1; \
 	else echo "Transient scene-bank linkage audit: clean"; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE \

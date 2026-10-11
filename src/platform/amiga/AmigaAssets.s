@@ -1,10 +1,12 @@
 	.section .rodata
+	.ifdef DOWNWELL_REFERENCE_SCENE_BANKS
 	.balign 4
 	.globl amiga_hud_pack
 amiga_hud_pack:
 	.include "../generated/amiga-health-source.inc"
 	.globl amiga_hud_pack_end
 amiga_hud_pack_end:
+	.endif
 
 	.balign 4
 	.globl amiga_effect_stamps

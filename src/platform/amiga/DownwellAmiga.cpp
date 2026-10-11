@@ -343,9 +343,8 @@ static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
 static const UBYTE* activeGamePack = nullptr;
 static const UBYTE* activeGamePackEnd = nullptr;
-static const UBYTE* activeHudPack = amiga_hud_pack;
-static const UBYTE* activeHudPackEnd = amiga_hud_pack_end;
-static AmigaImmutableByteUpload entryHudUpload;
+static const UBYTE* activeHudPack = nullptr;
+static const UBYTE* activeHudPackEnd = nullptr;
 static bool entryHudReady=false;
 
 #include "AmigaTransientBank.h"
@@ -361,6 +360,9 @@ static AmigaTransientBank overlayBank;
 static AmigaPlatform* sceneAssetPlatform;
 extern "C" { volatile ULONG gDownwellTransientLoads, gDownwellUpgradeSourceBytes; }
 extern "C" { volatile ULONG gDownwellExitMaskLoads=0, gDownwellSelectionMaskLoads=0; }
+extern "C" { volatile ULONG gDownwellHudLoads=0; }
+static_assert(DOWNWELL_HUD_BANK_BYTES<=DOWNWELL_HUD_BANK_BUDGET,
+    "HUD growth requires an explicit scene residency budget");
 
 static bool readTransientBank(const char* file, UBYTE* target, unsigned bytes) {
     if (!sceneAssetPlatform || sceneAssetPlatform->loadFile(file, target, bytes) != LONG(bytes)) return false;
@@ -2819,8 +2821,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 presentedSplashDither = scenes.splashDitherFrame();
                 if (presentationChanged && priorPresentedScene == AmigaScene::gameplay &&
                     presentedScene != AmigaScene::gameplay) {
-                    entryHudUpload.invalidate();
                     entryHudReady=false;
+                    activeHudPack=activeHudPackEnd=nullptr;
                     // Gameplay reused the intro storage. Retire all DMA before
                     // rebuilding either destination; never draw over a live ring.
                     splashBlankList.reset();
@@ -2858,8 +2860,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                 }
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
-                    entryHudUpload.invalidate();
                     entryHudReady=false;
+                    activeHudPack=activeHudPackEnd=nullptr;
                     // These framebuffers and copper slots may contain gameplay,
                     // even when the new selection matches the last visit exactly.
                     // Garden prepared the immutable border/masks on entry and
@@ -3015,7 +3017,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     DW_PROFILE_PHASE(profileEntryAssets);
                     AmigaHardware::blitterDrain();
                     memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
-                    const unsigned hudBytes = amiga_hud_pack_end - amiga_hud_pack;
+                    const unsigned hudBytes = DOWNWELL_HUD_BANK_BYTES;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                         downwellGameRingBytes, hudBytes);
@@ -3027,23 +3029,40 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                     UBYTE* hudStorage = memory.menuForeground() + storage.hudOffset;
                     DW_PROFILE_PHASE(profileEntryHudCopy);
-#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
-                    if (!entryHudReady)
-#endif
+#ifdef DOWNWELL_REFERENCE_ENTRY_ASSETS
                     for (unsigned byte = 0; byte < hudBytes; ++byte)
                         hudStorage[byte] = amiga_hud_pack[byte];
+#else
+                    if (!entryHudReady) {
+                        if (platform.loadFile("PROGDIR:Downwell.hud",hudStorage,hudBytes)!=LONG(hudBytes) ||
+                            !validateTransientBank(hudStorage,hudBytes)) {
+                            exitCode=20;
+                            break;
+                        }
+                        ++gDownwellHudLoads;
+                    }
+#endif
+#ifdef DOWNWELL_REFERENCE_SCENE_BANKS
+                    // Linked bytes are an independent verifier, never the
+                    // shipping upload source. Check the actual file-loaded art.
+                    bool hudMatches=hudBytes==unsigned(amiga_hud_pack_end-amiga_hud_pack);
+                    for(unsigned byte=0;hudMatches&&byte<hudBytes;++byte)
+                        hudMatches=hudStorage[byte]==amiga_hud_pack[byte];
+                    if(!hudMatches){exitCode=20;break;}
+#endif
                     // Gameplay and upgrade banks reserve this same high-end
                     // region. Keep residency across level handoffs; garden
                     // reuse and fresh style preparation invalidate it first.
-                    entryHudUpload.invalidate();
                     entryHudReady=true;
                     activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
+#ifdef DOWNWELL_REFERENCE_ENTRY_ASSETS
                     healthHud.bindLinkedCopy(amiga_hud_pack,amiga_hud_pack_end,
                                              activeHudPack,activeHudPackEnd);
 #ifdef DOWNWELL_AMMO_FACTORED
                     ammoHud.bindLinkedCopy(amiga_hud_pack,amiga_hud_pack_end,
                                            activeHudPack,activeHudPackEnd);
+#endif
 #endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
                     // Verify residency after the actual presentation handoff,
@@ -3304,20 +3323,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(styleScene.copper(back));
                     front = back;
                     DW_PROFILE_PHASE(profileOther);
-#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
-                    // A previous style list has already retired garden DMA.
-                    // Copy only on frames whose retained content needed no
-                    // repaint; never add this work to carousel/layout bursts.
-                    if (!presentationChanged && !style.paintedPixels) {
-                        const unsigned bytes = amiga_hud_pack_end-amiga_hud_pack;
-                        const auto layout = GameplaySceneStorage::partition(
-                            menuPlaneBytes*2+amigaMenuEntryPlaneBytes,
-                            downwellGameRingBytes,bytes);
-                        if (!layout.valid) { exitCode=20; break; }
-                        entryHudReady=entryHudUpload.step(memory.menuForeground()+layout.hudOffset,
-                            amiga_hud_pack,bytes,256);
-                    }
-#endif
 #if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_FIELD_BANK)
                     static_assert(DOWNWELL_FRONT_STYLE_BYTES<=downwellTerrainBatchBytes,
                         "Small-field staging must not overwrite style sources");
@@ -3432,7 +3437,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (!upgradeSource.acquire()) { exitCode = 20; break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
-                            amiga_hud_pack_end - amiga_hud_pack, upgradeSource.view().data, upgradeSource.view().bytes,
+                            DOWNWELL_HUD_BANK_BYTES, upgradeSource.view().data, upgradeSource.view().bytes,
                             upgradeSource.mask(), DOWNWELL_SELECTIONMASK_BANK_BYTES)) { exitCode = 20; break; }
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 2;
