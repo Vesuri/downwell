@@ -531,8 +531,18 @@ private:
         const auto* objectFlags=families_.flags(unsigned(objectOf(h)));if(!objectFlags)return check(false);
         const auto& sprite=state->sprite;
         PackedSpriteCollision resource;Owner::Box bounds;
-        const bool found=sprites_.collisionSprite(sprite.spriteId,sprite.maskId,resource);
-        if(found){
+        const int collisionSprite=sprite.maskId<0?sprite.spriteId:sprite.maskId;
+        // Reuse the same immutable unit-geometry preparation as the scalar
+        // owner. Native births used to rebuild this shape for every box.
+        // Admission rejects fractional/oversized positions and all non-unit
+        // transforms; live eligibility and spatial publication remain below.
+        const bool prepared=!(sprite.angle.bits&0x7fffffffu)&&
+            (sprite.scaleX.bits&0x7fffffffu)==0x3f800000u&&
+            (sprite.scaleY.bits&0x7fffffffu)==0x3f800000u&&
+            spriteGeometry_.at(collisionSprite,state->x,state->y,bounds,
+                (sprite.scaleX.bits>>31)!=0,(sprite.scaleY.bits>>31)!=0);
+        const bool found=prepared||sprites_.collisionSprite(sprite.spriteId,sprite.maskId,resource);
+        if(found&&!prepared){
             if(!RunnerSpatialSplit::valid(sprite.angle))return check(false);
             const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
             RunnerImageValue cosine{},sine{};
@@ -546,7 +556,8 @@ private:
         }
         const bool okay=owner_.externalSpatialPublication([&](auto& index){
             return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,state->bounds,
-                found?&bounds:nullptr,state->x,state->y,found&&resource.collisionMode==1,publish);
+                found?&bounds:nullptr,state->x,state->y,
+                found&&(prepared?preparedSprites_[collisionSprite].collisionMode==1:resource.collisionMode==1),publish);
         });
         state->appearanceFlags=flags&0xc208u;return check(okay);
     }

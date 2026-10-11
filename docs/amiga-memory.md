@@ -91,24 +91,27 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,128,268 bytes**, SHA-256
-`4c0e0a0b6d8e943ea608e2528843bbec60863544e2d82703faf717230ad4ac74`.
+and without reference-only collision masks is **2,129,244 bytes**, SHA-256
+`0c0b1d1568637634420554b8f50334dd399aa9d7409f188d288a6812ecd80928`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,370,734 | Yes |
+| Machine code (`.text`) | 1,371,696 | Yes |
 | Read-only data (`.rodata`) | 675,032 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
 | Zero-filled storage (`.bss`) | 4,572,432 | No; allocated at load |
 
-Initialized payload totals 2,079,964 bytes. Hunk relocation and container
-records account for the remaining 48,304 bytes. Stripping cannot remove
+Initialized payload totals 2,080,926 bytes. Hunk relocation and container
+records account for the remaining 48,318 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
 startup still leaves 126,840 bytes free (`tmp/sparse-draw-startup-gdb.log`).
+Native prepared bounds reuse the existing geometry table and add no BSS or
+Chip allocation; the same startup free space is verified in
+`tmp/native-geometry-startup-gdb.log`.
 
 The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to

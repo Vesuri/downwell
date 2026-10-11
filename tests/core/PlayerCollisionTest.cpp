@@ -76,6 +76,17 @@ int main() {
                 "prepared signed-unit geometry matches original arithmetic at domain extremes and zero");
         }
         downwell::RunnerSpatialSplit::Box rejected;
+        for(unsigned flip=0;flip<4;++flip)for(unsigned sign=0;sign<4;++sign){
+            const downwell::RunnerImageValue x{(sign&1)?0x80000000u:0u},y{(sign&2)?0x80000000u:0u};
+            downwell::RunnerSpatialSplit::Box cached,reference;
+            require(geometry.at(x,y,cached,flip&1,flip&2)&&downwell::RunnerSpriteBounds::fromSprite(
+                resource,x,y,{(flip&1)?0xbf800000u:0x3f800000u},
+                {(flip&2)?0xbf800000u:0x3f800000u},false,{},{},true,
+                [](auto v,std::int32_t& p){return v.roundPixel(p);},reference)&&
+                cached.left.bits==reference.left.bits&&cached.right.bits==reference.right.bits&&
+                cached.top.bits==reference.top.bits&&cached.bottom.bits==reference.bottom.bits,
+                "prepared signed-zero coordinates match generic refresh bounds");
+        }
         require(!geometry.at({0x3f000000u},{},rejected)&&
             !geometry.at({0x4a000000u},{},rejected)&&!geometry.at({0x7f800000u},{},rejected),
             "fractional, oversized and nonfinite coordinates retain generic geometry");

@@ -145,33 +145,36 @@ Unprepared families, missing layers, source observers, journal pressure and
 unsupported geometry retain the scalar constructor. A terminal failure still
 publishes only the completed prefix, not an atomic all-or-nothing batch.
 
-Current four windows, with the cavern asset bank, single-admission journal and
-sparse executable Draw chain:
+Current four windows, with the cavern asset bank, single-admission journal,
+sparse executable Draw chain and native prepared sprite geometry:
 
 | Frames | Mean ms | Worst ms (frame) |
 | --- | ---: | ---: |
-| 51–74 | 40.17 | 57.6 (54) |
-| 676–683 | 133.43 | 460.3 (676) |
-| 1301–1314 | 74.13 | 98.4 (1314) |
-| 1689–1696 | 118.99 | 410.2 (1689) |
+| 51–74 | 40.11 | 57.1 (54) |
+| 676–683 | 132.30 | 451.1 (676) |
+| 1301–1314 | 74.10 | 97.9 (1314) |
+| 1689–1696 | 118.85 | 409.2 (1689) |
 
-Against `f4b4433a`, Draw collection at frame 54 falls from 11.5 to 5.6 ms:
-rebuilding actor order no longer walks non-drawing placeholders/scenery.
-Full-frame 54 falls from 63.4 to 57.6 ms, frame 60 from 54.2 to 48.4 ms,
-and frame 1304 from 96.2 to 90.4 ms. Independent eight-field captures confirm
-57.5/90.4 ms at 54/1304. Generation frames 676/1689 save 5.6/5.4 ms through
-the same Draw-chain change, not faster constructors. No matched frame is more
-than 0.4 ms slower. Frame 51 remains 32.6 ms. These are still unacceptable
-gameplay stalls, not 50 FPS. The full 1,800-update tape takes 6,179 PAL fields
-(14.57 FPS), versus 6,250 at `f4b4433a`; its maximum gap is 33 fields at 1512.
+Draw collection at frame 54 is 5.6 ms; rebuilding actor order no longer walks
+non-drawing placeholders/scenery. Native bounds refresh now shares the
+reference owner's prepared immutable shapes. Against `c4228228`, frame 676
+falls from 460.3 to 451.1 ms, independently confirmed by a 35-field capture.
+Its breakable birth observer spends 40.85 ms in bounds refresh rather than
+49.07 ms: prepared translation costs 10.30 ms instead of 17.90 ms rebuilding
+the shape. Spatial publication still costs 21.43 ms and is not bypassed.
+No matched frame is more than 0.3 ms slower. Frame 51 remains 32.6 ms; frame
+1304 is 90.0 ms. These are still unacceptable gameplay stalls, not 50 FPS.
+The full 1,800-update tape takes 6,176 PAL fields (14.57 FPS), versus 6,179
+at `c4228228`; its maximum gap remains 33 fields at 1512. PAL quantization
+largely hides the focused computation saving in the aggregate FPS figure.
 Coverage
 remains ticks 0–1799, view Y 39–2749 (maximum 2759), seven enemy slots,
 final health 2 and no dead samples. Gameplay art loads/prepares once.
 
 Trace ELF SHA-256:
-`7f36534a49d839e6f12ea2fcc7b32fae57e5a09df83abd2d54681f0329e07722`.
-Reports: `tmp/sparse-draw-fps-gdb.log`, `tmp/sparse-draw-report.txt` and
-`tmp/sparse-draw-confirm-report.txt`. Reproduce using the preceding contact command
+`d1819a83dd71901581e664b2109e50d7207c7a5590a08504f769ece5ecbb4677`.
+Reports: `tmp/native-geometry-fps-gdb.log`, `tmp/native-geometry-report.txt` and
+`tmp/native-geometry-confirm-report.txt`. Reproduce using the preceding contact command
 with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
 
 ### Remaining generation ownership costs — `c4228228`

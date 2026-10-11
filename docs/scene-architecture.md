@@ -232,6 +232,15 @@ event, not a general license to skip actor End Step or source callbacks.
 
 ## Read-only actor ordering
 
+Native and reference spatial refresh share the immutable
+`PreparedSpriteGeometry` built during owner preparation. Zero-angle,
+signed-unit-scale sprites at admitted integer positions translate those
+prepared bounds instead of reconstructing the resource shape. Mask IDs retain
+their precedence over sprite IDs; missing resources, fractional/oversized
+positions and other transforms use the generic refresh. Published bounds,
+precise-mask flags, eligibility and ordered spatial insertion are still live
+state. No per-instance result or callback is cached by this admission.
+
 `GameplayWorld::visitRoomActors` remains the live layer traversal. Command
 collectors that do not change lifetimes, eligibility, sprites or depth may use
 `visitRoomActorsReadOnly`. Its owner retains ordered actor handles and depths;

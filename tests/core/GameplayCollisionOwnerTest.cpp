@@ -5871,6 +5871,32 @@ int main(){
         hits=0;assert(owner->inspectNativeIndex(all,[&](InstanceHandle){++hits;return true;})&&hits==1);
     }
     {
+        // Native refresh must consume prepared immutable geometry, while
+        // retaining exact mask precedence and the fractional-scale fallback.
+        for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
+            auto tested=makeCollisionOwner(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,tested->enemyBinding(),
+                tested->breakableBinding(),tested->playerBinding(),nullptr,&rooms);
+            assert(tested->attach(*world));
+            const auto local=world->playerHandle();const auto* record=world->findPlayer(local);
+            InstanceHandle h;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,local,h));
+            const auto binding=tested->playerBinding();
+            for(int mask:{-1,31,582})for(unsigned sx:{0x3f800000u,0xbf800000u,0x3f000000u})
+            for(unsigned sy:{0x3f800000u,0xbf800000u}){
+                assert(binding.mask(local,*record,mask)&&
+                    binding.transform(local,*record,RunnerTransformField::scaleX,{sx},{0x3f800000u},0xffffffu)&&
+                    binding.transform(local,*record,RunnerTransformField::scaleY,{sy},{0x3f800000u},0xffffffu));
+                GameplayCollisionOwner::Owner::Sprite appearance;std::uint32_t flags;
+                RunnerImageValue x,y;RunnerSpatialSplit::Box actual,oracle;PackedSpriteCollision resource;
+                assert(tested->nativeActorBounds(h,actual,true)&&tested->nativePublishedSprite(h,appearance,flags)&&
+                    tested->nativePublishedPosition(h,x,y)&&sprites.collisionSprite(appearance.spriteId,appearance.maskId,resource)&&
+                    RunnerSpriteBounds::fromSpriteBinary32(resource,x,y,appearance.scaleX,appearance.scaleY,
+                        false,{},{},true,[](auto v,std::int32_t& p){return v.roundPixel(p);},oracle));
+                assert(actual.left.bits==oracle.left.bits&&actual.right.bits==oracle.right.bits&&
+                    actual.top.bits==oracle.top.bits&&actual.bottom.bits==oracle.bottom.bits);
+            }
+        }
         using Sprite=GameplayCollisionOwner::Owner::Sprite;
         std::vector<Sprite> expected;
         std::vector<std::uint32_t> expectedFlags;
