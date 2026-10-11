@@ -11,6 +11,10 @@ end
 break downwellStartupReady
 continue
 printf "Startup passed: resident assets=%lu, Chip remaining=%lu bytes\n", gDownwellStartupAssetBytes, gDownwellStartupChipRemaining
+if gDownwellSceneBankLoads != 1 || gDownwellSplashPreparations != 1 || gDownwellGardenPreparations != 0
+    printf "Normal startup loaded/prepared a scene beyond the splash sequence\n"
+    quit 1
+end
 # This is the normal-startup audit; explicit plane/replay oracle builds have
 # their own verifiers and must not weaken the front-end residency guard.
 if gDownwellGamePlaneResidentBytes != 0 || gDownwellGamePlaneLoads != 0

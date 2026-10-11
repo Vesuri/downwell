@@ -49,6 +49,13 @@ if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     quit 1
 end
 printf "Transient scene residency: loads=%lu upgrade_source_bytes=%lu results_bytes=%lu shop_bytes=%lu\n", gDownwellTransientLoads, gDownwellUpgradeSourceBytes, gDownwellResultsAssetBytes, gDownwellShopAssetBytes
+printf "Front-end residency: startup_scene=%lu bank_loads=%lu splash_preparations=%lu garden_preparations=%lu\n", gDownwellStartupScene, gDownwellSceneBankLoads, gDownwellSplashPreparations, gDownwellGardenPreparations
+if gDownwellStartupScene == 3 && gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
+    if gDownwellSceneBankLoads != 0 || gDownwellSplashPreparations != 0 || gDownwellGardenPreparations != 0
+        printf "Gameplay-only contact route admitted front-end assets or preparation\n"
+        quit 1
+    end
+end
 # The living world-1 contact tape never enters a shop, results or upgrade room.
 # New scene content must not introduce bank loading/preparation to this route.
 if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0

@@ -419,6 +419,8 @@ static const UBYTE* frontPackEnd;
 static void invalidateGameplayFieldBank();
 extern "C" volatile ULONG gDownwellSceneBankLoads;
 volatile ULONG gDownwellSceneBankLoads;
+extern "C" volatile ULONG gDownwellSplashPreparations, gDownwellGardenPreparations, gDownwellStartupScene;
+volatile ULONG gDownwellSplashPreparations, gDownwellGardenPreparations, gDownwellStartupScene;
 static bool loadSceneBank(AmigaPlatform& platform, const char* name, ULONG bytes) {
     AmigaHardware::blitterDrain();
     invalidateGameplayFieldBank();
@@ -2272,9 +2274,15 @@ __attribute__((noinline)) static int runDownwell(void) {
     auto& gardenScene=*new(gardenStorage) AmigaGardenScene(memory.menuForeground(), memory.menuBackground(),
         memory.menuEntry(), memory.copper(), memory.copper() + downwellCopperWords,
         downwellCopperWords);
-    if (!loadSceneBank(platform, bootBankName, DOWNWELL_BOOT_BANK_BYTES) ||
+#ifdef DOWNWELL_REPLAY_VERIFY
+    const bool initialSplash = false;
+#else
+    const bool initialSplash = scenes.scene() == AmigaScene::splash;
+    gDownwellStartupScene = static_cast<ULONG>(scenes.scene());
+#endif
+    if (initialSplash && (!loadSceneBank(platform, bootBankName, DOWNWELL_BOOT_BANK_BYTES) ||
         !amigaBuildSplashCache(sceneBank, sceneBank + DOWNWELL_BOOT_BANK_BYTES,
-                               memory.sceneCache(), memory.hud())) {
+                               memory.sceneCache(), memory.hud()))) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -2282,25 +2290,13 @@ __attribute__((noinline)) static int runDownwell(void) {
         downwellStartupFailed();
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
+    if (initialSplash) ++gDownwellSplashPreparations;
+#if defined(DOWNWELL_SKIP_INTRO) && !defined(DOWNWELL_SKIP_TO_GAME) && !defined(DOWNWELL_REPLAY_VERIFY)
     if (!loadFrontBank(platform)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
         gDownwellStartupFailure = 11;
-        downwellStartupFailed();
-        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
-    }
-#ifndef DOWNWELL_REPLAY_VERIFY
-    /*
-     * Compose the garden completely while the startup display is still
-     * blank.  Once presented, these two one-bit planes are immutable: the
-     * copper scrolls them solely through pointers and BPLCON1.
-     */
-    if (!gardenScene.prepare(menuDrawList, frontPack, frontPackEnd)) {
-        platform.restore();
-        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-        memory.release();
-        gDownwellStartupFailure = 8;
         downwellStartupFailed();
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
@@ -2450,6 +2446,12 @@ __attribute__((noinline)) static int runDownwell(void) {
         bulletSprites[bullet].hide();
     enemySprites[0].hide();
     enemySprites[1].hide();
+    // A skipped splash owns no cached pixels. Publish a DMA-disabled list,
+    // not a list pointing at unprepared or later scene-owned storage.
+    splashBlankList.reset();
+    splashBlankList.move(bplcon0, 0);
+    for (unsigned channel=0;channel<8;++channel) splashBlankList.showSprite(channel,nullSprite);
+    splashBlankList.finish();
     if (
 #ifdef DOWNWELL_REPLAY_VERIFY
         !gameplayScene.build(dynamicCopper0,
@@ -2457,11 +2459,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             gameplayRegularSpriteCount, enemySprites[0], palette,
             port.ringOrigin())
 #else
-        !splashBlankList.buildNarrow(
+        initialSplash && (!splashBlankList.buildNarrow(
             amigaSplashFrame(memory.sceneCache(), 1), nullSprite, palette) ||
         !publisherScene.prepare(memory.sceneCache(), sceneCacheBytes, nullSprite, palette) ||
         !creditsScene.prepare(hudBitmap, nullSprite, palette) ||
-        !controlsScene.prepare(memory.sceneCache(), sceneCacheBytes, nullSprite, palette)
+        !controlsScene.prepare(memory.sceneCache(), sceneCacheBytes, nullSprite, palette))
 #endif
     ) {
         platform.restore();
@@ -2744,11 +2746,19 @@ __attribute__((noinline)) static int runDownwell(void) {
                     releaseGameplayArt();
                     ++gDownwellGamePlaneReleases;
                     ++gDownwellGameArtReleases;
-                    if (!loadFrontBank(platform)) break;
-                    if (presentedScene == AmigaScene::menu &&
-                        !gardenScene.prepare(menuDrawList, frontPack, frontPackEnd))
-                        break;
+                    frontPack = frontPackEnd = nullptr;
                     gameplayScene.invalidate();
+                }
+                if (presentationChanged && (presentedScene == AmigaScene::menu ||
+                        presentedScene == AmigaScene::styleSelect)) {
+                    if (!frontPack && !loadFrontBank(platform)) break;
+                    // Front art is admitted only when a consumer enters. The
+                    // garden planes are prepared once per entry, never during
+                    // splash/gameplay or a direct style-selection shortcut.
+                    if (presentedScene == AmigaScene::menu) {
+                        if (!gardenScene.prepare(menuDrawList,frontPack,frontPackEnd)) break;
+                        ++gDownwellGardenPreparations;
+                    }
                 }
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
                     entryHudUpload.invalidate();

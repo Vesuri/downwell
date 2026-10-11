@@ -15,6 +15,10 @@ silent
 dump binary memory .run/splash-frame.bin gDownwellSplashFrame gDownwellSplashFrame+12496
 set $splash_captures = $splash_captures | 1
 printf "SCENE_PROGRESS: publisher captured\n"
+if gDownwellSceneBankLoads != 1 || gDownwellSplashPreparations != 1 || gDownwellGardenPreparations != 0
+    printf "Publisher phase admitted front-end work too early\n"
+    quit 1
+end
 continue
 end
 break downwellCreditsFrameReady
@@ -37,6 +41,10 @@ break downwellMenuWakeFrameReady
 commands
 silent
 printf "SCENE_PROGRESS: garden wake\n"
+if gDownwellSceneBankLoads != 2 || gDownwellSplashPreparations != 1 || gDownwellGardenPreparations != 1
+    printf "Garden entry did not prepare exactly its own bank and planes\n"
+    quit 1
+end
 continue
 end
 break downwellMenuEntryFrameReady
@@ -67,6 +75,10 @@ break downwellSceneGameplayActive
 continue
 if $splash_captures != 7
     printf "Missing current-run splash captures: %lu\n", $splash_captures
+    quit 1
+end
+if gDownwellSceneBankLoads != 2 || gDownwellGardenPreparations != 1
+    printf "Front-end work repeated after entering gameplay\n"
     quit 1
 end
 if gDownwellMenuCopperPatchFailures != 0

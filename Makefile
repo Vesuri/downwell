@@ -3168,6 +3168,10 @@ verify-amiga-credits-frame:
 	python3 tools/decode-amiga-wide-frame.py amiga/.run/credits-frame.bin build/amiga-credits-frame.png
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
+.PHONY: verify-amiga-style-admission
+verify-amiga-style-admission:
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0" EXIT; $(MAKE) -C amiga -j4 SKIP_INTRO=1 SKIP_TO_GAME=0 SKIP_LEVEL=0; GDB_SOURCE=verify_style_admission.gdb READY_MARKER=DOWNWELL_STYLE_ADMISSION_READY READY_DESCRIPTION="direct style scene admission" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh'
+
 verify-amiga-scenes:
 	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SCENE_DESCENT_VERIFY=0 SCENE_VERIFY=0" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -j4 SCENE_DESCENT_VERIFY=1 SKIP_TO_GAME=0 SKIP_INTRO=0 SKIP_LEVEL=0; GDB_SOURCE=verify_scenes.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE READY_DESCRIPTION="complete native scene sequence through scrolling gameplay and enemy activation" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-180} amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_SPLASH_FRAME_SHA256)' 'amiga/.run/splash-frame.bin' | shasum -a 256 -c -

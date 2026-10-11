@@ -325,6 +325,21 @@ directory bytes. Their writable position headers cannot be interned. All
 streams stay below the retained style-prefix bound, including while field
 and results artwork is staged elsewhere in the shared bank.
 
+Front-end work is admitted by scene entry, not by executable startup. The
+publisher/credits/controls route loads and composes only the boot bank. The
+front bank and immutable garden planes are prepared on garden entry, before
+their first presentation. Direct style entry loads front art without painting
+the garden; direct gameplay entry loads neither bank and composes neither
+splash nor garden pixels. The blank startup copper disables bitplane DMA when
+there is no splash cache. Shared backing allocations still exist because
+gameplay reuses them; skipping preparation does not claim to free that memory.
+Native startup, full-scene and contact-tape verifiers check these load and
+preparation counts, including no repeated front-end work during gameplay.
+`make verify-amiga-style-admission` checks the direct-style route through 64
+updates and restores the normal build. `make verify-amiga-scenes` checks the
+complete route and splash pixel hashes; the contact FPS tape checks direct
+gameplay admission. Use `VERIFY_CHIP_KB=512` for the native memory gate.
+
 The two scene banks are files beside the executable. Each load is a single
 `Open`/`Read`/`Close` of the whole file into the shared Chip region, through
 `AmigaPlatform::loadFile`. During the load the OS gets back its VERTB
