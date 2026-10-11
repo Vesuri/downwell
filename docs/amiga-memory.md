@@ -91,20 +91,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,144,392 bytes**, SHA-256
-`44de42e790f66dd04993005bdb89a5a871e53bc63a3cf3cac2a2225017bcbd6a`.
+and without reference-only collision masks is **2,141,020 bytes**, SHA-256
+`e28bd170d36ac30c3515fef90eb7d0c4319d9595a286b77851be2f9fa89a70c1`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,385,742 | Yes |
-| Read-only data (`.rodata`) | 675,032 | Yes |
+| Machine code (`.text`) | 1,383,684 | Yes |
+| Read-only data (`.rodata`) | 674,952 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
 | Zero-filled storage (`.bss`) | 3,491,648 | No; allocated at load |
 
-Initialized payload totals 2,094,972 bytes. Hunk relocation, padding and container
-records account for the remaining 49,420 bytes. Stripping cannot remove
+Initialized payload totals 2,092,834 bytes. Hunk relocation, padding and container
+records account for the remaining 48,186 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
@@ -202,17 +202,17 @@ ownership machinery still have their existing owners.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Gameplay-leased DMA plane atlas (full union maximum; cavern 106,574) | 112,970 |
+| Gameplay-leased DMA plane atlas (cavern; full pixel oracle 112,970) | 106,574 |
 | Effect surface | 20,448 |
 | Offline interleaved smoke/gem stamps | 0 additional (4,932 in cache tail) |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Gameplay total, before allocation alignment** | **488,710** |
+| **Gameplay total, before allocation alignment** | **482,314** |
 | **Front-end total, without gameplay DMA atlas** | **375,740** |
 
 The directory sizes depend on the generated asset set; remeasure actual free
 and largest Chip blocks when it changes. The original contiguous gameplay
 DWAP stays in ordinary memory for CPU rendering, effects, metadata and sprite
-stream selection. `Downwell.planes` has a separate Chip allocation acquired at
+stream selection. `Downwell.cavernplanes` has a separate Chip allocation acquired at
 gameplay entry, not during ordinary startup. Retry retains the allocation;
 returning to style select or the surface retires its blits and cached Bitmap
 views before freeing it. Re-entry allocates, loads and validates it again;
@@ -239,21 +239,24 @@ ordinary front-end scenes, including later returns. CPU-side actor/effect
 preparation occurs only when a gameplay lease is acquired. The gameplay bank
 uses an explicitly admitted cavern subset in area 1. It excludes later-area
 skeleton/bone and wood/default debris art, including mirror/DMA derivatives.
-Other areas still use the admitted gameplay union; this is not complete
-per-level residency. Other embedded gameplay tables remain outside this lease.
+Other areas are not admitted by the production loader. They need explicit
+CPU/DMA dependencies before area progression is enabled; normal progression
+currently reaches only the three cavern levels. The old area-2–5 fallback to
+the gameplay union is forbidden. Other embedded gameplay tables remain outside
+this lease, so this is not complete scene-local residency.
 `generate-amiga-hud.py --profile game`
-splits its records, unchanged, into three banks:
+splits its records, unchanged, into the following banks:
 
-- `amiga-game.dwap` (`Downwell.game`), 234,718 bytes of CPU-only art allocated
-  with `MEMF_FAST` at gameplay entry, retained through Retry/upgrades and freed
-  when returning to style select or the surface. Its offline
-  `amiga-game.planes` derivative (`Downwell.planes`) is the gameplay DMA lease.
+- `amiga-game.dwap` (`Downwell.game`), 234,718 bytes of CPU-only reference art,
+  and `amiga-game.planes` (`Downwell.planes`), 112,970 bytes of DMA reference
+  art. Only explicit replay/plane pixel oracles may load these catalogues.
+  The normal link audit rejects their load paths in production code.
 - `amiga-cavern.dwap` (`Downwell.cavern`), 221,282 CPU bytes, paired with
   `amiga-cavern.planes` (`Downwell.cavernplanes`), 106,574 DMA bytes, replaces
   that union during cavern gameplay. `CAVERN_ROOTS` is independent of future
   union additions. The exporter checks fixed 224 KiB CPU/105 KiB DMA ceilings
-  and retained payloads against the full pack. Area-bank replacement drains
-  DMA and invalidates every borrowed CPU/DMA view before release/rebind;
+  and retained payloads against the full pack. Scene retirement drains
+  DMA and invalidates every borrowed CPU/DMA view before release;
   same-bank Retry/upgrade handoffs retain the lease. Full-catalogue replay
   and plane pixel oracles explicitly retain the full reference bank.
 - `amiga-boot.dwap` (`Downwell.boot`), the publisher logo, controls, credits

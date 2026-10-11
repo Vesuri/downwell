@@ -1338,6 +1338,7 @@ def main():
                  + f"#define DOWNWELL_BOOT_BANK_BYTES {len(pack_records(banks['boot']))}UL\n"
                    f"#define DOWNWELL_GAME_BANK_BYTES {len(data)}UL\n"
                    f"#define DOWNWELL_CAVERN_BANK_BYTES {len(cavern)}UL\n"
+                   f"#define DOWNWELL_CAVERN_BANK_BUDGET {BANK_BUDGETS['cavern']}UL\n"
                    f"#define DOWNWELL_GAME_BANK_BUDGET {BANK_BUDGETS['game']}UL\n"
                    f"#define DOWNWELL_FRONT_BANK_BYTES {len(front)}UL\n"
                    f"#define DOWNWELL_FRONT_LIVE_BYTES {live_end}UL\n"

@@ -30,7 +30,7 @@ behavior, both backend integrations and relevant original-game verification.
 ## 0. Restore a runnable, measured A500 baseline
 
 - Enforce scene/level-local residency and execution before adding content:
-  1. Finish splitting gameplay art by level beyond the cavern subset; replace remaining resident
+  1. Replace remaining resident
      gameplay tables/room catalogues and SDL collision masks with explicit
      scene/level dependencies. New native mask consumers
      must use those dependencies, not link the full reference mask catalogue.
@@ -410,6 +410,10 @@ integration does not erase those separate performance/memory requirements.
   motion, collisions, alarms, animation and artwork.
 - Implement area transition/entry/exit and verify natural cavern-to-catacomb
   progression. Do not substitute cavern actors or patterns.
+- Declare and budget catacomb CPU/DMA asset dependencies before enabling its
+  production admission. Include source spawns, effects, persistent objects and
+  transition overlap; verify unload/re-entry. Do the same for each later area;
+  never restore the full-catalogue fallback.
 
 Reference: [area-two recovery](area-two-recovery.md).
 
@@ -734,7 +738,7 @@ Reference: [scene architecture](scene-architecture.md).
 - Budget further Chip residency against the measured 20,272-byte cavern
   minimum free space (126,840 bytes before gameplay); remeasure after pack
   growth and through scene transitions. The cavern DMA bank is 106,574 bytes;
-  the full reference/later-area union remains 112,970 bytes. Reconcile gameplay-family
+  the verification-only full union remains 112,970 bytes. Reconcile gameplay-family
   residency before admitting additional encounter artwork on a stock-memory machine.
   Keep the gate unchanged until residency is reduced or a new whole-program
   allocation measurement justifies a different budget.

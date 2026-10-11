@@ -1074,6 +1074,7 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit:
+	@python3 $(REPO)/tools/audit-amiga-scene-loads.py $(OUT).elf $(if $(filter 1,$(REPLAY_VERIFY) $(PLANE_VERIFY)),--reference-oracle)
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_game_pack'; then \
 		echo "*** gameplay CPU art must be scene-loaded, not linked"; exit 1; \
 	else echo "Gameplay CPU art linkage audit: clean"; fi

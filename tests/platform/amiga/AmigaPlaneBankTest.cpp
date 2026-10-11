@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaPlaneBank.h"
+#include "platform/amiga/AmigaGameplayAssetAdmission.h"
 #include "../../../generated/amiga-game-planes.h"
 #include "../../../generated/amiga-cavern-planes.h"
 #include <cassert>
@@ -41,6 +42,10 @@ static void check(const char* sourcePath,const char* bankPath,unsigned expectedB
     std::printf("Plane atlas: %u asset views, all three planes byte-exact; invalid banks rejected\n",checked);
 }
 int main(){
+    for(int area=-10;area<10000;++area){
+        assert(AmigaGameplayAssetAdmission::production(area)==(area==0||area==1));
+        assert(AmigaGameplayAssetAdmission::referenceOracle(area)==(area>=0&&area<=5));
+    }
     check("generated/amiga-game.dwap","generated/amiga-game.planes",DOWNWELL_GAME_PLANE_BYTES,downwellGamePlaneSourceHash);
     check("generated/amiga-cavern.dwap","generated/amiga-cavern.planes",DOWNWELL_CAVERN_PLANE_BYTES,downwellCavernPlaneSourceHash);
     auto full=load("generated/amiga-game.dwap"),cavern=load("generated/amiga-cavern.dwap");

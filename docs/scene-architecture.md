@@ -48,6 +48,16 @@ The link audit, lease tests, entry profiler and clear/restart verifiers enforce
 these boundaries. These contracts do not yet partition the gameplay resource,
 room, collision-mask or SDL texture catalogues; that scope remains in the queue.
 
+Production gameplay admission is explicit: `AmigaGameplayAssetAdmission`
+admits the cavern bank for area 1 (and bootstrap area 0). Unknown/later areas
+fail before reuse or allocation; they must not inherit an already-resident
+bank or load the reference union. Current Amiga progression stops after the
+third cavern level. Enabling another area requires declared, budgeted CPU/DMA
+dependencies and verified transition overlap. Replay and plane pixel oracles
+have a separate compile-time full-catalogue path. The native load-path audit
+rejects `Downwell.game`/`Downwell.planes` loads outside those two oracle builds.
+Exporter growth cannot change this admission policy.
+
 Use the platform framework for Copper publication and DMA retirement.
 Prepare an inactive list or patch only safe, relevant words; do not rebuild
 complete lists for pointer-only scrolling. Failed preparation must prevent

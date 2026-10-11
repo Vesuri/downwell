@@ -2427,7 +2427,7 @@ generated/amiga-game-planes.h: generated/amiga-game.planes
 generated/amiga-cavern-planes.h: generated/amiga-game.planes
 	@test -f $@ || python3 tools/generate-amiga-plane-bank.py
 
-build/amiga-plane-bank-test: tests/platform/amiga/AmigaPlaneBankTest.cpp src/platform/amiga/AmigaPlaneBank.h generated/amiga-game-planes.h generated/amiga-cavern-planes.h
+build/amiga-plane-bank-test: tests/platform/amiga/AmigaPlaneBankTest.cpp src/platform/amiga/AmigaPlaneBank.h src/platform/amiga/AmigaGameplayAssetAdmission.h generated/amiga-game-planes.h generated/amiga-cavern-planes.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
 

@@ -13,6 +13,9 @@ from amiga_scene_contract import GAME_IDS, CAVERN_IDS, CAVERN_ROOTS, BANK_BUDGET
 spec = importlib.util.spec_from_file_location('amiga_hud', ROOT / 'tools/generate-amiga-hud.py')
 hud = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hud)
+audit_spec = importlib.util.spec_from_file_location('scene_load_audit', ROOT / 'tools/audit-amiga-scene-loads.py')
+audit = importlib.util.module_from_spec(audit_spec)
+audit_spec.loader.exec_module(audit)
 
 
 def record(ident, frame=0):
@@ -20,6 +23,12 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_shipping_load_path_audit(self):
+        cavern = b'PROGDIR:Downwell.cavern\0PROGDIR:Downwell.cavernplanes\0'
+        self.assertEqual(audit.violations(cavern), [])
+        for path in audit.FORBIDDEN:
+            self.assertEqual(audit.violations(cavern + path), [path[:-1].decode('ascii')])
+
     def test_cavern_admission_is_not_the_gameplay_union(self):
         for ident in (91, 116, 205, 206, 207, 208, 460):
             for offset in (0, 62000, 63000):
