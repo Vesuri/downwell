@@ -196,6 +196,14 @@ preserves the declaration. A new query consumer must choose the full index
 before scene construction, not switch it on after losing birth history.
 This removes work, not the journal's static 90,112-byte storage reservation.
 
+This declaration excludes index traversal, not all collision-state readers.
+`GameplayCollisionOwner::collisionPointCandidate` and `collisionOverlap` read
+`nativeCollisionVisual` directly and can refresh cached bounds without first
+querying the tree. Direct collision-event adapters also read published actor
+coordinates through that view. Do not infer permission to remove cached bounds,
+appearance flags or dirty ordering from an absent R-tree query alone; those
+would require a separately proven consumer contract.
+
 Query-enabled owners, including the native original-mask verification path,
 retain the complete ordered journal. Validity checks, zero-budget service and
 empty resets do not allocate. Queries, nonempty explicit service, journal pressure and eager numeric fallback

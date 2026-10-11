@@ -83,6 +83,21 @@ build. Saved reports: `tmp/scene-dispatch-idle51.txt` and
 
 ## No-input generation gate
 
+Current check at `16979319`: frame 163 is **245.63 ms**, 1,745,260 cycles
+(0.3 ms from the preceding no-query admission capture, within noise).
+`constructTerrainSpan` is 43.12 ms inclusive, 6.17 ms self. Its 26
+`PreparedTerrainBirthBounds::publication` calls total 4.76 ms, including
+necessary key, precision and domain checks as well as the unused historical
+envelope. Removing only the envelope has not established the 10 ms worst-frame
+work threshold; no implementation variant was attempted. Cached collision
+state has direct readers outside index traversal (see the memory contract),
+so no-query admission alone cannot remove that state or its publication.
+
+Reproduce with the command below, `TRACE_OUTPUT=tmp/trace/span-envelope-16979319`,
+then report `--frames=163 --top=140 --lines=constructTerrainSpan --tree-min=0.2`.
+Report: `tmp/span-envelope-report.txt`; matching ELF SHA-256:
+`7d2e3f9e5542d675f3da193a58c9f6546e3bbb2874ba5c63da1214195f9c295d`.
+
 The same `778b7fc4` capture measures frame 163 at **256.91 ms** (1,825,390
 cycles). This is instruction time, not a CPU estimate from a presentation gap.
 It agrees with the preceding sparse-cutoff measurement (256.8 ms) within noise.
