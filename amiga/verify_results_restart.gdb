@@ -16,26 +16,25 @@ commands
 end
 break downwellResultsRestartReady
 continue
-if gDownwellPreciseMaskChecks != 2
-    printf "Native terrain mask probe did not complete\n"
-    quit 1
-end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
-if $owner->owner_.control_.bank_ == 0
-    printf "Full-service reference scene is missing scalar control backing\n"
+if $owner->collisionConsumersAdmitted_ || !$owner->native_ || !$owner->sceneryLayers_
+    printf "Results re-entry is not exercising shipping native scene admission\n"
     quit 1
 end
-printf "Reference scalar control: %lu resident bytes\n", sizeof(*$owner->owner_.control_.bank_)
-if $owner->terrain_.records_ == 0
-    printf "Full-service scene fixture is missing scalar terrain backing\n"
+if $owner->owner_.control_.bank_ != 0 || $owner->terrain_.records_ != 0
+    printf "Reference control/terrain backing resident after native re-entry\n"
     quit 1
 end
-if $owner->geometry_ == 0
-    printf "Full-service scene fixture is missing its admitted collision geometry\n"
+if $owner->geometry_ != 0 || $owner->nativeCollisionStorage_ != 0
+    printf "Unadmitted collision backing resident after native re-entry\n"
     quit 1
 end
-printf "Full-service collision geometry: %lu resident bytes\n", sizeof(*$owner->geometry_)
-printf "Initial Chip allocation: free=%lu largest=%lu remaining=%lu; native terrain mask checks=%lu\n", gDownwellStartupChipFree, gDownwellStartupChipLargest, gDownwellStartupChipRemaining, gDownwellPreciseMaskChecks
+if $owner->owner_.index_.tree_.tree_ != 0 || $owner->owner_.index_.operations_.bank_ != 0 || $owner->owner_.index_.population_ != 0
+    printf "Unadmitted spatial service resident or populated after native re-entry\n"
+    quit 1
+end
+printf "Native re-entry: external backend retained; no reference control, terrain, geometry, queue, tree or journal allocation\n"
+printf "Initial Chip allocation: free=%lu largest=%lu remaining=%lu\n", gDownwellStartupChipFree, gDownwellStartupChipLargest, gDownwellStartupChipRemaining
 if gDownwellResultsRestartCount != 3 || gDownwellResultsRestartMask != 7
     printf "Not all results destinations executed\n"
     quit 1

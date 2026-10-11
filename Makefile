@@ -3206,9 +3206,7 @@ verify-amiga-scenes:
 
 .PHONY: verify-amiga-results-restart
 verify-amiga-results-restart:
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1'
-	bash -c '. amiga/env.sh && GDB_SOURCE=verify_results_restart.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="all results destinations and gameplay reentry" amiga/verify_startup.sh'
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_results_restart.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="native scene admission across all results destinations and gameplay reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-180} amiga/verify_startup.sh'
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'

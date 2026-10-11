@@ -1832,9 +1832,10 @@ __attribute__((noinline)) static int runDownwell(void) {
     alignas(downwell::GameplayCollisionOwner) static UBYTE collisionStorage[sizeof(downwell::GameplayCollisionOwner)];
     // Gameplay answers wall collision from the occupancy grid, never
     // dispatches wall End Step and issues no spatial query through the owner,
-    // so it keeps only actor order. The scene, field and entry fixtures
-    // exercise the complete registered reference.
-#if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
+    // so it keeps only admitted event order. Scene, field and entry fixtures
+    // exercise the complete reference; results/re-entry deliberately exercises
+    // shipping native ownership across all three results destinations.
+#if (defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::reference;
 #elif defined(DOWNWELL_SCENERY_LAYERS)
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::nativeScenery;
@@ -1842,7 +1843,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::native;
 #endif
     downwell::GameplayCollisionOwner::ReferenceStorage* referenceStorage=nullptr;
-#if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
+#if (defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
     using ReferenceStorage=downwell::GameplayCollisionOwner::ReferenceStorage;
     alignas(ReferenceStorage) static UBYTE referenceMemory[sizeof(ReferenceStorage)];
     referenceStorage=new(referenceMemory) ReferenceStorage;
@@ -2134,7 +2135,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         worldViewX = mainViewX + port.cameraOffsetX();
         worldViewY = mainInitialViewY + port.cameraOffsetY();
         terrainCollision.index = &terrainIndex;
-#ifdef DOWNWELL_SCENE_VERIFY
+#if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)
         // Exercise the target's actual precise-mask route, not an occupancy
         // answer. This does not replace the legacy live collision adapters.
         // The verification callback probes resources only, not game events.

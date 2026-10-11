@@ -15,8 +15,8 @@ their terrain is owned by `nativeTerrainStorage` below. There is no allocation
 fallback. An undeclared scalar birth fails, while empty lookup/clear remain
 safe. Bind fresh backing once and keep it alive throughout the borrower's
 use; clear preserves lifetime generations for Retry rather than rebinding.
-Startup/contact guards require absent backing, the full-service re-entry
-fixture requires it present, and a host size assertion prevents embedding
+Startup/contact guards require absent backing, full-service reference
+fixtures require it present, and a host size assertion prevents embedding
 the arrays in the scalar service again. This is ordinary-memory residency,
 not Chip-memory savings or a new terrain registry encoding.
 The 68000 bank is 152,064 bytes; replacing the embedded arrays with three
@@ -280,6 +280,20 @@ under external admission; terrain population queries fail without replacing
 the output with an empty count. Diagnostic registration walks describe only
 the admitted registry, while ownership replay also compares native terrain
 identities, chronology and destruction marks before cleanup.
+
+`make verify-amiga-results-restart` uses native-scenery ownership and external
+collision admission, not the full-service owner selected by the other scene
+oracles. It injects results readiness and then exercises production confirmation,
+Retry, style-selection and surface-return paths, ending after 200 gameplay
+updates. The debugger requires absent scalar control/terrain, geometry,
+collision backing, spatial tree and journal after re-entry. Existing counters
+also verify HUD contents and CPU/DMA art retention, release and reload across
+the four gameplay entries. Source-mask querying remains in the separate scene
+and field fixtures; its unused probe counter is not a native admission check.
+The results target bounds the emulator run and restores a normal stripped
+executable through an exit trap, including on verification failure. This
+instrumented re-entry fixture is not a frame-time benchmark.
+
 Player, enemy and bullet position setters retain lifetime/ownership validation,
 but do not maintain the excluded backend's coordinate mirror. Player/enemy
 records own their integer positions; bullet `sourceMotion` owns the published
