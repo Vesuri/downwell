@@ -681,6 +681,7 @@ private:
         return check(okay&&recorded);
     }
     bool nativeCollisionVisual(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
+        DW_PROFILE_COUNT(counterCachedCollisionReads);
         if(wallQuery_&&wallQuery_->handle.slot==h.slot&&wallQuery_->handle.generation==h.generation){
             state=wallQuery_->state;sprite=wallQuery_->sprite;return true;
         }
@@ -1511,6 +1512,7 @@ public:
     // Explicit source dirty pass. It is not yet scheduled as a gameplay
     // collision pass: complete animation/scene publication remains required.
     bool flushNativeSpatial(){
+        DW_PROFILE_COUNT(counterCollisionDirtyPasses);
         if(!native_||!valid())return false;
         return check(nativeSpatialDirty_.flush([&](unsigned slot){
             std::uint32_t flags=0;
@@ -1525,6 +1527,7 @@ public:
     // separate: this must not dispatch partial family passes in gameplay.
     template<unsigned Pairs> bool collectCollisionPairs(
         RunnerCollisionPairs<View::capacity,Pairs>& pairs,bool indexAvailable=true){
+        DW_PROFILE_COUNT(counterCollisionPairPasses);
         if(!valid())return false;
         if(!native_)return check(owner_.collectCollisionPairs(pairs,indexAvailable,
             [&](InstanceHandle h,bool publish){return refresh(h,publish);},
@@ -1675,6 +1678,7 @@ public:
     // Explicit publication for integration tests and future lazy collision
     // refresh. This does not flush the mixed queue or admit native selectors.
     bool nativeActorBounds(InstanceHandle h,Owner::Box& bounds,bool refreshBounds=false){
+        DW_PROFILE_COUNT(counterCachedCollisionReads);
         if(!native_||!valid()||(refreshBounds&&!refreshNativeActor(h,true)))return false;
         std::uint32_t flags;if(!eligibilityFlags(h,flags))return false;
         const auto* state=nativePosition(h.slot);if(!state)return false;
@@ -3878,6 +3882,7 @@ private:
             });
     }
     bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
+        DW_PROFILE_COUNT(counterObjectQueryPreparations);
         if(!valid()||!world_||!native_)return check(false);
         if(object==82){if(!timeFieldFamily_)return check(false);}
         else if(object==90||object==83){/* No terrain descendants; use every registered subtype. */}

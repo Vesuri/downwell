@@ -507,6 +507,17 @@ horizontal clipping and presentation validation can still suppress drawing.
 These counters isolate selection cost from the exposed-row raster policy;
 a large examined count does not mean the whole level is being repainted.
 
+`Collision consumers` reports four independent operations: direct native
+cached-bounds reads (including explicit `nativeActorBounds`), collision-pair
+collection, mixed dirty-bound flushes and native object-query preparation.
+These are entry counts, including failed calls, not timings; a pair pass may
+also perform a dirty flush and direct reads. They compile away outside PROBES.
+Like the other gameplay counters, they reset after cold gameplay setup.
+Zero tree queries alone does not establish that cached geometry is unused.
+Zero consumer counts establish only the measured live workload, not cold
+construction, unvisited events or later areas. Use source call-path checks and
+explicit admission guards before removing state needed by these consumers.
+
 Phase 96 isolates pending destroyed-instance sweeps at Draw entry from phase 4
 (the historical `title` label also covers gameplay HUD/overlay updates). It
 excludes nested spatial removals; frames without a pending sweep do not enter

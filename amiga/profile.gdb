@@ -95,6 +95,7 @@ printf "Spatial publications: first=%lu reinsert_equal=%lu reinsert_changed=%lu\
 printf "Spatial reads: box=%lu line=%lu height=%lu node_count=%lu\n", gDownwellProfileCounters[21], gDownwellProfileCounters[22], gDownwellProfileCounters[23], gDownwellProfileCounters[24]
 printf "Spatial journal: queued=%lu serviced=%lu pressure_drains=%lu eager_fallbacks=%lu\n", gDownwellProfileCounters[25], gDownwellProfileCounters[26], gDownwellProfileCounters[27], gDownwellProfileCounters[28]
 printf "Terrain wall selection: passes=%lu records_examined=%lu row_candidates=%lu\n", gDownwellProfileCounters[29], gDownwellProfileCounters[30], gDownwellProfileCounters[31]
+printf "Collision consumers: cached_reads=%lu pair_passes=%lu dirty_passes=%lu object_query_preparations=%lu\n", gDownwellProfileCounters[32], gDownwellProfileCounters[33], gDownwellProfileCounters[34], gDownwellProfileCounters[35]
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

@@ -18,6 +18,8 @@ enum DownwellProfileCounter {
     counterSpatialJournalPressure, counterSpatialJournalFallback,
     counterTerrainWallPasses, counterTerrainWallRecords,
     counterTerrainWallRowCandidates,
+    counterCachedCollisionReads, counterCollisionPairPasses,
+    counterCollisionDirtyPasses, counterObjectQueryPreparations,
     profileCounterCount
 };
 #ifdef DOWNWELL_PROBES
