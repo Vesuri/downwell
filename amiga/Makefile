@@ -779,7 +779,9 @@ check:
 	@echo "Amiga 68000 toolchain OK"
 
 .PHONY: FORCE_HUNK_OPTIONS
-$(OUT).exe: $(OUT).elf FORCE_HUNK_OPTIONS
+# Audit even an up-to-date ELF: a rejected link remains on disk, and a
+# subsequent make must not publish it merely because linking is now skipped.
+$(OUT).exe: $(OUT).elf FORCE_HUNK_OPTIONS | audit
 	@mkdir -p $(@D)
 	@printf '%s\n' '$(STRIP)' > $(OUT).hunk-options.tmp
 	@if [ ! -f $@ ] || [ $< -nt $@ ] || ! cmp -s $(OUT).hunk-options.tmp $(OUT).hunk-options; then \
@@ -791,7 +793,6 @@ $(OUT).elf: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) -o $@
 	$(OBJDUMP) --disassemble --no-show-raw-ins -S $@ > $(OUT).s
-	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
 		$(REPO)/generated/amiga-game-planes.h \
@@ -1102,7 +1103,7 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
-audit:
+audit: $(OUT).elf
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'fieldBandPixels|fieldColumnWords'; then \
 		echo "*** gameplay field upload pixels must be scene-loaded, not linked"; exit 1; \
 	else echo "Field image source linkage audit: clean"; fi

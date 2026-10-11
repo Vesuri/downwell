@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 import sys
 import struct
+import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +25,31 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_rejected_elf_cannot_bypass_audit_on_retry(self):
+        makefile = (ROOT / 'amiga/Makefile').read_text()
+        # Exercise the production Hunk publication rule with an existing ELF
+        # and executable, not a reimplementation of its dependency ordering.
+        begin = makefile.index('.PHONY: FORCE_HUNK_OPTIONS')
+        end = makefile.index('\n$(OUT).elf:', begin)
+        rule = makefile[begin:end]
+        self.assertIn('audit: $(OUT).elf\n', makefile)
+        with tempfile.TemporaryDirectory(prefix='downwell-scene-guard-') as directory:
+            root = Path(directory)
+            (root / 'Downwell.elf').write_bytes(b'existing rejected ELF')
+            executable = root / 'Downwell.exe'
+            executable.write_bytes(b'previous accepted executable')
+            (root / 'Downwell.hunk-options').write_text('1\n')
+            harness = ('OUT := Downwell\nSTRIP := 1\n.PHONY: audit\n' + rule +
+                       '\naudit: $(OUT).elf\n\t@echo AUDIT_REJECTED\n\t@false\n')
+            for _ in range(2):
+                result = subprocess.run(['make', '-j4', '-f', '-', 'Downwell.exe'],
+                                        input=harness, text=True, cwd=root,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn('AUDIT_REJECTED', result.stdout)
+                self.assertEqual(executable.read_bytes(), b'previous accepted executable')
+                self.assertFalse((root / 'Downwell.hunk-options.tmp').exists())
+
     def test_shipping_load_path_audit(self):
         cavern = b'PROGDIR:Downwell.cavern\0PROGDIR:Downwell.cavernplanes\0'
         self.assertEqual(audit.violations(cavern), [])
