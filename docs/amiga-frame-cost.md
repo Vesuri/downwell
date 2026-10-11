@@ -48,6 +48,47 @@ Reference report/ELF: `tmp/baseline-exact-windows-report.txt` and
 
 ## Phase attribution at the current baseline
 
+### Firing versus retirement boundaries
+
+A bounded recheck at `f1b720e7` separates two early contact-tape spikes before
+any enemies are allocated. These are different structures, not one repeated
+HUD cost. Values are inclusive milliseconds; nested rows must not be added.
+
+| Boundary | Frame 54 (shot birth) | Frame 60 (retirement) |
+| --- | ---: | ---: |
+| Whole frame | 46.40 | 44.69 |
+| Gameplay Step | 29.76 | 30.01 |
+| Projectile Step, all live bullets | 7.74 | 4.25 |
+| Actor End Step, including admission | 0.94 | 12.99 |
+| Bullet End Step, inside actor End Step | — | 7.50 |
+| Generic projectile retirement, inside bullet End Step | — | 6.28 |
+| Actor draw collection | 5.27 | 4.4 |
+
+Frame 54 spends 3.16 ms in one birth and 3.19 ms in room animation; its
+ammo redraw is 3.57 ms. Native birth itself is 2.34 ms, so removing only that
+adapter cannot recover the entire shot spike. The projectile initialization
+trigonometry is 1.76 ms, below the structural work threshold.
+
+Frame 60 leaves `tryNativeActorEndStepInterior` and enters the complete
+captured dispatcher (11.84 ms). Generic projectile retirement reads published
+Y four times, performs source binary64 threshold arithmetic/comparisons, and
+publishes destruction. The no-op proof does not cover this boundary. A typed
+production phase is a candidate, not an implemented saving: it must retain
+player-before-boxes-before-actors order, thin-platform retirement, captured
+birth cutoffs, activation and destruction/failure prefixes. The existing
+callback adapter is still required for mutable or unsupported environments.
+Merely changing snapshot traversal repeats a rejected approach.
+
+Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 STRIP=1
+VERIFY_TIMEOUT_SECONDS=120 TRACE_FRAMES=53 TRACE_FIELDS=24
+TRACE_OUTPUT="$PWD/tmp/trace/shot-phase" bash amiga/profile.sh trace`.
+Run the reporter separately with `--frames 54` and `--frames 60 --causes`.
+One window avoids overlapping capture markers. Reports are
+`tmp/shot-phase-{54,60}.txt`; trace ELF SHA-256:
+`f3c1583bd48bf842f5ace001d9e282e7e11d767f4b612f404d8999d20f040ed0`.
+The normal stripped build is restored after the bounded run. This audit
+identifies remaining work; it is not a performance improvement.
+
 The independent no-input generation gate uses
 [`amiga-idle-frame-baseline.json`](amiga-idle-frame-baseline.json), captured at
 `27ff7482`. Do not compare these frame numbers with the contact tape. Reproduce
