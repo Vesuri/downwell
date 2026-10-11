@@ -1501,7 +1501,19 @@ private:
     Binding<GameplayDitherAbove::Record,View::Kind::ditherAbove> aboveBinding_{*this};
     GameplayDitherAbove above_{GameplayDitherAbove::Binding::bindDestruction(aboveBinding_)};
     Binding<GameplayBuilderController::Record,View::Kind::builder> builderBinding_{*this};
-    GameplayBuilderController builderController_{GameplayBuilderController::Binding::bindMovement(builderBinding_)};
+    GameplayBuilderController builderController_{GameplayBuilderController::Binding::bindMovement(builderBinding_),
+        &builderBinding_,[](void* context,const GameplayBuilderController::Record& record,
+                           GameplayBuilderController::Publication& publication){
+            auto& binding=*static_cast<Binding<GameplayBuilderController::Record,View::Kind::builder>*>(context);
+            auto& owner=binding.parent;
+            if(!owner.native_||owner.collisionConsumersAdmitted_)return true;
+            InstanceHandle shared;
+            if(!binding.key({0,record.lifetimeId},record,shared))return false;
+            auto* position=owner.nativePosition(shared.slot);
+            if(!owner.check(position!=nullptr))return false;
+            publication={&position->x,&position->y,&position->appearanceFlags};
+            return true;
+        }};
     Binding<GameplayPlayerControllers::Record,View::Kind::playerController> playerControllerBinding_{*this};
     GameplayPlayerControllers playerControllers_{GameplayPlayerControllers::Binding::bindDestruction(playerControllerBinding_)};
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};

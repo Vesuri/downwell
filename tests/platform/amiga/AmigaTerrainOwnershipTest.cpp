@@ -127,6 +127,7 @@ struct Scene {
     AmigaGameplayGeneration generation;
     downwell::CollisionOwnerFixture owner;
     std::unique_ptr<AmigaPortRuntime> world;
+    bool nativeOwner=false;
     Scene(const downwell::BuilderPatternPack& patterns,const downwell::ObjectPack& objects,
           const downwell::SpriteCollisionPack& sprites,const downwell::RoomPack& rooms,
           const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership,
@@ -134,6 +135,7 @@ struct Scene {
         :collision{nullptr,nullptr,&patterns,nullptr,0,nullptr},
          lifetimes(nativeLifetimes?std::make_unique<AmigaGameplayGeneration::TerrainLifetimes>():nullptr),
          generation(builder,patterns,objects,index,tiles,lifetimes.get()){
+        nativeOwner=ownership==Ownership::native||ownership==Ownership::nativeScenery;
         owner=downwell::makeCollisionOwner(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
             &rooms,ownership,nativeBoxes,nativeFields,!noQueries);
@@ -168,6 +170,20 @@ struct Scene {
     std::uint64_t digest(){
         downwell::StateDigest d;
         const auto& w=*world;
+        const auto* controller=w.builderController();
+        require(controller!=nullptr,"builder controller is scene-owned");
+        const auto local=controller->handle();const auto* record=controller->find(local);
+        require(record!=nullptr,"builder survives generation phase");
+        downwell::InstanceHandle shared;
+        require(View::encode(View::Kind::builder,local,shared),"builder public identity");
+        downwell::RunnerImageValue x,y;
+        if(nativeOwner)require(owner->nativePublishedPosition(shared,x,y),"builder native publication");
+        else {
+            const auto* state=owner->state(shared);require(state!=nullptr,"builder reference publication");
+            x=state->x;y=state->y;
+        }
+        require(x.bits==record->x.bits&&y.bits==record->y.bits,"builder record and mirror agree after generation");
+        d.addU32(local.generation);d.addU32(record->sourceId);d.addU32(x.bits);d.addU32(y.bits);
         d.addU64(w.checkpoint());d.addU64(w.randomDrawCount());
         const auto& random=w.randomState();
         d.addU32(random.seed());d.addU32(unsigned(random.stateIndex()));

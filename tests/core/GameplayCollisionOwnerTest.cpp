@@ -1417,6 +1417,47 @@ int main(){
         assert(!result.position(0,0)&&!healthy&&!result.valid());
         healthy=true;GameplayBuilderController builder;builder.observeFailure(healthy);
         assert(!builder.position(0,0)&&!healthy&&!builder.valid());
+        {
+            struct Mirror {
+                RunnerImageValue x{},y{};std::uint32_t flags=0;
+                unsigned acquisitions=0;bool reject=false;
+                static bool acquire(void* p,const GameplayBuilderController::Record&,
+                                    GameplayBuilderController::Publication& out){
+                    auto& m=*static_cast<Mirror*>(p);++m.acquisitions;
+                    if(m.reject)return false;
+                    out={&m.x,&m.y,&m.flags};return true;
+                }
+            } mirror;
+            GameplayBuilderController leased({},&mirror,Mirror::acquire);
+            assert(leased.create(100856,-16,704));
+            const auto key=leased.handle();const auto* retained=leased.find(key);
+            assert(leased.withGeneration([]{return true;})&&!mirror.acquisitions);
+            // A failed nested birth retains each completed row, including
+            // through a Record pointer captured before entering generation.
+            assert(!leased.withGeneration([&]{
+                for(int y=720;y<=800;y+=16){
+                    assert(leased.position(-16,y));RunnerImageValue expected;
+                    assert(expected.assignInteger(y)&&retained->y.bits==expected.bits&&
+                           mirror.y.bits==expected.bits&&mirror.x.bits==retained->x.bits);
+                }
+                return false;
+            }));
+            assert(leased.valid()&&mirror.acquisitions==1&&(mirror.flags&8u));
+            assert(leased.withGeneration([&]{return leased.position(-16,816);})&&mirror.acquisitions==2);
+            const auto last=retained->y.bits;mirror.reject=true;
+            assert(!leased.withGeneration([&]{return leased.position(-16,832);})&&
+                !leased.valid()&&retained->y.bits==last&&mirror.y.bits==last);
+            mirror.reject=false;
+            GameplayBuilderController retiring({},&mirror,Mirror::acquire);
+            assert(retiring.create(100856,-16,704));
+            assert(!retiring.withGeneration([&]{
+                return retiring.position(-16,720)&&retiring.clear();
+            })&&
+                retiring.find(retiring.handle()));
+            GameplayBuilderController unleased;
+            assert(unleased.create(100856,-16,704));
+            assert(unleased.withGeneration([&]{return unleased.clear();}));
+        }
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery}){
             auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},nullptr,mode);

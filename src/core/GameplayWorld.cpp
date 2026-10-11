@@ -1737,8 +1737,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         const long bottom = generationCameraY + 318L * 256L;
         const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
                                               : -(int)((-bottom) / 256);
-        generationSucceeded_ = generationStep_(generationContext_, *this,
-                                               enemyRandom_, bottomCeiling);
+        const auto generate=[&]{return generationStep_(generationContext_, *this,
+                                                      enemyRandom_, bottomCeiling);};
+        generationSucceeded_ = builderController_?builderController_->withGeneration(generate):generate();
         if (!generationSucceeded_) return {};
     }
 
