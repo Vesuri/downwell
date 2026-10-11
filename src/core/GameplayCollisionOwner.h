@@ -2666,24 +2666,30 @@ private:
     }
     // This specialization is only for the pinned production objBox_n End Step,
     // not arbitrary event callbacks. Native box positions and autoTile are
-    // immutable after admission. A boundary crossing retains the exact ordered
-    // walk; births during earlier callbacks cannot enter its captured prefix.
+    // immutable after admission. A boundary crossing retains the ordered walk,
+    // but only potentially effectful events enter the generic dispatcher.
+    // Births during earlier callbacks cannot enter its captured prefix.
     template<class Execute>
     bool dispatchStationaryBoxes(GameplayWorld::BoxAlarmPrefix boxes,long topQ12,Execute execute){
         if(boxRetirementWindow_.contains(topQ12,boxes.lastLifetime))return true;
         auto proof=boxRetirementWindow_.begin(boxes.lastLifetime);
-        const bool okay=dispatchNativeBoxes(boxes,[&](InstanceHandle h,int object){
-            const auto& box=world_->breakableSlot(h.slot-View::breakableBase);
-            if(!execute(h,object))return false;
+        for(unsigned i=0;i<boxes.end&&i<world_->breakableSlots();++i){
+            const auto& box=world_->breakableSlot(i);
+            if(!box.nativeRegistration||box.lifetimeId>boxes.lastLifetime||!box.active||box.destroyRequested||
+                (nativeBoxFlags_&0x100003u))continue;
+            const bool ordinary=!box.state.autoTile&&box.y>=-521464&&box.y<=523951;
+            if(!ordinary||!StationaryRetirementWindow::interior(box.y+176,topQ12)){
+                const InstanceHandle h{View::breakableBase+i,box.lifetimeId};
+                if(!check(execute(h,92))||!valid())return false;
+            }
             // Removal only shrinks the set. Retained old extremes are safe
             // until a camera crossing rebuilds this proof from survivors.
-            if(box.destroyRequested)return true;
-            if(box.state.autoTile||box.y < -521464||box.y > 523951)proof.supported=false;
+            if(box.destroyRequested)continue;
+            if(!ordinary)proof.supported=false;
             else proof.include(box.y+176);
-            return true;
-        });
-        if(okay)boxRetirementWindow_.complete(proof);
-        return okay;
+        }
+        boxRetirementWindow_.complete(proof);
+        return true;
     }
     bool retireThinPlatforms(long topQ12,std::uint32_t cutoff){
         const bool retain=native_&&world_->nativeTerrainInstances();

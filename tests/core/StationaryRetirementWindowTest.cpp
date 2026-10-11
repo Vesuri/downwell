@@ -20,6 +20,14 @@ int main() {
                     [&](unsigned i){return LifetimeInstance{93,first+int(i)*128,true};},
                     [&](unsigned){++destroyed;return true;}));
                 assert(window.contains(top,9)==(destroyed==0));++checks;
+                for(int y:{first,first+128}){
+                    unsigned retired=0;
+                    assert(retireMainRoomObjectsChecked(1,11,1,top,
+                        [&](unsigned){return LifetimeInstance{92,y,true};},
+                        [&](unsigned){++retired;return true;}));
+                    assert(StationaryRetirementWindow::interior(y,top)==(retired==0));
+                    ++checks;
+                }
             }
         assert(!window.contains(first*4096L,10)); // A different phase birth ceiling.
         window.invalidate();assert(!window.contains(first*4096L,9));
@@ -33,8 +41,14 @@ int main() {
     window.append(-10000,true,14);assert(!window.contains(0,14));
     window.complete(duringBirth);assert(!window.contains(0,13));
     for(int y : {-2147483647,2147483647}) {
+        assert(!StationaryRetirementWindow::interior(y,0));
         auto unsupported=window.begin(12);unsupported.include(y);window.complete(unsupported);
         assert(!window.contains(0,12));
     }
+    // Match the whole-set certificate's safe 32-bit camera domain. Even a
+    // mathematically interior point must not bypass the retained path outside
+    // the domain where both original view-offset operations are defined.
+    assert(!StationaryRetirementWindow::interior(-521288,-2146828289L));
+    assert(!StationaryRetirementWindow::interior(524127,2135195648L));
     std::printf("Stationary retirement: %u exact boundary/oracle checks passed\n",checks);
 }

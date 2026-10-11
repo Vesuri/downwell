@@ -50,11 +50,6 @@ behavior, both backend integrations and relevant original-game verification.
      variants (see the rejected-approaches table).
      Use the current actor-event audit; do not start another capture/traversal
      or individual setter optimization without a structural removal.
-     At stationary-box retirement boundaries, replace the fallback's generic
-     event dispatch for interior survivors at the family boundary. Preserve
-     the captured birth ceiling, eligibility, destruction order, unsupported
-     autoTile behavior and subsequent Draw cleanup. Retain the existing ordered
-     dispatcher as oracle; do not replace its small helpers individually.
   3. Add regression fixtures that add unrelated resources/families and verify
      unchanged current-scene residency and work counts, alongside replay and
      bounded native timing gates. Transition-only preparation must not run in

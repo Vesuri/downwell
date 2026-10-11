@@ -8,6 +8,13 @@ namespace downwell {
 // runs the original ordered event walk. Bounds are inclusive (source LT/GT).
 class StationaryRetirementWindow {
 public:
+    // Exact no-op admission for one pinned scrOutofview event. Keep unusual
+    // coordinates on the retained event path, including its failure behavior.
+    static bool interior(int y,long topQ12) {
+        return topQ12>=-2146828288L&&topQ12<=2135195647L&&
+            y>=-521288&&y<=524127&&
+            topQ12>=(y-3000)*4096L&&topQ12<=(y+160)*4096L;
+    }
     struct Proof {
         std::int32_t low=-2146828288, high=2135195647;
         std::uint32_t revision=0, cutoff=0;
