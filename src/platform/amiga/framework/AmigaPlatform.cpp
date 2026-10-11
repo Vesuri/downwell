@@ -72,7 +72,12 @@ void AmigaPlatform::endIo()
 
 LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)
 {
+    DW_PROFILE_SCOPE(profileSceneFileIo);
     if (!DOSBase || !destination) return -1;
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+    const ULONG osFieldsBefore = active_ ?
+        *static_cast<volatile ULONG*>(&GfxBase->VBCounter) : 0;
+#endif
     if (active_) beginIo();
     LONG read = -1;
     const BPTR file = Open((CONST_STRPTR)name, MODE_OLDFILE);
@@ -82,6 +87,15 @@ LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)
     }
     if (active_) {
         endIo();
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+        // VBCounter runs only while the OS owns VERTB. Transfer its elapsed
+        // fields before the phase's next beam stamp; do not race our ISR's
+        // read/modify/write of the same profiling epoch.
+        Disable();
+        downwellProfileOsFields(
+            *static_cast<volatile ULONG*>(&GfxBase->VBCounter)-osFieldsBefore);
+        Enable();
+#endif
         // graphics.library's VERTB server may have loaded its own copper
         // list, and the OS may have left a blit running.
         AmigaHardware::blitterDrain();

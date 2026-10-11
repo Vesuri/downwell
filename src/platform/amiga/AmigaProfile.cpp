@@ -69,6 +69,7 @@ volatile ULONG gDownwellProfileTargetScene = 1;
 volatile ULONG gDownwellProfileTargetFrames = 180;
 #endif
 volatile ULONG gDownwellProfileVbi;
+volatile ULONG gDownwellProfileOsFieldCount;
 volatile ULONG gDownwellProfileDamageBirths;
 // Read-only, pre-Step coverage samples. Enemy slots are allocated records,
 // not an active/on-screen count. Dead samples must not masquerade as combat.
@@ -215,6 +216,17 @@ void downwellProfileVblank()
 #endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
     gDownwellProfileEpoch += ticksPerField;
+#endif
+}
+
+void downwellProfileOsFields(unsigned long fields)
+{
+    // loadFile borrows the OS VERTB chain. Those fields do not invoke our
+    // handler, but still belong to the active frame and its current phase.
+    gDownwellProfileOsFieldCount += fields;
+    gDownwellProfileVbi += fields;
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
+    gDownwellProfileEpoch += fields * ticksPerField;
 #endif
 }
 

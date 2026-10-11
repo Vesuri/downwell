@@ -13,6 +13,8 @@ printf "ROOM_PLAN startup bind: ticks=%lu ms=%.3f\n", gDownwellRoomPlanTicks, gD
 printf "ENTRY scene banks: transient_loads=%lu discarded_for_entry=%lu results_frames=%lu field_loads=%u\n", gDownwellTransientLoads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames, gDownwellFieldBandLoads
 printf "ENTRY attribution: room_admission_phase=%u game_art_admission_phase=%u (exclusive phase ticks; nested phases reported separately)\n", profileEntryRoomAdmission, profileEntryGameArtAdmission
 printf "ENTRY room detail: pattern_lease_phase=%u metadata_phase=%u creates_phase=%u\n", profileEntryPatternLease, profileEntryRoomMetadata, profileEntryRoomCreates
+printf "ENTRY scene file IO: phase=%u (includes OS handoff and DMA retirement)\n", profileSceneFileIo
+printf "ENTRY profiling clock: recovered_OS_fields=%lu\n", gDownwellProfileOsFieldCount
 if @VERIFY_AMMO@
     printf "ENTRY ammo pixels: checks=%lu failures=%lu prepared=%lu\n", gDownwellAmmoChecks, gDownwellAmmoFailures, gDownwellAmmoFactoredUses
     if gDownwellAmmoChecks == 0 || gDownwellAmmoFailures != 0 || gDownwellAmmoFactoredUses == 0

@@ -67,6 +67,7 @@ enum DownwellProfilePhase {
     profileAmmoArtAdmission,
     profileEntryRoomAdmission, profileEntryGameArtAdmission,
     profileEntryPatternLease, profileEntryRoomMetadata, profileEntryRoomCreates,
+    profileSceneFileIo,
     profilePhaseCount
 };
 
