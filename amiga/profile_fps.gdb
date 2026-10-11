@@ -150,6 +150,11 @@ if $owner->sprites_.prepared_ != 0
     quit 1
 end
 printf "Sprite descriptor cache: resident=0\n"
+if $owner->bones_.records_ != 0 || $owner->skeletons_.records_ != 0
+    printf "Cavern gameplay retained unadmitted skeleton encounter records\n"
+    quit 1
+end
+printf "Skeleton encounter records: resident=0\n"
 if $owner->nativeCollisionStorage_ != 0
     printf "External collision backend retained unused queue/mask backing\n"
     quit 1

@@ -88,6 +88,11 @@ public:
         PreparedSpriteGeometry<741> sprites;
         PreparedTerrainBirthBounds terrain;
     };
+    struct SkeletonEncounterStorage {
+        GameplayWorld::Bones::Storage bones;
+        GameplayWorld::Skeletons::Storage skeletons;
+    };
+    bool hasSkeletonEncounterStorage()const{return bones_.hasStorage()&&skeletons_.hasStorage();}
     struct ReferenceStorage {
         Owner::ControlStorage control;
         Owner::State states[View::capacity]{};
@@ -1550,7 +1555,8 @@ public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference,bool nativeBoxes=true,bool nativeFields=true,
-        ReferenceStorage* reference=nullptr,NativeCollisionStorage* nativeCollision=nullptr):
+        ReferenceStorage* reference=nullptr,NativeCollisionStorage* nativeCollision=nullptr,
+        SkeletonEncounterStorage* encounter=nullptr):
         nativeCollisionStorage_(nativeCollision),
         objects_(objects),sprites_(sprites),layers_(rooms),
         native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
@@ -1577,7 +1583,8 @@ public:
         if(!native_&&!terrain_.bindStorage(reference->terrain)){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
         geometry_=native_?(nativeCollision?&nativeCollision->geometry:nullptr):&reference->geometry;
-        good_=(!geometry_||sprites_.prepare(geometry_->descriptors,741))&&objectDefaults_.prepare(objects,sprites_)&&
+        good_=(!encounter||(bones_.bindStorage(&encounter->bones)&&skeletons_.bindStorage(&encounter->skeletons)))&&
+            (!geometry_||sprites_.prepare(geometry_->descriptors,741))&&objectDefaults_.prepare(objects,sprites_)&&
             (!geometry_||(geometry_->sprites.prepare(sprites_)&&
                          geometry_->terrain.prepare(objectDefaults_,sprites_)))&&
             nativeTerrainCreate_.prepare(objectDefaults_,sprites_)&&

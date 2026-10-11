@@ -824,6 +824,21 @@ block, requested asset bytes and remaining Chip memory after allocations.
 
 ## Ordinary memory
 
+Skeleton and bone records borrow an explicit
+`GameplayCollisionOwner::SkeletonEncounterStorage` bank. Cavern startup and
+contact-profile guards require both pointers to be null; there is no implicit
+allocation on a birth. An unadmitted birth fails before family-local lifetime
+allocation, RNG consumption or publication. Stored/reference registrations
+explicitly own their backing and retain the same record capacity and behavior.
+The bank must outlive its borrowers. Binding or withdrawing backing is allowed
+only with no live records and no executing event; supplied backing must be
+empty. Retirement followed by withdrawal and re-entry preserves generation
+counters, so old handles cannot address replacement actors. These are ordinary
+records, not sprite pixels or Chip allocations. Moving them out of the native
+owner removes 19,128 bytes on the 68000, net of two borrowed pointers. This does
+not install the still-unfinished registered skeleton encounter in production
+or partition every other family's storage.
+
 `AmigaActorFrames` owns 45,138 bytes of static ordinary-memory render bindings
 on the 68000: canvas geometry, immutable sprite-part pointers and a bounded
 sparse frame index. It is prepared once per gameplay art lease, before

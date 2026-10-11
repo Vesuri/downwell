@@ -14,6 +14,7 @@ private:
     Entry entries_[Capacity]{};
     InstanceStore<WorldCapacity>& records_;const ObjectPack* objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;
+    typename Store::Storage storage_;
     Store store_{Store::Binding::bindPositionedActor(*this),{this,[](void* p,InstanceHandle key,const Record&){
         return static_cast<StoredSkeletonRegistration*>(p)->sync(key);
     }}};
@@ -43,7 +44,9 @@ private:
 public:
     StoredSkeletonRegistration(InstanceStore<WorldCapacity>& records,const ObjectPack* objects,
         InstanceLifecycleBinding lifecycle,std::uint32_t& nextId,const int& room,bool& good)
-        :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){}
+        :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){
+        if(!store_.bindStorage(&storage_))good_=false;
+    }
     StoredSkeletonRegistration(const StoredSkeletonRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
     bool endStep(InstanceHandle key,MotionBinary64 top,bool mainRoom){

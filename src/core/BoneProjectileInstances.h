@@ -21,6 +21,13 @@ public:
         bool active=true,destroyRequested=false; // Engine flags, not state.active.
     };
     using Binding=RecordLifecycleBinding<Record>;
+    struct Storage { Record records[Capacity]{}; };
+    bool hasStorage()const{return records_!=nullptr;}
+    bool bindStorage(Storage* storage){
+        if(!good_||count_||executing_.generation)return fail();
+        if(storage)for(const auto& record:storage->records)if(record.lifetimeId)return fail();
+        records_=storage?storage->records:nullptr;return true;
+    }
     explicit BoneProjectileInstances(Binding binding):binding_(binding){}
     BoneProjectileInstances(const BoneProjectileInstances&)=delete;
     BoneProjectileInstances& operator=(const BoneProjectileInstances&)=delete;
@@ -28,11 +35,11 @@ public:
     void observeFailure(bool& owner,CallbackFailureScopes& scopes){good_.observe(owner,scopes);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
-        return h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
+        return records_&&h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
     template<class Random> bool create(unsigned sourceId,int x,int y,Random& random,InstanceHandle& result){
         if(!good_)return false;
-        if(!binding_.hasOwner()||!sourceId||sourceId>0x7fffffffu||!next_||executing_.generation)return fail();
+        if(!records_||!binding_.hasOwner()||!sourceId||sourceId>0x7fffffffu||!next_||executing_.generation)return fail();
         unsigned slot=Capacity;
         for(unsigned i=0;i<Capacity;++i){
             if(records_[i].lifetimeId&&records_[i].sourceId==sourceId)return fail();
@@ -119,7 +126,7 @@ public:
     }
     bool clear(){
         if(executing_.generation)return fail();
-        for(unsigned i=0;i<Capacity;++i)if(records_[i].lifetimeId){
+        for(unsigned i=0;records_&&i<Capacity;++i)if(records_[i].lifetimeId){
             const InstanceHandle key{i,records_[i].lifetimeId};
             if(!binding_.retire(key,records_[i]))return fail();
             records_[i]={};--count_;
@@ -130,7 +137,7 @@ private:
     static bool same(InstanceHandle a,InstanceHandle b){return a.slot==b.slot&&a.generation==b.generation;}
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle h){return good_?const_cast<Record*>(find(h)):nullptr;}
-    Record records_[Capacity]{};Binding binding_;
+    Record* records_=nullptr;Binding binding_;
     unsigned next_=1,count_=0;CallbackFailureSignal good_=true;InstanceHandle executing_{};
 };
 }

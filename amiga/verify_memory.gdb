@@ -56,6 +56,11 @@ if $owner->sprites_.prepared_ != 0
     quit 1
 end
 printf "Startup sprite descriptor cache: resident=0\n"
+if $owner->bones_.records_ != 0 || $owner->skeletons_.records_ != 0
+    printf "Skeleton encounter records resident before scene admission\n"
+    quit 1
+end
+printf "Startup skeleton encounter: resident=0\n"
 if $owner->nativeCollisionStorage_ != 0
     printf "Unused collision queue/mask backing resident during startup\n"
     quit 1

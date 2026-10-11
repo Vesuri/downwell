@@ -20,6 +20,15 @@ public:
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
+    struct Storage { Record records[Capacity]{}; };
+    bool hasStorage()const{return records_!=nullptr;}
+    // The scene owns zero-initialized backing until after retirement. Never
+    // acquire storage implicitly from a birth or reset the lifetime counter.
+    bool bindStorage(Storage* storage){
+        if(!good_||count_||executing_.generation)return fail();
+        if(storage)for(const auto& record:storage->records)if(record.lifetimeId)return fail();
+        records_=storage?storage->records:nullptr;return true;
+    }
     struct Builtins {
         void* context=nullptr;
         bool (*publish)(void*,InstanceHandle,const Record&)=nullptr;
@@ -31,11 +40,11 @@ public:
     void observeFailure(bool& owner,CallbackFailureScopes& scopes){good_.observe(owner,scopes);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle key)const{
-        return key.generation&&key.slot<Capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
+        return records_&&key.generation&&key.slot<Capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
     }
     bool create(unsigned id,int x,int y,InstanceHandle& result){
         if(!good_)return false;
-        if(!id||id>0x7fffffffu||!next_||executing_.generation||!binding_.hasOwner())return fail();
+        if(!records_||!id||id>0x7fffffffu||!next_||executing_.generation||!binding_.hasOwner())return fail();
         unsigned slot=Capacity;
         for(unsigned i=0;i<Capacity;++i){
             if(records_[i].lifetimeId&&records_[i].sourceId==id)return fail();
@@ -176,7 +185,7 @@ public:
     }
     bool clear(){
         if(executing_.generation)return fail();
-        for(unsigned i=0;i<Capacity;++i)if(records_[i].lifetimeId){
+        for(unsigned i=0;records_&&i<Capacity;++i)if(records_[i].lifetimeId){
             if(!binding_.retire({i,records_[i].lifetimeId},records_[i]))return fail();
             records_[i]={};--count_;
         }
@@ -191,7 +200,7 @@ private:
     }
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle key){return good_?const_cast<Record*>(find(key)):nullptr;}
-    Record records_[Capacity]{};Binding binding_;Builtins builtins_;
+    Record* records_=nullptr;Binding binding_;Builtins builtins_;
     unsigned next_=1,count_=0;CallbackFailureSignal good_=true;InstanceHandle executing_{};
 };
 }

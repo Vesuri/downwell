@@ -1771,6 +1771,42 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(bool bone:{false,true}){
+        auto owner=makeCollisionOwner(objects,sprites,{}, {},nullptr,
+            GameplayCollisionOwner::Ownership::nativeScenery,true,true,false,false);
+        assert(owner->valid()&&!owner->hasSkeletonEncounterStorage()&&owner->declareExternalCollisionBackend());
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding());
+        assert(owner->attach(*world));
+        const auto draws=world->randomDrawCount();InstanceHandle missing{19,23};
+        assert(!(bone?world->createBoneWithSourceId(709001,240,192,missing):
+            world->createSkeletonWithSourceId(709001,240,192,missing)));
+        assert(!owner->valid()&&!world->effectsSucceeded()&&world->randomDrawCount()==draws&&
+            missing.slot==19&&missing.generation==23&&!owner->bones().size()&&!owner->skeletons().size());
+    }
+    {
+        auto owner=makeCollisionOwner(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding());
+        assert(owner->hasSkeletonEncounterStorage()&&owner->attach(*world));
+        InstanceHandle skeleton,bone;
+        assert(world->createSkeletonWithSourceId(709010,240,192,skeleton)&&
+            world->createBoneWithSourceId(709011,240,192,bone));
+        assert(owner->skeletons().markDestroyed(skeleton)&&owner->bones().markDestroyed(bone)&&owner->prepareDraw());
+        assert(!owner->skeletons().find(skeleton)&&!owner->bones().find(bone));
+        auto& bank=*owner.get_deleter().encounter;
+        assert(owner->skeletons().bindStorage(nullptr)&&owner->bones().bindStorage(nullptr)&&
+            !owner->hasSkeletonEncounterStorage());
+        assert(owner->skeletons().clear()&&owner->bones().clear());
+        assert(owner->skeletons().bindStorage(&bank.skeletons)&&owner->bones().bindStorage(&bank.bones));
+        InstanceHandle nextSkeleton,nextBone;
+        assert(world->createSkeletonWithSourceId(709012,240,192,nextSkeleton)&&
+            world->createBoneWithSourceId(709013,240,192,nextBone));
+        assert(nextSkeleton.generation>skeleton.generation&&nextBone.generation>bone.generation&&
+            !owner->skeletons().find(skeleton)&&!owner->bones().find(bone));
+        // A live lease cannot be withdrawn, even when the caller owns it.
+        assert(!owner->bones().bindStorage(nullptr)&&owner->bones().find(nextBone)&&!owner->valid());
+    }
     {
         auto missing=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         assert(!missing->valid()); // Scalar storage must be admitted explicitly.
