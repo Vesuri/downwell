@@ -18,6 +18,25 @@ comparison = importlib.util.module_from_spec(compare_spec)
 compare_spec.loader.exec_module(comparison)
 
 
+class SourceLines(unittest.TestCase):
+    def test_requested_limit_and_accounting(self):
+        lines = Counter({f'fixture.cpp:{i}': i for i in range(1, 71)})
+        partial = list(report.source_line_report(lines, 10000, 40))
+        self.assertIn('40/70 source locations shown', partial[0])
+        self.assertIn('465 self cycles omitted', partial[0])
+        complete = list(report.source_line_report(lines, 10000, 100))
+        self.assertEqual(len(complete), 71)
+        self.assertIn('70/70 source locations shown', complete[0])
+        self.assertIn('0 self cycles omitted', complete[0])
+        self.assertTrue(complete[-1].endswith('fixture.cpp:1'))
+        self.assertIn('Called functions are excluded', complete[0])
+
+    def test_empty_selection(self):
+        lines = list(report.source_line_report(Counter(), 0, 60))
+        self.assertEqual(len(lines), 1)
+        self.assertIn('0/0 source locations shown', lines[0])
+
+
 class MatchedWindows(unittest.TestCase):
     def test_summary_excludes_partial_and_retains_exact_cycles(self):
         summary = report.frame_summary({10: 10, 11: 142103, 12: 20}, {10, 12}, 'a' * 64)

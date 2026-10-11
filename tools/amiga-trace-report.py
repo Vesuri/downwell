@@ -542,6 +542,19 @@ def select_frames(frame_cycles, partial_frames, frames=None, min_fields=0.0, par
     return chosen
 
 
+def source_line_report(lines, selected_cycles, top):
+    """Report coverage explicitly: a truncated ranking cannot prove absence."""
+    own = sum(lines.values())
+    shown = lines.most_common(top)
+    omitted = own - sum(cycles for _, cycles in shown)
+    yield (f'{len(shown)}/{len(lines)} source locations shown; '
+           f'{own:,} self cycles total; {omitted:,} self cycles omitted. '
+           'Called functions are excluded.')
+    for line, cycles in shown:
+        yield (f'  {100.0 * cycles / max(1, own):6.2f}%  '
+               f'{100.0 * cycles / max(1, selected_cycles):6.2f}% of all  {line}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -785,9 +798,8 @@ def main():
 
     if args.lines:
         print(f'\n## Self cycles of `{args.lines}` by source line')
-        own = sum(leaf_lines.values())
-        for line, c in leaf_lines.most_common(40):
-            print(f'  {100.0 * c / max(1, own):6.2f}%  {pct(c):6.2f}% of all  {line}')
+        for line in source_line_report(leaf_lines, selected, args.top):
+            print(line)
 
     if args.collapsed:
         with open(args.collapsed, 'w') as out:
