@@ -18,6 +18,7 @@ public:
         const std::uint8_t* high=nullptr;
     };
     bool ready()const{return ready_;}
+    void release(){ready_=false;pack_=nullptr;size_=count_=0;entryMask_=nullptr;}
     bool bindEntryMask(const std::uint8_t* data,std::size_t bytes){
         entryMask_=nullptr;
         if(!data||bytes!=EntryDitherMask::bytes)return false;

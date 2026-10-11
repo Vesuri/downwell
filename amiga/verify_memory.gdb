@@ -17,6 +17,10 @@ if gDownwellGamePlaneResidentBytes != 0 || gDownwellGamePlaneLoads != 0
     printf "Gameplay DMA unexpectedly resident during normal startup\n"
     quit 1
 end
+if gDownwellGameArtResidentBytes != 0 || gDownwellGameArtLoads != 0 || gDownwellGameArtPreparations != 0
+    printf "Gameplay CPU art unexpectedly loaded/prepared during normal startup\n"
+    quit 1
+end
 downwell-chip-snapshot
 if $chip_changes == 0 || $chip_minimum > gDownwellStartupChipRemaining
     printf "CHIP_AUDIT_ERROR: watcher missed startup allocations\n"

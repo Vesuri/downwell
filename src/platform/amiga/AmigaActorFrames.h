@@ -32,6 +32,7 @@ private:
     static unsigned word(const UBYTE* p){return unsigned(p[0])*256+p[1];}
     static unsigned longword(const UBYTE* p){return word(p)*65536u+word(p+2);}
 public:
+    void invalidate(){ready_=false;}
     bool prepare(const UBYTE* pack,const UBYTE* end){
         ready_=false;
         for(auto& row:base_)for(auto& n:row)n=0;

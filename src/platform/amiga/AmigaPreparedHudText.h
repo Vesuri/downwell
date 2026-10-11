@@ -62,6 +62,7 @@ class AmigaPreparedHudText {
         write(p,UWORD((read(p)&~mask)|(high&mask)));
     }
 public:
+    void release(){hud_=game_=nullptr;valid_=false;invalidate();}
     void invalidate(){currency_={};streak_={};}
     void invalidateStreak(){streak_={};}
     bool bind(const UBYTE* hud,const UBYTE* hudEnd,const UBYTE* game,const UBYTE* gameEnd){

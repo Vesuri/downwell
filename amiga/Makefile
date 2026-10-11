@@ -583,7 +583,11 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).planes $(OUT).results $(OUT).shop $(OUT).clear
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).results $(OUT).shop $(OUT).clear
+
+$(OUT).game: $(AMIGA_GAME)
+	@mkdir -p $(@D)
+	cp -f $< $@
 
 $(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
@@ -1054,6 +1058,9 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit:
+	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_game_pack'; then \
+		echo "*** gameplay CPU art must be scene-loaded, not linked"; exit 1; \
+	else echo "Gameplay CPU art linkage audit: clean"; fi
 	@if [ -z '$(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_collision_masks'; then \
 		echo "*** reference-only collision masks linked into shipping executable"; exit 1; \
 	else echo "Collision-mask ownership linkage audit: clean"; fi

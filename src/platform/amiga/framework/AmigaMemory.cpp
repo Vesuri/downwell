@@ -15,6 +15,7 @@ static_assert(__builtin_offsetof(MemChunk, mc_Bytes) == 4, "Chip audit ABI");
 AmigaMemory::AmigaMemory()
     : game_(0), hud_(0), menu_(0), copper_(0), nullSprite_(0), bulletSprite_(0),
       sceneCache_(0), assets_(0), gameAssets_(0), gameAssetBytes_(0),
+      gameCatalogue_(0), gameCatalogueBytes_(0),
       gameBytes_(0), hudBytes_(0), menuPlaneBytes_(0), menuEntryBytes_(0),
       copperBytes_(0),
       playerSpriteBytes_(0), bulletSpriteBytes_(0), enemySpriteBytes_(0),
@@ -98,6 +99,7 @@ void AmigaMemory::releaseGameAssets()
 void AmigaMemory::release()
 {
     releaseGameAssets();
+    releaseGameCatalogue();
     if (assets_) FreeMem(assets_, assetBytes_);
     if (sceneCache_) FreeMem(sceneCache_, sceneCacheBytes_);
     if (enemySprite_[1]) FreeMem(enemySprite_[1], enemySpriteBytes_);
@@ -122,4 +124,21 @@ void AmigaMemory::release()
     enemySprite_[1] = 0;
     sceneCache_ = 0;
     assets_ = 0;
+}
+
+bool AmigaMemory::acquireGameCatalogue(ULONG bytes)
+{
+    if (!bytes) return false;
+    if (gameCatalogue_) return gameCatalogueBytes_ == bytes;
+    // CPU-only art must never fall back into the DMA budget.
+    gameCatalogue_ = (UBYTE*)AllocMem(bytes, MEMF_FAST);
+    gameCatalogueBytes_ = gameCatalogue_ ? bytes : 0;
+    return gameCatalogue_ != 0;
+}
+
+void AmigaMemory::releaseGameCatalogue()
+{
+    if (gameCatalogue_) FreeMem(gameCatalogue_, gameCatalogueBytes_);
+    gameCatalogue_ = 0;
+    gameCatalogueBytes_ = 0;
 }

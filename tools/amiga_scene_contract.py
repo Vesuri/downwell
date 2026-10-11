@@ -1,7 +1,8 @@
 """Reviewed native art admission, independent of what exporters can produce.
 
 This is the current bootstrap/gameplay bank boundary, not a claim that the
-gameplay bank has already been split by level or unloaded during startup.
+gameplay bank has already been split by level. CPU and DMA gameplay art are
+leased only across gameplay scenes.
 IDs above 62000 are explicit host-prepared variants, not source resource IDs.
 Do not infer admission from SELECTIONS or from the output of an exporter.
 """

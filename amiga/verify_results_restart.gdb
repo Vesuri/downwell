@@ -66,6 +66,11 @@ if gDownwellGamePlaneLoads != 3 || gDownwellGamePlaneReleases != 2 || gDownwellG
     quit 1
 end
 printf "Gameplay DMA lease: Retry retained; style/surface released and reloaded\n"
+if gDownwellGameArtLoads != 3 || gDownwellGameArtReleases != 2 || gDownwellGameArtPreparations != 3 || gDownwellGameArtResidentBytes != gDownwellGameArtExpectedBytes || gDownwellGameArtExpectedBytes == 0
+    printf "Gameplay CPU art lease failed: loads=%u releases=%u preparations=%u resident=%u\n", gDownwellGameArtLoads, gDownwellGameArtReleases, gDownwellGameArtPreparations, gDownwellGameArtResidentBytes
+    quit 1
+end
+printf "Gameplay CPU art lease: zero startup preparation, Retry retained, re-entry rebound\n"
 printf "Three results destinations executed; final gameplay reached 200 updates\n"
 printf "DOWNWELL_RESULTS_RESTART_READY\n"
 downwell-chip-snapshot

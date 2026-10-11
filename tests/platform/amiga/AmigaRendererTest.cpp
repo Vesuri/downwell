@@ -1,4 +1,6 @@
 #include "platform/amiga/AmigaRenderer.h"
+#include "../../../generated/amiga-game-planes.h"
+#include "../../../generated/amiga-scene-banks.h"
 #include "platform/amiga/AmigaActorFrames.h"
 #include "platform/amiga/AmigaWallBackground.h"
 #include "platform/amiga/AmigaAmmoHud.h"
@@ -1629,6 +1631,9 @@ int main(int argc, char** argv) {
         static AmigaActorFrames prepared;
         const auto* pack=gamePack.data();const auto* end=pack+gamePack.size();
         require(prepared.prepare(pack,end),"prepare immutable gameplay actor bindings");
+        prepared.invalidate();
+        require(!prepared.find(92,0),"released gameplay bank exposes no borrowed frame");
+        require(prepared.prepare(pack,end),"rebind gameplay frames after re-entry");
         for(unsigned frame=0;frame<8;++frame){
             const auto* particle=prepared.find(92,frame);
             require(particle&&particle->width==2&&particle->height==2,
@@ -1664,12 +1669,12 @@ int main(int argc, char** argv) {
         std::cout<<"Prepared actor frame cases: "<<checked<<'\n';
     }
     std::cout << "Amiga renderer pixel comparisons passed\n";
-    // Run the raster checks even when asset growth violates the residency gate.
-    // Keep the budget a hard failure, not an automatically growing allowance.
-    const auto residentBytes = amigaRendererChipPackBytes(gamePack.data(), gamePack.data() + gamePack.size());
-    std::cout << "Resident game art: " << residentBytes << " bytes (budget 120000)\n";
-    require(residentBytes <= 120000,
-            "resident game art stays within the tested 512 KiB A500 budget");
+    // The old per-asset upload sum is not the shipping Chip allocation: the
+    // offline atlas shares planes. Enforce the actual banks' fixed ceilings.
+    require(gamePack.size()==DOWNWELL_GAME_BANK_BYTES&&gamePack.size()<=240u*1024u,
+            "CPU gameplay art stays within its fixed scene lease budget");
+    require(DOWNWELL_GAME_PLANE_BYTES<=112u*1024u,
+            "DMA gameplay atlas stays within its fixed Chip lease budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;
 }

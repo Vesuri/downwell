@@ -48,5 +48,9 @@ int main(int argc,char** argv) {
     assert(!text->bind(bad.data(),bad.data()+bad.size(),game.data(),game.data()+game.size()));
     AmigaRenderer renderer;amigaRendererInit(&renderer,nullptr,actual.data());
     assert(!text->currency(&renderer,1)&&!text->streak(&renderer,1));
+    assert(text->bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
+    text->release();
+    assert(!text->currency(&renderer,1)&&!text->streak(&renderer,1));
+    assert(text->bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
     std::printf("HUD text: %u full-layer comparisons against layered asset drawing\n",cases);
 }

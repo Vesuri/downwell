@@ -71,21 +71,24 @@ Packing manifests record the admission contract version and hash.
 `make test-scene-asset-admission` checks unknown-resource rejection, exporter
 growth, unchanged gameplay membership when boot art grows, shared dependencies
 and budget failures. This guard does **not** split the existing gameplay bank
-by level, unload its CPU catalogue during startup, or control SDL residency; those remaining
+by level or control SDL residency; those remaining
 boundaries are tracked in `docs/open-work.md`.
 
 `generate-amiga-plane-bank.py` reads `generated/amiga-game.dwap` and interns
 its immutable colour and mask planes independently, including aligned matching
 substreams. It writes `amiga-game.planes`, its size/source-hash header, and an
 input/output hash manifest under `generated/`. The Amiga build installs the bank
-as `Downwell.planes`; keep it beside the executable, `.boot`, `.front`,
+as `Downwell.planes`; keep it beside the executable, `.boot`, `.front`, `.game`,
 `.results`, `.shop` and `.clear` files. The build and run scripts package them.
-CPU effects continue reading the original ordinary-memory DWAP. The blitter
+CPU effects read the unchanged DWAP loaded as `Downwell.game` in non-Chip
+memory. It is absent from both the executable and front-end residency. The blitter
 binds separate low/high/mask views through the common `Bitmap` class; it does
 not regenerate or upload planes during gameplay.
-The DMA bank is leased at gameplay entry, retained for Retry and upgrades,
+The CPU and DMA banks are leased at gameplay entry, retained for Retry and upgrades,
 and released after retiring DMA when returning to style selection or the
-surface. `verify_memory.gdb` rejects gameplay DMA residency in normal startup;
+surface. Actor/effect/HUD/terrain views are prepared only upon acquiring a new
+lease, and invalidated before freeing it. CPU allocation never falls back to
+Chip memory. `verify_memory.gdb` rejects either gameplay bank or preparation in normal startup;
 `make verify-amiga-results-restart` checks retention/reload across all results
 destinations, alongside the existing native pixels and memory watcher.
 

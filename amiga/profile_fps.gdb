@@ -52,6 +52,11 @@ printf "Transient scene residency: loads=%lu upgrade_source_bytes=%lu results_by
 # The living world-1 contact tape never enters a shop, results or upgrade room.
 # New scene content must not introduce bank loading/preparation to this route.
 if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
+    if gDownwellGameArtLoads != 1 || gDownwellGameArtPreparations != 1 || gDownwellGameArtReleases != 0 || gDownwellGameArtResidentBytes != gDownwellGameArtExpectedBytes
+        printf "Gameplay art reloaded/prepared during the live contact tape\n"
+        quit 1
+    end
+    printf "Gameplay CPU art: one entry load/preparation, %lu resident bytes\n", gDownwellGameArtResidentBytes
     if gDownwellTransientLoads != 0 || gDownwellUpgradeSourceBytes != 0 || gDownwellResultsAssetBytes != 0 || gDownwellShopAssetBytes != 0
         printf "Unrelated transient scene work on the contact tape\n"
         quit 1

@@ -164,6 +164,15 @@ Reports: `tmp/terrain-complete-report.txt`,
 `tmp/terrain-complete-fps.log`. Reproduce using the preceding contact command
 with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
 
+The subsequent gameplay CPU-art lease changes residency, not gameplay cost.
+The same four windows have means 41.39/141.15/74.97/129.26 ms and worst frames
+63.5/522.0/104.2/480.4 ms. Frame 51 remains 32.5 ms; no matched frame grows by
+more than 0.5 ms. The full contact run remains 6,211 PAL fields (14.49 FPS),
+with identical coverage and exactly one gameplay-art load/preparation for all
+1,800 updates. Report: `tmp/game-art-lease-report.txt`; full run:
+`tmp/game-art-lease-fps.log`. Matching trace ELF SHA-256:
+`5ab9fd6efcb62aa22ef2865c0c2f2e671cd74a78ed98bf4f044ca6e5427ec2fc`.
+
 ## Historical pre-integration audit
 
 ### Early-game regression comparison

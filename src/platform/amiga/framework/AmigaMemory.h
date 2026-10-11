@@ -20,6 +20,9 @@ public:
     bool acquireGameAssets(ULONG bytes);
     void releaseGameAssets();
     UBYTE* gameAssets() const { return gameAssets_; }
+    bool acquireGameCatalogue(ULONG bytes);
+    void releaseGameCatalogue();
+    UBYTE* gameCatalogue() const { return gameCatalogue_; }
 
     UBYTE* game() const { return game_; }
     UBYTE* hud() const { return hud_; }
@@ -54,6 +57,8 @@ private:
     UBYTE* assets_;
     UBYTE* gameAssets_;
     ULONG gameAssetBytes_;
+    UBYTE* gameCatalogue_;
+    ULONG gameCatalogueBytes_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG menuPlaneBytes_;

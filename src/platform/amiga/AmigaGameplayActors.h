@@ -23,6 +23,7 @@ class AmigaGameplayActors {
 public:
     static constexpr unsigned regularChannels = 6;
     static bool prepareDamageText(const UBYTE* pack, const UBYTE* packEnd);
+    static void releaseDamageText();
     struct Assignment {
         unsigned bobCount;
         bool ready;

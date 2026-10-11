@@ -116,5 +116,10 @@ int main(){
     assert(!assets.bind(nullptr,0));
     assert(!assets.debris(115,0,debris));
     assert(!assets.corpse(206,false,debris));
+    assert(assets.bind(good.data(),good.size()));
+    assets.release();
+    assert(!assets.ready()&&!assets.smoke(0)&&!assets.shade()&&!assets.currency(false,0));
+    assert(!assets.entryDither(80,0,debris)&&!assets.debris(91,0,debris));
+    assert(assets.bind(good.data(),good.size())&&assets.smoke(0));
     std::printf("Effect assets: shared color/mask payloads, signed origins, 458 truncations and %u malformed records rejected\n",invalid);
 }

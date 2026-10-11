@@ -83,5 +83,8 @@ int main(int argc,char** argv){
         AmigaHudText::streakReference(&o,game.data(),game.data()+game.size(),value,offset);
         assert(actual==expected);previous=offset;++cases;
     }
+    text.release();
+    assert(!text.currency(&r,1)&&!text.streak(&r,1));
+    assert(text.bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
     std::printf("Prepared HUD: %u full-layer comparisons, resets and continuous digit transitions\n",cases);
 }

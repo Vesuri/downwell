@@ -24,6 +24,8 @@ extern "C" void amigaBlitterReleaseGamePlanes();
 extern "C" {
 volatile unsigned gDownwellGamePlaneResidentBytes, gDownwellGamePlaneLoads, gDownwellGamePlaneReleases,
     gDownwellGamePlaneExpectedBytes;
+volatile unsigned gDownwellGameArtResidentBytes, gDownwellGameArtLoads, gDownwellGameArtReleases,
+    gDownwellGameArtPreparations, gDownwellGameArtExpectedBytes;
 __attribute__((noinline, used)) void downwellGamePlanesReady(){ __asm__ volatile("" ::: "memory"); }
 }
 #ifdef DOWNWELL_PLANE_BANK_VERIFY
@@ -244,9 +246,7 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 extern "C" {
 extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
-extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_effect_stamps[],amiga_effect_stamps_end[];
-extern const UBYTE amiga_game_pack_end[];
 #ifdef DOWNWELL_PREPARED_FIELDS
 extern const UBYTE amiga_field_images[],amiga_field_images_end[];
 #endif
@@ -332,8 +332,8 @@ static bool generateLiveTerrain(void*, AmigaPortRuntime&,
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
-static const UBYTE* activeGamePack = amiga_game_pack;
-static const UBYTE* activeGamePackEnd = amiga_game_pack_end;
+static const UBYTE* activeGamePack = nullptr;
+static const UBYTE* activeGamePackEnd = nullptr;
 static const UBYTE* activeHudPack = amiga_hud_pack;
 static const UBYTE* activeHudPackEnd = amiga_hud_pack_end;
 static AmigaImmutableByteUpload entryHudUpload;
@@ -2148,35 +2148,6 @@ __attribute__((noinline)) static int runDownwell(void) {
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
     }
 #endif
-    const auto acquireGameplayPlanes=[&](){
-        if(memory.gameAssets())return true;
-        if(!memory.acquireGameAssets(gamePackBytes))return false;
-        if(platform.loadFile("PROGDIR:Downwell.planes",memory.gameAssets(),gamePackBytes)!=(LONG)gamePackBytes||
-           !amigaBlitterBindGamePlanes(amiga_game_pack,amiga_game_pack_end-amiga_game_pack,
-               memory.gameAssets(),gamePackBytes,downwellGamePlaneSourceHash)){
-            amigaBlitterReleaseGamePlanes();memory.releaseGameAssets();return false;
-        }
-        gDownwellGamePlaneResidentBytes=gamePackBytes;
-        ++gDownwellGamePlaneLoads;
-        downwellGamePlanesReady();
-        return true;
-    };
-#if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
-    // Explicit gameplay-only oracles, not the ordinary startup path.
-    if(!acquireGameplayPlanes()){
-        gDownwellStartupFailure=7;downwellStartupFailed();
-        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-    }
-    gDownwellStartupAssetBytes=gamePackBytes;
-#endif
-    activeGamePack = amiga_game_pack;
-    activeGamePackEnd = amiga_game_pack_end;
-#ifdef DOWNWELL_PLANE_BANK_VERIFY
-    if(!amigaBlitterVerifyGamePlanes(amiga_game_pack,memory.game())){
-        gDownwellStartupFailure=7;downwellStartupFailed();
-        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-    }
-#endif
 #ifdef DOWNWELL_TERRAIN_DIRECT
     if(!AmigaTerrainPainter::bindPrepared(amiga_terrain_phase6,amiga_terrain_phase6_end-amiga_terrain_phase6)){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
@@ -2193,33 +2164,70 @@ __attribute__((noinline)) static int runDownwell(void) {
     (void)initialTerrainReady;
 #endif
 #endif
-#ifdef DOWNWELL_TERRAIN_BATCH
-    if(!AmigaTerrainPainter::bindBatch(amiga_game_pack,amiga_game_pack_end,sceneBank,sceneBankBytes)){
-        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-    }
-#endif
-    if(!AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd)){
-        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-    }
 #ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
     static AmigaActorFrames actorFrames;
-    if(!actorFrames.prepare(amiga_game_pack,amiga_game_pack_end)){
-        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-    }
 #endif
     static downwell::EffectMaskAssets effectAssets;
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
-    if (!effectAssets.bind(activeGamePack,activeGamePackEnd-activeGamePack)||
-        !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
-        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
-            amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)||
-        !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
-        platform.restore();
-        FreeMem(startupCopperWords,4*sizeof(UWORD));
-        memory.release();
-        return 20;
+    static_assert(DOWNWELL_GAME_BANK_BYTES<=DOWNWELL_GAME_BANK_BUDGET,"Gameplay art admission budget");
+    gDownwellGameArtExpectedBytes=DOWNWELL_GAME_BANK_BYTES;
+    const auto releaseGameplayArt=[&](){
+        amigaBlitterReleaseGamePlanes();
+#ifdef DOWNWELL_TERRAIN_BATCH
+        (void)AmigaTerrainPainter::bindBatch(nullptr,nullptr,nullptr,0);
+#endif
+#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
+        actorFrames.invalidate();
+#endif
+        effectAssets.release();
+        AmigaGameplayActors::releaseDamageText();
+        hudText.release();
+        activeGamePack=activeGamePackEnd=nullptr;
+        memory.releaseGameAssets();memory.releaseGameCatalogue();
+        gDownwellGamePlaneResidentBytes=gDownwellGameArtResidentBytes=0;
+    };
+    const auto acquireGameplayPlanes=[&](){
+        if(gDownwellGameArtResidentBytes)return memory.gameAssets()&&activeGamePack;
+        if(!memory.acquireGameCatalogue(DOWNWELL_GAME_BANK_BYTES))return false;
+        activeGamePack=memory.gameCatalogue();activeGamePackEnd=activeGamePack+DOWNWELL_GAME_BANK_BYTES;
+        bool good=platform.loadFile("PROGDIR:Downwell.game",memory.gameCatalogue(),DOWNWELL_GAME_BANK_BYTES)==LONG(DOWNWELL_GAME_BANK_BYTES)&&
+            effectAssets.bind(activeGamePack,DOWNWELL_GAME_BANK_BYTES)&&
+            effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)&&
+            AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd);
+#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
+        good=good&&actorFrames.prepare(activeGamePack,activeGamePackEnd);
+#endif
+#ifdef DOWNWELL_TERRAIN_BATCH
+        good=good&&AmigaTerrainPainter::bindBatch(activeGamePack,activeGamePackEnd,sceneBank,sceneBankBytes);
+#endif
+        good=good&&AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
+            amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)&&
+            AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)&&
+            memory.acquireGameAssets(gamePackBytes)&&
+            platform.loadFile("PROGDIR:Downwell.planes",memory.gameAssets(),gamePackBytes)==LONG(gamePackBytes)&&
+            amigaBlitterBindGamePlanes(activeGamePack,DOWNWELL_GAME_BANK_BYTES,
+                memory.gameAssets(),gamePackBytes,downwellGamePlaneSourceHash);
+        if(!good){releaseGameplayArt();return false;}
+        gDownwellGameArtResidentBytes=DOWNWELL_GAME_BANK_BYTES;
+        gDownwellGamePlaneResidentBytes=gamePackBytes;
+        ++gDownwellGameArtLoads;++gDownwellGameArtPreparations;++gDownwellGamePlaneLoads;
+        downwellGamePlanesReady();return true;
+    };
+#if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
+    // Explicit gameplay-only oracles, not ordinary startup.
+    if(!acquireGameplayPlanes()){
+        gDownwellStartupFailure=7;downwellStartupFailed();
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
+    gDownwellStartupAssetBytes=gamePackBytes;
+#endif
+#ifdef DOWNWELL_PLANE_BANK_VERIFY
+    if(!amigaBlitterVerifyGamePlanes(activeGamePack,memory.game())){
+        gDownwellStartupFailure=7;downwellStartupFailed();
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
+#endif
     alignas(AmigaGardenScene) static UBYTE gardenStorage[sizeof(AmigaGardenScene)];
     auto& gardenScene=*new(gardenStorage) AmigaGardenScene(memory.menuForeground(), memory.menuBackground(),
         memory.menuEntry(), memory.copper(), memory.copper() + downwellCopperWords,
@@ -2332,8 +2340,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             ++gDownwellOverlayCopperFailures;
     }
 #endif
+#ifdef DOWNWELL_REPLAY_VERIFY
     if (!amigaRendererBuildHardwareSprite(
-            amiga_game_pack, amiga_game_pack_end, 31, 0,
+            activeGamePack, activeGamePackEnd, 31, 0,
             downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
@@ -2343,7 +2352,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             0,
             memory.playerSprite(0), playerSpriteHeight) ||
         !amigaRendererBuildHardwareSprite(
-            amiga_game_pack, amiga_game_pack_end, 37, 0,
+            activeGamePack, activeGamePackEnd, 37, 0,
             downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
@@ -2359,6 +2368,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         downwellStartupFailed();
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
+#endif
     Sprite playerSprites[2] = {
         Sprite(memory.playerSprite(0), playerSpriteHeight),
         Sprite(memory.playerSprite(1), playerSpriteHeight)
@@ -2691,10 +2701,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     overlayBank.release();
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
-                    amigaBlitterReleaseGamePlanes();
-                    memory.releaseGameAssets();
-                    gDownwellGamePlaneResidentBytes=0;
+                    releaseGameplayArt();
                     ++gDownwellGamePlaneReleases;
+                    ++gDownwellGameArtReleases;
                     if (!loadFrontBank(platform)) break;
                     if (presentedScene == AmigaScene::menu &&
                         !gardenScene.prepare(menuDrawList, frontPack, frontPackEnd))
@@ -3018,7 +3027,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         // generic builder uses the gameplay beam origin, while
                         // garden DMA retains its independent fetch geometry.
                         amigaRendererBuildHardwareSprite(
-                            amiga_game_pack, amiga_game_pack_end,
+                            frontPack, frontPackEnd,
                             (UWORD)scenes.menuPlayerSprite(),
                             (UWORD)scenes.menuPlayerFrame(),
                             downwellPlayfieldX + scenes.menuPlayerX() -
@@ -3339,12 +3348,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                     sprite.hide();
                 }
                 const unsigned playerId = port.player().spriteId(), playerFrame = port.player().spriteFrame();
-                const unsigned parts = amigaRendererHardwareSpritePartCount(amiga_game_pack, amiga_game_pack_end, playerId, playerFrame);
+                const unsigned parts = amigaRendererHardwareSpritePartCount(activeGamePack, activeGamePackEnd, playerId, playerFrame);
                 bool ready = parts > 0 && parts <= 8;
                 for (unsigned part = 0; ready && part < parts; ++part) {
                     Sprite& sprite = part == 0 ? playerSprites[back] :
                         actorSpriteAt(bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back], part - 1);
-                    ready = amigaRendererBuildHardwareSpritePart(amiga_game_pack, amiga_game_pack_end, playerId, playerFrame, part,
+                    ready = amigaRendererBuildHardwareSpritePart(activeGamePack, activeGamePackEnd, playerId, playerFrame, part,
                         frame.playerX, frame.playerY, port.player().facing() < 0, sprite.data(), playerSpriteHeight) != 0;
                 }
                 DW_PROFILE_PHASE(profileClearCopper);
@@ -4018,7 +4027,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                           "Gameplay Copper and sprite slots must agree");
             DW_PROFILE_PHASE(profileActorChannels);
             const auto assignment = AmigaGameplayActors::assign(actors, actorCount,
-                amiga_game_pack, amiga_game_pack_end, playerSprites[back],
+                activeGamePack, activeGamePackEnd, playerSprites[back],
                 bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back],
                 enemySpriteHeight,
 #ifdef DOWNWELL_BOB_VERIFY

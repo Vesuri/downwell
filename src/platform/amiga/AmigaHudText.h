@@ -85,6 +85,7 @@ struct AmigaHudText {
         }
         return valid_;
     }
+    void release(){hud_=game_=nullptr;valid_=false;}
     bool currency(AmigaRenderer* renderer, unsigned currency) {
         if (!valid_) return false;
         unsigned divisor = 1, digits = 1;

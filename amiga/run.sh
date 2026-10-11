@@ -26,6 +26,7 @@ cp -f "$EXE" "$DH1/Downwell"
 cp -f "${EXE%.exe}.boot" "$DH1/Downwell.boot"
 cp -f "${EXE%.exe}.front" "$DH1/Downwell.front"
 cp -f "${EXE%.exe}.planes" "$DH1/Downwell.planes"
+cp -f "${EXE%.exe}.game" "$DH1/Downwell.game"
 for bank in results shop clear; do
   cp -f "${EXE%.exe}.$bank" "$DH1/Downwell.$bank"
 done

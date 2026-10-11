@@ -16,6 +16,7 @@ extern "C" { volatile unsigned gDownwellDamageTextChecks; }
 #endif
 
 namespace { AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; AmigaDamageTextCache damageText; }
+void AmigaGameplayActors::releaseDamageText(){damageGlyphsReady=false;damageText.invalidate();}
 bool AmigaGameplayActors::prepareDamageText(const UBYTE* pack, const UBYTE* end) {
     damageText.invalidate();
     damageGlyphsReady=amigaRendererPrepareDamageGlyphs(&damageGlyphs,pack,end)!=0;

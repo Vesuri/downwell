@@ -90,21 +90,21 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 ## Executable size versus runtime memory
 
-The normal `STRIP=1` build with admitted room payloads and without reference-only
-collision-mask payloads is **2,359,388 bytes**, SHA-256
-`3d115dc1253bcc939c84e9ef5e80abcf655bcfaad9cf16aec1e0102c978e4026`.
+The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
+and without reference-only collision masks is **2,125,252 bytes**, SHA-256
+`743200d239f02b8b56aba1d75ae08287f5f88deeb87d6538b679013850dabf72`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,367,686 | Yes |
-| Read-only data (`.rodata`) | 909,652 | Yes |
-| Initialized writable data (`.data`) | 34,202 | Yes |
+| Machine code (`.text`) | 1,368,056 | Yes |
+| Read-only data (`.rodata`) | 674,944 | Yes |
+| Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 4,563,836 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 4,563,864 | No; allocated at load |
 
-Initialized payload totals 2,311,544 bytes. Hunk relocation and container
-records account for the remaining 47,844 bytes. Stripping cannot remove
+Initialized payload totals 2,077,198 bytes. Hunk relocation and container
+records account for the remaining 48,054 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
 The pre-repair owner audit attributes roughly 551 KB to
@@ -209,14 +209,17 @@ remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
 
-Boot/front art shares a scene bank. The gameplay DMA atlas is absent during
-ordinary front-end scenes, including later returns. The CPU-side gameplay
-catalogue and gameplay preparation still exist during startup, so this is
-partial scene banking, not proof that only current-scene assets are loaded.
+Boot/front art shares a scene bank. Both gameplay art banks are absent during
+ordinary front-end scenes, including later returns. CPU-side actor/effect
+preparation occurs only when a gameplay lease is acquired. The gameplay bank
+still contains the admitted gameplay union, not separate per-level payloads;
+other embedded gameplay tables remain outside this lease.
 `generate-amiga-hud.py --profile game`
 splits its records, unchanged, into three banks:
 
-- `amiga-game.dwap`, the ordinary-memory gameplay reference. Its offline
+- `amiga-game.dwap` (`Downwell.game`), 234,718 bytes of CPU-only art allocated
+  with `MEMF_FAST` at gameplay entry, retained through Retry/upgrades and freed
+  when returning to style select or the surface. Its offline
   `amiga-game.planes` derivative (`Downwell.planes`) is the gameplay DMA lease.
 - `amiga-boot.dwap` (`Downwell.boot`), the publisher logo, controls, credits
   text and dither fade. Startup composes it into the splash cache, then
@@ -402,8 +405,9 @@ block, requested asset bytes and remaining Chip memory after allocations.
 
 `AmigaActorFrames` owns 45,138 bytes of static ordinary-memory render bindings
 on the 68000: canvas geometry, immutable sprite-part pointers and a bounded
-sparse frame index. It is prepared once from the linked game bank, before
-gameplay. Actor draw records carry pointers into that bank. It adds no Chip
+sparse frame index. It is prepared once per gameplay art lease, before
+gameplay. Actor draw records carry pointers into that bank; lookup is disabled
+before the bank is released and re-entry rebuilds the bindings. It adds no Chip
 allocation; the existing sixteen channel buffers still own DMA control words.
 This is not a second copy of sprite pixels.
 
