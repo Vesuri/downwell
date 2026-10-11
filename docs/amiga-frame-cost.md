@@ -11,29 +11,45 @@ the player has not landed by the last observation.
 
 Separate uninterrupted instruction captures give these matched-frame means:
 
-| Work, ms/frame | Historical | Current |
-| --- | ---: | ---: |
-| Frames 11–20, including publication wait | 20.35 | 22.03 |
-| Frames 11–20, excluding that wait | 15.78 | 21.53 |
-| Frames 51–55, including publication wait | 20.64 | 23.69 |
-| Frames 51–55, excluding that wait | 17.12 | 23.01 |
-| Gameplay Step, frames 51–55 | 7.43 | 12.00 |
-| Player movement, inside Step | 2.10 | 2.04 |
-| Alarm phase, inside Step | 0.91 | 1.55 |
-| Actor Draw collection | 1.30 | 1.75 |
+| Work, ms/frame | Historical | Before pixel controller | Pixel controller |
+| --- | ---: | ---: | ---: |
+| Frames 11–20, including publication wait | 20.35 | 22.03 | 20.85 |
+| Frames 11–20, excluding that wait | 15.78 | 21.53 | 20.67 |
+| Frames 51–55, including publication wait | 20.64 | 23.69 | 23.27 |
+| Frames 51–55, excluding that wait | 17.12 | 23.01 | 22.10 |
+| Gameplay Step, frames 51–55 | 7.43 | 12.00 | 11.08 |
+| Player movement, inside Step | 2.10 | 2.04 | 2.06 |
+| Alarm phase, inside Step | 0.91 | 1.55 | 1.55 |
+| Actor Draw collection | 1.30 | 1.75 | 1.75 |
 
 Worst marker-to-marker times are 26.1 → 29.2 ms for 11–20 and
 23.4 → 25.0 ms for 51–55. These include variable display waiting; they are
 not worst work-only costs. Frame 56 generates terrain and is deliberately
-excluded from the steady-fall window. The current DitherAbove Begin Step
-alone costs 2.08 ms in 51–55. Source-required controller behavior cannot
+excluded from the steady-fall window. Before the pixel adapter, DitherAbove
+Begin Step alone costs 2.08 ms in 51–55. Source-required controller behavior cannot
 simply be removed: the structural question is the added phase traversal,
 state publication and ownership work. Player physics and terrain row copying
-do not explain the observed increase. No optimization is claimed here.
+do not explain the observed increase.
+
+The pixel controller retains integral Y at publication boundaries and consumes
+the already-integral gameplay camera. Fractional/large imported Y falls back
+to the source translation. Ordered setters and camera-Y read timing are
+unchanged. Its inclusive cost is 2.08 → 1.15 ms in frames 51–55. All 160
+observations still match, and the native/scalar/snapshot ownership witnesses
+agree. This restores about 0.9 ms of work, not the historical baseline.
+
+Candidate worst marker-to-marker times are 25.1 ms for 11–20 and 25.8 ms
+for 51–55. The latter rises from 25.0 ms because frame 54's publication wait
+moves from 3.34 to 5.83 ms: that frame's work falls from 20.54 to 20.00 ms.
+Independent 12-field re-captures of control and candidate reproduce all five
+frame totals exactly (841,440 versus 826,700 cycles). Do not describe the
+longer wait as a computation regression or omit it from reported cadence.
+The normal candidate passes the 512 KiB Chip startup check; its stripped
+Hunk is 1,766,656 bytes. No new assets or Chip buffers are allocated.
 
 Source check: `13e08ca2` has no authored `ditherAbove_` Begin Step in
 `GameplayWorld::step`. Object 61 was introduced by `16ccf0ff` and subsequently
-connected to room admission. Thus its current 2.08 ms is not all redundant
+connected to room admission. Thus its pre-adapter 2.08 ms is not all redundant
 bookkeeping, nor does matching the 160 player-state observations prove full
 old/new behavior equivalence. It is **not** entry-wipe object 73. Assembly
 `gml_Object_objDitherAbove_Step_1.asm` requires camera X publication, a single
@@ -67,9 +83,12 @@ Measured ELF SHA-256:
 
 - Historical: `784563b8b4e74de6f00c66b5feb34a47d4b1ef1186137922a0ac0fc1f29f9be9`.
 - Current: `3c2847e4781903b7a7db5f1c18313f3219476830679c39c9050485ea96391982`.
+- Pixel controller: `bb2721d775e78242376cc4beb788bd222d4bf8bf29095f6eb92f68f3c182314f`.
 
 The normal stripped executable was restored byte-identically after capture
 (`c8bf6211b9ad2c965fe46f27c1e9268e75ac4e710e51ad9f0d824a90f9f4fa28`).
+After the pixel-controller run the restored normal Hunk hash is
+`01ec13a2fec8e0125290cd4e1a92058750aad633d3f4f2457cfc4421f6334a2b`.
 
 ## Regression comparison baseline
 

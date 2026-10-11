@@ -31,6 +31,7 @@ public:
         if(!good_||record_.lifetimeId||!next_||!id||id>0x7fffffffu)return fail();
         record_={};record_.sourceId=id;record_.lifetimeId=next_++;
         if(!record_.x.assignInteger(x)||!record_.y.assignInteger(y)||!binding_.birth(handle(),record_))return fail();
+        preparePixelY();
         // Create's only script write is material="foliage"; this typed
         // actor has that material invariant and no additional RNG or setters.
         return true;
@@ -46,6 +47,7 @@ public:
         record_={};record_.sourceId=source.sourceId;record_.lifetimeId=next_++;
         record_.x=source.x;record_.y=source.y;record_.active=source.active;
         if(!binding_.birth(handle(),record_))return fail();
+        preparePixelY();
         // Publish destruction through the owner as well as the record. Birth
         // does not execute Create, setters, audio or RNG.
         return !source.destroyRequested||mark();
@@ -67,10 +69,37 @@ public:
         } ops{*this,cameraX,cameraY,lowSpec,ending};
         return DitherAboveStep::run(ops)||fail();
     }
+    // Gameplay's camera publication is already integral. Retain the authored
+    // controller in that domain rather than reconstructing binary64 arithmetic
+    // every Begin Step. Imported fractional/large values keep the reference.
+    // Lifecycle adapters must not mutate this store (InstanceLifecycle.h), so
+    // the cache changes only at the position/lifetime publication boundaries.
+    template<class CameraY>
+    bool beginStepPixels(int cameraX,CameraY cameraY,bool lowSpec,bool ending){
+        if(!good_)return false;
+        if(!record_.lifetimeId||!record_.active||record_.destroyRequested)return true;
+        if(!pixelYValid_)
+            return beginStep([&](MotionBinary64& x){x=MotionBinary64::fromInteger(cameraX);return true;},
+                [&](MotionBinary64& y){y=MotionBinary64::fromInteger(cameraY());return true;},lowSpec,ending);
+        RunnerImageValue x;
+        if(!x.assignInteger(cameraX)||!position(x,record_.y))return fail();
+        // Read camera Y only after X publication, as in the source. The sum
+        // fits int32 in the admitted Y range; comparing avoids subtraction
+        // overflow even at either extreme of the integer camera domain.
+        if(cameraY() >= pixelY_+(lowSpec?208:272)){
+            RunnerImageValue y;
+            if(!y.assignInteger(pixelY_+16)||!position(record_.x,y))return fail();
+        }
+        // round(integer) is identity except for signed zero. Keep this second
+        // setter even after +=16: failure prefixes and publication are visible.
+        auto rounded=record_.y;
+        if(!(rounded.bits&0x7fffffffu))rounded.bits=0;
+        return (position(record_.x,rounded)&&(!ending||mark()))||fail();
+    }
     bool clear(){
         if(!good_)return false;
         if(record_.lifetimeId&&!binding_.retire(handle(),record_))return fail();
-        record_={};return true;
+        record_={};pixelYValid_=false;return true;
     }
     bool retireMarked(InstanceHandle h){
         if(!good_||!find(h)||!record_.destroyRequested)return fail();
@@ -78,15 +107,25 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
+    void preparePixelY(){
+        RunnerImageValue narrowed;
+        pixelYValid_=record_.y.roundPixel(pixelY_)&&pixelY_>=-(0x7fffff-16)&&pixelY_<=0x7fffff-16&&
+            narrowed.assignInteger(pixelY_)&&
+            (narrowed.bits==record_.y.bits||!(record_.y.bits&0x7fffffffu));
+    }
     bool position(RunnerImageValue x,RunnerImageValue y){
         if(!good_||(binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,x,y)))return fail();
-        record_.x=x;record_.y=y;return true;
+        const bool changed=record_.y.bits!=y.bits;
+        record_.x=x;record_.y=y;
+        if(changed)preparePixelY();
+        return true;
     }
     bool mark(){
         if(!good_||(binding_.hasOwner()&&!binding_.markDestroyed(handle(),record_)))return fail();
         record_.destroyRequested=true;return true;
     }
     Record record_{};Binding binding_{};unsigned next_=1;bool good_=true;
+    std::int32_t pixelY_=0;bool pixelYValid_=false;
 };
 }
 #endif

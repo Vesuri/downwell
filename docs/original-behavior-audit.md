@@ -484,6 +484,14 @@ or alternate cameras instead of choosing storage order. Low-spec and ending
 inputs are normalized booleans supplied through `configureDitherAboveEnvironment`
 and included in stored replay state; ordinary desktop entry defaults both to
 false. Full settings/ending owners still need to supply their changes.
+The gameplay pixel-camera adapter retains exact integral controller Y at its
+position/lifetime boundaries. It preserves X publication before reading camera
+Y, the optional Y increment, the unconditional rounding write (including signed
+zero normalization), and destruction. Its integral range keeps the increment
+exact in binary32 and the threshold sum in int32. Fractional or large imported
+Y uses the retained `DitherAboveStep` translation. Lifecycle adapters may not
+mutate the store; rejected writes leave its retained Y unchanged. This is not
+permission to skip a setter because its numeric value is unchanged.
 The stored collision handler checks the resource-selected event and marks the
 contacted plain wall through its lifecycle owner, retaining it until cleanup.
 It rejects unsupported target families rather than omitting their Destroy
