@@ -1655,7 +1655,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Alarms follow Begin Step movement, before builder Step/Create events.
     // Runner 0x50dc89 reconciles pending room membership after the complete
     // Begin Step dispatcher, not after each individual activation request.
-    if(ditherAbove_&&!ditherAbove_->beginStepPixels(cameraMotion_.pixelX(),[&]{return cameraMotion_.pixelY();},
+    if(ditherAbove_&&!ditherAbove_->beginStepPublishedPixels(cameraMotion_.pixelX(),[&]{return cameraMotion_.pixelY();},
         ditherLowSpec_,ditherEnding_)){run_.effectsSucceeded=false;return {};}
     if(!reconcilePhase(PhaseBoundary::beginStep))return {};
     const auto damageNumberAlarmPhase=run_.damageNumbers.beginPhase();

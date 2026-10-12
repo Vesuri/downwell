@@ -2,6 +2,34 @@
 
 ## No-input initial-fall comparison
 
+### Phase-scoped controller publication
+
+The current no-input fall independently repeats at **198 PAL fields for 164
+updates (41.41 FPS)** with 512 KiB Chip, versus 199 before this change and the
+historical target of 181. The one-field cadence change alone is noise, not
+evidence that the regression is resolved. The missed-field ledger attributes
+seven extra fields to updates 57–121, out of seventeen over the whole fall.
+
+DitherAbove now acquires its native position mirrors once per Begin Step,
+retaining every source-ordered setter and its appearance dirtiness. Collision
+consumers and ordinary callers keep the checked callback reference path.
+Matched marks 91–110 measure controller work **1.20 → 0.88 ms/update** and
+whole Step **11.64 → 11.27 ms/update**. Including redistributed VBlank waits,
+the window is 3,130,780 → 3,172,050 cycles (22.03 → 22.32 ms/update); its worst
+interval is 30.0 → 29.0 ms. This is a small removed-work improvement, not a
+large cadence win. Leave this now-submillisecond controller alone.
+
+Marks 161–166 total 2,442,890 → 2,430,370 cycles; frame 163 is 137.0 → 136.8 ms,
+effectively unchanged. All 165 native state witnesses match. Host controller
+fixtures, collision-owner integration and ten terrain replay tapes (18,000
+frames) pass. The normal non-profile build passes 512 KiB Chip startup.
+Normal Hunk: 1,769,920 bytes (+240); no allocation added. Profile ELF SHA-256:
+`6eb1e3c26e4457fa488a68353bc50cfa10ad7905ef9b33cfb5f6f2f8cab017d2`.
+Normal Hunk SHA-256:
+`aad33042d3ceb75edb8d4fda7ad4ef1ffa5c51fbd9210dcaa5e373b281090f1f`.
+Reproduce with the same mark-90/26-field and mark-160/20-field captures below.
+Reports and cadence/state witnesses: `tmp/quiet-dither-phase-*`.
+
 ### Middle of the quiet fall: updates 91–110
 
 Matched deterministic 26-field captures beginning at mark 90 compare historical
@@ -68,7 +96,7 @@ recording these numbers. The normal executable was not rebuilt or replaced.
 
 ### Complete fall through first landing
 
-Current target-memory result: **199 PAL fields for 164 updates (41.21 FPS)**,
+Pre-controller-publication result: **199 PAL fields for 164 updates (41.21 FPS)**,
 independently repeated with deterministic emulation and 512 KiB Chip. The
 historical target remains 181 fields (45.30 FPS), not a new 50 FPS requirement.
 The current normal stripped build passes the 512 KiB Chip startup check; this

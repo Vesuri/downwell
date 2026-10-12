@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_DITHER_ABOVE_H
 #include "DitherAboveStep.h"
 #include "InstanceLifecycle.h"
+#include "RunnerSpatialSplit.h"
 namespace downwell {
 // Authored object 61, NOT the player-created entry wipe (73). The source room
 // supplies the numeric ID. A generation survives room teardown so old handles
@@ -21,7 +22,26 @@ public:
         RunnerImageValue x{},y{};
         bool active=true,destroyRequested=false,lowSpec=false,ending=false;
     };
-    explicit GameplayDitherAbove(Binding binding={}):binding_(binding){}
+    struct Publication {
+        RunnerImageValue* x=nullptr;
+        RunnerImageValue* y=nullptr;
+        std::uint32_t* appearance=nullptr;
+    };
+    using AcquirePublication=bool (*)(void*,const Record&,Publication&);
+    explicit GameplayDitherAbove(Binding binding={},void* context=nullptr,
+        AcquirePublication acquire=nullptr):binding_(binding),publicationContext_(context),acquire_(acquire){}
+    // One engine-owned Begin Step, with a read-only camera accessor and no
+    // intervening lifetime mutation. An admitted native owner lends stable
+    // mirrors, not permission to omit any source setter. Other owners retain
+    // the checked callback path, including its failure prefixes.
+    template<class CameraY>
+    bool beginStepPublishedPixels(int cameraX,CameraY cameraY,bool lowSpec,bool ending){
+        if(!acquire_)return beginStepPixels(cameraX,cameraY,lowSpec,ending);
+        if(phase_)return fail();
+        Phase phase;phase_=&phase;
+        struct Reset {GameplayDitherAbove& owner;~Reset(){owner.phase_=nullptr;}} reset{*this};
+        return beginStepPixels(cameraX,cameraY,lowSpec,ending);
+    }
     bool valid()const{return good_;}
     InstanceHandle handle()const{return {0,record_.lifetimeId};}
     const Record* find(InstanceHandle h)const{
@@ -114,7 +134,19 @@ private:
             (narrowed.bits==record_.y.bits||!(record_.y.bits&0x7fffffffu));
     }
     bool position(RunnerImageValue x,RunnerImageValue y){
-        if(!good_||(binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,x,y)))return fail();
+        if(!good_)return false;
+        if(phase_&&!phase_->acquired){
+            if(!acquire_(publicationContext_,record_,phase_->publication))return fail();
+            const auto& p=phase_->publication;
+            if(bool(p.x)!=bool(p.y)||bool(p.x)!=bool(p.appearance))return fail();
+            phase_->acquired=true;
+        }
+        if(phase_&&phase_->publication.x){
+            const auto& p=phase_->publication;
+            if(!RunnerSpatialSplit::equal(*p.x,x)||!RunnerSpatialSplit::equal(*p.y,y)){
+                *p.x=x;*p.y=y;*p.appearance|=8u;
+            }
+        }else if(binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,x,y))return fail();
         const bool changed=record_.y.bits!=y.bits;
         record_.x=x;record_.y=y;
         if(changed)preparePixelY();
@@ -125,6 +157,10 @@ private:
         record_.destroyRequested=true;return true;
     }
     Record record_{};Binding binding_{};unsigned next_=1;bool good_=true;
+    struct Phase {Publication publication{};bool acquired=false;};
+    void* publicationContext_=nullptr;
+    AcquirePublication acquire_=nullptr;
+    Phase* phase_=nullptr;
     std::int32_t pixelY_=0;bool pixelYValid_=false;
 };
 }

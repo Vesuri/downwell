@@ -51,6 +51,56 @@ struct PixelOwner {
         writes[count++]={r.x.bits,r.y.bits,true};return count!=reject;
     }
 };
+struct PublicationOwner:PixelOwner {
+    RunnerImageValue x{},y{};
+    std::uint32_t flags=0;
+    unsigned acquisitions=0;
+    bool rejectAcquire=false,empty=false,partial=false;
+    bool birth(InstanceHandle,const Record& r){x=r.x;y=r.y;return true;}
+    bool move(InstanceHandle h,const Record& r,RunnerImageValue px,RunnerImageValue py){
+        if(!PixelOwner::move(h,r,px,py))return false;
+        if(!RunnerSpatialSplit::equal(x,px)||!RunnerSpatialSplit::equal(y,py)){
+            x=px;y=py;flags|=8u;
+        }
+        return true;
+    }
+    static bool acquire(void* context,const Record&,GameplayDitherAbove::Publication& out){
+        auto& p=*static_cast<PublicationOwner*>(context);++p.acquisitions;
+        if(p.rejectAcquire)return false;
+        if(!p.empty)out={&p.x,p.partial?nullptr:&p.y,&p.flags};
+        return true;
+    }
+};
+static void verifyPhasePublication(){
+    for(float initial:{-80.5F,-80.0F,-0.0F,0.0F,0.5F,16777216.0F})
+    for(int camera:{-100,128,192,272,4096})for(bool low:{false,true})for(bool ending:{false,true}){
+        PublicationOwner a,b;
+        GameplayDitherAbove reference(GameplayDitherAbove::Binding::bindDestruction(a));
+        GameplayDitherAbove candidate(GameplayDitherAbove::Binding::bindDestruction(b),&b,PublicationOwner::acquire);
+        GameplayDitherAbove::Snapshot state;state.sourceId=100854;state.y=encoded(initial);
+        assert(reference.adopt(state)&&candidate.adopt(state));
+        unsigned readsA=0,readsB=0;
+        assert(reference.beginStepPixels(240,[&]{++readsA;assert(a.x.bits==encoded(240).bits);return camera;},low,ending));
+        assert(candidate.beginStepPublishedPixels(240,[&]{++readsB;assert(b.x.bits==a.x.bits);return camera;},low,ending));
+        const auto* ar=reference.find(reference.handle());const auto* br=candidate.find(candidate.handle());
+        assert(readsA==1&&readsB==1&&b.acquisitions==1);
+        assert(a.x.bits==b.x.bits&&a.y.bits==b.y.bits&&a.flags==b.flags);
+        assert(ar->x.bits==br->x.bits&&ar->y.bits==br->y.bits&&ar->destroyRequested==br->destroyRequested);
+        assert(b.count==unsigned(ending)); // No per-setter owner callbacks.
+        assert(candidate.clear()&&candidate.create(100854,0,-80));
+        assert(candidate.beginStepPublishedPixels(241,[]{return 4096;},false,false)&&b.acquisitions==2);
+    }
+    for(unsigned mode=0;mode<3;++mode){
+        PublicationOwner p;p.rejectAcquire=mode==0;p.partial=mode==1;p.empty=mode==2;
+        GameplayDitherAbove candidate(GameplayDitherAbove::Binding::bindDestruction(p),&p,PublicationOwner::acquire);
+        assert(candidate.create(100854,0,-80));unsigned reads=0;
+        assert(candidate.beginStepPublishedPixels(240,[&]{++reads;return 4096;},false,false)==(mode==2));
+        assert(p.acquisitions==1&&reads==unsigned(mode==2));
+        assert(p.count==(mode==2?3u:0u));
+        if(mode!=2)assert(!candidate.find(candidate.handle())->x.bits);
+    }
+    std::puts("Dither phase publication: mirrors, camera-read ordering, rebirth and admission failures passed");
+}
 static void verifyPixelController(){
     unsigned cases=0;
     for(float initial:{-8388592.0F,-8388591.0F,-80.5F,-80.0F,-0.0F,0.0F,0.5F,
@@ -89,6 +139,7 @@ static void verifyPixelController(){
     std::printf("Pixel controller: %u lifecycle/fallback cases and 20000 trajectory updates passed\n",cases);
 }
 int main(){
+    verifyPhasePublication();
     verifyPixelController();
     assert(nativeDitherAboveProbe());
     unsigned checked=0;
