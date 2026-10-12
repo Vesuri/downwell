@@ -59,12 +59,6 @@ int main(int argc,char** argv){
     for(int y=0;y<=80;y+=16)for(int x:{160,320})
         require(amigaAddTerrainObject(index,60,x,y,true),"corridor fixture wall");
     require(AmigaTerrainPainter::corridorRows(index,tiles,32,48),"corridor admission");
-    for(unsigned y=1;y<=4;++y)for(unsigned x=41;x<=53;++x){
-        auto& cell=index.cells[y*AmigaTerrainIndex::columns+x];const auto saved=cell;
-        cell^=AmigaTerrainIndex::wallAppearanceFlags;
-        require(!AmigaTerrainPainter::corridorRows(index,tiles,32,48),"changed neighbourhood accepted as corridor");
-        cell=saved;
-    }
     require(tiles.appendPlatforms(240,32,16,1),"corridor platform fixture");
     require(!AmigaTerrainPainter::corridorRows(index,tiles,32,48),"platform accepted as empty corridor");
     tiles.clear();
@@ -76,15 +70,32 @@ int main(int argc,char** argv){
     require(AmigaTerrainPainter::paintCached(corridor.data(),&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
         pack.data(),pack.data()+pack.size(),160,32,0,16),"compose corridor");
     require(!AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),nullptr,0),"corridor scalar oracle");
-    for(unsigned phaseY=0;phaseY<16;++phaseY){
+    auto checkCorridorPixels=[&](unsigned phaseY){
         std::fill(game.begin(),game.end(),0);
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
             pack.data(),pack.data()+pack.size(),160,32+phaseY,110,0,160,16),"scalar corridor oracle");
         for(unsigned y=0;y<16;++y)for(unsigned plane=0;plane<2;++plane)for(unsigned w=0;w<11;++w){
             const unsigned offset=plane*downwellGameRingPlaneBytes+y*48+12+w*2;
             require(corridor[((y+phaseY)&15)*22+plane*11+w]==UWORD(unsigned(game[offset])*256+game[offset+1]),
-                "periodic corridor scalar pixel mismatch");
+                "admitted corridor differs from scalar pixels");
         }
+    };
+    for(unsigned y=1;y<=4;++y)for(unsigned x=41;x<=53;++x){
+        auto& cell=index.cells[y*AmigaTerrainIndex::columns+x];const auto saved=cell;
+        cell^=AmigaTerrainIndex::wallAppearanceFlags;
+        const bool offscreenDiagonal=(y==1||y==4)&&x!=42&&x!=52;
+        require(AmigaTerrainPainter::corridorRows(index,tiles,32,48)==offscreenDiagonal,
+            "corridor neighbourhood admission differs");
+        if(offscreenDiagonal)checkCorridorPixels(0);
+        cell=saved;
+    }
+    for(unsigned phaseY=0;phaseY<16;++phaseY)checkCorridorPixels(phaseY);
+    // Guard-row tiles have no neighbour-selection effect and no pixels in
+    // the requested span. Prove that for every prepared tile frame.
+    for(int y:{16,64})for(int x:{160,240,320})for(unsigned frame=0;frame<26;++frame){
+        require(tiles.appendCreatedTile(93,x,y,frame),"offscreen tile fixture");
+        require(AmigaTerrainPainter::corridorRows(index,tiles,32,48),"offscreen tile blocks corridor");
+        checkCorridorPixels(0);tiles.clear();
     }
     using Row=std::array<UWORD,22>;
     std::map<Row,unsigned> dictionary;std::vector<Row> entries;std::vector<unsigned> references;

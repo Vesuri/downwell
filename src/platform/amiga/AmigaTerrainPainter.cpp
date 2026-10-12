@@ -106,10 +106,14 @@ bool AmigaTerrainPainter::bindPrepared(const UBYTE* data,unsigned bytes){
 bool AmigaTerrainPainter::corridorRows(const AmigaTerrainIndex& index,
     const AmigaTerrainTiles& tiles,int first,int end){
     if(first<24||first>=end||end>AmigaTerrainIndex::rows*16-24)return false;
-    const int firstRow=((first+8)>>4)-1,lastRow=((end+7)>>4)+1;
-    // Include horizontal and vertical neighbours: they select the wall frame
-    // even when their own artwork is outside the viewport. Contact counts are
-    // not artwork; duplicate wall instances retain the same indexed pixels.
+    const int firstRow=(first+8)>>4,lastRow=(end+7)>>4;
+    // Only the vertical neighbours of the two visible wall columns select
+    // their frames. Offscreen diagonals at the authored entrance do not.
+    const int guards[]={firstRow-1,lastRow+1};
+    for(int row:guards)for(unsigned column=42;column<=52;column+=10)
+        if(!(index.cells[row*AmigaTerrainIndex::columns+column]&AmigaTerrainIndex::wallAppearanceFlags))return false;
+    // Every rendered row must still contain exactly the two walls, with
+    // empty horizontal neighbours. Contact multiplicity is not artwork.
     for(int row=firstRow;row<=lastRow;++row){
         if(tiles.first(row*16))return false;
         for(unsigned column=41;column<=53;++column){

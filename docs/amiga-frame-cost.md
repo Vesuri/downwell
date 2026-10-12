@@ -2,6 +2,29 @@
 
 ## No-input initial-fall comparison
 
+### Authored-entrance seam
+
+Corridor admission now ignores offscreen diagonals: only the vertical neighbours
+of visible wall columns affect their frames. Rendered rows still require the
+exact corridor shape and empty horizontal neighbours. Scalar pixels verify the
+newly admitted diagonal cases and all 26 tile frames in the offscreen guard rows.
+
+Matched marks 57–80 total **3,639,740 → 3,621,110 cycles**. Frame 73's terrain
+painting falls **5.9 → 2.8 ms**, and its whole interval 28.5 → 25.4 ms; both
+arms include the same 6.9 ms publication wait. A separate five-field capture
+from mark 72 confirms **180,420 cycles / 25.4 ms**. The whole-window saving
+is small because waiting redistributes. The full fall is still **191 fields**;
+the two early missed fields at 67 and 72 remain. Do not claim restored cadence.
+Marks 161–166 remain exactly 2,412,320 cycles, including frame 163 at 135.9 ms.
+All 165 state samples match; normal 512 KiB Chip startup passes. Normal Hunk
+is 1,606,200 bytes, with no new assets or allocation. Profile ELF SHA-256:
+`f8b656c909c636b0607c7c5ef468959b748893e3deaf1c211a3f14a1ec4b004a`.
+Normal Hunk SHA-256:
+`4c279b9e5cb847fa6f6daf84f2099ee1faa04b003351635be086d2f7a18e030a`.
+Reports: `tmp/quiet-corridor-{onset,seam-onset,seam-recheck,seam-stall}.txt`.
+The onset capture starts at mark 56 and records thirty fields; the burst
+capture uses the existing mark-160/twenty-field procedure.
+
 ### Borrowed corridor pixels
 
 The complete fall independently repeats at **191 fields / 164 updates
