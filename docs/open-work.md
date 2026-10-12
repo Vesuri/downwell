@@ -38,7 +38,13 @@ The immediate priority is the **no-input initial fall to the first platform**:
    57–121 next: the current missed-field ledger attributes 8 of 18 extra fields
    to this interval, before the larger generation bursts. Separate ordinary phase work and
    small border-generation updates using the onset trace in the audit. Keep the same
-   configuration and no-input trajectory. The historical 32.14 FPS contact
+   configuration and no-input trajectory. The matched middle-fall capture
+   (91–110) identifies small border births, not scrolling/painting: eight
+   generation Steps cost 14.7–15.7 ms versus 10.9–11.3 historically.
+   Remove redundant ownership publication at that boundary; hoisting admission
+   checks alone cannot deliver the measured saving. Preserve required
+   DitherAbove behavior and keep the large frame-163 burst secondary to this
+   recurring quiet workload. The historical 32.14 FPS contact
    average and 19.45 ms firing frame are not acceptance targets for this fall.
 2. Identify and remove the added per-frame work in that sequence, preserving
    source event order and behavior. Accept against the matched historical

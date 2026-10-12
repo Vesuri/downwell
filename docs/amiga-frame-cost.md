@@ -2,6 +2,52 @@
 
 ## No-input initial-fall comparison
 
+### Middle of the quiet fall: updates 91–110
+
+Matched deterministic 26-field captures beginning at mark 90 compare historical
+`13e08ca2` with `bad8bd33`, using the frozen profile ELFs identified below.
+Both comparison arms use 1 MiB Chip because the rebuilt historical asset pack
+does not fit 512 KiB. A separate current 512 KiB capture confirms the same
+cost: **3,130,780 cycles**, versus **3,130,800** at 1 MiB. Historical cost is
+**2,806,770 cycles**. These are twenty complete marker intervals, including
+publication waits, not twenty independent work timers.
+
+| Inclusive ms/update, updates 91–110 | Historical | Current |
+| --- | ---: | ---: |
+| Whole marker interval | 19.75 | 22.03 |
+| Gameplay Step | 9.14 | 11.65 |
+| Generation callback, within Step | 1.49 | 2.56 |
+| Player movement, within Step | 2.09 | 2.03 |
+| Alarm phase, within Step | 0.91 | 0.29 |
+| DitherAbove Begin Step, within Step | absent | 1.20 |
+| Actor Draw collection | 1.30 | 1.74 |
+| New terrain span painting/transfer | 2.68 | 2.67 |
+| Display row synchronization | 1.22 | 1.21 |
+
+Ordinary Step updates cost 7.8–8.0 ms historically versus 9.0–10.1 ms now.
+The eight border-generation updates (93/95/97/99/102/104/106/109) cost
+10.9–11.3 versus 14.7–15.7 ms. This is the recurring quiet-fall workload,
+not the large generation burst at 163. Frame totals peak at 25.1 versus
+30.0 ms, but the current peak at 105 includes 8.5 ms in publication waiting;
+do not attribute that interval to terrain construction.
+
+The prepared border callback costs 1.17 ms averaged across all twenty updates,
+or **2.93 ms per invocation** (eight calls). Native lifetime construction
+accounts for 0.97 ms/update (2.43 ms/call), including 0.56 ms/update in the
+collision owner's span publication. Occupancy admission and `canAppend`
+together account for only about 0.05 ms/update. Hoisting those checks cannot
+remove the measured regression; the surviving ownership publication is the
+relevant structure. Terrain drawing, restoration and player movement are not
+the regressed work. Required DitherAbove behavior must remain.
+
+Reproduce with the frozen quiet-fall build and memory configurations below:
+ignore 89 hits of `downwellTraceFrameMark`, delete the breakpoint, capture
+26 fields, then report `--frames=91-110 --causes`; `--focus createPrepared`
+isolates border publication. Reports are `tmp/quiet-middle-{old,current,512}.txt`
+and `tmp/quiet-middle-generation.txt`. All three emulators stopped on explicit
+success within their 90-second deadlines. Raw captures were removed after
+recording these numbers. The normal executable was not rebuilt or replaced.
+
 ### Complete fall through first landing
 
 Current target-memory result: **199 PAL fields for 164 updates (41.21 FPS)**,
