@@ -16,6 +16,7 @@ case "$mode" in
   quiet-fall)
     flags=(FPSCOUNT=1 TRACE_FRAMES=165); script=profile_quiet_cadence.gdb
     ready_marker=DOWNWELL_QUIET_CADENCE_READY
+    export DETERMINISTIC=1
     export STRIP=1 PROFILE_IDLE=1 PROFILE_FRAMES=600 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
@@ -247,6 +248,7 @@ if [[ $mode == trace ]]; then
   exit 0
 fi
 if [[ $mode == quiet-fall ]]; then
+  python3 ../tools/verify-quiet-fall.py ".run/profile-${mode}.log"
   grep '^QUIET_' ".run/profile-${mode}.log"
 elif [[ $mode == draw-cache ]]; then
   grep '^DRAW_CACHE' ".run/profile-${mode}.log"

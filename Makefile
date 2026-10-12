@@ -2682,6 +2682,10 @@ generate-amiga-game: generate-amiga-clear
 	python3 tests/scene-asset-admission-test.py
 
 .PHONY: test-scene-asset-admission
+.PHONY: test-quiet-fall-witness
+test-quiet-fall-witness:
+	python3 tests/quiet-fall-witness-test.py
+test: test-quiet-fall-witness
 test-scene-asset-admission: generate-amiga-game generate-amiga-clear
 	python3 tests/scene-asset-admission-test.py
 test: test-scene-asset-admission

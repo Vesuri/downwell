@@ -33,14 +33,31 @@ bash amiga/profile.sh quiet-fall
 ```
 
 This cleans/builds a stripped no-input profiling executable, defaults to
-512 KiB Chip, stops at first landing after 164 updates, prints its executable
-hash and `QUIET_CADENCE`/`QUIET_LANDING`, and restores the normal stripped
+512 KiB Chip and explicitly enables FS-UAE deterministic mode. It stops at
+first landing after 164 updates, prints its executable hash and
+`QUIET_CADENCE`/`QUIET_LANDING`/`QUIET_MOTION`, and restores the normal stripped
 build on exit. The emulator run has a 90-second deadline; build time is
 separate. The raw debugger result remains in
 `amiga/.run/profile-quiet-fall.log`. `VERIFY_CHIP_KB=1024` explicitly selects
 the expanded-memory historical-comparison configuration; it is not the default.
 This is a cadence measurement, not a pixel oracle or a passing performance
 threshold. A successful run still needs comparison with the historical target.
+`tools/verify-quiet-fall.py` checks the complete printed landing witness
+(position, velocity, camera, grounded state, health, ammo, enemy/bullet counts
+and consumed RNG count), unique completion records and cadence accounting.
+It rejects mismatched or incomplete measurements; it does not impose a speed
+threshold or prove full-state/pixel equivalence. Its sabotage fixtures are
+run by `make test-quiet-fall-witness`.
+
+The earlier launcher left FS-UAE deterministic mode unset. An unchanged
+`bf566363` profile executable subsequently produced 206 fields as well as the
+recorded 208, with matching landing state. Do not treat this two-field
+variation as a gain. With `DETERMINISTIC=1` explicitly supplied, two bounded
+512 KiB Chip runs and a matched 1 MiB Chip current run reproduce 208 fields;
+the historical 1 MiB Chip control reproduces 181. This does not establish a
+zero noise floor for all runs.
+Logs: `tmp/quiet-witness-{current,fixed-1,fixed-2,fixed-1m,old-fixed}-gdb.log`.
+Use `DETERMINISTIC=1` for direct frozen-binary verification commands too.
 
 The complete no-input fall is 164 updates. `13e08ca2` and `f5c7705f`
 match all 165 pre-Step observations through tick 164 using
