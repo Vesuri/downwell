@@ -34,20 +34,13 @@ The immediate priority is the **no-input initial fall to the first platform**:
 
 1. Use the matched 164-update no-input fall through first landing in
    `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
-   222 at `f5c7705f`. Trace the remaining fall beyond the short early windows
+   211 after prepared border-pair publication. Trace the remaining fall beyond the short early windows
    to separate steady-frame regression from generation stalls. Keep the same
    configuration and no-input trajectory. The historical 32.14 FPS contact
    average and 19.45 ms firing frame are not acceptance targets for this fall.
 2. Identify and remove the added per-frame work in that sequence, preserving
    source event order and behavior. Accept against the matched historical
    mean and worst-frame costs, not a new 20 ms requirement.
-   Start with the recurring initial-border pair publication: frame 93's
-   generation is 10.06 ms versus 3.36 ms historically, with unchanged painting.
-   Replace its two scalar lifetime/layer publications through a certified
-   whole-pair path; retain source order, failure prefixes and the scalar oracle.
-   Use the existing prepared-span owner rather than another registry encoding
-   or per-cell helper rewrite. Price the whole replacement against the measured
-   5.93 ms birth boundary and remeasure the complete fall.
 3. Verify the restored fall, normal 512 KiB Chip startup, and unchanged replay
    behavior before returning to generation bursts or combat profiling.
 

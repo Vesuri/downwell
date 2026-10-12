@@ -430,8 +430,19 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
         random.chooseIndexSmall(2);
         for (int cell = 0; cell < 19; ++cell)
             random.nextU32();
-        if (!emitObject(60, 160, y_, random, emit, context) ||
-            !emitObject(60, 320, y_, random, emit, context))
+        if(preparedTerrainEmitter_){
+            // The source has already consumed this row's RNG. Both wall
+            // Creates precede advanceRow and have no intervening event.
+            // Static storage is required: native ownership borrows creates.
+            static constexpr std::uint8_t borders[]={
+                0,0,0,2,2,0, 42,0,52,0,
+                42,1,83,0, 52,1,83,0
+            };
+            const PreparedTerrain batch(borders,y_,random,specialObjectsGenerated_);
+            if(!preparedTerrainEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,batch,emit)||
+               !batch.completed())return false;
+        }else if (!emitObject(60, 160, y_, random, emit, context) ||
+                  !emitObject(60, 320, y_, random, emit, context))
             return false;
         if (!advanceRow()) return false;
         ++generationCount_;

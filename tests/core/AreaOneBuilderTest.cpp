@@ -16,6 +16,7 @@ using Commands = std::vector<DeferredCreateInstance>;
 std::uint64_t emissionDigest = 14695981039346656037ULL;
 std::uint64_t legacyDigest = 14695981039346656037ULL;
 std::uint64_t preBoxDigest = 14695981039346656037ULL;
+unsigned initialBorderPairs = 0;
 void mix(std::uint32_t value,bool newFieldPayload=false,bool boxPayload=false) {
     auto legacy=(newFieldPayload||boxPayload)?0u:value;
     auto preBox=boxPayload?0u:value;
@@ -240,7 +241,7 @@ int main(int argc, char** argv) {
     }
     unsigned runs=0,runCells=0;
     for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
-    for(unsigned executor:{0u,1u,2u,3u,4u})for(unsigned failAt:{0u,1u,17u,101u,701u}){
+    for(unsigned executor:{0u,1u,2u,3u,4u})for(unsigned failAt:{0u,1u,2u,17u,101u,701u}){
         AreaOneBuilder scalar,grouped;GameMakerRandom a(seed),b(seed);
         scalar.reset(240,704,a,{level,seed%5,true,false});
         grouped.reset(240,704,b,{level,seed%5,true,false});
@@ -300,6 +301,13 @@ int main(int argc, char** argv) {
         if(executor>=3)grouped.setPreparedTerrainEmitter([](void* context,const AreaOneBuilder::PreparedTerrain& batch,
                                                           AreaOneBuilder::EmitFunction emit){
             auto& p=*static_cast<RunProbe*>(context);++p.runs;p.cells+=batch.count();
+            if(batch.draws()==0&&batch.count()==2&&batch.creates()[0]==42&&batch.creates()[2]==52){
+                ++initialBorderPairs;
+                const std::uint8_t words[]={42,1,83,0,52,1,83,0};
+                require(batch.wordCount()==2&&batch.platforms()==0&&
+                    std::memcmp(batch.words(),words,sizeof words)==0,
+                    "initial border pair has exact occupancy, contacts and landing bits");
+            }
             const bool ok=batch.executeReference(emit,context);
             require(batch.completed()==ok,"prepared segment completion tracks callback failure");
             const auto after=p.random;const unsigned calls=p.count;
@@ -331,6 +339,7 @@ int main(int argc, char** argv) {
         require(terminated,"terrain run tape bounded");runs+=right.runs;runCells+=right.cells;
     }
     require(runs>100&&runCells>runs*2,"terrain run corpus covers repeated wall/platform spans");
+    require(initialBorderPairs>0,"prepared initial border pair path exercised");
     std::cout<<"ordered terrain runs "<<runs<<", candidate cells "<<runCells<<'\n';
     {
         AreaOneBuilder invalid;GameMakerRandom random(1);

@@ -48,6 +48,28 @@ Complete-fall ELF SHA-256:
 
 ### Short instruction-traced windows
 
+The prepared initial-border pair now uses the existing certified span owner
+instead of two scalar lifetime/layer births. Frame 93 is **34.03 → 29.91 ms**
+(241,790 → 212,510 cycles); generation is 10.06 → 6.07 ms. The replacement's
+prepared publication costs 2.93 ms, including 2.45 ms native construction.
+It does not change the RNG draws preceding the pair or the following row
+setter. The static 18-byte description has process lifetime because native
+terrain ownership borrows its create sequence; callbacks/admission failures
+retain the scalar executor.
+
+The complete fall is now **211 PAL fields / 38.86 FPS**, independently
+repeated, versus 222 / 36.94 before this change and 181 / 45.30 historically.
+All 165 selected state observations still match. Frames 151–164 cost
+3,951,952 → 3,946,902 cycles in matched captures; frame 163 remains 155.8 ms
+and frame 164 changes 51.9 → 51.8 ms. These differences are noise, not a
+claimed generation-stall saving. The 18,000-frame native ownership comparison,
+incremental terrain tests and builder callback/failure-prefix checks pass.
+The normal stripped Hunk is 1,767,696 bytes and passes 512 KiB Chip startup.
+Candidate profile ELF SHA-256:
+`d2829f9e5b8024ce2c0913326ff6ead2a0ae0b39e57dd671df9f4a0ef6e338f0`.
+Normal Hunk SHA-256:
+`0cef6f2a03d9f78aab9f9ee20c2bca23bdf58b1fbe7f0715c68f1b59fab984b6`.
+
 Matched later-fall captures (same complete-fall ELFs above), starting at
 frame 90 for 100 PAL fields, expose a recurring row-publication regression.
 Both reports select **91–157**, 67 complete updates; the current capture
