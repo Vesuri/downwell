@@ -100,6 +100,29 @@ be separated from redundant bookkeeping; the absent historical DitherAbove
 event is not removable source behavior. These inclusive rows overlap and
 must not be summed as independent phases.
 
+The first-landing stall was separately recaptured at **512 KiB Chip** from
+frame 160 for 20 fields, using the prepared-pair ELF above. Complete frame
+163 is **155.76 ms**, agreeing with the 1 MiB capture. Of this, generation
+costs 115.85 ms and terrain painting 6.84 ms. Generation's principal
+non-overlapping publication branches are:
+
+| Frame 163 generation branch | Inclusive ms |
+| --- | ---: |
+| Prepared wall/platform segments | 47.26 |
+| Breakable backend publication | 16.21 |
+| Breakable Create evaluation | 11.90 |
+| Other event-cell object emission (including enemy births) | 13.34 |
+
+Within the 47.26 ms prepared branch, native construction is 35.99 ms and
+its `constructTerrainSpan` owner is 19.05 ms. The latter's own instructions
+are only 25,724 cycles (3.62 ms), spread across 46 source locations; it is
+not one expensive arithmetic helper. Its nested layer publication, room
+membership and admission cost 3.59, 3.35 and 3.15 ms, respectively. These
+numbers locate costs, not justify reviving the rejected registration-owner
+or fresh-cell-initialization variants. Breakable publication likewise
+already uses `NativeFamilyBirth`; it is not the old generic box path.
+No runtime change was made from this attribution alone.
+
 Matched later-fall captures (same complete-fall ELFs above), starting at
 frame 90 for 100 PAL fields, expose a recurring row-publication regression.
 Both reports select **91–157**, 67 complete updates; the current capture
