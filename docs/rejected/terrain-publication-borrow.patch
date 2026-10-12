@@ -1,0 +1,187 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index cd801a3d..90eb88e4 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -787,10 +787,66 @@ private:
+         return sprite.imageIndex.assignInteger(index);
+     }
+ #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
++    struct PreparedTerrainRecipe {
++        int tile=-1;
++        RunnerImageValue depth;
++        std::uint32_t flags[2]{};
++        bool ready=false;
++    } terrainRecipe_;
++    typename decltype(layers_)::PreparedTerrainPublication terrainPublication_;
++    bool prepareTerrainRecipe(int tile){
++        terrainRecipe_.ready=false;
++        const auto* wall=objectDefaults_.get(60);const auto* thin=objectDefaults_.get(93);
++        if(!wall||!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth))return false;
++        for(unsigned kind=0;kind<2;++kind){
++            const int object=kind?93:60;const auto* definition=kind?thin:wall;
++            const auto* objectFlags=families_.flags(unsigned(object));
++            const auto* plan=nativeTerrainCreate_.get(object,tile);
++            if(!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||
++               (definition->initialFlags&0x8000u))return false;
++            terrainRecipe_.flags[kind]=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
++        }
++        terrainRecipe_.depth=wall->creationDepth;terrainRecipe_.tile=tile;terrainRecipe_.ready=true;
++        return true;
++    }
++    GameplayWorld::NativeTerrain::SpanResult publishPreparedExternalTerrain(
++        const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
++        unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
++        using Result=GameplayWorld::NativeTerrain::SpanResult;
++        completed=0;const unsigned count=cells.count,slot=View::terrainBase+first.handle.slot;
++        if(!valid()||!count||count>GameplayWorld::NativeTerrain::capacity||nativeTerrainLayerRunActive_||
++           !nativeTerrainLayersBound_||terrainRoomCount_||tile!=terrainTileForArea(world_->runStage().area)||
++           !table_.canFreshExternalSpan(slot,count))return Result::unsupported;
++        if((!terrainRecipe_.ready||terrainRecipe_.tile!=tile)&&!prepareTerrainRecipe(tile))return Result::unsupported;
++        if(!terrainPublication_.layer.current()&&
++           !layers_.borrowPreparedTerrainPublication(terrainRecipe_.depth,terrainPublication_))return Result::unsupported;
++        if(!terrainPublication_.admits(count))return Result::unsupported;
++        unsigned present=0;
++        for(unsigned i=0;i<count;++i){
++            present|=1u<<cells.kind(i);
++            if(room_.contains(slot+i))return Result::unsupported;
++        }
++        for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind))flags[kind]=terrainRecipe_.flags[kind];
++        if(!table_.externalBirthSpan(slot,count,stamp))return Result::unsupported;
++        thinRetirementWindow_.appendSpan(cells.y,(present&2u)!=0,first.handle.generation+count-1,count);
++        bool okay=true;
++        for(unsigned i=0;i<count;++i){
++            if(cells.kind(i)&&!table_.registerExternalObject({slot+i,first.handle.generation+i},93,true)){
++                okay=false;break;
++            }
++            ++completed;
++        }
++        if(completed&&!terrainPublication_.publish(completed,layer))okay=false;
++        if(!room_.bindTerrainSpan(slot,completed,terrainRecipe_.depth))okay=false;
++        if(!okay){check(false);return Result::failure;}
++        return Result::success;
++    }
+     GameplayWorld::NativeTerrain::SpanResult constructTerrainSpan(
+         const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
+         unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer,bool direct=false){
+         using Result=GameplayWorld::NativeTerrain::SpanResult;
++        if(direct&&!collisionConsumersAdmitted_)
++            return publishPreparedExternalTerrain(first,cells,tile,completed,stamp,flags,layer);
+         completed=0;const unsigned count=cells.count;
+         const unsigned slot=View::terrainBase+first.handle.slot;
+         const auto* wall=objectDefaults_.get(60);unsigned layerSlot=0;
+diff --git a/src/core/GameplayRoomLayers.h b/src/core/GameplayRoomLayers.h
+index fa698821..3596b356 100644
+--- a/src/core/GameplayRoomLayers.h
++++ b/src/core/GameplayRoomLayers.h
+@@ -290,6 +290,23 @@ public:
+         // retirement mutations retain their ordinary invalidation paths.
+         return true;
+     }
++    struct PreparedTerrainPublication {
++        RunnerConstructedSpan layer;
++        unsigned* live=nullptr;
++        std::uint32_t* drawRevision=nullptr;
++        bool admits(unsigned count)const{return live&&layer.admits(count);}
++        bool publish(unsigned count,RunnerRetainedLayerState& first){
++            if(!layer.publish(count,first))return false;
++            *live+=count;
++            *drawRevision=*drawRevision>0xffffffffu-count?0xffffffffu:*drawRevision+count;
++            return true;
++        }
++    };
++    bool borrowPreparedTerrainPublication(RunnerImageValue depth,PreparedTerrainPublication& out){
++        unsigned layer;
++        if(!admitPreparedTerrainSpan(1,depth,layer)||!layers_.borrowConstructedSpan(layer,out.layer))return false;
++        out.live=&live_;out.drawRevision=&drawRevision_;return true;
++    }
+     bool birthInheritedTerrain(InstanceHandle h,TerrainRunBirth& run){
+         ++run.drawPending;
+         if(!enabled())return true;
+diff --git a/src/core/RunnerLogicalLayerOrder.h b/src/core/RunnerLogicalLayerOrder.h
+index bfb3ba74..3e9b6247 100644
+--- a/src/core/RunnerLogicalLayerOrder.h
++++ b/src/core/RunnerLogicalLayerOrder.h
+@@ -42,6 +42,28 @@ public:
+     const RunnerRetainedLayerState* operator->()const{return &value_;}
+     const RunnerRetainedLayerState& operator*()const{return value_;}
+ };
++// Borrowed constructor metadata, not a layer element or an always-active
++// family. Every birth still receives its own retained state and source key.
++// Layer identity/depth are checked before using pointers into reusable slots.
++struct RunnerConstructedSpan {
++    NativeFamilyBirth::Population population;
++    RunnerRegistrationOrder* clock=nullptr;
++    bool* cutoffDirty=nullptr;
++    const bool* present=nullptr;
++    const std::int32_t *id=nullptr,*depth=nullptr;
++    std::int32_t expectedId=-1,expectedDepth=0;
++    unsigned layer=0xffffffffu;
++    bool current()const{return present&&*present&&*id==expectedId&&*depth==expectedDepth;}
++    bool admits(unsigned count)const{
++        return current()&&count&&count<=population.capacity-*population.logical;
++    }
++    bool publish(unsigned count,RunnerRetainedLayerState& first){
++        if(!admits(count))return false;
++        *population.retained+=count;*population.logical+=count;
++        clock->advance();first={{*clock,false},expectedId,layer,false};
++        *clock=clock->shifted(count-1);*cutoffDirty=true;return true;
++    }
++};
+ // Terrain supplies layerState(slot/handle) and visitLayerStates(handle,state).
+ // Its records own retained state; this adapter owns only physical order keys,
+ // per-layer cutoffs and scratch used at logical merge/normalization boundaries.
+@@ -150,6 +172,14 @@ public:
+         first={stamp(false),Base::get(layer)->id,layer,false};
+         clock_=clock_.shifted(count-1);cutoffs_[layer].dirty=true;return true;
+     }
++    bool borrowConstructedSpan(unsigned layer,RunnerConstructedSpan& out){
++        const auto* value=Base::get(layer);
++        if(!succeeded()||!value||!Base::borrowRetainedPopulation(layer,out.population))return false;
++        out.clock=&clock_;out.cutoffDirty=&cutoffs_[layer].dirty;
++        out.present=&value->present;out.id=&value->id;out.depth=&value->depth;
++        out.expectedId=value->id;out.expectedDepth=value->depth;out.layer=layer;
++        return true;
++    }
+     bool releaseInstance(InstanceHandle h){
+         auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
+         if(!succeeded()||!s||!s->bound()||!Base::releaseRetained(s->layer,1))return false;
+diff --git a/tests/core/RunnerLogicalLayerOrderTest.cpp b/tests/core/RunnerLogicalLayerOrderTest.cpp
+index 124bd7be..2a0f7c4f 100644
+--- a/tests/core/RunnerLogicalLayerOrderTest.cpp
++++ b/tests/core/RunnerLogicalLayerOrderTest.cpp
+@@ -367,7 +367,34 @@ static void sparsePreparedDraw(){
+         REQUIRE(run(false)==run(true));
+     }
+ }
+-int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();sparsePreparedDraw();
++static void borrowedConstruction(){
++    Terrain ta,tb;Logical a,b;REQUIRE(a.bindTerrain(ta)&&b.bindTerrain(tb));
++    unsigned la,lb;
++    REQUIRE(a.insertAfterEquals(73,100,true,la)&&b.insertAfterEquals(73,100,true,lb));
++    RunnerConstructedSpan loan,referenceClock;
++    REQUIRE(a.borrowConstructedSpan(la,loan)&&b.borrowConstructedSpan(lb,referenceClock));
++    *loan.clock={0xfffffffeu,2};*referenceClock.clock=*loan.clock;
++    RunnerRetainedLayerState x,y;
++    REQUIRE(!loan.admits(0)&&!loan.publish(9,x));
++    for(unsigned n:{2u,1u,5u}){
++        REQUIRE(loan.publish(n,x)&&b.retainConstructedSpan(lb,n,y));
++        REQUIRE(x.same(y)&&a.elementCount(la)==b.elementCount(lb));
++        // Another source attachment can advance the same clock between spans.
++        if(n==2){
++            REQUIRE(a.attach(la,0,true,false,[](unsigned){return true;}));
++            REQUIRE(b.attach(lb,0,true,false,[](unsigned){return true;}));
++            REQUIRE(a.detach(0)&&b.detach(0));
++        }
++    }
++    REQUIRE(!loan.admits(1)&&!loan.publish(1,x));
++    REQUIRE(a.releaseRetained(la,8)&&b.releaseRetained(lb,8));
++    REQUIRE(!loan.current()&&!loan.publish(1,x));
++    REQUIRE(a.insertAfterEquals(74,100,true,la));
++    REQUIRE(!loan.current()&&!loan.publish(1,x));
++    REQUIRE(a.borrowConstructedSpan(la,loan)&&loan.publish(1,x));
++    REQUIRE(x.publishedId==74&&a.elementCount(la)==1);
++}
++int main(){borrowedConstruction();inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();sparsePreparedDraw();
+     sparseTerrainCutoffs();
+     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
+     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
