@@ -67,8 +67,13 @@ The immediate priority is the **no-input initial fall to the first platform**:
      against matched historical costs, not a new 20 ms requirement.
    Leave shared intrusive room/lifetime descriptors closed: publication splits
    fragment the room animation skip traversal. Do not tune their accessors or
-   add another skip projection. Initial-state, recipe-cache, cross-row grouping
-   and observed-room reconstruction variants also remain closed.
+   add another skip projection. The sparse-change room-owner attempt is also
+   closed: it removes that traversal cost but saves under 1 ms in the measured
+   native construction region, with no complete-fall cadence improvement. Do
+   not pursue room-state packing/accessor or sparse-list variants. Initial-state,
+   recipe-cache, cross-row grouping and observed-room reconstruction variants
+   also remain closed. Another attempt must replace a larger construction stage,
+   not repackage room membership alone.
 3. Verify the restored complete fall (including its generation bursts), normal
    512 KiB Chip startup, and unchanged replay behavior before returning to
    later gameplay or combat optimization.
