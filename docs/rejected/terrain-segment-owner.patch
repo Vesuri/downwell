@@ -1,0 +1,1527 @@
+diff --git a/Makefile b/Makefile
+index 07d209cf..4edfa7ea 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1446,7 +1446,8 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp t
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+ 
+ build/gameplay-external-collision-contract-test: CXXFLAGS += -DDOWNWELL_EXTERNAL_COLLISION_BACKEND
+-build/gameplay-external-collision-contract-test build/gameplay-full-collision-contract-test: tests/core/GameplayCollisionContractTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
++build/gameplay-segment-collision-contract-test: CXXFLAGS += -DDOWNWELL_EXTERNAL_COLLISION_BACKEND -DDOWNWELL_SEGMENT_TERRAIN
++build/gameplay-segment-collision-contract-test build/gameplay-external-collision-contract-test build/gameplay-full-collision-contract-test: tests/core/GameplayCollisionContractTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+ 	@mkdir -p build
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+ .PHONY: test-gameplay-collision-contract
+@@ -3401,7 +3402,8 @@ test-amiga-trace-report:
+ 
+ TERRAIN_OWNERSHIP_TEST_SOURCES := tests/platform/amiga/AmigaTerrainOwnershipTest.cpp src/platform/amiga/AmigaGameplayGeneration.cpp src/platform/amiga/AmigaTerrain.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
+ .PHONY: verify-terrain-ownership
+-build/amiga-terrain-ownership-test: $(TERRAIN_OWNERSHIP_TEST_SOURCES) $(HOST_CHECK_HEADERS)
++build/amiga-terrain-segment-ownership-test: CXXFLAGS += -DDOWNWELL_SEGMENT_TERRAIN
++build/amiga-terrain-ownership-test build/amiga-terrain-segment-ownership-test: $(TERRAIN_OWNERSHIP_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+ 	@mkdir -p build
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(TERRAIN_OWNERSHIP_TEST_SOURCES)
+ verify-terrain-ownership: build/amiga-terrain-ownership-test generate-room-pack generate-object-pack generate-builder-pattern-pack
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 57691e00..c60b7384 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -68,6 +68,9 @@ REFERENCE_FIELD_BANK ?= 0
+ REFERENCE_FIELD_ADMISSION ?= 0
+ REFERENCE_ENTRY_ASSETS ?= 0
+ REFERENCE_EMPTY_TERRAIN ?= 0
++# Keep the retained owner as the default until the complete section-0 A
++# candidate has passed behavior and whole-fall performance gates.
++REFERENCE_TERRAIN_RECORDS ?= 1
+ REFERENCE_ROOM_INDEX ?= 0
+ REFERENCE_ROOM_TERRAIN ?= 0
+ REFERENCE_ROOM_VIEWS ?= 0
+@@ -367,6 +370,9 @@ endif
+ ifeq ($(REFERENCE_EMPTY_TERRAIN),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_EMPTY_TERRAIN
+ endif
++ifeq ($(REFERENCE_TERRAIN_RECORDS),0)
++CFLAGS += -DDOWNWELL_SEGMENT_TERRAIN
++endif
+ ifeq ($(REFERENCE_ROOM_INDEX),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_ROOM_INDEX
+ endif
+@@ -743,6 +749,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_FIELD_ADMISSION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_TERRAIN_RECORDS)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_INDEX)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_VIEWS)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 5f019476..f1c70a1c 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -136,6 +136,7 @@ fi
+ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
+ # Always leave the playable binary behind, including after a timeout/failure.
+ restore() {
++  unset REFERENCE_TERRAIN_RECORDS
+   unset TERRAIN_READ_CENSUS
+   unset PROBES FPSCOUNT
+   unset PROFILE_ENTRY
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 2ad6d104..d30946e3 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -13,6 +13,7 @@
+ #include "RunnerObjectFamilies.h"
+ #include "RunnerRoomMembership.h"
+ #include "RunnerRunRoomMembership.h"
++#include "RunnerSegmentRoomMembership.h"
+ #include "RunnerActivationChanges.h"
+ #include "SmokeDirection.h"
+ #include "SmokeTrig.h"
+@@ -94,6 +95,9 @@ public:
+     };
+     bool hasSkeletonEncounterStorage()const{return bones_.hasStorage()&&skeletons_.hasStorage();}
+     struct ReferenceStorage {
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room;
++#endif
+         Owner::ControlStorage control;
+         Owner::State states[View::capacity]{};
+         Owner::Properties properties[View::capacity]{};
+@@ -260,6 +264,8 @@ private:
+     }
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     RunnerRoomMembership<View::capacity> room_;
++#elif defined(DOWNWELL_SEGMENT_TERRAIN)
++    RunnerSegmentRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase,GameplayWorld::NativeTerrain> room_;
+ #else
+     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
+ #endif
+@@ -514,7 +520,11 @@ private:
+                     std::uint32_t spatial;
+                     if(!world_->nativeTerrainInstances()->spatialFlags(id.handle,spatial))return false;
+                     out=(definition->initialFlags&~8u)|spatial|
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++                        ((collisionConsumersAdmitted_?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
++#else
+                         (((collisionConsumersAdmitted_||id.object==93)?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
++#endif
+                 }
+             }
+             return false;
+@@ -536,12 +546,35 @@ private:
+         return owner_.visitRegistrationFlags(visit);
+ #endif
+     }
++    template<class Flags,class Visit> bool visitNativeTableRegistered(unsigned first,unsigned last,Flags flagsOf,Visit visit)const{
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        if(!collisionConsumersAdmitted_&&world_&&world_->nativeTerrainInstances()&&
++           first<View::timeFieldBase&&last>View::terrainBase){
++            const auto* terrain=world_->nativeTerrainInstances();
++            const unsigned begin=first>View::terrainBase?first-View::terrainBase:0;
++            const unsigned end=last<View::timeFieldBase?last-View::terrainBase:GameplayWorld::NativeTerrain::capacity;
++            InstanceHandle next;std::uint32_t order;
++            bool found=terrain->nextRegistered(begin,end,93,0,next,order);
++            auto before=[&](std::uint32_t cutoff){
++                while(found&&(!cutoff||order<cutoff)){
++                    const InstanceHandle h{View::terrainBase+next.slot,next.generation};std::uint32_t flags;
++                    if(!flagsOf(h,flags)||!visit(h,93,flags))return false;
++                    found=terrain->nextRegistered(begin,end,93,order,next,order);
++                }return true;
++            };
++            return table_.visitRegistrationRange(first,last,flagsOf,[&](InstanceHandle h,int object,std::uint32_t flags){
++                return before(table_.registrationOrder(h))&&visit(h,object,flags);
++            })&&before(0);
++        }
++#endif
++        return table_.visitRegistrationRange(first,last,flagsOf,visit);
++    }
+     template<class Visit> bool visitNativeRegistered(unsigned first,unsigned last,Visit visit)const{
+         const bool boxes=nativeBoxes_&&last>View::breakableBase&&first<View::terrainBase;
+         const bool fields=nativeFields_&&last>View::timeFieldBase&&first<View::goalFieldBase;
+         auto flagsOf=[&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);};
+         if(!boxes&&!fields)
+-            return table_.visitRegistrationRange(first,last,flagsOf,visit);
++            return visitNativeTableRegistered(first,last,flagsOf,visit);
+         if(!world_||first>last||last>View::capacity)return false;
+         unsigned box=first>View::breakableBase?first-View::breakableBase:0;
+         const unsigned end=boxes?(last<View::terrainBase?last-View::breakableBase:world_->breakableSlots()):0;
+@@ -574,7 +607,7 @@ private:
+                 }
+             }
+         };
+-        return table_.visitRegistrationRange(first,last,flagsOf,[&](InstanceHandle h,int object,std::uint32_t flags){
++        return visitNativeTableRegistered(first,last,flagsOf,[&](InstanceHandle h,int object,std::uint32_t flags){
+             const auto order=h.slot>=View::terrainBase&&h.slot<View::timeFieldBase?
+                 world_->nativeTerrainInstances()->registrationOrder({h.slot-View::terrainBase,h.generation}):
+                 table_.registrationOrder(h);
+@@ -799,7 +832,11 @@ private:
+                    (!nativeTerrainLayerRunActive_||tile!=terrainCreateTile_))||
+            !nativeTerrainLayersBound_||!wall||terrainRoomCount_||
+            !layers_.admitPreparedTerrainSpan(count,wall->creationDepth,layerSlot)||
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++           (collisionConsumersAdmitted_&&!table_.canFreshExternalSpan(slot,count)))return Result::unsupported;
++#else
+            !table_.canFreshExternalSpan(slot,count))return Result::unsupported;
++#endif
+         if(direct){
+             const auto* thin=objectDefaults_.get(93);
+             if(!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)||
+@@ -812,7 +849,9 @@ private:
+             unsigned present=0;
+             for(unsigned i=0;i<count;++i){
+                 present|=1u<<cells.kind(i);
++#ifndef DOWNWELL_SEGMENT_TERRAIN
+                 if(room_.contains(slot+i))return Result::unsupported;
++#endif
+             }
+             for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind)){
+                 const int object=kind?93:60;
+@@ -832,6 +871,9 @@ private:
+                 first.handle.generation+count-1,count);
+             if(!direct){terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;}
+             bool okay=true;
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++            completed=count; // Registration is read from this record's kind bits.
++#else
+             for(unsigned i=0;i<count;++i){
+                 const unsigned current=slot+i,kind=cells.kind(i);
+                 // Only thin-platform End Step consumes terrain registration
+@@ -842,6 +884,7 @@ private:
+                 }
+                 ++completed;
+             }
++#endif
+             if(!direct)terrainRoomCount_+=completed;
+             if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
+             // This admitted span has no callbacks or allocation. The native
+@@ -933,12 +976,19 @@ private:
+         if(!nativeTerrainLayersBound_){
+             if(!world_||!world_->nativeTerrainInstances()||
+                !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++            if(!room_.bindTerrainOwner(*world_->nativeTerrainInstances()))return check(false);
++#endif
+             nativeTerrainLayersBound_=true;
+         }
+ #endif
+         const unsigned slot=View::terrainBase+id.handle.slot;
+         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
+-        if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
++        if((collisionConsumersAdmitted_
++#ifndef DOWNWELL_SEGMENT_TERRAIN
++            ||id.object==93
++#endif
++            )&&!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
+         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
+         if(!definition||!objectFlags)return check(false);
+ #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+@@ -1013,7 +1063,11 @@ private:
+         }
+         if(!check(room_.remove(slot)))return false;
+         if(!check(layers_.retire({slot,h.generation})))return false;
+-        if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
++        if((collisionConsumersAdmitted_
++#ifndef DOWNWELL_SEGMENT_TERRAIN
++            ||id.object==93
++#endif
++            )&&!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
+         table_.externalRetire(slot);return nativeRetireQueues(slot);
+     }
+     template<class Record,View::Kind Kind> struct Binding {
+@@ -1638,6 +1692,9 @@ public:
+                                     (!reference||!owner_.bindControlStorage(&reference->control)||!owner_.bindStateStorage(reference->states)||
+                                      !properties_.bindStorage(reference->properties))){good_=false;return;}
+         if(!native_&&!terrain_.bindStorage(reference->terrain)){good_=false;return;}
++#if defined(DOWNWELL_SEGMENT_TERRAIN) && !defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND)
++        if(!native_)room_.bindReference(reference->room);
++#endif
+         if(preparedDrawEnabled())layers_.enablePreparedDraw();
+         geometry_=native_?(nativeCollision?&nativeCollision->geometry:nullptr):&reference->geometry;
+         good_=(!encounter||(bones_.bindStorage(&encounter->bones)&&skeletons_.bindStorage(&encounter->skeletons)))&&
+@@ -2866,6 +2923,16 @@ private:
+                 });
+             };
+         // The retained actor projection deliberately excludes terrain.
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        if(retain&&!collisionConsumersAdmitted_){
++            const bool okay=check(world_->nativeTerrainInstances()->visitRegistered(0,GameplayWorld::NativeTerrain::capacity,93,
++                [&](InstanceHandle local,std::uint32_t){
++                    const InstanceHandle h{View::terrainBase+local.slot,local.generation};std::uint32_t flags;
++                    return eligibilityFlags(h,flags)&&visit(h,93,flags);
++                }));
++            if(okay)thinRetirementWindow_.complete(proof);return okay;
++        }
++#endif
+         const bool okay=check(native_?table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
+                 [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},visit):
+             owner_.visitRegistrationRange(View::terrainBase,View::timeFieldBase,
+@@ -4845,7 +4912,11 @@ public:
+                         !world_->rebindNativeTerrainOrder({slot-View::terrainBase,h.generation},order))return false;
+                 }
+                 const int object=objectOf(h);
+-                return ((!collisionConsumersAdmitted_&&object!=93)||table_.registerExternalObject(h,object,registered))&&
++                return ((!collisionConsumersAdmitted_
++#ifndef DOWNWELL_SEGMENT_TERRAIN
++                    &&object!=93
++#endif
++                    )||table_.registerExternalObject(h,object,registered))&&
+                     layers_.reconcile(h)&&publishPreparedDraw(h);
+             }
+             // Writes while inactive may have been consumed by an intervening
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index c86475f1..a0bae47f 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -1,34 +1,81 @@
+ #ifndef DOWNWELL_NATIVE_TERRAIN_LIFETIMES_H
+ #define DOWNWELL_NATIVE_TERRAIN_LIFETIMES_H
+ #include "TerrainOwnershipRuns.h"
++#include "TerrainSegmentRecords.h"
+ #include "PlacementNew.h"
+ #include "WallEndStep.h"
+ #include "PackedWallState.h"
+ #include "WallFootprint.h"
+ #include "RunnerLogicalLayerOrder.h"
++#include "RunnerSegmentRoomState.h"
+ namespace downwell {
+ // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
+ // raster cache. Generated source IDs remain unknown until the shared global
+ // allocation stream is connected; family-local generations are never VM IDs.
+ template<unsigned Capacity> class NativeTerrainLifetimes {
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++    struct Cell {
++        unsigned char flags=0;
++        std::int16_t sprite=0;
++        PackedWallState wall;
++        bool same(const Cell& b)const{return flags==b.flags&&sprite==b.sprite&&wall.bits==b.wall.bits;}
++    };
++#endif
+     struct Order {
+         std::uint32_t stamp=0;
+         RunnerRetainedLayerState layer;
+-        Order shifted(unsigned n)const{return {stamp?stamp+n:0,layer.shifted(n)};}
+-        bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer);}
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        Cell cell[2]; // Kind bits select defaults without a per-cell write.
++        RunnerSegmentRoomState room;
++#endif
++        Order shifted(unsigned n)const{auto r=*this;r.stamp=stamp?stamp+n:0;r.layer=layer.shifted(n);
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++            r.room=room.shifted(n);
++#endif
++            return r;}
++        bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer)
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++            &&cell[0].same(other.cell[0])&&cell[1].same(other.cell[1])
++            &&room.same(other.room)
++#endif
++            ;}
+     };
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++    using Runs=TerrainSegmentRecords<Capacity,Order>;
++#else
+     using Runs=TerrainOwnershipRuns<Capacity,Order>;
++#endif
+     Runs runs_;
+     unsigned next_=1,freeHint_=0;
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++    const Cell& cell(unsigned slot)const{return runs_.common(slot)->cell[runs_.object(slot)==93];}
++    Cell& cell(unsigned slot){const unsigned kind=runs_.object(slot)==93;return runs_.writable(slot)->cell[kind];}
++    unsigned char cellFlags(unsigned slot)const{return cell(slot).flags;}
++    unsigned char& cellFlags(unsigned slot){return cell(slot).flags;}
++    std::int16_t cellSprite(unsigned slot)const{return cell(slot).sprite;}
++    std::int16_t& cellSprite(unsigned slot){return cell(slot).sprite;}
++    const PackedWallState& cellWall(unsigned slot)const{return cell(slot).wall;}
++    PackedWallState& cellWall(unsigned slot){return cell(slot).wall;}
++#else
+     unsigned char flags_[Capacity]{};
+     std::int16_t createSprite_[Capacity]{};
+     PackedWallState walls_[Capacity]{};
++    unsigned char cellFlags(unsigned slot)const{return flags_[slot];}
++    unsigned char& cellFlags(unsigned slot){return flags_[slot];}
++    std::int16_t cellSprite(unsigned slot)const{return createSprite_[slot];}
++    std::int16_t& cellSprite(unsigned slot){return createSprite_[slot];}
++    const PackedWallState& cellWall(unsigned slot)const{return walls_[slot];}
++    PackedWallState& cellWall(unsigned slot){return walls_[slot];}
++#endif
+     WallEndStepState* stepping_=nullptr;
+     InstanceHandle steppingHandle_{};
+     bool good_=true;
+     bool wallPresentationState_=false,unboundedWallArt_=false;
+     Order* pendingPublication_=nullptr;
+     InstanceHandle pendingHandle_{};
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++    unsigned pendingCount_=0,roomMarks_=0;
++#endif
+     bool publicationRun_=false;
+     RunnerRetainedLayerState inheritedLayer_;
+     unsigned inheritedLayerCount_=0;
+@@ -44,6 +91,82 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+     }
+ public:
+     static constexpr unsigned capacity=Capacity;
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++    bool roomContains(unsigned slot)const{const auto* s=runs_.common(slot);return s&&s->room.present;}
++    bool roomActive(unsigned slot)const{const auto* s=runs_.common(slot);return s&&s->room.present&&s->room.active;}
++    bool roomMarked(unsigned slot)const{const auto* s=runs_.common(slot);return s&&s->room.present&&s->room.marked;}
++    bool roomHasMarks()const{return roomMarks_!=0;}
++    bool roomBind(unsigned slot,unsigned count,RunnerImageValue depth,RunnerRegistrationOrder sequence){
++        // The constructor owns this pending descriptor. No membership becomes
++        // observable until the same record is committed by the lifetime owner.
++        if(!count)return false;
++        if(pendingPublication_&&slot==pendingHandle_.slot){
++            if(count!=pendingCount_)return false;
++            pendingPublication_->room={depth,sequence,true,true,false};return true;
++        }
++        // The non-prepared oracle publishes room membership at the end of
++        // its source run. It may have completed only a prefix before failing.
++        for(unsigned i=0;i<count;++i)if(!runs_.occupied(slot+i)||roomContains(slot+i))return false;
++        for(unsigned i=0;i<count;++i)
++            runs_.writable(slot+i)->room={depth,sequence.shifted(i),true,true,false};
++        return true;
++    }
++    bool roomMark(unsigned slot){
++        if(!roomContains(slot))return false;
++        if(!roomMarked(slot)){runs_.writable(slot)->room.marked=true;++roomMarks_;}
++        return true;
++    }
++    bool roomRemove(unsigned slot){
++        if(!roomContains(slot))return false;
++        auto& state=runs_.writable(slot)->room;
++        if(state.marked)--roomMarks_;state.present=state.marked=false;return true;
++    }
++    bool roomMove(unsigned slot,bool active,RunnerRegistrationOrder sequence){
++        if(!roomContains(slot))return false;
++        auto& state=runs_.writable(slot)->room;state.active=active;state.sequence=sequence;return true;
++    }
++    bool nextRegistered(unsigned first,unsigned end,int object,std::uint32_t after,InstanceHandle& handle,std::uint32_t& order)const{
++            unsigned selected=Capacity;order=0;
++            runs_.visitPublicationRuns([&](const auto& run){
++                const auto& state=run.publication();
++                if(!state.stamp||!state.room.present||!state.room.active)return true;
++                return run.visitSlots([&](unsigned slot,unsigned offset){
++                    if(slot<first||slot>=end)return true;
++                    const auto stamp=state.stamp+offset;
++                    if(stamp<=after||(order&&stamp>=order)||runs_.object(slot)!=object)return true;
++                    selected=slot;order=stamp;return true;
++                });
++            });
++            if(selected==Capacity)return false;
++            handle=runs_.currentHandle(selected);return true;
++    }
++    template<class Visit> bool visitRegistered(unsigned first,unsigned end,int object,Visit visit)const{
++        std::uint32_t after=0,order;InstanceHandle handle;
++        while(nextRegistered(first,end,object,after,handle,order)){
++            after=order;if(!visit(handle,order))return false;
++        }return true;
++    }
++    // Search descriptors, not expanded cells. Select skips unchanged cells at
++    // activation boundaries; common active scenery has no marks to traverse.
++    template<class Select> bool nextRoom(bool active,bool marked,const RunnerSegmentRoomState* after,
++        bool reverse,Select select,unsigned& slot,RunnerSegmentRoomState& result)const{
++        bool found=false;
++        runs_.visitPublicationRuns([&](const auto& run){
++            const auto& state=run.publication().room;
++            if(!state.present||state.active!=active||(marked&&!state.marked))return true;
++            const unsigned first=run.first(),end=first+run.count();
++            // A normal span has ascending room sequence, irrespective of X.
++            // Selection is ascending; compare keys to support both Draw and
++            // forward room traversals without constructing another list.
++            for(unsigned s=select(first,end);s<end;s=select(s+1,end)){
++                const auto key=state.shifted(s-first);
++                if(after&&!(reverse?key.before(*after):after->before(key)))continue;
++                if(!found||(reverse?result.before(key):key.before(result))){slot=s;result=key;found=true;}
++                if(!reverse)break;
++            }return true;
++        });return found;
++    }
++#endif
+     using Identity=typename Runs::Identity;
+     enum class SpanResult { unsupported, success, failure };
+     // Borrowed AreaOneBuilder prepared-cell stream: two bytes per cell, with
+@@ -78,7 +201,7 @@ public:
+     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
+         DW_TERRAIN_READ(terrainFlagsRead);
+         if(!contains(h))return false;
+-        const unsigned value=flags_[h.slot];
++        const unsigned value=cellFlags(h.slot);
+         out=(value&3u)|((value&4u)?8u:0u)|((value&8u)?0x200u:0u)|((value&16u)?0x8000u:0u);
+         return true;
+     }
+@@ -175,7 +298,7 @@ public:
+     bool appearance(InstanceHandle h,int& sprite,unsigned& index,bool& created)const{
+         DW_TERRAIN_READ(terrainSpriteRead);
+         if(!contains(h))return false;
+-        created=(flags_[h.slot]&32u)!=0;sprite=createSprite_[h.slot];
++        created=(cellFlags(h.slot)&32u)!=0;sprite=cellSprite(h.slot);
+         index=created&&runs_.object(h.slot)==93?23u:0u;
+         if(created&&runs_.object(h.slot)==60){WallEndStepState state;if(!wallState(h,state))return false;index=state.imageIndex;}
+         return true;
+@@ -183,31 +306,31 @@ public:
+     bool cachedSprite(InstanceHandle h,int& sprite)const{
+         DW_TERRAIN_READ(terrainSpriteRead);
+         if(!contains(h))return false;
+-        sprite=(flags_[h.slot]&64u)?createSprite_[h.slot]:-2;return true;
++        sprite=(cellFlags(h.slot)&64u)?cellSprite(h.slot):-2;return true;
+     }
+     bool cachedOffset(InstanceHandle h,int& x,int& y)const{
+-        return contains(h)&&walls_[h.slot].cachedOffset(x,y);
++        return contains(h)&&cellWall(h.slot).cachedOffset(x,y);
+     }
+     // Store the cache's origin, not the instance position. The source list
+     // branch restores position but leaves these temporary bounds dirty.
+     bool publishCachedOffset(InstanceHandle h,int x,int y){
+-        return good_=(good_&&contains(h)&&walls_[h.slot].storeCachedOffset(x,y));
++        return good_=(good_&&contains(h)&&cellWall(h.slot).storeCachedOffset(x,y));
+     }
+     bool publishQueryDirty(InstanceHandle h){
+         if(!contains(h))return good_=false;
+-        flags_[h.slot]|=4u;return true;
++        cellFlags(h.slot)|=4u;return true;
+     }
+     bool publishIndexed(InstanceHandle h){
+         if(!contains(h))return good_=false;
+-        flags_[h.slot]|=16u;return true;
++        cellFlags(h.slot)|=16u;return true;
+     }
+     // One flags bit selects constructor versus post-Create cached resource.
+     // A normal refresh also returns the cached origin to the actual position.
+     bool publishRefreshedBounds(InstanceHandle h,std::uint32_t spatial){
+         if(!contains(h))return good_=false;
+-        if(!walls_[h.slot].storeCachedOffset(0,0))return good_=false;
+-        const unsigned previous=flags_[h.slot];
+-        flags_[h.slot]=(previous&163u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
++        if(!cellWall(h.slot).storeCachedOffset(0,0))return good_=false;
++        const unsigned previous=cellFlags(h.slot);
++        cellFlags(h.slot)=(previous&163u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
+             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+         return true;
+     }
+@@ -219,16 +342,16 @@ public:
+ private:
+     bool createKnownIdentity(const Identity& id,int tile){
+         const auto h=id.handle;std::uint32_t spatial;
+-        if(!spatialFlags(h,spatial)||(flags_[h.slot]&32u))return good_=false;
++        if(!spatialFlags(h,spatial)||(cellFlags(h.slot)&32u))return good_=false;
+         if(id.object!=99){
+             if(tile<0||tile>32767||(binding_.context&&
+                 (!binding_.create||!binding_.create(binding_.context,id,tile,spatial))))return good_=false;
+-            createSprite_[h.slot]=static_cast<std::int16_t>(tile);
++            cellSprite(h.slot)=static_cast<std::int16_t>(tile);
+             if(id.object==60&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+         }
+-        flags_[h.slot]=(flags_[h.slot]&3u)|32u|((spatial&8u)?4u:0u)|
++        cellFlags(h.slot)=(cellFlags(h.slot)&3u)|32u|((spatial&8u)?4u:0u)|
+             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+-        walls_[h.slot].store(WallEndStepState{});
++        cellWall(h.slot).store(WallEndStepState{});
+         return true;
+     }
+ public:
+@@ -237,11 +360,11 @@ public:
+     // immutable operand in the existing run identity, not a per-cell record.
+     bool roomCreation(InstanceHandle h){
+         Identity id;
+-        if(stepping_||!readIdentity(h,id)||!(flags_[h.slot]&32u))return good_=false;
+-        WallEndStepState state=walls_[h.slot].load();
++        if(stepping_||!readIdentity(h,id)||!(cellFlags(h.slot)&32u))return good_=false;
++        WallEndStepState state=cellWall(h.slot).load();
+         if(id.creationCode!=-1&&(id.object!=60||!wallRoomCreation(id.creationCode,state)))return good_=false;
+-        if(!walls_[h.slot].store(state))return good_=false;
+-        flags_[h.slot]|=128u;return true;
++        if(!cellWall(h.slot).store(state))return good_=false;
++        cellFlags(h.slot)|=128u;return true;
+     }
+     // Initial event state only; wallState exposes retained End Step mutations.
+     // Never reconstruct a previously stepped wall with this initial snapshot.
+@@ -249,36 +372,36 @@ public:
+         DW_TERRAIN_READ(terrainWallStateRead);
+         DW_TERRAIN_READ(terrainFlagsRead);
+         Identity id;
+-        if(!readIdentity(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
++        if(!readIdentity(h,id)||id.object!=60||!(cellFlags(h.slot)&32u))return false;
+         state={};
+-        return !(flags_[h.slot]&128u)||wallRoomCreation(id.creationCode,state);
++        return !(cellFlags(h.slot)&128u)||wallRoomCreation(id.creationCode,state);
+     }
+     // Read-only inspection also exposes the retained failure prefix. Execution
+     // remains terminal after failure; stale handles never read a reused slot.
+     bool wallState(InstanceHandle h,WallEndStepState& state)const{
+         DW_TERRAIN_READ(terrainWallStateRead);
+-        Identity id;if(!runs_.read(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
++        Identity id;if(!runs_.read(h,id)||id.object!=60||!(cellFlags(h.slot)&32u))return false;
+         state=stepping_&&h.slot==steppingHandle_.slot&&h.generation==steppingHandle_.generation?
+-            *stepping_:walls_[h.slot].load();return true;
++            *stepping_:cellWall(h.slot).load();return true;
+     }
+     bool setWallDeactivation(InstanceHandle h,bool value){
+         WallEndStepState state;if(!good_||!wallState(h,state))return good_=false;
+         state.deactivate=value;
+         if(stepping_&&h.slot==steppingHandle_.slot&&h.generation==steppingHandle_.generation)*stepping_=state;
+-        return walls_[h.slot].store(state)||(good_=false);
++        return cellWall(h.slot).store(state)||(good_=false);
+     }
+     template<class Ops> bool wallEvent(InstanceHandle h,int area,GameMakerRandom& random,Ops& ops){
+         Identity id;WallEndStepState state;
+         if(stepping_||!readIdentity(h,id))return good_=false;
+         // Wall (99) owns an empty End Step override; it must never inherit
+         // code 986, consume its RNG or require object-60 wall state.
+-        if((flags_[h.slot]&3u)||id.object==99)return true;
++        if((cellFlags(h.slot)&3u)||id.object==99)return true;
+         if(id.object!=60||!wallState(h,state))return good_=false;
+         const int before=drawSprite(h);const bool checked=state.checked!=0;const int image=state.imageIndex;
+         stepping_=&state;steppingHandle_=h;
+         const bool ok=wallEndStep(state,area,random,ops);
+         stepping_=nullptr;steppingHandle_={};
+-        const bool retained=walls_[h.slot].store(state);
++        const bool retained=cellWall(h.slot).store(state);
+         if(!ok||!retained||!good_)return good_=false;
+         wallPresentationState_=true;
+         const int after=drawSprite(h);
+@@ -297,11 +420,11 @@ public:
+             DW_TERRAIN_READ(terrainFlagsRead);
+             DW_TERRAIN_READ(terrainSpriteRead);
+             WallEndStepState state;
+-            if((flags_[id.handle.slot]&32u)&&!wallState(id.handle,state))return false;
+-            const int sprite=state.checked?createSprite_[id.handle.slot]:51;
++            if((cellFlags(id.handle.slot)&32u)&&!wallState(id.handle,state))return false;
++            const int sprite=state.checked?cellSprite(id.handle.slot):51;
+             if(!wallIntersectsRows(sprite,id.y,first,end))return true;
+-            return visit(WallDrawRecord{id.object,id.x,id.y,!(flags_[id.handle.slot]&2u),
+-                (flags_[id.handle.slot]&1u)!=0,createSprite_[id.handle.slot],state.imageIndex,state});
++            return visit(WallDrawRecord{id.object,id.x,id.y,!(cellFlags(id.handle.slot)&2u),
++                (cellFlags(id.handle.slot)&1u)!=0,cellSprite(id.handle.slot),state.imageIndex,state});
+         };
+         return unboundedWallArt_?runs_.visit(emit):runs_.visitRows(first,end,emit);
+     }
+@@ -311,13 +434,13 @@ public:
+     bool read(InstanceHandle h,Identity& id,bool& active,bool& destroyed)const{
+         if(!good_||!runs_.read(h,id))return false;
+         DW_TERRAIN_READ(terrainFlagsRead);
+-        active=(flags_[h.slot]&2)==0;destroyed=(flags_[h.slot]&1)!=0;return true;
++        active=(cellFlags(h.slot)&2)==0;destroyed=(cellFlags(h.slot)&1)!=0;return true;
+     }
+     InstanceHandle handle(unsigned ordinal)const{return runs_.handle(ordinal);}
+     InstanceHandle currentHandle(unsigned slot)const{return good_?runs_.currentHandle(slot):InstanceHandle{};}
+     template<class Visit> bool visit(Visit visit)const{
+-        return good_&&runs_.visit([&](const Identity& id){DW_TERRAIN_READ(terrainFlagsRead);return visit(id,(flags_[id.handle.slot]&2)==0,
+-            (flags_[id.handle.slot]&1)!=0);});
++        return good_&&runs_.visit([&](const Identity& id){DW_TERRAIN_READ(terrainFlagsRead);return visit(id,(cellFlags(id.handle.slot)&2)==0,
++            (cellFlags(id.handle.slot)&1)!=0);});
+     }
+     bool append(int object,int x,int y,bool active=true,unsigned source=0,int creation=-1){
+         return appendConstructed(object,x,y,active,source,creation,nullptr,0);
+@@ -358,9 +481,14 @@ private:
+     bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded,
+                              bool direct=false,bool* admitted=nullptr){
+         const unsigned count=cells.count;
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        unsigned slot=freeHint_;
++        const bool contiguous=count<=runs_.freeSpan(slot);
++#else
+         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
+         bool contiguous=count<=Capacity-slot;
+         if(contiguous)for(unsigned i=0;i<count;++i)if(runs_.occupied(slot+i)){contiguous=false;break;}
++#endif
+         const auto construct=direct?binding_.constructDirectSpan:binding_.constructSpan;
+         if(construct&&contiguous&&canAppend(count)){
+             Order temporary;Order* order=&temporary;
+@@ -370,21 +498,41 @@ private:
+             }
+             unsigned completed=0;std::uint32_t spatial[2]{};
+             const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.y,-1,0};
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++            pendingPublication_=order;pendingHandle_=first.handle;pendingCount_=count;
++#endif
+             const auto result=construct(binding_.context,first,cells,tile,
+                                                     completed,order->stamp,spatial,order->layer);
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++            pendingPublication_=nullptr;pendingHandle_={};pendingCount_=0;
++#endif
+             if(result!=SpanResult::unsupported){
+                 if(admitted)*admitted=true;
+                 if(completed>count){if(cells.retained)runs_.commitRetainedCells(0);return good_=false;}
+                 if(cells.retained&&!runs_.commitRetainedCells(completed))return good_=false;
+                 unsigned i=0;
+                 if(cells.retained&&completed){
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++                    for(unsigned kind=0;kind<2;++kind){const auto value=spatial[kind];
++                        order->cell[kind].flags=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
++                        order->cell[kind].sprite=static_cast<std::int16_t>(tile);
++                        order->cell[kind].wall=PackedWallState{};
++                    }
++                    // Inactive construction is exceptional; ordinary prepared
++                    // segments do not acquire any per-cell runner state.
++                    if(order->layer.bound()&&order->layer.inactive)
++                        for(unsigned j=0;j<completed;++j)selectLayerCutoff(slot+j,true);
++                    if(wallRadius(tile)<0||wallRadius(tile)>16)unboundedWallArt_=true;
++                    i=completed;
++#else
+                     for(;i<completed;++i){
+                         const auto kind=cells.kind(i),value=spatial[kind];
+                         if(order->layer.bound()&&order->layer.inactive)selectLayerCutoff(slot+i,true);
+-                        flags_[slot+i]=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
+-                        createSprite_[slot+i]=static_cast<std::int16_t>(tile);walls_[slot+i]=PackedWallState{};
++                        cellFlags(slot+i)=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
++                        cellSprite(slot+i)=static_cast<std::int16_t>(tile);cellWall(slot+i)=PackedWallState{};
+                         if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+                     }
++#endif
+                 }
+                 while(i<completed){
+                     const unsigned kind=cells.kind(i);const int x=cells.x(i),object=cells.object(i);
+@@ -397,8 +545,8 @@ private:
+                     const auto value=spatial[kind];
+                     const unsigned char flags=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
+                     for(unsigned j=0;j<n;++j){
+-                        flags_[slot+i+j]=flags;createSprite_[slot+i+j]=static_cast<std::int16_t>(tile);
+-                        walls_[slot+i+j]=PackedWallState{};
++                        cellFlags(slot+i+j)=flags;cellSprite(slot+i+j)=static_cast<std::int16_t>(tile);
++                        cellWall(slot+i+j)=PackedWallState{};
+                     }
+                     if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+                     i+=n;
+@@ -421,21 +569,39 @@ private:
+         bool* effectsSucceeded,int tile){
+         DW_TERRAIN_CONSTRUCTION_SCOPE;
+         if(!canAppend(1)||(object!=60&&object!=93&&object!=99))return good_=false;
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        unsigned slot=freeHint_;runs_.freeSpan(slot);
++#else
+         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
++#endif
+         Order order;
+         const Identity identity{{slot,next_},object,x,y,creation,source};
+         std::uint32_t spatial=8u;
+         if(slot==Capacity||pendingPublication_)return good_=false;
+         pendingPublication_=&order;pendingHandle_=identity.handle;
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        pendingCount_=1;
++#endif
+         const bool published=!binding_.birth||binding_.birth(binding_.context,identity,active,order.stamp,spatial);
+         pendingPublication_=nullptr;pendingHandle_={};
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        pendingCount_=0;
++#endif
++#ifdef DOWNWELL_SEGMENT_TERRAIN
++        for(auto& value:order.cell){
++            value.flags=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
++            value.sprite=-2;
++        }
++#endif
+         if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+         if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot,true);
+         ++next_;freeHint_=slot+1;
+-        flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+-        createSprite_[slot]=-2;
+-        walls_[slot]=PackedWallState{}; // Slot reuse must not inherit a query cache.
+-        walls_[slot].store(WallEndStepState{});
++#ifndef DOWNWELL_SEGMENT_TERRAIN
++        cellFlags(slot)=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
++        cellSprite(slot)=-2;
++        cellWall(slot)=PackedWallState{}; // Slot reuse must not inherit a query cache.
++        cellWall(slot).store(WallEndStepState{});
++#endif
+         if(object==60&&!active)wallPresentationState_=true;
+         if(effectsSucceeded)
+             return *effectsSucceeded=*effectsSucceeded&&createKnownIdentity(identity,tile);
+@@ -448,10 +614,10 @@ public:
+     }
+     bool markDestroyed(InstanceHandle h){
+         if(!good_||!runs_.contains(h))return good_=false;
+-        if(flags_[h.slot]&1)return true;
++        if(cellFlags(h.slot)&1)return true;
+         if(binding_.mark&&!binding_.mark(binding_.context,h.slot))return good_=false;
+         Identity id;if(!runs_.read(h,id))return good_=false;
+-        const int before=drawSprite(h);flags_[h.slot]|=1;
++        const int before=drawSprite(h);cellFlags(h.slot)|=1;
+         if(id.object==60)wallPresentationState_=true;
+         if(before>=0&&binding_.collision&&!binding_.collision(binding_.context,id,false))return good_=false;
+         return stepping_?true:notifyPresentation(id,before,-1,before>=0);
+@@ -461,7 +627,7 @@ public:
+         if(!readIdentity(h,id)||!spatialFlags(h,spatial))return good_=false;
+         const int before=drawSprite(h);
+         if(binding_.activation&&!binding_.activation(binding_.context,id,active,spatial))return good_=false;
+-        flags_[h.slot]=active?(flags_[h.slot]&~2u):(flags_[h.slot]|2u);
++        cellFlags(h.slot)=active?(cellFlags(h.slot)&~2u):(cellFlags(h.slot)|2u);
+         const int after=drawSprite(h);
+         if(before!=after){
+             wallPresentationState_=true;
+@@ -470,7 +636,7 @@ public:
+         return stepping_?true:notifyPresentation(id,before,after,before!=after);
+     }
+     bool retire(InstanceHandle h){
+-        if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
++        if(stepping_||!good_||!runs_.contains(h)||!(cellFlags(h.slot)&1)||
+             (binding_.retire&&!binding_.retire(binding_.context,h.slot))||!runs_.retire(h))return good_=false;
+         selectLayerCutoff(h.slot,false);
+         if(h.slot<freeHint_)freeHint_=h.slot;
+@@ -492,9 +658,9 @@ private:
+     int drawSprite(InstanceHandle h)const{
+         DW_TERRAIN_READ(terrainFlagsRead);
+         DW_TERRAIN_READ(terrainSpriteRead);
+-        if(runs_.object(h.slot)!=60||(flags_[h.slot]&3u))return -1;
++        if(runs_.object(h.slot)!=60||(cellFlags(h.slot)&3u))return -1;
+         WallEndStepState state;
+-        return wallState(h,state)&&state.checked?createSprite_[h.slot]:51;
++        return wallState(h,state)&&state.checked?cellSprite(h.slot):51;
+     }
+     bool notifyPresentation(const Identity& id,int before,int after,bool changed){
+         if(changed&&binding_.presentation&&!binding_.presentation(binding_.context,id,before,after))return good_=false;
+diff --git a/src/core/RunnerRunRoomMembership.h b/src/core/RunnerRunRoomMembership.h
+index 8ac4ef1a..0f1ed673 100644
+--- a/src/core/RunnerRunRoomMembership.h
++++ b/src/core/RunnerRunRoomMembership.h
+@@ -45,6 +45,18 @@ template<unsigned Capacity,unsigned First,unsigned Last> class RunnerRunRoomMemb
+     }
+ public:
+     static constexpr unsigned End=Capacity;
++    // Borrowed traversal for the native segment-room merge. This owner keeps
++    // actors only in that adapter; terrain chronology remains in its records.
++    unsigned firstSlot(unsigned list)const{return first(list);}
++    unsigned nextSlot(unsigned slot)const{return next(slot);}
++    RunnerImageValue roomKey(unsigned slot)const{return runs_[locator_[slot]-1].key;}
++    bool moveToList(unsigned slot,bool active){
++        if(!contains(slot))return false;
++        const auto key=roomKey(slot);const bool wasMarked=marked(slot);
++        remove(slot);
++        if(active)insertActive(slot,key);else insertAfter(slot,key,1,tail_[1]);
++        return !wasMarked||mark(slot);
++    }
+     struct AnimationProjection {}; // Runs themselves supply the skip projection.
+     // A borrowed cursor, not a prepared list. Family consumers may process
+     // consecutive entries without changing room order. Save next before each
+diff --git a/src/core/RunnerSegmentRoomMembership.h b/src/core/RunnerSegmentRoomMembership.h
+new file mode 100644
+index 00000000..a917f664
+--- /dev/null
++++ b/src/core/RunnerSegmentRoomMembership.h
+@@ -0,0 +1,237 @@
++#ifndef DOWNWELL_CORE_RUNNER_SEGMENT_ROOM_MEMBERSHIP_H
++#define DOWNWELL_CORE_RUNNER_SEGMENT_ROOM_MEMBERSHIP_H
++#include "RunnerRunRoomMembership.h"
++#include "RunnerSegmentRoomState.h"
++namespace downwell {
++// Actors own ordinary room nodes. Terrain owns no node, locator or mark bit
++// here: all of those observations come from its authoritative segment record.
++// Ordered merges are observation-boundary work, not terrain birth work.
++template<unsigned Capacity,unsigned First,unsigned Last,class Terrain> class RunnerSegmentRoomMembership {
++    static constexpr unsigned ActorCapacity=Capacity-(Last-First);
++    using Actors=RunnerRunRoomMembership<ActorCapacity,0,0>;
++    Actors actors_;
++    RunnerRegistrationOrder actorSequence_[ActorCapacity]{};
++    RunnerRegistrationOrder clock_;
++    Terrain* terrain_=nullptr;
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++    using Reference=RunnerRunRoomMembership<Capacity,First,Last>;
++    Reference* reference_=nullptr;
++#endif
++    static bool terrainSlot(unsigned slot){return slot>=First&&slot<Last;}
++    static unsigned local(unsigned slot){return slot<First?slot:slot-(Last-First);}
++    static unsigned global(unsigned slot){return slot<First?slot:slot+(Last-First);}
++    RunnerRegistrationOrder stamp(unsigned count=1){
++        clock_.advance();const auto first=clock_;clock_=clock_.shifted(count-1);return first;
++    }
++    template<class Select> unsigned next(bool active,bool marked,const RunnerSegmentRoomState* after,
++        bool reverse,Select select,RunnerSegmentRoomState& result)const{
++        bool found=false;unsigned chosen=End;
++        for(unsigned a=actors_.firstSlot(active?0:1);a!=Actors::End;a=actors_.nextSlot(a)){
++            const unsigned slot=global(a);
++            if((marked&&!actors_.marked(a))||select(slot,slot+1)!=slot)continue;
++            const RunnerSegmentRoomState key{actors_.roomKey(a),actorSequence_[a],true,active,actors_.marked(a)};
++            if(after&&!(reverse?key.before(*after):after->before(key)))continue;
++            if(!found||(reverse?result.before(key):key.before(result))){chosen=slot;result=key;found=true;}
++        }
++        if(terrain_&&(!marked||terrain_->roomHasMarks())){
++            unsigned slot;RunnerSegmentRoomState key;
++            if(terrain_->nextRoom(active,marked,after,reverse,[&](unsigned first,unsigned end){
++                return select(first+First,end+First)-First;
++            },slot,key)&&(!found||(reverse?result.before(key):key.before(result)))){
++                chosen=slot+First;result=key;
++            }
++        }
++        return chosen;
++    }
++    template<class Visit> bool walk(bool active,bool marked,bool reverse,Visit visit)const{
++        RunnerSegmentRoomState previous,key;bool havePrevious=false;
++        for(;;){
++            const unsigned slot=next(active,marked,havePrevious?&previous:nullptr,reverse,
++                [](unsigned first,unsigned){return first;},key);
++            if(slot==End)return true;
++            previous=key;havePrevious=true;
++            if(!visit(slot,key.depth,active))return false;
++        }
++    }
++public:
++    static constexpr unsigned End=Capacity;
++    struct AnimationProjection {};
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++    void bindReference(Reference& reference){reference_=&reference;}
++#endif
++    bool bindTerrainOwner(Terrain& terrain){
++        if(terrain_&&terrain_!=&terrain)return false;terrain_=&terrain;return true;
++    }
++    bool contains(unsigned slot)const{
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->contains(slot);
++#endif
++        return slot<Capacity&&(terrainSlot(slot)?terrain_&&terrain_->roomContains(slot-First):actors_.contains(local(slot)));
++    }
++    bool active(unsigned slot)const{
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->active(slot);
++#endif
++        return slot<Capacity&&(terrainSlot(slot)?terrain_&&terrain_->roomActive(slot-First):actors_.active(local(slot)));
++    }
++    bool marked(unsigned slot)const{
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->marked(slot);
++#endif
++        return slot<Capacity&&(terrainSlot(slot)?terrain_&&terrain_->roomMarked(slot-First):actors_.marked(local(slot)));
++    }
++    bool mark(unsigned slot){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->mark(slot);
++#endif
++        return slot<Capacity&&(terrainSlot(slot)?terrain_&&terrain_->roomMark(slot-First):actors_.mark(local(slot)));
++    }
++    bool remove(unsigned slot){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->remove(slot);
++#endif
++        return slot<Capacity&&(terrainSlot(slot)?terrain_&&terrain_->roomRemove(slot-First):actors_.remove(local(slot)));
++    }
++    bool bind(unsigned slot,RunnerImageValue key){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->bind(slot,key);
++#endif
++        if(slot>=Capacity||!RunnerSpatialSplit::valid(key))return false;
++        if(terrainSlot(slot))return bindTerrainSpan(slot,1,key);
++        if(!actors_.bind(local(slot),key))return false;
++        actorSequence_[local(slot)]=stamp();return true;
++    }
++    bool bindTerrainSpan(unsigned first,unsigned count,RunnerImageValue key){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->bindTerrainSpan(first,count,key);
++#endif
++        if(!count)return true;
++        if(!terrain_||first<First||first>=Last||count>Last-first||!RunnerSpatialSplit::valid(key))return false;
++        const auto sequence=clock_.shifted(1);
++        // shifted preserves the zero sentinel; the first real stamp is one.
++        auto begin=sequence;if(!begin.present())begin.low=1;
++        if(!terrain_->roomBind(first-First,count,key,begin))return false;
++        stamp(count);return true;
++    }
++    bool prepareRetainedAnimation(unsigned first,unsigned last)const{return first<=last&&last<=Capacity;}
++    class AnimationCursor {
++        const RunnerSegmentRoomMembership& room_;
++        unsigned first_,last_,actor_;
++        bool actorsOnly_,started_=false;
++        RunnerSegmentRoomState previous_,key_;
++        unsigned selected_=End;
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        unsigned referenceSlot_=End;
++#endif
++    public:
++        AnimationCursor(const RunnerSegmentRoomMembership& room,unsigned first,unsigned last)
++            :room_(room),first_(first),last_(last),actor_(room.actors_.firstSlot(0)),
++             actorsOnly_(first<=First&&last>=Last){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++            if(room.reference_)referenceSlot_=room.reference_->firstSlot(0);
++#endif
++        }
++        unsigned slot(){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++            if(room_.reference_){
++                while(referenceSlot_!=End&&referenceSlot_>=first_&&referenceSlot_<last_)
++                    referenceSlot_=room_.reference_->nextSlot(referenceSlot_);
++                return referenceSlot_;
++            }
++#endif
++            if(actorsOnly_){
++                while(actor_!=Actors::End){const unsigned s=global(actor_);
++                    if(s<first_||s>=last_)return s;actor_=room_.actors_.nextSlot(actor_);
++                }return End;
++            }
++            if(selected_==End)selected_=room_.next(true,false,started_?&previous_:nullptr,false,
++                [&](unsigned first,unsigned end){return first>=first_&&first<last_?(last_<end?last_:end):first;},key_);
++            return selected_;
++        }
++        unsigned take(){
++            const auto s=slot();if(s==End)return s;
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++            if(room_.reference_){referenceSlot_=room_.reference_->nextSlot(s);return s;}
++#endif
++            if(actorsOnly_)actor_=room_.actors_.nextSlot(actor_);
++            else{previous_=key_;started_=true;selected_=End;}
++            return s;
++        }
++        bool within(unsigned first,unsigned last){const auto s=slot();return s>=first&&s<last;}
++    };
++    template<class Visit> bool visitAnimationChecked(Visit visit)const{
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->visitAnimationChecked(visit);
++#endif
++        return walk(true,false,false,[&](unsigned s,RunnerImageValue,bool){return visit(s);});
++    }
++    template<class Visit> bool visitDrawChecked(Visit visit)const{
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->visitDrawChecked(visit);
++#endif
++        return walk(true,false,true,[&](unsigned s,RunnerImageValue,bool){return visit(s);});
++    }
++    template<class Visit> bool visitAnimationRetainedChecked(unsigned first,unsigned last,bool& dirty,Visit visit)const{
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->visitAnimationRetainedChecked(first,last,dirty,visit);
++#endif
++        if(first>last||last>Capacity)return false;
++        bool full=dirty;dirty=false;
++        RunnerSegmentRoomState previous,key;bool started=false;
++        for(;;){
++            if(dirty)full=true;
++            const auto s=next(true,false,started?&previous:nullptr,false,[&](unsigned begin,unsigned end){
++                return !full&&begin>=first&&begin<last?(last<end?last:end):begin;
++            },key);
++            if(s==End)return true;previous=key;started=true;
++            if(!visit(s))return false;
++        }
++    }
++    template<class Visit> bool visitAnimationProjectedChecked(AnimationProjection&,unsigned first,unsigned last,bool& dirty,Visit visit)const{
++        return visitAnimationRetainedChecked(first,last,dirty,visit);
++    }
++    template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->visitMarkedCleanupOrdered(visit);
++#endif
++        return walk(true,true,false,visit)&&walk(false,true,false,visit);
++    }
++    template<class Visit> bool visitMarkedCleanupChecked(Visit visit){
++        return visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue,bool){return visit(s);});
++    }
++    template<class Visit> bool visitCleanupChecked(Visit visit){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->visitCleanupChecked(visit);
++#endif
++        return walk(true,false,false,[&](unsigned s,RunnerImageValue,bool){return visit(s);})&&
++            walk(false,false,false,[&](unsigned s,RunnerImageValue,bool){return visit(s);});
++    }
++    template<class Select,class Inactive,class Publish> bool reconcileSelectedChecked(Select select,Inactive inactive,Publish publish){
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        if(reference_)return reference_->reconcileSelectedChecked(select,inactive,publish);
++#endif
++        for(unsigned list=1;;--list){
++            RunnerSegmentRoomState previous,key;bool started=false;
++            for(;;){
++                const auto s=next(!list,false,started?&previous:nullptr,false,select,key);
++                if(s==End)break;previous=key;started=true;
++                if(bool(inactive(s))!=bool(list)){
++                    const auto sequence=stamp();
++                    if(terrainSlot(s)){
++                        if(!terrain_->roomMove(s-First,list!=0,sequence))return false;
++                    }else{
++                        if(!actors_.moveToList(local(s),list!=0))return false;
++                        actorSequence_[local(s)]=sequence;
++                    }
++                    if(!publish(s,list!=0))return false;
++                }
++            }
++            if(!list)break;
++        }return true;
++    }
++    template<class Inactive,class Publish> bool reconcileChecked(Inactive inactive,Publish publish){
++        return reconcileSelectedChecked([](unsigned first,unsigned){return first;},inactive,publish);
++    }
++};
++}
++#endif
+diff --git a/src/core/RunnerSegmentRoomState.h b/src/core/RunnerSegmentRoomState.h
+new file mode 100644
+index 00000000..b713e3c0
+--- /dev/null
++++ b/src/core/RunnerSegmentRoomState.h
+@@ -0,0 +1,26 @@
++#ifndef DOWNWELL_CORE_RUNNER_SEGMENT_ROOM_STATE_H
++#define DOWNWELL_CORE_RUNNER_SEGMENT_ROOM_STATE_H
++#include "RunnerSpatialSplit.h"
++#include "RunnerRegistrationOrder.h"
++namespace downwell {
++// Room chronology is independent of registration and logical Draw-layer order.
++// A common segment value represents its unmodified cells. Deferred activation
++// changes membership only at reconciliation, not when flag 2 is requested.
++struct RunnerSegmentRoomState {
++    RunnerImageValue depth;
++    RunnerRegistrationOrder sequence;
++    bool present=false,active=true,marked=false;
++    RunnerSegmentRoomState shifted(unsigned n)const{
++        auto out=*this;out.sequence=sequence.shifted(n);return out;
++    }
++    bool same(const RunnerSegmentRoomState& b)const{
++        return depth.bits==b.depth.bits&&sequence.same(b.sequence)&&present==b.present&&active==b.active&&marked==b.marked;
++    }
++    bool before(const RunnerSegmentRoomState& b)const{
++        if(active!=b.active)return active;
++        if(active&&!RunnerSpatialSplit::equal(depth,b.depth))return RunnerSpatialSplit::less(depth,b.depth);
++        return sequence.before(b.sequence);
++    }
++};
++}
++#endif
+diff --git a/src/core/TerrainSegmentRecords.h b/src/core/TerrainSegmentRecords.h
+new file mode 100644
+index 00000000..cdcd3993
+--- /dev/null
++++ b/src/core/TerrainSegmentRecords.h
+@@ -0,0 +1,235 @@
++#ifndef DOWNWELL_CORE_TERRAIN_SEGMENT_RECORDS_H
++#define DOWNWELL_CORE_TERRAIN_SEGMENT_RECORDS_H
++#include "InstanceHandle.h"
++#include <cstdint>
++namespace downwell {
++// A record is authoritative for its entire source-ordered cell interval.
++// There is no slot locator or per-cell initialization. A mutation splits only
++// the affected cell from its neighbours. Records stay in birth order; fresh
++// allocation also keeps slot order, allowing binary search until slot reuse.
++// Publication contains the common runner state, with shifted(n) supplying the
++// nth cell's chronology. Its exceptional state is materialized by writable().
++template<unsigned Capacity,class Publication> class TerrainSegmentRecords {
++    static_assert(Capacity&&Capacity<65535,"Terrain segment capacity");
++    struct Segment {
++        Publication state{};
++        const unsigned char* cells=nullptr;
++        std::uint32_t generation=0,source=0;
++        unsigned first=0,count=0;
++        int object=0,x=0,y=0,step=0,creationCode=-1;
++        int objectAt(unsigned i)const{return cells?((cells[2*i]&128)?93:60):object;}
++        int xAt(unsigned i)const{return cells?(int(cells[2*i]&127)-32)*16:x+int(i)*step;}
++        void advance(unsigned n){
++            state=state.shifted(n);first+=n;generation+=n;count-=n;
++            if(cells)cells+=2*n;else x+=int(n)*step;
++        }
++    };
++    Segment segments_[Capacity]{};
++    unsigned count_=0,population_=0;
++    bool slotOrdered_=true,reserved_=false;
++    unsigned find(unsigned slot)const{
++        if(slotOrdered_){
++            unsigned first=0,end=count_;
++            while(first<end){const unsigned middle=first+(end-first)/2;
++                const auto& s=segments_[middle];
++                if(slot<s.first)end=middle;
++                else if(slot-s.first>=s.count)first=middle+1;
++                else return middle;
++            }
++        }else for(unsigned n=0;n<count_;++n){const auto& s=segments_[n];
++            if(slot>=s.first&&slot-s.first<s.count)return n;
++        }
++        return count_;
++    }
++    bool admitted(InstanceHandle h,unsigned count)const{
++        if(reserved_||!count||!h.generation||h.slot>=Capacity||count>Capacity-h.slot||
++           count>Capacity-population_||count-1>0xffffffffu-h.generation)return false;
++        if(!count_||h.slot>=segments_[count_-1].first+segments_[count_-1].count){
++            if(slotOrdered_)return true;
++        }
++        for(unsigned n=0;n<count_;++n){const auto& s=segments_[n];
++            if(h.slot<s.first+s.count&&s.first<h.slot+count)return false;
++        }
++        return true;
++    }
++    void insert(unsigned n){
++        for(unsigned i=count_;i>n;--i)segments_[i]=segments_[i-1];
++        ++count_;
++    }
++    void erase(unsigned n){
++        for(unsigned i=n+1;i<count_;++i)segments_[i-1]=segments_[i];
++        --count_;
++    }
++    unsigned isolate(unsigned n,unsigned slot){
++        const unsigned offset=slot-segments_[n].first;
++        if(offset){
++            insert(n+1);segments_[n+1]=segments_[n];
++            segments_[n+1].advance(offset);segments_[n].count=offset;++n;
++        }
++        if(segments_[n].count>1){
++            insert(n+1);segments_[n+1]=segments_[n];
++            segments_[n+1].advance(1);segments_[n].count=1;
++        }
++        return n;
++    }
++    void published(unsigned count){
++        const auto& s=segments_[count_];
++        if(count_&&s.first<segments_[count_-1].first+segments_[count_-1].count)slotOrdered_=false;
++        ++count_;population_+=count;
++    }
++public:
++    struct Identity {
++        InstanceHandle handle{};
++        int object=0,x=0,y=0,creationCode=-1;
++        std::uint32_t source=0;
++    };
++    unsigned size()const{return population_;}
++    unsigned runCount()const{return count_;}
++    bool reservationPending()const{return reserved_;}
++    // Allocation asks the authoritative ranges once, not occupied() for each
++    // prospective cell. The fresh tail is a range proof; reuse walks gaps.
++    unsigned freeSpan(unsigned& first)const{
++        if(first>=Capacity)return 0;
++        if(!count_||(slotOrdered_&&first>=segments_[count_-1].first+segments_[count_-1].count))
++            return Capacity-first;
++        unsigned n;
++        while((n=find(first))!=count_){
++            first=segments_[n].first+segments_[n].count;
++            if(first>=Capacity)return 0;
++        }
++        unsigned end=Capacity;
++        for(unsigned i=0;i<count_;++i)
++            if(segments_[i].first>first&&segments_[i].first<end)end=segments_[i].first;
++        return end-first;
++    }
++    bool occupied(unsigned slot)const{return slot<Capacity&&find(slot)!=count_;}
++    bool contains(InstanceHandle h)const{
++        const unsigned n=find(h.slot);
++        return n!=count_&&h.generation&&h.generation==segments_[n].generation+h.slot-segments_[n].first;
++    }
++    InstanceHandle currentHandle(unsigned slot)const{
++        const unsigned n=find(slot);if(n==count_)return {};
++        const auto& s=segments_[n];return {slot,s.generation+slot-s.first};
++    }
++    int object(unsigned slot)const{
++        const unsigned n=find(slot);return n==count_?-1:segments_[n].objectAt(slot-segments_[n].first);
++    }
++    InstanceHandle handle(unsigned ordinal)const{
++        for(unsigned n=0;n<count_;++n){const auto& s=segments_[n];
++            if(ordinal<s.count)return {s.first+ordinal,s.generation+ordinal};
++            ordinal-=s.count;
++        }return {};
++    }
++    bool read(InstanceHandle h,Identity& out)const{
++        const unsigned n=find(h.slot);if(n==count_)return false;
++        const auto& s=segments_[n];const unsigned offset=h.slot-s.first;
++        if(!h.generation||h.generation!=s.generation+offset)return false;
++        out={h,s.objectAt(offset),s.xAt(offset),s.y,s.creationCode,s.source};return true;
++    }
++    bool publication(InstanceHandle h,Publication& out)const{
++        const unsigned n=find(h.slot);if(n==count_)return false;
++        const auto& s=segments_[n];const unsigned offset=h.slot-s.first;
++        if(!h.generation||h.generation!=s.generation+offset)return false;
++        out=s.state.shifted(offset);return true;
++    }
++    const Publication* common(unsigned slot)const{
++        const unsigned n=find(slot);return n==count_?nullptr:&segments_[n].state;
++    }
++    Publication* writable(unsigned slot){
++        const unsigned n=find(slot);if(reserved_||n==count_)return nullptr;
++        return &segments_[isolate(n,slot)].state;
++    }
++    bool changePublication(InstanceHandle h,const Publication& value){
++        Publication old;
++        if(reserved_||!publication(h,old))return false;
++        if(old.same(value))return true;
++        *writable(h.slot)=value;return true;
++    }
++    bool append(InstanceHandle h,int object,int x,int y,std::uint32_t source=0,int creation=-1,
++                const Publication& state=Publication{}){
++        if((object!=60&&object!=93&&object!=99)||!admitted(h,1))return false;
++        if(count_&&!source&&creation==-1){auto& s=segments_[count_-1];
++            if(!s.cells&&!s.source&&s.creationCode==-1&&s.object==object&&s.y==y&&
++               s.first+s.count==h.slot&&s.generation+s.count==h.generation){
++                const int last=s.xAt(s.count-1);
++                const int step=last<=2147483631&&x==last+16?16:
++                    last>=(-2147483632)&&x==last-16?-16:0;
++                if(step&&(s.count==1||s.step==step)&&s.state.shifted(s.count).same(state)){
++                    s.step=step;++s.count;++population_;return true;
++                }
++            }
++        }
++        auto& s=segments_[count_];s=Segment{};
++        s.state=state;s.generation=h.generation;s.source=source;s.first=h.slot;s.count=1;
++        s.object=object;s.x=x;s.y=y;s.creationCode=creation;published(1);return true;
++    }
++    Publication* reserveRetainedCells(InstanceHandle h,const unsigned char* cells,int y,unsigned count){
++        if(!cells||!admitted(h,count))return nullptr;
++        auto& s=segments_[count_];s=Segment{};
++        s.cells=cells;s.first=h.slot;s.generation=h.generation;s.count=count;s.y=y;
++        reserved_=true;return &s.state;
++    }
++    bool commitRetainedCells(unsigned completed){
++        if(!reserved_||completed>segments_[count_].count)return false;
++        reserved_=false;if(!completed)return true;
++        segments_[count_].count=completed;published(completed);return true;
++    }
++    bool appendRetainedCells(InstanceHandle h,const unsigned char* cells,int y,unsigned count,const Publication& state){
++        if(!count)return !reserved_;
++        auto* out=reserveRetainedCells(h,cells,y,count);
++        if(!out)return false;*out=state;return commitRetainedCells(count);
++    }
++    bool appendSpan(InstanceHandle h,int object,int x,int y,int step,unsigned count,const Publication& state){
++        if((object!=60&&object!=93)||(step!=16&&step!=-16)||!admitted(h,count))return false;
++        const int distance=int(count-1)*16;
++        if((step>0&&x>2147483647-distance)||(step<0&&x<(-2147483647-1)+distance))return false;
++        // Scalar geometry coalescing is only needed for the non-borrowed
++        // fallback. Prepared rows use one reserve/commit above.
++        for(unsigned i=0;i<count;++i)
++            if(!append({h.slot+i,h.generation+i},object,x+int(i)*step,y,0,-1,state.shifted(i)))return false;
++        return true;
++    }
++    bool retire(InstanceHandle h){
++        if(reserved_||!contains(h))return false;
++        unsigned n=find(h.slot);auto& s=segments_[n];
++        if(s.count==1)erase(n);
++        else if(h.slot==s.first)s.advance(1);
++        else if(h.slot+1==s.first+s.count)--s.count;
++        else{
++            const unsigned offset=h.slot-s.first;
++            insert(n+1);segments_[n+1]=segments_[n];
++            segments_[n+1].advance(offset+1);segments_[n].count=offset;
++        }
++        --population_;return true;
++    }
++    template<bool Rows,class Visit> bool visitSelected(int first,int end,Visit visit)const{
++        for(unsigned n=0;n<count_;++n){const auto& s=segments_[n];
++            if(Rows&&((s.y<first&&unsigned(first)-unsigned(s.y)>=16u)||
++                (s.y>=end&&unsigned(s.y)-unsigned(end)>=16u)))continue;
++            for(unsigned i=0;i<s.count;++i)
++                if(!visit(Identity{{s.first+i,s.generation+i},s.objectAt(i),s.xAt(i),s.y,s.creationCode,s.source}))return false;
++        }return true;
++    }
++    template<class Visit> bool visit(Visit visit)const{return visitSelected<false>(0,0,visit);}
++    template<class Visit> bool visitRows(int first,int end,Visit visit)const{
++        return first>=end||visitSelected<true>(first,end,visit);
++    }
++    class PublicationRun {
++        const Segment& segment_;
++    public:
++        explicit PublicationRun(const Segment& s):segment_(s){}
++        unsigned first()const{return segment_.first;}
++        unsigned count()const{return segment_.count;}
++        const Publication& publication()const{return segment_.state;}
++        template<bool Reverse=false,class Visit> bool visitSlots(Visit visit)const{
++            for(unsigned i=0;i<segment_.count;++i){const unsigned offset=Reverse?segment_.count-1-i:i;
++                if(!visit(segment_.first+offset,offset))return false;
++            }return true;
++        }
++    };
++    template<class Visit> bool visitPublicationRuns(Visit visit)const{
++        for(unsigned n=0;n<count_;++n)if(!visit(PublicationRun(segments_[n])))return false;return true;
++    }
++};
++}
++#endif
+diff --git a/tests/core/RunnerSegmentRoomMembershipTest.cpp b/tests/core/RunnerSegmentRoomMembershipTest.cpp
+new file mode 100644
+index 00000000..4d191a3f
+--- /dev/null
++++ b/tests/core/RunnerSegmentRoomMembershipTest.cpp
+@@ -0,0 +1,111 @@
++#include "core/NativeTerrainLifetimes.h"
++#include "core/RunnerSegmentRoomMembership.h"
++#include <cassert>
++#include <vector>
++#include <tuple>
++#include <cstdio>
++using Terrain=downwell::NativeTerrainLifetimes<16>;
++using Room=downwell::RunnerSegmentRoomMembership<32,8,24,Terrain>;
++using Reference=downwell::RunnerRunRoomMembership<32,8,24>;
++using Key=downwell::RunnerImageValue;
++struct Fixture {
++    Terrain terrain;
++    Room room;
++    Reference reference;
++    bool inactive[32]{};
++    unsigned registration=1;
++    Fixture(){
++        assert(room.bindTerrainOwner(terrain));
++        Terrain::Binding binding;
++        binding.context=this;binding.admit=[](void*,unsigned){return true;};
++        binding.birth=[](void* p,const Terrain::Identity& id,bool,std::uint32_t& stamp,std::uint32_t&){
++            auto& f=*static_cast<Fixture*>(p);stamp=f.registration++;
++            return f.room.bind(id.handle.slot+8,Key{0x42c80000});
++        };
++        binding.retire=[](void* p,unsigned slot){return static_cast<Fixture*>(p)->room.remove(slot+8);};
++        binding.mark=[](void* p,unsigned slot){return static_cast<Fixture*>(p)->room.mark(slot+8);};
++        binding.create=[](void*,const Terrain::Identity&,int,std::uint32_t&){return true;};
++        binding.constructDirectSpan=[](void* p,const Terrain::Identity& id,Terrain::PreparedCells cells,int,
++            unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,downwell::RunnerRetainedLayerState&){
++            auto& f=*static_cast<Fixture*>(p);stamp=f.registration;f.registration+=cells.count;
++            flags[0]=flags[1]=8;completed=cells.count;
++            return f.room.bindTerrainSpan(id.handle.slot+8,cells.count,Key{0x42c80000})?
++                Terrain::SpanResult::success:Terrain::SpanResult::failure;
++        };
++        assert(terrain.bind(binding));
++    }
++    void actor(unsigned slot,unsigned bits){assert(room.bind(slot,Key{bits})&&reference.bind(slot,Key{bits}));}
++    void compare(){
++        std::vector<unsigned> a,b;
++        assert(room.visitAnimationChecked([&](unsigned s){a.push_back(s);return true;}));
++        assert(reference.visitAnimationChecked([&](unsigned s){b.push_back(s);return true;}));assert(a==b);
++        a.clear();b.clear();
++        assert(room.visitDrawChecked([&](unsigned s){a.push_back(s);return true;}));
++        assert(reference.visitDrawChecked([&](unsigned s){b.push_back(s);return true;}));assert(a==b);
++        a.clear();b.clear();
++        Room::AnimationCursor ac(room,8,24);Reference::AnimationCursor bc(reference,8,24);
++        for(unsigned s=ac.take();s!=32;s=ac.take())a.push_back(s);
++        for(unsigned s=bc.take();s!=32;s=bc.take())b.push_back(s);assert(a==b);
++        for(unsigned s=0;s<32;++s){
++            assert(room.contains(s)==reference.contains(s));
++            assert(room.active(s)==reference.active(s));assert(room.marked(s)==reference.marked(s));
++        }
++    }
++    void reconcile(unsigned failure=0){
++        std::vector<std::pair<unsigned,bool>> a,b;
++        const bool x=room.reconcileChecked([&](unsigned s){return inactive[s];},[&](unsigned s,bool active){
++            a.emplace_back(s,active);return !failure||a.size()!=failure;
++        });
++        const bool y=reference.reconcileChecked([&](unsigned s){return inactive[s];},[&](unsigned s,bool active){
++            b.emplace_back(s,active);return !failure||b.size()!=failure;
++        });assert(x==y&&a==b);compare();
++    }
++};
++int main(){
++    {
++        // A scalar fallback can finish its preceding room span inside the
++        // next birth callback (for example when allocation crosses a hole).
++        // The pending identity must not hide those already-committed cells.
++        struct Deferred {Terrain terrain;Room room;unsigned previous=16;} f;
++        assert(f.room.bindTerrainOwner(f.terrain));
++        Terrain::Binding binding;binding.context=&f;
++        binding.admit=[](void*,unsigned){return true;};
++        binding.birth=[](void* p,const Terrain::Identity& id,bool,std::uint32_t& stamp,std::uint32_t&){
++            auto& f=*static_cast<Deferred*>(p);stamp=id.handle.generation;
++            if(f.previous!=16&&!f.room.bind(f.previous+8,Key{0x42c80000}))return false;
++            f.previous=id.handle.slot;return true;
++        };
++        binding.retire=[](void* p,unsigned slot){return static_cast<Deferred*>(p)->room.remove(slot+8);};
++        binding.mark=[](void* p,unsigned slot){return static_cast<Deferred*>(p)->room.mark(slot+8);};
++        assert(f.terrain.bind(binding));
++        assert(f.terrain.append(60,0,160));
++        assert(f.terrain.append(60,16,160));
++        assert(f.room.contains(8)&&!f.room.contains(9));
++        assert(f.room.bind(9,Key{0x42c80000}));
++    }
++    unsigned char cells[32];for(unsigned i=0;i<16;++i){cells[i*2]=static_cast<unsigned char>(32+i+(i&1?128:0));cells[i*2+1]=0;}
++    for(unsigned failure=0;failure<=4;++failure){
++        Fixture f;
++        f.actor(0,0x42c80000);f.actor(25,0);
++        bool okay=true;
++        assert(f.terrain.constructPrepared(51,okay,{cells,8,160,true})&&okay);
++        assert(f.reference.bindTerrainSpan(8,8,Key{0x42c80000}));
++        f.actor(1,0x42c80000);f.actor(26,0x43480000);
++        assert(f.terrain.constructPrepared(51,okay,{cells+16,8,176,true})&&okay);
++        assert(f.reference.bindTerrainSpan(16,8,Key{0x42c80000}));f.compare();
++        assert(f.terrain.runCount()==2); // Two births, no cell materialization.
++        for(unsigned slot:{1u,9u,16u,26u})f.inactive[slot]=true;
++        f.reconcile(failure);
++        if(failure)continue;
++        for(unsigned slot:{0u,9u,12u,16u,26u})assert(f.room.mark(slot)&&f.reference.mark(slot));
++        f.inactive[9]=false;f.inactive[26]=false;f.inactive[12]=true;f.reconcile();
++        std::vector<std::tuple<unsigned,unsigned,bool>> a,b;
++        assert(f.room.visitMarkedCleanupOrdered([&](unsigned s,Key key,bool active){
++            a.emplace_back(s,key.bits,active);return f.room.remove(s);
++        }));
++        assert(f.reference.visitMarkedCleanupOrdered([&](unsigned s,Key key,bool active){
++            b.emplace_back(s,key.bits,active);return f.reference.remove(s);
++        }));assert(a==b);f.compare();
++    }
++    std::puts("Segment-owned room: actor merge, animation skips, deferred activation, cleanup and failed prefixes agree");
++}
+diff --git a/tests/core/TerrainSegmentRecordsTest.cpp b/tests/core/TerrainSegmentRecordsTest.cpp
+new file mode 100644
+index 00000000..be3d783b
+--- /dev/null
++++ b/tests/core/TerrainSegmentRecordsTest.cpp
+@@ -0,0 +1,94 @@
++#include "core/TerrainSegmentRecords.h"
++#include "core/TerrainOwnershipRuns.h"
++#include <cassert>
++#include <cstdio>
++struct State {
++    unsigned serial=0,flags=0;
++    State shifted(unsigned n)const{return {serial+n,flags};}
++    bool same(const State& b)const{return serial==b.serial&&flags==b.flags;}
++};
++using Segments=downwell::TerrainSegmentRecords<64,State>;
++using Reference=downwell::TerrainOwnershipRuns<64,State>;
++static void compare(const Segments& segments,const Reference& reference){
++    assert(segments.size()==reference.size());
++    for(unsigned i=0;i<segments.size();++i){
++        const auto a=segments.handle(i),b=reference.handle(i);
++        assert(a.slot==b.slot&&a.generation==b.generation);
++        Segments::Identity ai;Reference::Identity bi;State as,bs;
++        assert(segments.read(a,ai)&&reference.read(b,bi));
++        assert(ai.object==bi.object&&ai.x==bi.x&&ai.y==bi.y&&ai.source==bi.source&&ai.creationCode==bi.creationCode);
++        assert(segments.publication(a,as)&&reference.publication(b,bs)&&as.same(bs));
++    }
++    for(unsigned slot=0;slot<64;++slot){
++        unsigned expected=slot;
++        while(expected<64&&reference.occupied(expected))++expected;
++        unsigned end=expected;
++        while(end<64&&!reference.occupied(end))++end;
++        unsigned actual=slot;
++        assert(segments.freeSpan(actual)==end-expected&&actual==expected);
++        assert(segments.occupied(slot)==reference.occupied(slot));
++        const auto a=segments.currentHandle(slot),b=reference.currentHandle(slot);
++        assert(a.slot==b.slot&&a.generation==b.generation);
++        assert(segments.object(slot)==reference.object(slot));
++        assert(!segments.contains({slot,a.generation+1000000}));
++    }
++}
++int main(){
++    unsigned char cells[128];
++    for(unsigned i=0;i<64;++i){cells[i*2]=static_cast<unsigned char>(i|((i&1)?128:0));cells[i*2+1]=0;}
++    for(unsigned completed=0;completed<=64;++completed){
++        Segments segments;Reference reference;
++        auto* target=segments.reserveRetainedCells({0,1},cells,160,64);
++        assert(target&&!segments.size()&&!segments.occupied(0)&&segments.reservationPending());
++        *target={100,0x28};
++        assert(!segments.append({0,1},60,0,0)&&!segments.writable(0));
++        assert(!segments.commitRetainedCells(65));
++        assert(segments.commitRetainedCells(completed));
++        assert(reference.appendRetainedCells({0,1},cells,160,completed,{100,0x28}));
++        compare(segments,reference);
++        if(!completed)continue;
++        assert(segments.runCount()==1);
++        for(unsigned i=0;i<completed;++i){
++            const auto h=segments.handle(i);State state;
++            assert(segments.publication(h,state));
++            assert(segments.changePublication(h,state)&&segments.runCount()==1);
++        }
++        for(unsigned i=0;i<completed;++i){
++            const auto h=segments.handle(i);const State state{500+i, i^31u};
++            assert(segments.changePublication(h,state)&&reference.changePublication(h,state));
++            compare(segments,reference);
++        }
++        assert(segments.runCount()==completed);
++    }
++    Segments segments;Reference reference;
++    assert(segments.appendRetainedCells({0,1},cells,160,64,{100,0x28}));
++    assert(reference.appendRetainedCells({0,1},cells,160,64,{100,0x28}));
++    unsigned random=17391,generation=1000;
++    for(unsigned step=0;step<12000;++step){
++        random=random*1664525u+1013904223u;
++        const unsigned slot=(random>>8)&63;
++        const auto h=segments.currentHandle(slot);
++        if(!h.generation){
++            const State state{generation,random>>16};
++            assert(segments.append({slot,generation},60,int(slot)*16,320,0,-1,state));
++            assert(reference.append({slot,generation},60,int(slot)*16,320,0,-1,state));
++            ++generation;
++        }else if(random&1){
++            assert(segments.retire(h)&&reference.retire(h));
++        }else{
++            const State state{generation++,random>>16};
++            *segments.writable(slot)=state;
++            assert(reference.changePublication(h,state));
++        }
++        compare(segments,reference);
++    }
++    unsigned visited=0;
++    assert(segments.visitPublicationRuns([&](const auto& run){
++        return run.visitSlots([&](unsigned slot,unsigned offset){
++            State state;assert(segments.publication(segments.currentHandle(slot),state));
++            assert(state.same(run.publication().shifted(offset)));++visited;return true;
++        });
++    }));
++    assert(visited==segments.size());
++    std::puts("Segment records: prefixes, lazy cell mutation, chronology, holes and reuse match the retained oracle");
++}
