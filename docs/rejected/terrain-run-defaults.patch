@@ -1,0 +1,393 @@
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index 98f7fac1..3917b896 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -10,12 +10,17 @@ namespace downwell {
+ // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
+ // raster cache. Generated source IDs remain unknown until the shared global
+ // allocation stream is connected; family-local generations are never VM IDs.
+-template<unsigned Capacity> class NativeTerrainLifetimes {
++template<unsigned Capacity,bool ReferenceState=false> class NativeTerrainLifetimes {
+     struct Order {
+         std::uint32_t stamp=0;
+         RunnerRetainedLayerState layer;
+-        Order shifted(unsigned n)const{return {stamp?stamp+n:0,layer.shifted(n)};}
+-        bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer);}
++        std::int16_t initialSprite=-2;
++        unsigned char initialFlags[2]{};
++        Order shifted(unsigned n)const{
++            auto result=*this;result.stamp=stamp?stamp+n:0;result.layer=layer.shifted(n);return result;
++        }
++        bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer)&&
++            initialSprite==other.initialSprite&&initialFlags[0]==other.initialFlags[0]&&initialFlags[1]==other.initialFlags[1];}
+     };
+     using Runs=TerrainOwnershipRuns<Capacity,Order>;
+     Runs runs_;
+@@ -23,6 +28,40 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+     unsigned char flags_[Capacity]{};
+     std::int16_t createSprite_[Capacity]{};
+     PackedWallState walls_[Capacity]{};
++    // Prepared births own immutable Create defaults in their run. Only real
++    // mutations publish these three per-cell arrays; reused slots lose the bit.
++    unsigned char materialized_[(Capacity+7)/8]{};
++    bool materialized(unsigned slot)const{
++        if constexpr(ReferenceState)return true;
++        return (materialized_[slot>>3]&(1u<<(slot&7)))!=0;
++    }
++    void materializedRange(unsigned first,unsigned count,bool value){
++        if constexpr(!ReferenceState){
++            while(count){
++                const unsigned offset=first&7,n=count<8-offset?count:8-offset;
++                const unsigned mask=((1u<<n)-1)<<offset;
++                auto& byte=materialized_[first>>3];
++                if(value)byte|=mask;else byte&=~mask;
++                first+=n;count-=n;
++            }
++        }
++    }
++    unsigned cellFlags(unsigned slot)const{
++        if(materialized(slot))return flags_[slot];
++        return runs_.publicationBasis(slot)->initialFlags[runs_.object(slot)==93];
++    }
++    unsigned lifetimeFlags(unsigned slot)const{return materialized(slot)?flags_[slot]&3u:0u;}
++    int cellSprite(unsigned slot)const{
++        return materialized(slot)?createSprite_[slot]:runs_.publicationBasis(slot)->initialSprite;
++    }
++    PackedWallState cellWall(unsigned slot)const{return materialized(slot)?walls_[slot]:PackedWallState{};}
++    void materialize(unsigned slot){
++        if(materialized(slot))return;
++        const auto* basis=runs_.publicationBasis(slot);
++        flags_[slot]=basis->initialFlags[runs_.object(slot)==93];
++        createSprite_[slot]=basis->initialSprite;walls_[slot]=PackedWallState{};
++        materializedRange(slot,1,true);
++    }
+     WallEndStepState* stepping_=nullptr;
+     InstanceHandle steppingHandle_{};
+     bool good_=true;
+@@ -77,7 +116,7 @@ public:
+     };
+     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
+         if(!contains(h))return false;
+-        const unsigned value=flags_[h.slot];
++        const unsigned value=cellFlags(h.slot);
+         out=(value&3u)|((value&4u)?8u:0u)|((value&8u)?0x200u:0u)|((value&16u)?0x8000u:0u);
+         return true;
+     }
+@@ -171,35 +210,39 @@ public:
+     // -2 means constructor defaults, not the runner's missing-sprite value.
+     bool appearance(InstanceHandle h,int& sprite,unsigned& index,bool& created)const{
+         if(!contains(h))return false;
+-        created=(flags_[h.slot]&32u)!=0;sprite=createSprite_[h.slot];
++        created=(cellFlags(h.slot)&32u)!=0;sprite=cellSprite(h.slot);
+         index=created&&runs_.object(h.slot)==93?23u:0u;
+         if(created&&runs_.object(h.slot)==60){WallEndStepState state;if(!wallState(h,state))return false;index=state.imageIndex;}
+         return true;
+     }
+     bool cachedSprite(InstanceHandle h,int& sprite)const{
+         if(!contains(h))return false;
+-        sprite=(flags_[h.slot]&64u)?createSprite_[h.slot]:-2;return true;
++        sprite=materialized(h.slot)&&(flags_[h.slot]&64u)?createSprite_[h.slot]:-2;return true;
+     }
+     bool cachedOffset(InstanceHandle h,int& x,int& y)const{
+-        return contains(h)&&walls_[h.slot].cachedOffset(x,y);
++        return contains(h)&&cellWall(h.slot).cachedOffset(x,y);
+     }
+     // Store the cache's origin, not the instance position. The source list
+     // branch restores position but leaves these temporary bounds dirty.
+     bool publishCachedOffset(InstanceHandle h,int x,int y){
+-        return good_=(good_&&contains(h)&&walls_[h.slot].storeCachedOffset(x,y));
++        if(!contains(h))return good_=false;
++        materialize(h.slot);return good_=walls_[h.slot].storeCachedOffset(x,y);
+     }
+     bool publishQueryDirty(InstanceHandle h){
+         if(!contains(h))return good_=false;
++        materialize(h.slot);
+         flags_[h.slot]|=4u;return true;
+     }
+     bool publishIndexed(InstanceHandle h){
+         if(!contains(h))return good_=false;
++        materialize(h.slot);
+         flags_[h.slot]|=16u;return true;
+     }
+     // One flags bit selects constructor versus post-Create cached resource.
+     // A normal refresh also returns the cached origin to the actual position.
+     bool publishRefreshedBounds(InstanceHandle h,std::uint32_t spatial){
+         if(!contains(h))return good_=false;
++        materialize(h.slot);
+         if(!walls_[h.slot].storeCachedOffset(0,0))return good_=false;
+         const unsigned previous=flags_[h.slot];
+         flags_[h.slot]=(previous&163u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
+@@ -214,6 +257,7 @@ public:
+ private:
+     bool createKnownIdentity(const Identity& id,int tile){
+         const auto h=id.handle;std::uint32_t spatial;
++        materialize(h.slot);
+         if(!spatialFlags(h,spatial)||(flags_[h.slot]&32u))return good_=false;
+         if(id.object!=99){
+             if(tile<0||tile>32767||(binding_.context&&
+@@ -232,7 +276,8 @@ public:
+     // immutable operand in the existing run identity, not a per-cell record.
+     bool roomCreation(InstanceHandle h){
+         Identity id;
+-        if(stepping_||!readIdentity(h,id)||!(flags_[h.slot]&32u))return good_=false;
++        if(stepping_||!readIdentity(h,id)||!(cellFlags(h.slot)&32u))return good_=false;
++        materialize(h.slot);
+         WallEndStepState state=walls_[h.slot].load();
+         if(id.creationCode!=-1&&(id.object!=60||!wallRoomCreation(id.creationCode,state)))return good_=false;
+         if(!walls_[h.slot].store(state))return good_=false;
+@@ -242,19 +287,20 @@ public:
+     // Never reconstruct a previously stepped wall with this initial snapshot.
+     bool initialWallState(InstanceHandle h,WallEndStepState& state)const{
+         Identity id;
+-        if(!readIdentity(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
++        if(!readIdentity(h,id)||id.object!=60||!(cellFlags(h.slot)&32u))return false;
+         state={};
+-        return !(flags_[h.slot]&128u)||wallRoomCreation(id.creationCode,state);
++        return !(cellFlags(h.slot)&128u)||wallRoomCreation(id.creationCode,state);
+     }
+     // Read-only inspection also exposes the retained failure prefix. Execution
+     // remains terminal after failure; stale handles never read a reused slot.
+     bool wallState(InstanceHandle h,WallEndStepState& state)const{
+-        Identity id;if(!runs_.read(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
++        Identity id;if(!runs_.read(h,id)||id.object!=60||!(cellFlags(h.slot)&32u))return false;
+         state=stepping_&&h.slot==steppingHandle_.slot&&h.generation==steppingHandle_.generation?
+-            *stepping_:walls_[h.slot].load();return true;
++            *stepping_:cellWall(h.slot).load();return true;
+     }
+     bool setWallDeactivation(InstanceHandle h,bool value){
+         WallEndStepState state;if(!good_||!wallState(h,state))return good_=false;
++        materialize(h.slot);
+         state.deactivate=value;
+         if(stepping_&&h.slot==steppingHandle_.slot&&h.generation==steppingHandle_.generation)*stepping_=state;
+         return walls_[h.slot].store(state)||(good_=false);
+@@ -264,8 +310,9 @@ public:
+         if(stepping_||!readIdentity(h,id))return good_=false;
+         // Wall (99) owns an empty End Step override; it must never inherit
+         // code 986, consume its RNG or require object-60 wall state.
+-        if((flags_[h.slot]&3u)||id.object==99)return true;
++        if(lifetimeFlags(h.slot)||id.object==99)return true;
+         if(id.object!=60||!wallState(h,state))return good_=false;
++        materialize(h.slot);
+         const int before=drawSprite(h);const bool checked=state.checked!=0;const int image=state.imageIndex;
+         stepping_=&state;steppingHandle_=h;
+         const bool ok=wallEndStep(state,area,random,ops);
+@@ -287,11 +334,11 @@ public:
+         const auto emit=[&](const Identity& id){
+             if(id.object!=60)return true;
+             WallEndStepState state;
+-            if((flags_[id.handle.slot]&32u)&&!wallState(id.handle,state))return false;
+-            const int sprite=state.checked?createSprite_[id.handle.slot]:51;
++            if((cellFlags(id.handle.slot)&32u)&&!wallState(id.handle,state))return false;
++            const int sprite=state.checked?cellSprite(id.handle.slot):51;
+             if(!wallIntersectsRows(sprite,id.y,first,end))return true;
+-            return visit(WallDrawRecord{id.object,id.x,id.y,!(flags_[id.handle.slot]&2u),
+-                (flags_[id.handle.slot]&1u)!=0,createSprite_[id.handle.slot],state.imageIndex,state});
++            return visit(WallDrawRecord{id.object,id.x,id.y,!(lifetimeFlags(id.handle.slot)&2u),
++                (lifetimeFlags(id.handle.slot)&1u)!=0,cellSprite(id.handle.slot),state.imageIndex,state});
+         };
+         return unboundedWallArt_?runs_.visit(emit):runs_.visitRows(first,end,emit);
+     }
+@@ -300,13 +347,13 @@ public:
+     bool contains(InstanceHandle h)const{return good_&&runs_.contains(h);}
+     bool read(InstanceHandle h,Identity& id,bool& active,bool& destroyed)const{
+         if(!good_||!runs_.read(h,id))return false;
+-        active=(flags_[h.slot]&2)==0;destroyed=(flags_[h.slot]&1)!=0;return true;
++        active=(lifetimeFlags(h.slot)&2)==0;destroyed=(lifetimeFlags(h.slot)&1)!=0;return true;
+     }
+     InstanceHandle handle(unsigned ordinal)const{return runs_.handle(ordinal);}
+     InstanceHandle currentHandle(unsigned slot)const{return good_?runs_.currentHandle(slot):InstanceHandle{};}
+     template<class Visit> bool visit(Visit visit)const{
+-        return good_&&runs_.visit([&](const Identity& id){return visit(id,(flags_[id.handle.slot]&2)==0,
+-            (flags_[id.handle.slot]&1)!=0);});
++        return good_&&runs_.visit([&](const Identity& id){return visit(id,(lifetimeFlags(id.handle.slot)&2)==0,
++            (lifetimeFlags(id.handle.slot)&1)!=0);});
+     }
+     bool append(int object,int x,int y,bool active=true,unsigned source=0,int creation=-1){
+         return appendConstructed(object,x,y,active,source,creation,nullptr,0);
+@@ -358,7 +405,20 @@ private:
+                 if(completed>count)return good_=false;
+                 unsigned i=0;
+                 if(cells.retained&&completed){
++                    if constexpr(!ReferenceState){
++                        order.initialSprite=static_cast<std::int16_t>(tile);
++                        for(unsigned kind=0;kind<2;++kind){const auto value=spatial[kind];
++                            order.initialFlags[kind]=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
++                        }
++                    }
+                     if(!runs_.appendRetainedCells({slot,next_},cells.bytes,cells.y,completed,order))return good_=false;
++                    if constexpr(!ReferenceState){
++                        materializedRange(slot,completed,false);
++                        if(order.layer.bound()&&order.layer.inactive)
++                            for(unsigned j=0;j<completed;++j)selectLayerCutoff(slot+j,true);
++                        if(wallRadius(tile)<0||wallRadius(tile)>16)unboundedWallArt_=true;
++                        i=completed;
++                    }
+                     for(;i<completed;++i){
+                         const auto kind=cells.kind(i),value=spatial[kind];
+                         if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot+i,true);
+@@ -367,6 +427,7 @@ private:
+                         if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+                     }
+                 }
++                if(!cells.retained)materializedRange(slot,completed,true);
+                 while(i<completed){
+                     const unsigned kind=cells.kind(i);const int x=cells.x(i),object=cells.object(i);
+                     int step=16;if(i+1<completed&&cells.x(i+1)==x-16)step=-16;
+@@ -411,6 +472,7 @@ private:
+         if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+         if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot,true);
+         ++next_;freeHint_=slot+1;
++        materializedRange(slot,1,true);
+         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+         createSprite_[slot]=-2;
+         walls_[slot]=PackedWallState{}; // Slot reuse must not inherit a query cache.
+@@ -427,6 +489,7 @@ public:
+     }
+     bool markDestroyed(InstanceHandle h){
+         if(!good_||!runs_.contains(h))return good_=false;
++        materialize(h.slot);
+         if(flags_[h.slot]&1)return true;
+         if(binding_.mark&&!binding_.mark(binding_.context,h.slot))return good_=false;
+         Identity id;if(!runs_.read(h,id))return good_=false;
+@@ -438,6 +501,7 @@ public:
+     bool activation(InstanceHandle h,bool active){
+         Identity id;std::uint32_t spatial;
+         if(!readIdentity(h,id)||!spatialFlags(h,spatial))return good_=false;
++        materialize(h.slot);
+         const int before=drawSprite(h);
+         if(binding_.activation&&!binding_.activation(binding_.context,id,active,spatial))return good_=false;
+         flags_[h.slot]=active?(flags_[h.slot]&~2u):(flags_[h.slot]|2u);
+@@ -449,7 +513,7 @@ public:
+         return stepping_?true:notifyPresentation(id,before,after,before!=after);
+     }
+     bool retire(InstanceHandle h){
+-        if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
++        if(stepping_||!good_||!runs_.contains(h)||!(lifetimeFlags(h.slot)&1)||
+             (binding_.retire&&!binding_.retire(binding_.context,h.slot))||!runs_.retire(h))return good_=false;
+         selectLayerCutoff(h.slot,false);
+         if(h.slot<freeHint_)freeHint_=h.slot;
+@@ -469,9 +533,9 @@ public:
+     }
+ private:
+     int drawSprite(InstanceHandle h)const{
+-        if(runs_.object(h.slot)!=60||(flags_[h.slot]&3u))return -1;
++        if(runs_.object(h.slot)!=60||lifetimeFlags(h.slot))return -1;
+         WallEndStepState state;
+-        return wallState(h,state)&&state.checked?createSprite_[h.slot]:51;
++        return wallState(h,state)&&state.checked?cellSprite(h.slot):51;
+     }
+     bool notifyPresentation(const Identity& id,int before,int after,bool changed){
+         if(changed&&binding_.presentation&&!binding_.presentation(binding_.context,id,before,after))return good_=false;
+diff --git a/src/core/TerrainOwnershipRuns.h b/src/core/TerrainOwnershipRuns.h
+index 487734b3..eb19b8d9 100644
+--- a/src/core/TerrainOwnershipRuns.h
++++ b/src/core/TerrainOwnershipRuns.h
+@@ -71,6 +71,11 @@ public:
+         return h.generation==r.generation+h.slot-r.first;
+     }
+     bool occupied(unsigned slot)const{return slot<Capacity&&locator_[slot]!=0;}
++    // Read immutable run defaults without copying/offsetting its chronology.
++    // The pointer is borrowed only until the next structural mutation.
++    const Publication* publicationBasis(unsigned slot)const{
++        return occupied(slot)?static_cast<const Publication*>(&runs_[locator_[slot]-1]):nullptr;
++    }
+     InstanceHandle currentHandle(unsigned slot)const{
+         if(!occupied(slot))return {};
+         const auto& r=runs_[locator_[slot]-1];return {slot,r.generation+slot-r.first};
+diff --git a/tests/core/TerrainOwnershipRunsTest.cpp b/tests/core/TerrainOwnershipRunsTest.cpp
+index 817ce95c..f9f54106 100644
+--- a/tests/core/TerrainOwnershipRunsTest.cpp
++++ b/tests/core/TerrainOwnershipRunsTest.cpp
+@@ -567,16 +567,16 @@ static void bulkPublicationRuns(){
+     require(!invalid.size());
+     std::puts("Whole-run publication: scalar geometry/order/merge/carry/mutation/reuse comparisons passed");
+ }
+-static void preparedSpanConstruction(){
+-    using Native=downwell::NativeTerrainLifetimes<16>;
++template<bool ReferenceState=false> static void preparedSpanConstruction(){
++    using Native=downwell::NativeTerrainLifetimes<16,ReferenceState>;
+     struct Observer {
+         Native* live;unsigned next=100,spanCalls=0,spanCells=0,begins=0,ends=0,directMisses=0;
+         downwell::RunnerRegistrationOrder clock{0xfffffffcu,7};int fail=-1;
+     };
+     auto binding=[](Observer& observer,bool spans){
+-        Native::Binding b;
++        typename Native::Binding b;
+         b.context=&observer;b.admit=[](void*,unsigned){return true;};
+-        b.birth=[](void* p,const Native::Identity& id,bool,std::uint32_t& stamp,std::uint32_t& flags){
++        b.birth=[](void* p,const typename Native::Identity& id,bool,std::uint32_t& stamp,std::uint32_t& flags){
+             auto& o=*static_cast<Observer*>(p);if(int(id.handle.slot)==o.fail)return false;
+             stamp=o.next++;flags=0x8008u;o.clock.advance();
+             o.live->setLayerState(id.handle.slot,{{o.clock,false},21,2,false});return true;
+@@ -584,8 +584,8 @@ static void preparedSpanConstruction(){
+         b.retire=[](void*,unsigned){return true;};b.mark=b.retire;
+         b.beginRun=[](void* p){++static_cast<Observer*>(p)->begins;return true;};
+         b.endRun=[](void* p){++static_cast<Observer*>(p)->ends;return true;};
+-        b.create=[](void*,const Native::Identity&,int,std::uint32_t& flags){flags|=0x200u;return true;};
+-        if(spans)b.constructSpan=[](void* p,const Native::Identity& id,Native::PreparedCells cells,int,unsigned& completed,
++        b.create=[](void*,const typename Native::Identity&,int,std::uint32_t& flags){flags|=0x200u;return true;};
++        if(spans)b.constructSpan=[](void* p,const typename Native::Identity& id,typename Native::PreparedCells cells,int,unsigned& completed,
+             std::uint32_t& stamp,std::uint32_t* flags,downwell::RunnerRetainedLayerState& layer){
+             auto& o=*static_cast<Observer*>(p);++o.spanCalls;
+             const unsigned count=cells.count;completed=count;
+@@ -602,7 +602,7 @@ static void preparedSpanConstruction(){
+         Native scalar,bulk;Observer a{&scalar},b{&bulk};a.fail=b.fail=failure;
+         auto bindings=binding(b,true);
+         if(direct==1)bindings.constructDirectSpan=bindings.constructSpan;
+-        if(direct==2)bindings.constructDirectSpan=[](void* p,const Native::Identity&,Native::PreparedCells,int,
++        if(direct==2)bindings.constructDirectSpan=[](void* p,const typename Native::Identity&,typename Native::PreparedCells,int,
+             unsigned&,std::uint32_t&,std::uint32_t*,downwell::RunnerRetainedLayerState&){
+             ++static_cast<Observer*>(p)->directMisses;return Native::SpanResult::unsupported;
+         };
+@@ -623,6 +623,42 @@ static void preparedSpanConstruction(){
+             require(scalar.layerState(h)->same(*bulk.layerState(h)));
+             require(scalar.spatialFlags(h,ap)&&bulk.spatialFlags(h,bp)&&ap==bp);
+             require(scalar.appearance(h,as,ai,ac)&&bulk.appearance(h,bs,bi,bc)&&as==bs&&ai==bi&&ac==bc);
++            // Query/cache and room mutations must not overwrite borrowed
++            // defaults in neighbouring cells of the same prepared run.
++            require(scalar.publishQueryDirty(h)&&bulk.publishQueryDirty(h));
++            require(scalar.publishIndexed(h)&&bulk.publishIndexed(h));
++            require(scalar.publishCachedOffset(h,16,0)&&bulk.publishCachedOffset(h,16,0));
++            int ax=0,ay=0,bx=0,by=0;
++            require(scalar.cachedOffset(h,ax,ay)&&bulk.cachedOffset(h,bx,by)&&ax==bx&&ay==by);
++            require(scalar.publishRefreshedBounds(h,0x8200)&&bulk.publishRefreshedBounds(h,0x8200));
++            require(scalar.activation(h,false)&&bulk.activation(h,false));
++            require(scalar.activation(h,true)&&bulk.activation(h,true));
++            if(i%3!=1){
++                require(scalar.setWallDeactivation(h,true)&&bulk.setWallDeactivation(h,true));
++                downwell::WallEndStepState aw,bw;downwell::PackedWallState pa,pb;
++                require(scalar.wallState(h,aw)&&bulk.wallState(h,bw)&&pa.store(aw)&&pb.store(bw)&&pa.bits==pb.bits);
++            }
++            auto layer=*scalar.layerState(h);layer.inactive=true;
++            scalar.setLayerState(h.slot,layer);bulk.setLayerState(h.slot,layer);
++            require(scalar.valid()&&bulk.valid()&&scalar.layerState(h)->same(*bulk.layerState(h)));
++            require(scalar.spatialFlags(h,ap)&&bulk.spatialFlags(h,bp)&&ap==bp);
++        }
++        if(actual){
++            // Retained births into old slots must discard materialized query,
++            // wall, flags and sprite state from the previous lifetimes.
++            for(unsigned i=0;i<12;++i){
++                const auto h=scalar.currentHandle(i);
++                require(scalar.markDestroyed(h)&&bulk.markDestroyed(h)&&scalar.retire(h)&&bulk.retire(h));
++            }
++            require(scalar.constructPrepared(52,af,{source,12,64})&&
++                    bulk.constructPrepared(52,bf,{source,12,64,retained}));
++            for(unsigned i=0;i<12;++i){
++                const auto h=scalar.handle(i);std::uint32_t ap=0,bp=0;int as=0,bs=0,ax=0,ay=0,bx=0,by=0;
++                unsigned ai=0,bi=0;bool ac=false,bc=false;
++                require(scalar.spatialFlags(h,ap)&&bulk.spatialFlags(h,bp)&&ap==bp);
++                require(scalar.appearance(h,as,ai,ac)&&bulk.appearance(h,bs,bi,bc)&&as==bs&&ai==bi&&ac==bc);
++                require(scalar.cachedOffset(h,ax,ay)&&bulk.cachedOffset(h,bx,by)&&ax==bx&&ay==by&&ax==0&&ay==0);
++            }
+         }
+     }
+     std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
+@@ -678,7 +714,7 @@ static void retainedIdentitySegments(){
+ int main(){
+     retainedIdentitySegments();
+     bulkPublicationRuns();
+-    preparedSpanConstruction();
++    preparedSpanConstruction();preparedSpanConstruction<true>();
+     constructedSegments();
+     static_assert(sizeof(downwell::PackedWallState)==4,"No extra per-wall cache allocation");
+     for(const auto delta:std::vector<std::pair<int,int>>{{0,0},{0,-16},{16,0},{0,16},{-16,0}}){
