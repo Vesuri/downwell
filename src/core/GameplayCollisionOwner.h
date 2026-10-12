@@ -1564,11 +1564,19 @@ private:
     void* timeEffectIdContext_=nullptr;
     bool (*timeEffectIdAllocate_)(void*,std::uint32_t&)=nullptr;
     const SpriteMaskPack* timeShardStepMasks_=nullptr; // Borrowed only during selected Step.
+#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+    // The external scene contract admits exactly nativeScenery with native
+    // boxes. Do not keep scalar-owner lifecycle branches in every callback
+    // when this executable cannot construct that owner in the first place.
+    static constexpr bool native_=true,sceneryLayers_=true,nativeBoxes_=true;
+    static constexpr bool terrainRegistered_=false;
+#else
     const bool native_;
     const bool sceneryLayers_;
     const bool nativeBoxes_;
-    const bool nativeFields_;
     const bool terrainRegistered_;
+#endif
+    const bool nativeFields_;
     bool unregisteredTerrainCleanup_=false;
     NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
     unsigned nativeAnimationPopulation_=0; // Includes inactive and marked lifetimes until retirement.
@@ -1606,11 +1614,13 @@ public:
         SkeletonEncounterStorage* encounter=nullptr):
         nativeCollisionStorage_(nativeCollision),
         objects_(objects),sprites_(sprites),layers_(rooms),
+#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
         native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         sceneryLayers_(ownership==Ownership::nativeScenery),
         nativeBoxes_(ownership==Ownership::nativeScenery&&nativeBoxes),
-        nativeFields_(ownership==Ownership::nativeScenery&&nativeFields),
         terrainRegistered_(ownership==Ownership::reference),
+#endif
+        nativeFields_(ownership==Ownership::nativeScenery&&nativeFields),
         table_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision),
@@ -1619,7 +1629,7 @@ public:
         // Reject incompatible ownership instead of silently constructing a
         // partial reference runner. The scene must still declare its external
         // backend before births; that admission closes the spatial index.
-        if(!native_||!nativeBoxes_||reference||nativeCollision){good_=false;return;}
+        if(ownership!=Ownership::nativeScenery||!nativeBoxes||reference||nativeCollision){good_=false;return;}
 #endif
         owner_.observeStateFailure(good_);properties_.observeFailure(good_);
         // Only the scalar/reference backend may own these arrays. Native

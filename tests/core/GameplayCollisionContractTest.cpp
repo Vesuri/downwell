@@ -45,4 +45,11 @@ int main() {
     assert(full->valid()!=restricted);
     auto withoutBoxes=create(Owner::Ownership::nativeScenery,false);
     assert(withoutBoxes->valid()!=restricted);
+    // The restricted build's compile-time ownership must not turn rejected
+    // constructor arguments into a silently accepted native scene.
+    if(restricted)for(auto kind:{Owner::Ownership::reference,
+            Owner::Ownership::nativeTerrain,Owner::Ownership::native}){
+        auto incompatible=create(kind,true);
+        assert(!incompatible->valid());
+    }
 }

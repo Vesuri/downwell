@@ -2,9 +2,40 @@
 
 ## No-input initial-fall comparison
 
+### Shipping ownership specialization
+
+The shipping external-collision contract now fixes native/scenery/box ownership
+at compile time, excluding unreachable reference-owner lifecycle paths. The
+constructor still rejects incompatible arguments; reference builds retain the
+original ownership choices. Native field ownership remains runtime-selected.
+
+The current fall repeats at **195 PAL fields / 164 updates (42.05 FPS)** versus
+198 before specialization and the historical target of 181. This small cadence
+change alone remains below the 3% noise allowance. Marks 91–110 total
+3,172,050 → 3,078,280 cycles (22.32 → 21.66 ms/update), with Step 11.27 →
+11.19 ms. The window's worst interval moves **29.0 → 31.1 ms**: frame 105 now
+contains 9.6 ms of publication waiting; its work excluding that wait is about
+21.5 ms, versus 21.4 before. Do not describe redistributed waiting as removed
+simulation work. Marks 161–166 total 2,430,370 → 2,403,370 cycles; frame 163
+is 136.8 → 136.1 ms. The goal remains unresolved.
+
+Normal stripped Hunk: **1,769,920 → 1,603,992 bytes**. Matched profile ELF
+sections attribute this mainly to `.text` (1,320,120 → 1,158,186 bytes), not
+assets: `.rodata` grows 196 bytes, `.data` is unchanged and `.bss` shrinks four
+bytes. No dynamic allocation or Chip-memory configuration changes. All 165
+native state samples match; both ownership-contract configurations, the
+18,000-frame host ownership replay and normal 512 KiB Chip startup pass.
+Profile ELF SHA-256:
+`53ab87bcb24d62e22446fcccc5db096e1d6ca124c29de18146ac1575515d949c`.
+Normal Hunk SHA-256:
+`d82ffb6c9250357cce10348d2e09b53847d041f812445fbf58270a9d0b5f103a`.
+Reports and witnesses: `tmp/quiet-owner-specialization-*`; captures use the
+same mark-90/26-field and mark-160/20-field windows. A separate five-field
+capture starting at mark 104 checks frame 105's wait attribution.
+
 ### Phase-scoped controller publication
 
-The current no-input fall independently repeats at **198 PAL fields for 164
+The pre-specialization no-input fall independently repeats at **198 PAL fields for 164
 updates (41.41 FPS)** with 512 KiB Chip, versus 199 before this change and the
 historical target of 181. The one-field cadence change alone is noise, not
 evidence that the regression is resolved. The missed-field ledger attributes
