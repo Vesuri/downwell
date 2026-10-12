@@ -38,6 +38,17 @@ class SourceLines(unittest.TestCase):
 
 
 class MatchedWindows(unittest.TestCase):
+    def test_required_window_does_not_silently_shrink(self):
+        report.require_complete_selection(set(range(57, 123)), '57-121')
+        report.require_complete_selection({122}, '122')
+        for chosen in (set(range(58, 122)), set(range(57, 121)),
+                       set(range(57, 122)) - {90}):
+            with self.assertRaisesRegex(ValueError, 'missing complete requested'):
+                report.require_complete_selection(chosen, '57-121')
+        for invalid in (None, 'all', '0', '-1', '57-56'):
+            with self.assertRaises(ValueError):
+                report.require_complete_selection({57}, invalid)
+
     def test_summary_excludes_partial_and_retains_exact_cycles(self):
         summary = report.frame_summary({10: 10, 11: 142103, 12: 20}, {10, 12}, 'a' * 64)
         self.assertEqual(summary['frames'], [{'frame': 11, 'cycles': 142103}])

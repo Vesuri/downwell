@@ -13,14 +13,23 @@ case "$mode" in
     export PROFILE_IDLE=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     ;;
-  quiet-fall)
-    flags=(FPSCOUNT=1 TRACE_FRAMES=165); script=profile_quiet_cadence.gdb
+  quiet-fall|quiet-window)
+    flags=(PROBES=0 FPSCOUNT=1 TRACE_FRAMES=165); script=profile_quiet_cadence.gdb
     ready_marker=DOWNWELL_QUIET_CADENCE_READY
     export DETERMINISTIC=1
     export STRIP=1 PROFILE_IDLE=1 PROFILE_FRAMES=600 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
     export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-90}"
+    if [[ $mode == quiet-window ]]; then
+      # Same binary and trajectory as quiet-fall. The trace starts one mark
+      # before the measured interval; its first/last partial frames are excluded.
+      mkdir -p ../tmp/trace
+      trace_out=$(mktemp -d "$PWD/../tmp/trace/quiet-window.XXXXXX")
+      sed "s|@OUTPUT@|$trace_out|g" profile_quiet_window.gdb > "$trace_out/profile_quiet_window.gdb"
+      script="$trace_out/profile_quiet_window.gdb"
+      ready_marker=DOWNWELL_PROFILE_READY
+    fi
     ;;
   overflow-state)
     flags=(FPSCOUNT=1 OVERFLOW_VERIFY=1); script=verify_overflow.gdb
@@ -114,7 +123,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-window|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -239,11 +248,20 @@ if [[ $mode == frames ]]; then
   echo "Frames: $dump_out"
   exit 0
 fi
-if [[ $mode == trace ]]; then
+if [[ $mode == trace || $mode == quiet-window ]]; then
   ls "$trace_out"/trace-*.bin > /dev/null 2>&1 || { echo "FS-UAE wrote no trace" >&2; exit 1; }
   cp out/Downwell.elf "$trace_out/Downwell.elf"
   cp ".run/profile-${mode}.log" "$trace_out/capture.log"
   grep '^TRACE' "$trace_out/capture.log"
+  if [[ $mode == quiet-window ]]; then
+    python3 ../tools/amiga-trace-report.py "$trace_out" --frames=57-121 --require-complete \
+      --frame-summary="$trace_out/frames.json" --causes > "$trace_out/quiet.txt"
+    python3 ../tools/amiga-trace-report.py "$trace_out" --frames=122 --require-complete \
+      --causes > "$trace_out/generation-122.txt"
+    echo "Quiet updates 57–121: $trace_out/quiet.txt"
+    echo "First generation burst 122: $trace_out/generation-122.txt"
+    echo "Exact complete-frame cycles and build hash: $trace_out/frames.json"
+  fi
   echo "Traces: $trace_out (report: python3 tools/amiga-trace-report.py $trace_out)"
   exit 0
 fi

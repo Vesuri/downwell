@@ -39,6 +39,20 @@ options that select an older path (for example `TABLE_CONTACT_ATAN=0`,
 `TERRAIN_DIRECT=0`, `PREPARED_FIELDS=0`, `AMMO_FACTORED=0`) exist only as
 references for paired measurements and pixel/replay oracles; never ship one.
 
+For the deterministic no-input fall, use `bash amiga/profile.sh quiet-fall`
+for the complete 164-update landing/cadence witness, and
+`bash amiga/profile.sh quiet-window` for instruction-level costs. Both default
+to 512 KiB Chip, cap the emulator run at 90 seconds and restore the normal
+binary. The latter captures 75 PAL fields from mark 56, without debugger stops
+inside the window, in a fresh `tmp/trace/quiet-window.*` directory. It writes
+`quiet.txt` for complete updates 57–121, `generation-122.txt` for the first
+generation burst, and `frames.json` containing exact cycles and the ELF hash.
+Missing even one requested complete update fails the report: a slow run must
+not silently turn into a shorter, easier sample. Keep reports with the measured
+commit and delete disposable raw traces afterward. Neither command establishes
+combat performance, original-runner fidelity or completion of the restoration
+goal; compare the same windows, workload and memory configuration.
+
 Cross-CPU replay digests must use the same contact-direction precision policy
 on both sides. Both builds use the table by default; a reference built with
 `DOWNWELL_PORTABLE_CONTACT_ATAN` (host) or `TABLE_CONTACT_ATAN=0` (Amiga) must

@@ -30,8 +30,13 @@ startup is separately verified at 512 KiB Chip; no shipping memory increase.
 Frozen ELF hashes: historical
 `d1d1c64d3690c89ac343545c979946cd917543825ada4834c18a12c324f2a115`, current
 `f8b656c909c636b0607c7c5ef468959b748893e3deaf1c211a3f14a1ec4b004a`.
-Reproduce with the existing no-input profile build, ignore 55 frame marks,
-capture 75 fields, then report `--frames=57-121 --causes` and `--frames=122-126`.
+Reproduce the current target-memory arm with `bash amiga/profile.sh quiet-window`:
+it builds the no-input profile, ignores 55 frame marks and captures 75 fields.
+Its reports require every complete update in 57–121 and the separate update 122;
+`frames.json` preserves exact cycles and the ELF hash for matched comparisons.
+For the historical expanded-memory comparison, explicitly use
+`VERIFY_CHIP_KB=1024` on both arms. The underlying reports accept
+`--frames=122-126 --require-complete --causes` for the following window.
 Each run is capped at 90 seconds. Reports: `tmp/quiet-full-window-{current,historical}.txt`
 and `tmp/quiet-full-window-{current,historical}-next.txt`, with independent
 target-memory report `tmp/quiet-full-window-122-recheck.txt`; raw traces are

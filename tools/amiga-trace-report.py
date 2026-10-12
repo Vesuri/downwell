@@ -498,6 +498,17 @@ def complete_frame_numbers(frame_cycles, partial_frames):
     return [f for f in sorted(frame_cycles) if f not in partial_frames]
 
 
+def require_complete_selection(chosen, frames):
+    if frames is None or not re.fullmatch(r'[1-9][0-9]*(?:-[1-9][0-9]*)?', frames):
+        raise ValueError('--require-complete needs an explicit --frames range')
+    lo, hi = parse_range(frames, 0, 0)
+    if hi < lo:
+        raise ValueError('reversed required frame range')
+    missing = set(range(lo, hi + 1)) - set(chosen)
+    if missing:
+        raise ValueError(f'missing complete requested frames: {sorted(missing)}')
+
+
 def frame_summary(frame_cycles, partial_frames, elf_hash):
     """Keep exact cycles after disposable instruction traces are removed."""
     return {'schema': 'downwell-frame-cycles/v1', 'elf_sha256': elf_hash,
@@ -567,6 +578,8 @@ def main():
                         help='print callers/callees for an exact logical name or matching substring')
     parser.add_argument('--frames', default=None,
                         help='restrict attribution and the frame table to game frames N or N-M')
+    parser.add_argument('--require-complete', action='store_true',
+                        help='fail unless every requested --frames update is fully captured')
     parser.add_argument('--frame-summary', default=None,
                         help='save exact complete-frame cycles and ELF hash for matched comparisons')
     parser.add_argument('--partial-frame', type=int, default=None,
@@ -616,6 +629,10 @@ def main():
     complete = complete_frame_numbers(frame_cycles, partial_frames)
     try:
         chosen = select_frames(frame_cycles, partial_frames, args.frames, args.min_fields, args.partial_frame)
+        if args.require_complete:
+            if args.partial_frame is not None:
+                raise ValueError('--require-complete cannot select a partial frame')
+            require_complete_selection(chosen, args.frames)
     except ValueError as error:
         sys.exit(str(error))
     unit = 'captured slice' if args.partial_frame is not None else 'frame'
