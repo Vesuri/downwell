@@ -1,0 +1,633 @@
+diff --git a/Makefile b/Makefile
+index c79b4c20..3a88e696 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1366,8 +1366,12 @@ build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/c
+ 	@mkdir -p build
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+ 
+-verify-terrain-ownership-runs: build/terrain-ownership-runs-test
++verify-terrain-ownership-runs: build/terrain-ownership-runs-test build/runner-shared-room-membership-test
+ 	./build/terrain-ownership-runs-test
++	./build/runner-shared-room-membership-test
++build/runner-shared-room-membership-test: tests/core/RunnerSharedRoomMembershipTest.cpp $(wildcard src/core/*.h)
++	@mkdir -p build
++	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+ .PHONY: verify-terrain-ownership-runs
+ build/terrain-appearance-publication-test: tests/core/TerrainAppearancePublicationTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+ 	@mkdir -p build
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index cd801a3d..02d753c7 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -260,6 +260,9 @@ private:
+     }
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     RunnerRoomMembership<View::capacity> room_;
++#elif defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND)
++    RunnerSharedRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase,
++                               GameplayWorld::NativeTerrain::RoomTerrain> room_;
+ #else
+     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
+ #endif
+@@ -792,6 +795,11 @@ private:
+         unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer,bool direct=false){
+         using Result=GameplayWorld::NativeTerrain::SpanResult;
+         completed=0;const unsigned count=cells.count;
++#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++        // A transient recipe cannot supply retained identity geometry. Use
++        // synchronous singleton reservations instead of a second room owner.
++        if(!cells.retained)return Result::unsupported;
++#endif
+         const unsigned slot=View::terrainBase+first.handle.slot;
+         const auto* wall=objectDefaults_.get(60);unsigned layerSlot=0;
+         if(!valid()||!count||count>GameplayWorld::NativeTerrain::capacity||
+@@ -842,12 +850,18 @@ private:
+                 }
+                 ++completed;
+             }
++#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+             if(!direct)terrainRoomCount_+=completed;
++#endif
+             if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
+             // This admitted span has no callbacks or allocation. The native
+             // allocator has reserved fresh identities before entering here;
+             // no observer can see this room membership until it installs them.
++#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++            if(!room_.bindTerrainSpan(slot,completed,wall->creationDepth))okay=false;
++#else
+             if(direct&&!room_.bindTerrainSpan(slot,completed,wall->creationDepth))okay=false;
++#endif
+             if(!okay){check(false);return Result::failure;}
+             return Result::success;
+         }
+@@ -933,6 +947,9 @@ private:
+         if(!nativeTerrainLayersBound_){
+             if(!world_||!world_->nativeTerrainInstances()||
+                !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
++#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
++            if(!room_.bindTerrain(world_->nativeTerrainInstances()->roomTerrain()))return check(false);
++#endif
+             nativeTerrainLayersBound_=true;
+         }
+ #endif
+@@ -941,12 +958,16 @@ private:
+         if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
+         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
+         if(!definition||!objectFlags)return check(false);
++#if defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
++        if(!check(room_.bindTerrainSpan(slot,1,definition->creationDepth)))return false;
++#else
+ #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+         if(nativeTerrainLayerRunActive_){
+             if(!appendTerrainRoomSpan(slot,definition->creationDepth))return false;
+         }else
+ #endif
+         if(!check(room_.bind(slot,definition->creationDepth)))return false;
++#endif
+         if(!active)activationChanged(slot);
+         flags=definition->initialFlags|(active?0u:2u);
+         if(!collisionConsumersAdmitted_)flags&=~0x8208u;
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index 50804b11..04be0b17 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -6,6 +6,7 @@
+ #include "PackedWallState.h"
+ #include "WallFootprint.h"
+ #include "RunnerLogicalLayerOrder.h"
++#include "RunnerSharedRoomMembership.h"
+ namespace downwell {
+ // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
+ // raster cache. Generated source IDs remain unknown until the shared global
+@@ -17,7 +18,11 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+         Order shifted(unsigned n)const{return {stamp?stamp+n:0,layer.shifted(n)};}
+         bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer);}
+     };
++#if defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
++    using Runs=TerrainOwnershipRuns<Capacity,Order,true,RunnerRoomSpanState>;
++#else
+     using Runs=TerrainOwnershipRuns<Capacity,Order>;
++#endif
+     Runs runs_;
+     unsigned next_=1,freeHint_=0;
+     unsigned char flags_[Capacity]{};
+@@ -44,6 +49,8 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+     }
+ public:
+     static constexpr unsigned capacity=Capacity;
++    using RoomTerrain=Runs;
++    Runs& roomTerrain(){return runs_;}
+     using Identity=typename Runs::Identity;
+     enum class SpanResult { unsupported, success, failure };
+     // Borrowed AreaOneBuilder prepared-cell stream: two bytes per cell, with
+@@ -407,14 +414,23 @@ private:
+         bool* effectsSucceeded,int tile){
+         if(!canAppend(1)||(object!=60&&object!=93&&object!=99))return good_=false;
+         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
+-        Order order;
++        Order temporary;Order* publication=&temporary;
+         const Identity identity{{slot,next_},object,x,y,creation,source};
+         std::uint32_t spatial=8u;
+         if(slot==Capacity||pendingPublication_)return good_=false;
+-        pendingPublication_=&order;pendingHandle_=identity.handle;
++#if defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
++        publication=runs_.reserveSingleton(identity.handle,object,x,y,source,creation);
++        if(!publication)return good_=false;
++#endif
++        auto& order=*publication;
++        pendingPublication_=publication;pendingHandle_=identity.handle;
+         const bool published=!binding_.birth||binding_.birth(binding_.context,identity,active,order.stamp,spatial);
+         pendingPublication_=nullptr;pendingHandle_={};
++#if defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
++        if(!runs_.commitRetainedCells(published?1:0)||!published)return good_=false;
++#else
+         if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
++#endif
+         if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot,true);
+         ++next_;freeHint_=slot+1;
+         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+@@ -470,7 +486,8 @@ public:
+         // ordinal rather than mutating a borrowed descriptor traversal.
+         if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
+             if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
+-        runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;
++        if(!runs_.clear())return good_=false;
++        freeHint_=0;wallPresentationState_=unboundedWallArt_=false;
+         for(auto& byte:layerCutoffSlots_)byte=0;layerCutoffCount_=0;return true;
+     }
+ private:
+diff --git a/src/core/TerrainOwnershipRuns.h b/src/core/TerrainOwnershipRuns.h
+index 5983e578..6f9ff66c 100644
+--- a/src/core/TerrainOwnershipRuns.h
++++ b/src/core/TerrainOwnershipRuns.h
+@@ -7,15 +7,24 @@ struct TerrainIdentityOnly {
+     TerrainIdentityOnly shifted(unsigned)const{return {};}
+     bool same(const TerrainIdentityOnly&)const{return true;}
+ };
++struct TerrainNoAttachment {};
++template<bool Enabled> struct TerrainRunTopology {};
++template<> struct TerrainRunTopology<true> {
++    void* context=nullptr;
++    void (*onSplit)(void*,unsigned,unsigned)=nullptr;
++    void (*onRelease)(void*,unsigned)=nullptr;
++};
+ // Authoritative immutable terrain identities, in birth order. Per-cell mutable
+ // Create results belong to the caller; no second identity/order list is needed.
+ // Retired cells are holes until their run becomes empty. Slot reuse changes the
+ // locator, never the historical geometry of surviving cells in that run.
+-template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainOwnershipRuns {
++template<unsigned Capacity,class Publication=TerrainIdentityOnly,bool SharedTopology=false,
++         class Attachment=TerrainNoAttachment>
++class TerrainOwnershipRuns:private TerrainRunTopology<SharedTopology> {
+     static_assert(Capacity>0&&Capacity<65535,"Terrain run locator domain");
+     using Slot=std::uint16_t;
+     static constexpr unsigned End=Capacity;
+-    struct Run:Publication {
++    struct Run:Publication,Attachment {
+         int object=0,x=0,y=0,step=0,creationCode=-1;
+         std::uint32_t generation=0;
+         // object == -2 borrows an immutable prepared-cell stream. Authored
+@@ -32,6 +41,7 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
+     Slot locator_[Capacity]{};
+     unsigned head_=End,tail_=End,free_=End,used_=0,population_=0;
+     unsigned reserved_=End;
++    bool topologyBound()const{if constexpr(SharedTopology)return this->context!=nullptr;else return false;}
+     unsigned allocate(){if(free_!=End){unsigned n=free_;free_=runs_[n].next;return n;}return used_++;}
+     // Split only at an actual mutation boundary. Geometry, lifetime and
+     // publication share this descriptor and locator; no parallel per-cell
+@@ -57,6 +67,7 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
+         if(r.next==End)tail_=right;else runs_[r.next].previous=Slot(right);
+         left.next=Slot(right);left.count=Slot(offset);left.live-=Slot(rightLive);
+         for(unsigned s=first;s<end;++s)if(locator_[s]==n+1)locator_[s]=Slot(right+1);
++        if constexpr(SharedTopology)if(this->context)this->onSplit(this->context,n,right);
+         return right;
+     }
+ public:
+@@ -66,6 +77,36 @@ public:
+         std::uint32_t source=0;
+     };
+     unsigned size()const{return population_;}
++    static constexpr unsigned descriptorEnd=End;
++    bool bindTopology(void* context,void (*onSplit)(void*,unsigned,unsigned),void (*onRelease)(void*,unsigned)){
++        if constexpr(!SharedTopology)return false;
++        else{
++            if(this->context||population_||!context||!onSplit||!onRelease)return false;
++            this->context=context;this->onSplit=onSplit;this->onRelease=onRelease;return true;
++        }
++    }
++    unsigned descriptorOf(unsigned slot)const{return occupied(slot)?unsigned(locator_[slot]-1):End;}
++    unsigned reservedDescriptor()const{return reserved_;}
++    bool clear(){
++        if(reserved_!=End)return false;
++        if constexpr(SharedTopology)if(this->context)
++            for(unsigned n=head_;n!=End;n=runs_[n].next)this->onRelease(this->context,n);
++        for(auto& slot:locator_)slot=0;
++        head_=tail_=free_=End;used_=population_=0;return true;
++    }
++    unsigned descriptorFirst(unsigned n)const{return runs_[n].first;}
++    unsigned descriptorCount(unsigned n)const{return runs_[n].count;}
++    Attachment& attachment(unsigned n){return runs_[n];}
++    const Attachment& attachment(unsigned n)const{return runs_[n];}
++    // Isolate a live cell for an attached membership mutation. Attachment
++    // split hooks repair their own links; chronology remains in Publication.
++    unsigned isolate(unsigned slot){
++        if(reserved_!=End||!occupied(slot))return End;
++        unsigned n=descriptorOf(slot),offset=slot-runs_[n].first;
++        if(offset)n=split(n,offset);
++        if(runs_[n].count>1)split(n,1);
++        return n;
++    }
+     bool reservationPending()const{return reserved_!=End;}
+     bool contains(InstanceHandle h)const{
+         if(h.slot>=Capacity||!h.generation||!locator_[h.slot])return false;
+@@ -145,7 +186,7 @@ public:
+             (object!=60&&object!=93&&object!=99))return false;
+         // Only generated, adjacent horizontal cells share a descriptor.
+         // Authored source identities and creation scripts remain singleton.
+-        if(tail_!=End&&!source&&creationCode==-1){auto& r=runs_[tail_];
++        if(tail_!=End&&!source&&creationCode==-1&&!topologyBound()){auto& r=runs_[tail_];
+             if(r.object!=-2&&!r.source&&r.creationCode==-1&&r.object==object&&r.y==y&&
+                 unsigned(r.first)+r.count==h.slot&&r.generation+r.count==h.generation){
+                 // Avoid subtraction overflow, including unusual caller coordinates.
+@@ -164,6 +205,7 @@ public:
+         // Initialize only an actual new descriptor. Do not construct and copy
+         // an actor-sized run temporary for each inherited terrain cell.
+         auto& r=runs_[n];static_cast<Publication&>(r)=publication;
++        static_cast<Attachment&>(r)=Attachment{};
+         r.object=object;r.x=x;r.y=y;r.step=0;r.creationCode=creationCode;
+         r.generation=h.generation;r.source=source;r.first=Slot(h.slot);
+         r.count=r.live=1;r.next=End;r.previous=Slot(tail_);
+@@ -185,6 +227,7 @@ public:
+         for(unsigned i=0;i<count;++i)if(occupied(first.slot+i))return false;
+         const unsigned n=allocate();auto& r=runs_[n];
+         static_cast<Publication&>(r)=publication;
++        static_cast<Attachment&>(r)=Attachment{};
+         r.object=-2;r.cells=cells;r.x=r.step=0;r.y=y;r.creationCode=-1;
+         r.generation=first.generation;r.first=Slot(first.slot);r.count=r.live=Slot(count);
+         r.next=End;r.previous=Slot(tail_);
+@@ -203,14 +246,27 @@ public:
+         for(unsigned i=0;i<count;++i)if(occupied(first.slot+i))return nullptr;
+         const unsigned n=allocate();auto& r=runs_[n];
+         static_cast<Publication&>(r)=initialPublication_;
++        static_cast<Attachment&>(r)=Attachment{};
+         r.object=-2;r.cells=cells;r.x=r.step=0;r.y=y;r.creationCode=-1;
+         r.generation=first.generation;r.first=Slot(first.slot);r.count=Slot(count);r.live=0;
+         r.next=End;r.previous=End;reserved_=n;return &r;
+     }
++    Publication* reserveSingleton(InstanceHandle h,int object,int x,int y,unsigned source,int creation){
++        if(reserved_!=End||h.slot>=Capacity||!h.generation||occupied(h.slot)||population_==Capacity||
++           (object!=60&&object!=93&&object!=99))return nullptr;
++        const unsigned n=allocate();auto& r=runs_[n];
++        static_cast<Publication&>(r)=initialPublication_;static_cast<Attachment&>(r)=Attachment{};
++        r.object=object;r.x=x;r.y=y;r.step=0;r.creationCode=creation;r.source=source;
++        r.generation=h.generation;r.first=Slot(h.slot);r.count=1;r.live=0;
++        r.next=r.previous=End;reserved_=n;return &r;
++    }
+     bool commitRetainedCells(unsigned completed){
+         if(reserved_==End||completed>runs_[reserved_].count)return false;
+         const unsigned n=reserved_;auto& r=runs_[n];reserved_=End;
+-        if(!completed){r.next=Slot(free_);free_=n;return true;}
++        if(!completed){
++            if constexpr(SharedTopology)if(this->context)this->onRelease(this->context,n);
++            r.next=Slot(free_);free_=n;return true;
++        }
+         r.count=r.live=Slot(completed);r.previous=Slot(tail_);
+         if(tail_==End)head_=n;else runs_[tail_].next=Slot(n);
+         tail_=n;
+@@ -248,6 +304,7 @@ public:
+         const unsigned n=locator_[h.slot]-1;auto& r=runs_[n];
+         locator_[h.slot]=0;--population_;
+         if(--r.live==0){
++            if constexpr(SharedTopology)if(this->context)this->onRelease(this->context,n);
+             if(r.previous==End)head_=r.next;else runs_[r.previous].next=r.next;
+             if(r.next==End)tail_=r.previous;else runs_[r.next].previous=r.previous;
+             r.next=Slot(free_);free_=n;
+diff --git a/src/core/RunnerSharedRoomMembership.h b/src/core/RunnerSharedRoomMembership.h
+new file mode 100644
+index 00000000..d61804d0
+--- /dev/null
++++ b/src/core/RunnerSharedRoomMembership.h
+@@ -0,0 +1,225 @@
++#ifndef DOWNWELL_RUNNER_SHARED_ROOM_MEMBERSHIP_H
++#define DOWNWELL_RUNNER_SHARED_ROOM_MEMBERSHIP_H
++#include "RunnerSpatialSplit.h"
++#include "ProfileCounters.h"
++namespace downwell {
++// Stored on the lifetime descriptor, separately from layer publication. Room
++// chronology survives layer changes; it must not be copied back with that state.
++struct RunnerRoomSpanState {
++    RunnerImageValue key{};
++    std::uint16_t next=65535,previous=65535,marks=0,list=2;
++};
++// Terrain geometry and slot lookup belong exclusively to Terrain. Only actors
++// need standalone nodes. Terrain must outlive this owner and forward descriptor
++// split/release notifications. Remove room membership before physical retirement.
++template<unsigned Capacity,unsigned First,unsigned Last,class Terrain>
++class RunnerSharedRoomMembership {
++    static_assert(First<Last&&Last<=Capacity&&Capacity<65534,"Invalid shared room domain");
++    static_assert(Terrain::descriptorEnd==Last-First,"Terrain domain mismatch");
++    using Slot=std::uint16_t;
++    Terrain* terrain_=nullptr;
++    RunnerRoomSpanState actors_[Capacity-(Last-First)?Capacity-(Last-First):1]{};
++    std::uint32_t marks_[(Capacity+31)/32]{};
++    unsigned head_[2]={Capacity,Capacity},tail_[2]={Capacity,Capacity},markedCount_=0;
++    bool good_=true;
++    static bool terrainSlot(unsigned s){return s>=First&&s<Last;}
++    RunnerRoomSpanState& node(unsigned n){return terrainSlot(n)?terrain_->attachment(n-First):actors_[n<First?n:n-(Last-First)];}
++    const RunnerRoomSpanState& node(unsigned n)const{return terrainSlot(n)?terrain_->attachment(n-First):actors_[n<First?n:n-(Last-First)];}
++    unsigned descriptor(unsigned s)const{
++        if(s>=End)return End;
++        if(!terrainSlot(s))return s;
++        if(!terrain_)return End;
++        const unsigned n=terrain_->descriptorOf(s-First);
++        return n==Terrain::descriptorEnd?End:First+n;
++    }
++    unsigned begin(unsigned n)const{return terrainSlot(n)?First+terrain_->descriptorFirst(n-First):n;}
++    unsigned end(unsigned n)const{return terrainSlot(n)?begin(n)+terrain_->descriptorCount(n-First):n+1;}
++    unsigned liveAt(unsigned n,unsigned s)const{
++        if(terrainSlot(n))while(s<end(n)&&descriptor(s)!=n)++s;
++        return s;
++    }
++    unsigned firstNode(unsigned n)const{
++        while(n!=End){const unsigned s=liveAt(n,begin(n));if(s<end(n))return s;n=node(n).next;}
++        return End;
++    }
++    unsigned first(unsigned list)const{return firstNode(head_[list]);}
++    unsigned after(unsigned n)const{return firstNode(node(n).next);}
++    unsigned next(unsigned s)const{
++        const unsigned n=descriptor(s),following=liveAt(n,s+1);
++        return following<end(n)?following:after(n);
++    }
++    void unlink(unsigned n){
++        auto& r=node(n);if(r.list>1)return;
++        if(r.previous==End)head_[r.list]=r.next;else node(r.previous).next=r.next;
++        if(r.next==End)tail_[r.list]=r.previous;else node(r.next).previous=r.previous;
++        r.list=2;r.next=r.previous=End;
++    }
++    void insertAfter(unsigned n,RunnerImageValue key,unsigned list,unsigned previous){
++        const unsigned following=previous==End?head_[list]:node(previous).next;
++        auto& r=node(n);r.key=key;r.list=Slot(list);r.previous=Slot(previous);r.next=Slot(following);
++        if(previous==End)head_[list]=n;else node(previous).next=Slot(n);
++        if(following==End)tail_[list]=n;else node(following).previous=Slot(n);
++    }
++    void insertActive(unsigned n,RunnerImageValue key){
++        unsigned previous=tail_[0],forward=head_[0];
++        while(previous!=End&&RunnerSpatialSplit::less(key,node(previous).key)){
++            if(RunnerSpatialSplit::less(key,node(forward).key)){previous=node(forward).previous;break;}
++            forward=node(forward).next;previous=node(previous).previous;
++        }
++        insertAfter(n,key,0,previous);
++    }
++    void split(unsigned left,unsigned right){
++        left+=First;right+=First;
++        auto& l=node(left);auto& r=node(right);
++        if(l.list>1){r=RunnerRoomSpanState{};return;}
++        // Geometry and attachment were copied by Terrain before this callback.
++        r.previous=Slot(left);r.next=l.next;
++        if(l.next==End)tail_[l.list]=right;else node(l.next).previous=Slot(right);
++        l.next=Slot(right);r.marks=0;
++        if(l.marks)for(unsigned s=begin(right);s<end(right);++s)
++            if(descriptor(s)==right&&((marks_[s>>5]>>(s&31))&1u))++r.marks;
++        l.marks=Slot(l.marks-r.marks);
++    }
++    void release(unsigned n){unlink(First+n);}
++    unsigned isolate(unsigned s){return terrainSlot(s)?First+terrain_->isolate(s-First):s;}
++    void clearMark(unsigned s,unsigned n){
++        if((marks_[s>>5]>>(s&31))&1u){marks_[s>>5]&=~(1u<<(s&31));--node(n).marks;--markedCount_;}
++    }
++public:
++    static constexpr unsigned End=Capacity;
++    struct AnimationProjection {};
++    RunnerSharedRoomMembership()=default;
++    explicit RunnerSharedRoomMembership(Terrain& terrain){bindTerrain(terrain);}
++    bool bindTerrain(Terrain& terrain){
++        if(terrain_)return good_&&terrain_==&terrain;
++        terrain_=&terrain;
++        return good_=terrain_->bindTopology(this,
++            [](void* p,unsigned a,unsigned b){static_cast<RunnerSharedRoomMembership*>(p)->split(a,b);},
++            [](void* p,unsigned n){static_cast<RunnerSharedRoomMembership*>(p)->release(n);});
++    }
++    RunnerSharedRoomMembership(const RunnerSharedRoomMembership&)=delete;
++    RunnerSharedRoomMembership& operator=(const RunnerSharedRoomMembership&)=delete;
++    bool valid()const{return good_;}
++    bool contains(unsigned s)const{const unsigned n=descriptor(s);return good_&&n!=End&&node(n).list<2;}
++    bool active(unsigned s)const{return contains(s)&&node(descriptor(s)).list==0;}
++    bool marked(unsigned s)const{return contains(s)&&((marks_[s>>5]>>(s&31))&1u);}
++    bool mark(unsigned s){
++        if(!contains(s))return false;
++        if(!marked(s)){marks_[s>>5]|=1u<<(s&31);++node(descriptor(s)).marks;++markedCount_;}return true;
++    }
++    bool bind(unsigned s,RunnerImageValue key){
++        if(!good_||s>=End||!RunnerSpatialSplit::valid(key)||(terrain_&&terrain_->reservationPending()))return false;
++        if(terrainSlot(s)&&descriptor(s)==End)return false;
++        remove(s);insertActive(isolate(s),key);return true;
++    }
++    // No locator publication: borrow the complete lifetime span, including a
++    // reserved birth before its callback-free commit. No traversal is allowed
++    // between binding a reserved span and committing/aborting that reservation.
++    bool bindTerrainSpan(unsigned first,unsigned count,RunnerImageValue key){
++        if(!count)return true;
++        if(!good_||!terrain_||first<First||first>=Last||count>Last-first||!RunnerSpatialSplit::valid(key))return false;
++        unsigned n=terrain_->reservedDescriptor();
++        if(n==Terrain::descriptorEnd)n=terrain_->descriptorOf(first-First);
++        if(n==Terrain::descriptorEnd||terrain_->descriptorFirst(n)!=first-First||
++            terrain_->descriptorCount(n)!=count||terrain_->attachment(n).list<2)return false;
++        insertActive(First+n,key);return true;
++    }
++    bool remove(unsigned s){
++        if(!contains(s)||(terrain_&&terrain_->reservationPending()))return false;
++        const unsigned n=isolate(s);clearMark(s,n);unlink(n);return true;
++    }
++    void clear(){
++        for(unsigned list=0;list<2;++list)while(head_[list]!=End){
++            const unsigned n=head_[list];unlink(n);node(n).marks=0;
++        }
++        if(markedCount_)for(auto& word:marks_)word=0;markedCount_=0;
++    }
++    void clearReference(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(first(list));}
++    unsigned runCount()const{
++        unsigned count=0;for(unsigned list=0;list<2;++list)for(unsigned n=head_[list];n!=End;n=node(n).next)++count;return count;
++    }
++    class AnimationCursor {
++        const RunnerSharedRoomMembership& room_;unsigned current_,skipFirst_,skipLast_;
++    public:
++        AnimationCursor(const RunnerSharedRoomMembership& room,unsigned a,unsigned b)
++            :room_(room),current_(room.first(0)),skipFirst_(a),skipLast_(b){}
++        unsigned slot(){
++            while(current_!=End&&current_>=skipFirst_&&current_<skipLast_){
++                const unsigned n=room_.descriptor(current_);
++                current_=skipLast_<room_.end(n)?room_.liveAt(n,skipLast_):room_.after(n);
++                if(current_==room_.end(n))current_=room_.after(n);
++            }return current_;
++        }
++        bool within(unsigned a,unsigned b){const auto s=slot();return s>=a&&s<b;}
++        unsigned take(){const auto s=slot();if(s!=End)current_=room_.next(s);return s;}
++    };
++    template<class Visit> bool visitAnimationChecked(Visit visit)const{
++        for(unsigned s=first(0);s!=End;s=next(s))if(!visit(s))return false;return true;
++    }
++    template<class Visit> bool visitDrawChecked(Visit visit)const{
++        for(unsigned n=tail_[0];n!=End;n=node(n).previous)
++            for(unsigned s=end(n);s>begin(n);){--s;if(descriptor(s)==n&&!visit(s))return false;}
++        return true;
++    }
++    bool prepareRetainedAnimation(unsigned a,unsigned b)const{return a<=b&&b<=Capacity;}
++    template<class Visit> bool visitAnimationProjectedChecked(AnimationProjection&,unsigned a,unsigned b,bool& dirty,Visit visit)const{
++        return visitAnimationRetainedChecked(a,b,dirty,visit);
++    }
++    template<class Visit> bool visitAnimationRetainedChecked(unsigned a,unsigned b,bool& dirty,Visit visit)const{
++        if(a>b||b>Capacity)return false;
++        bool full=dirty;dirty=false;
++        if(full){DW_PROFILE_COUNT(counterAnimationFullPass);}else{DW_PROFILE_COUNT(counterAnimationProjectedPass);}
++        for(unsigned s=first(0);s!=End;){
++            if(dirty)full=true;
++            const unsigned n=descriptor(s);
++            if(!full&&s>=a&&s<b){
++                s=b<end(n)?liveAt(n,b):after(n);if(s==end(n))s=after(n);continue;
++            }
++            const unsigned following=next(s);if(!visit(s))return false;s=following;
++        }return true;
++    }
++    template<class Visit> bool visitCleanupChecked(Visit visit){
++        for(unsigned list=0;list<2;++list)for(unsigned s=first(list);s!=End;){
++            const unsigned following=next(s);if(!visit(s))return false;s=following;
++        }return true;
++    }
++    template<class Visit> bool visitMarkedCleanupChecked(Visit visit){
++        return visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue,bool){return visit(s);});
++    }
++    template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
++        if(!markedCount_)return true;
++        for(unsigned list=0;list<2;++list)for(unsigned s=first(list);s!=End;){
++            const unsigned n=descriptor(s),limit=end(n);
++            if(!node(n).marks){s=after(n);continue;}
++            while(s<limit&&!(descriptor(s)==n&&marked(s)))++s;
++            if(s==limit){s=after(n);continue;}
++            const unsigned following=next(s);
++            if(!visit(s,node(n).key,list==0))return false;s=following;
++        }return true;
++    }
++    template<class Select,class Inactive,class Publish>
++    bool reconcileSelectedChecked(Select select,Inactive inactive,Publish publish){
++        for(unsigned list=1;;--list){
++            for(unsigned s=first(list);s!=End;){
++                const unsigned n=descriptor(s),limit=end(n);s=select(s,limit);
++                if(s==limit){s=after(n);continue;}
++                s=liveAt(n,s);if(s==limit){s=after(n);continue;}
++                const unsigned following=next(s);
++                if(bool(inactive(s))!=bool(list)){
++                    const auto key=node(n).key;const bool wasMarked=marked(s);
++                    remove(s);const unsigned isolated=descriptor(s);
++                    if(list)insertActive(isolated,key);else insertAfter(isolated,key,1,tail_[1]);
++                    if(wasMarked)mark(s);if(!publish(s,list!=0))return false;
++                }s=following;
++            }if(!list)break;
++        }return true;
++    }
++    template<class Inactive,class Publish> bool reconcileChecked(Inactive inactive,Publish publish){
++        return reconcileSelectedChecked([](unsigned first,unsigned){return first;},inactive,publish);
++    }
++    template<class Inactive,class Publish> void reconcile(Inactive inactive,Publish publish){
++        reconcileChecked(inactive,[&](unsigned s,bool active){publish(s,active);return true;});
++    }
++};
++}
++#endif
+diff --git a/tests/core/RunnerSharedRoomMembershipTest.cpp b/tests/core/RunnerSharedRoomMembershipTest.cpp
+new file mode 100644
+index 00000000..d39ac51f
+--- /dev/null
++++ b/tests/core/RunnerSharedRoomMembershipTest.cpp
+@@ -0,0 +1,90 @@
++#include "core/RunnerSharedRoomMembership.h"
++#include "core/RunnerRunRoomMembership.h"
++#include "core/TerrainOwnershipRuns.h"
++#include <vector>
++#include <tuple>
++#include <cstdio>
++#include <cstdlib>
++using namespace downwell;
++static void check(bool ok,unsigned line){if(!ok){std::fprintf(stderr,"shared room failure at %u\n",line);std::abort();}}
++#define CHECK(x) check(bool(x),__LINE__)
++struct Publication {
++    unsigned stamp=0;
++    Publication shifted(unsigned n)const{return {stamp+n};}
++    bool same(Publication b)const{return stamp==b.stamp;}
++};
++using Terrain=TerrainOwnershipRuns<32,Publication,true,RunnerRoomSpanState>;
++using Room=RunnerSharedRoomMembership<48,8,40,Terrain>;
++using Reference=RunnerRunRoomMembership<48,8,40>;
++static RunnerImageValue key(int n){RunnerImageValue k;CHECK(k.assignInteger(n));return k;}
++static const unsigned char cells[64]={32,0,33,0,34,0,35,0,36,0,37,0,38,0,39,0,
++    40,0,41,0,42,0,43,0,44,0,45,0,46,0,47,0,48,0,49,0,50,0,51,0,52,0,53,0,
++    54,0,55,0,56,0,57,0,58,0,59,0,60,0,61,0,62,0,63,0};
++struct Fixture {
++    Terrain terrain;Room room{terrain};Reference reference;unsigned generation=1,checks=0;
++    void compare(){
++        CHECK(room.valid());
++        for(unsigned s=0;s<48;++s){CHECK(room.contains(s)==reference.contains(s));
++            CHECK(room.active(s)==reference.active(s));CHECK(room.marked(s)==reference.marked(s));}
++        std::vector<unsigned> a,b;
++        auto va=[&](unsigned s){a.push_back(s);return true;};auto vb=[&](unsigned s){b.push_back(s);return true;};
++        CHECK(room.visitAnimationChecked(va));CHECK(reference.visitAnimationChecked(vb));CHECK(a==b);a.clear();b.clear();
++        CHECK(room.visitDrawChecked(va));CHECK(reference.visitDrawChecked(vb));CHECK(a==b);a.clear();b.clear();
++        CHECK(room.visitCleanupChecked(va));CHECK(reference.visitCleanupChecked(vb));CHECK(a==b);
++        for(unsigned low: {0u,8u,15u,39u,40u})for(unsigned high:{15u,40u,48u})if(low<=high){
++            a.clear();b.clear();bool da=false,db=false;
++            CHECK(room.visitAnimationRetainedChecked(low,high,da,va));CHECK(reference.visitAnimationRetainedChecked(low,high,db,vb));CHECK(a==b);
++            a.clear();b.clear();Room::AnimationCursor ca(room,low,high);Reference::AnimationCursor cb(reference,low,high);
++            while(ca.slot()!=Room::End)a.push_back(ca.take());while(cb.slot()!=Reference::End)b.push_back(cb.take());CHECK(a==b);
++        }
++        using Mark=std::tuple<unsigned,unsigned,bool>;std::vector<Mark> ma,mb;
++        CHECK(room.visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue k,bool active){ma.emplace_back(s,k.bits,active);return true;}));
++        CHECK(reference.visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue k,bool active){mb.emplace_back(s,k.bits,active);return true;}));CHECK(ma==mb);++checks;
++    }
++    void birth(unsigned first,unsigned count,int depth){
++        CHECK(terrain.reserveRetainedCells({first,generation},cells,128,count));generation+=count;
++        CHECK(room.bindTerrainSpan(first+8,count,key(depth)));
++        CHECK(terrain.commitRetainedCells(count));CHECK(reference.bindTerrainSpan(first+8,count,key(depth)));compare();
++    }
++    void bind(unsigned s,int depth){CHECK(room.bind(s,key(depth))==reference.bind(s,key(depth)));compare();}
++    void remove(unsigned s){CHECK(room.remove(s)==reference.remove(s));compare();}
++    void retire(unsigned s){remove(s+8);CHECK(terrain.retire(terrain.currentHandle(s)));compare();}
++    void reconcile(unsigned mask){
++        std::vector<std::pair<unsigned,bool>> a,b;
++        auto inactive=[&](unsigned s){return ((s*13+mask)%7)<3;};
++        CHECK(room.reconcileChecked(inactive,[&](unsigned s,bool active){a.emplace_back(s,active);return true;}));
++        CHECK(reference.reconcileChecked(inactive,[&](unsigned s,bool active){b.emplace_back(s,active);return true;}));CHECK(a==b);compare();
++    }
++};
++int main(){
++    Fixture f;f.compare();f.bind(0,2);f.bind(47,-2);f.birth(0,32,0);f.bind(1,0);f.bind(42,3);
++    for(unsigned s:{8u,11u,20u,39u,47u}){CHECK(f.room.mark(s));CHECK(f.reference.mark(s));}f.compare();
++    // Layer-publication splits must preserve room chronology and marks even
++    // though publication is overwritten after the topology callback.
++    for(unsigned s:{10u,0u,31u,4u}){CHECK(f.terrain.changePublication(f.terrain.currentHandle(s),{900+s}));f.compare();}
++    f.reconcile(0);f.reconcile(2);f.reconcile(0);
++    f.retire(7);f.birth(7,1,-1);f.retire(0);f.retire(31);f.birth(0,1,2);f.birth(31,1,-2);
++    unsigned rng=1234567;
++    for(unsigned i=0;i<1500;++i){
++        rng=rng*1664525u+1013904223u;const unsigned s=(rng>>8)%48,action=(rng>>24)%5;
++        if(action==0&&s>=8&&s<40){if(f.terrain.occupied(s-8))f.retire(s-8);else f.birth(s-8,1,int(rng%7)-3);}
++        else if(action==1){if(s<8||s>=40||f.terrain.occupied(s-8))f.bind(s,int(rng%7)-3);}
++        else if(action==2){CHECK(f.room.mark(s)==f.reference.mark(s));f.compare();}
++        else if(action==3)f.reconcile(rng%9);
++        else if(s>=8&&s<40&&f.terrain.occupied(s-8)){CHECK(f.terrain.changePublication(f.terrain.currentHandle(s-8),{rng}));f.compare();}
++    }
++    // Cleanup callback removes the visited cell and marks later entries.
++    std::vector<unsigned> a,b;
++    CHECK(f.room.visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue,bool){a.push_back(s);f.room.remove(s);f.room.mark((s+1)%48);return true;}));
++    CHECK(f.reference.visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue,bool){b.push_back(s);f.reference.remove(s);f.reference.mark((s+1)%48);return true;}));CHECK(a==b);f.compare();
++    f.room.clear();f.reference.clear();f.compare();
++    // Prefix commits and aborted reservations do not leave visible room nodes.
++    for(unsigned count=0;count<=32;++count){
++        Fixture p;p.bind(0,0);CHECK(p.terrain.reserveRetainedCells({0,1},cells,64,32));
++        CHECK(p.room.bindTerrainSpan(8,32,key(0)));CHECK(p.terrain.commitRetainedCells(count));
++        if(count)CHECK(p.reference.bindTerrainSpan(8,count,key(0)));p.compare();
++        for(unsigned s=0;s<count;++s)p.retire(s);
++        p.birth(0,32,0);p.compare();
++    }
++    std::printf("Shared terrain room membership: %u mixed-state comparisons plus prefix/abort cases passed\n",f.checks);
++}
+

@@ -46,23 +46,30 @@ The immediate priority is the **no-input initial fall to the first platform**:
    required DitherAbove behavior and keep the full quiet interval as a guard
    against moving generation work into ordinary updates. The historical 32.14 FPS contact
    average and 19.45 ms firing frame are not acceptance targets for this fall.
-2. Replace duplicated terrain publication at its owner, preserving source event
-   order and behavior. Evaluate one shared lifetime/layer/room descriptor rather
-   than three independently maintained publications:
-   - Use the reserved lifetime descriptor and its slot locator for room
-     membership instead of building a second
-     room span and locator. Keep room insertion/deactivation chronology and
-     layer Draw chronology independent; they are not interchangeable clocks.
-   - Maintain room links through descriptor splits, retirement, slot reuse and
-     reactivation. Do not replace publication with full room-order rebuilds
-     during animation, activation or cleanup (the earlier observed-room path).
+2. Remove unnecessary terrain publication at its consumer boundary, preserving
+   source event order and behavior:
+   - Compare the historical and current `AmigaGameplayGeneration::createPrepared`
+     paths. The historical backend published occupancy/landing candidates and
+     tile runs; the added native-lifetime branch is the construction region to
+     remove or substantially reduce, not the already-small raster publication.
+   - Before another implementation, identify the actual world-1 consumers of
+     identity, room membership, layer membership, activation and cleanup. For
+     each, distinguish required source chronology from an unused generic
+     traversal. Keep thin-platform End Step registration: omitting that consumer
+     already caused an expensive replacement room scan.
+   - Use that evidence to bypass whole unused publication stages under the
+     admitted scene contract, retaining required order/state and mutation
+     behavior. Do not simply disable the lifetime branch, assume the historical
+     implementation was complete, or replace it with full order reconstruction.
+     The plan must remove a named substantial part of the frozen control's
+     21.73 ms construction region at 122 before another performance experiment.
    - Differentially check mixed actors/terrain, mutation and failure boundaries,
-     then measure 57–121, 122, 136 and 163 before broader validation. Price the
-     complete replacement against the frozen control's 21.73 ms construction
-     region at 122, not an intermediate preparatory build;
-     removing room insertion alone (2.38 ms) is not that replacement.
-   Accept against matched historical costs, not a new 20 ms requirement. Leave
-   initial-state, recipe-cache and cross-row grouping variants closed.
+     then measure 57–121, 122, 136 and 163 before broader validation. Accept
+     against matched historical costs, not a new 20 ms requirement.
+   Leave shared intrusive room/lifetime descriptors closed: publication splits
+   fragment the room animation skip traversal. Do not tune their accessors or
+   add another skip projection. Initial-state, recipe-cache, cross-row grouping
+   and observed-room reconstruction variants also remain closed.
 3. Verify the restored complete fall (including its generation bursts), normal
    512 KiB Chip startup, and unchanged replay behavior before returning to
    later gameplay or combat optimization.
