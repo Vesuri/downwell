@@ -1369,6 +1369,17 @@ build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/c
 verify-terrain-ownership-runs: build/terrain-ownership-runs-test
 	./build/terrain-ownership-runs-test
 .PHONY: verify-terrain-ownership-runs
+.PHONY: verify-terrain-read-census
+build/terrain-read-census-off: tests/core/TerrainReadCensusTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+build/terrain-read-census-on: tests/core/TerrainReadCensusTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TERRAIN_READ_CENSUS -o $@ $<
+verify-terrain-read-census: build/terrain-read-census-off build/terrain-read-census-on
+	./build/terrain-read-census-off
+	./build/terrain-read-census-on
+	python3 -B tests/test_terrain_read_census.py
 build/terrain-appearance-publication-test: tests/core/TerrainAppearancePublicationTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)

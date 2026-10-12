@@ -128,6 +128,56 @@ python3 tools/amiga-fall-budget.py tmp/fall/report-{1,60,120}.txt
 - **Pace build executable SHA-256:**
   `173315759dd7be7ddc0decf0ac5c1b6162ecdefd23474330aa09f2808eef4625`.
 
+### Terrain API-read census for section 0 A
+
+Diagnostic counters on `bec4e288` plus the census instrumentation cover
+updates 1–164; this is **not a timing measurement**. Reproduce with
+`bash amiga/profile.sh terrain-reads`; validate the instrument with
+`make verify-terrain-read-census`. The native capture checks the complete
+landing witness and snapshots 165 cumulative samples without debugger stops
+inside the fall. It restores the normal build on exit.
+
+Two captures gave the same counts and executable SHA-256:
+`c9c092860b3ddd41265981e02b5e2a5f9e386ab6ad9370bc72b4db330278a09e`.
+
+| Instrumented API boundary | Outside construction | During construction |
+| --- | ---: | ---: |
+| Identity query / visited cell | 0 | 362 |
+| Run publication query | 0 | 0 |
+| Room presence query | 0 | 286 |
+| Room activity query | 0 | 0 |
+| Room animation skipped run | 28 | 0 |
+| Room reconciliation / marked-cleanup run | 0 | 0 |
+| Layer state query | 0 | 0 |
+| Inactive layer cutoff query | 4 | 0 |
+| Flags query | 0 | 2 |
+| Sprite / retained wall-state query | 0 | 0 |
+| Thin-platform retirement proof | 164 | 0 |
+| External registration query / emitted member | 0 | 142 |
+| Generic table slot query / admission check | 0 | 142 |
+
+Construction attempted 63 prepared segments / 144 cells: 29/58 in updates
+56–121, 8/30 at 122–135, 13/28 at 136–162 and 13/28 at 163–164. The scalar
+fallback at 56 also contributes construction reads. There is no generated
+terrain construction in updates 1–55. Twenty-six animation skips occur in
+136–162 and two in 163–164. The four cutoff checks occur twice in the entrance
+and once in each of those final windows.
+
+These are nested API call/visit counts, **not disjoint memory-access counts**.
+Construction scope includes admission, publication and synchronous Create;
+it does not include unrelated later phases. Zero means this route did not use
+the instrumented query, not that the game's corresponding semantics can be
+removed. The native landing witness, 164 retirement-proof reads and nonzero
+construction counts provide route controls; host fixtures check scope nesting,
+disabled probes, capture truncation, counter resets and startup leakage.
+
+The replacement must supply room activation and cleanup, inactive-layer
+cutoffs, thin-platform retirement and all mutation queries from its segment
+owner. In particular, animation currently reads the room structure only to
+skip its terrain; that does not justify copying fragmented lifetime topology
+into animation. This census does not change the timing baseline above or close
+item A.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval

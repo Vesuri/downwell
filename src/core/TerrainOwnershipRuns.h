@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_TERRAIN_OWNERSHIP_RUNS_H
 #define DOWNWELL_TERRAIN_OWNERSHIP_RUNS_H
 #include "InstanceHandle.h"
+#include "TerrainReadCensus.h"
 #include <cstdint>
 namespace downwell {
 struct TerrainIdentityOnly {
@@ -68,11 +69,12 @@ public:
     unsigned size()const{return population_;}
     bool reservationPending()const{return reserved_!=End;}
     bool contains(InstanceHandle h)const{
+        DW_TERRAIN_READ(terrainIdentityRead);
         if(h.slot>=Capacity||!h.generation||!locator_[h.slot])return false;
         const auto& r=runs_[locator_[h.slot]-1];
         return h.generation==r.generation+h.slot-r.first;
     }
-    bool occupied(unsigned slot)const{return slot<Capacity&&locator_[slot]!=0;}
+    bool occupied(unsigned slot)const{DW_TERRAIN_READ(terrainIdentityRead);return slot<Capacity&&locator_[slot]!=0;}
     InstanceHandle currentHandle(unsigned slot)const{
         if(!occupied(slot))return {};
         const auto& r=runs_[locator_[slot]-1];return {slot,r.generation+slot-r.first};
@@ -82,6 +84,7 @@ public:
         const auto& r=runs_[locator_[slot]-1];return r.objectAt(slot-r.first);
     }
     InstanceHandle handle(unsigned ordinal)const{
+        DW_TERRAIN_READ(terrainIdentityRead);
         if(ordinal>=population_)return {};
         // Live generation immediately reads the newest birth for Create.
         // Avoid traversing older runs for that operation.
@@ -105,6 +108,7 @@ public:
         out={h,r.objectAt(offset),r.xAt(offset),r.y,r.creationCode,r.sourceId()};return true;
     }
     bool publication(InstanceHandle h,Publication& out)const{
+        DW_TERRAIN_READ(terrainPublicationRead);
         if(!contains(h))return false;
         const auto& r=runs_[locator_[h.slot]-1];
         out=static_cast<const Publication&>(r).shifted(h.slot-r.first);return true;
@@ -264,6 +268,7 @@ private:
                 (r.y>=end&&unsigned(r.y)-unsigned(end)>=16u)))continue;
             int x=r.x;
             for(unsigned i=0;i<r.count;++i){const unsigned slot=r.first+i;
+                DW_TERRAIN_READ(terrainIdentityRead);
                 if(locator_[slot]==n+1&&!visit(Identity{{slot,r.generation+i},r.objectAt(i),r.object==-2?r.xAt(i):x,r.y,r.creationCode,r.sourceId()}))return false;
                 if(i+1<r.count)x+=r.step;
             }
@@ -275,7 +280,7 @@ public:
         const TerrainOwnershipRuns& owner_;unsigned index_;
     public:
         PublicationRun(const TerrainOwnershipRuns& owner,unsigned index):owner_(owner),index_(index){}
-        const Publication& publication()const{return owner_.runs_[index_];}
+        const Publication& publication()const{DW_TERRAIN_READ(terrainPublicationRead);return owner_.runs_[index_];}
         template<bool Reverse=false,class Visit> bool visitSlots(Visit visit)const{
             const auto& r=owner_.runs_[index_];
             for(unsigned i=0;i<r.count;++i){const unsigned offset=Reverse?r.count-1-i:i,slot=r.first+offset;

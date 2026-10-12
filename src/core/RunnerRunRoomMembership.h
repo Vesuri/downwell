@@ -2,6 +2,7 @@
 #define DOWNWELL_RUNNER_RUN_ROOM_MEMBERSHIP_H
 #include "RunnerSpatialSplit.h"
 #include "ProfileCounters.h"
+#include "TerrainReadCensus.h"
 namespace downwell {
 // Source room order represented by contiguous terrain-slot runs. Actor nodes
 // are singletons. Descriptors reserve the full slot capacity: splitting an
@@ -56,6 +57,7 @@ public:
             :room_(room),current_(room.first(0)),skipFirst_(first),skipLast_(last){}
         unsigned slot(){
             while(current_!=End&&current_>=skipFirst_&&current_<skipLast_){
+                DW_TERRAIN_SLOT_READ(terrainRoomAnimationSkip,current_,First,Last);
                 const auto n=room_.locator_[current_]-1;
                 const auto& run=room_.runs_[n];
                 current_=skipLast_<unsigned(run.first)+run.count?skipLast_:room_.after(n);
@@ -65,8 +67,8 @@ public:
         bool within(unsigned first,unsigned last){const auto s=slot();return s>=first&&s<last;}
         unsigned take(){const auto s=slot();if(s!=End)current_=room_.next(s);return s;}
     };
-    bool contains(unsigned s)const{return s<Capacity&&locator_[s]!=0;}
-    bool active(unsigned s)const{return contains(s)&&runs_[locator_[s]-1].list==0;}
+    bool contains(unsigned s)const{DW_TERRAIN_SLOT_READ(terrainRoomPresence,s,First,Last);return s<Capacity&&locator_[s]!=0;}
+    bool active(unsigned s)const{DW_TERRAIN_SLOT_READ(terrainRoomActive,s,First,Last);return contains(s)&&runs_[locator_[s]-1].list==0;}
     bool marked(unsigned s)const{return contains(s)&&((marks_[s>>5]>>(s&31))&1u);}
     bool mark(unsigned s){
         if(!contains(s))return false;
@@ -180,6 +182,7 @@ public:
             for(unsigned s=first(list);s!=End;){
                 const unsigned n=locator_[s]-1;
                 const unsigned end=unsigned(runs_[n].first)+runs_[n].count;
+                DW_TERRAIN_SLOT_READ(terrainRoomCleanup,s,First,Last);
                 if(!runs_[n].marks){s=after(n);continue;}
                 // Marks already belong to this owner. Select the next marked
                 // cell without expanding an otherwise unchanged terrain run.
@@ -224,6 +227,7 @@ public:
                 const unsigned n=locator_[s]-1;
                 const unsigned end=unsigned(runs_[n].first)+runs_[n].count;
                 s=select(s,end);
+                DW_TERRAIN_SLOT_READ(terrainRoomReconcile,runs_[n].first,First,Last);
                 if(s==end){s=after(n);continue;}
                 const unsigned following=next(s);
                 if(bool(inactive(s))!=bool(list)){

@@ -504,6 +504,15 @@ endif
 ifneq ($(TRACE_FRAMES),)
 CFLAGS += -DDOWNWELL_TRACE_FRAMES=$(TRACE_FRAMES)
 endif
+ifeq ($(TERRAIN_READ_CENSUS),1)
+ifneq ($(FPSCOUNT),1)
+$(error TERRAIN_READ_CENSUS requires FPSCOUNT=1)
+endif
+ifneq ($(TRACE_FRAMES),165)
+$(error TERRAIN_READ_CENSUS requires TRACE_FRAMES=165)
+endif
+CFLAGS += -DDOWNWELL_TERRAIN_READ_CENSUS
+endif
 ifeq ($(PROFILE_AUTORUN),1)
 CFLAGS += -DDOWNWELL_PROFILE_AUTORUN
 endif
@@ -574,6 +583,10 @@ CPPFLAGS += -DDOWNWELL_REFERENCE_SCENE_BANKS
 ASFLAGS += --defsym DOWNWELL_REFERENCE_SCENE_BANKS=1
 endif
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
+ifeq ($(TERRAIN_READ_CENSUS),1)
+LDFLAGS += -Wl,--undefined=gDownwellTerrainReadSamples -Wl,--undefined=gDownwellTerrainReadFrames
+LDFLAGS += -Wl,--undefined=gDownwellTerrainReadActive -Wl,--undefined=gDownwellTerrainConstructionDepth
+endif
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap

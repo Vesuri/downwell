@@ -2,7 +2,25 @@
 #include "AmigaTerrainProfile.h"
 #include "core/GameplayContactProfileInput.h"
 #include "core/GameplayEntryProfileInput.h"
+#include "core/TerrainReadCensus.h"
 #include <exec/types.h>
+
+#ifdef DOWNWELL_TERRAIN_READ_CENSUS
+extern "C" {
+volatile unsigned long gDownwellTerrainReads[2][terrainCensusCount];
+volatile unsigned long gDownwellTerrainReadSamples[165][2][terrainCensusCount];
+volatile unsigned long gDownwellTerrainReadFrames;
+bool gDownwellTerrainReadActive=false;
+unsigned gDownwellTerrainConstructionDepth=0;
+}
+static void terrainReadFrame(unsigned frame){
+    if(frame>165){gDownwellTerrainReadActive=false;return;}
+    for(unsigned scope=0;scope<2;++scope)for(unsigned item=0;item<terrainCensusCount;++item)
+        gDownwellTerrainReadSamples[frame-1][scope][item]=gDownwellTerrainReads[scope][item];
+    gDownwellTerrainReadFrames=frame;
+    gDownwellTerrainReadActive=frame<165;
+}
+#endif
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
 #include <graphics/gfxbase.h>
@@ -317,6 +335,9 @@ void downwellProfileBegin(unsigned scene)
 #ifdef DOWNWELL_TRACE_FRAMES
     if(sceneId==3&&gameplayWarmed&&!gDownwellProfileFrozen){
         const ULONG frame=gDownwellProfileFrames[3]+1;
+#ifdef DOWNWELL_TERRAIN_READ_CENSUS
+        terrainReadFrame(frame);
+#endif
         for(ULONG i=0;i<gDownwellTraceFrameCount;++i)
             if(traceFrames[i]==frame)downwellTraceReady(frame);
         downwellTraceFrameMark(frame);

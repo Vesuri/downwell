@@ -3,6 +3,7 @@
 #include "InstanceHandle.h"
 #include "RunnerObjectMembership.h"
 #include "NativeFamilyBirth.h"
+#include "TerrainReadCensus.h"
 #include <cstdint>
 namespace downwell {
 // The ordering half of the runner instance registry, for owners whose
@@ -43,7 +44,7 @@ template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int Te
             *captureDirty_=true;
     }
     void changedBinding(unsigned slot,bool local=true){advance(bindingRevision_);changedCapture(slot,local);}
-    bool live(InstanceHandle h)const{return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
+    bool live(InstanceHandle h)const{DW_TERRAIN_SLOT_READ(terrainTableRead,h.slot,TerrainFirst,TerrainLast);return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
 public:
     explicit NativeInstanceTable(bool externalOrder=false):externalOrder_(externalOrder){}
     // Bind once for an append-only external family wholly inside/outside
@@ -84,8 +85,11 @@ public:
     }
     bool canFreshExternalSpan(unsigned first,unsigned count)const{
         if(first>=Capacity||count>Capacity-first||!canExternalBirth(count))return false;
-        for(unsigned i=first;i<first+count;++i)
+        for(unsigned i=first;i<first+count;++i){
+            DW_TERRAIN_SLOT_READ(terrainTableRead,i,TerrainFirst,TerrainLast);
+            DW_TERRAIN_SLOT_READ(terrainRegistrationRead,i,TerrainFirst,TerrainLast);
             if(entries_[i].generation||registration_.contains(i))return false;
+        }
         return true;
     }
     void externalRetire(unsigned slot){changedBinding(slot,false);}
@@ -94,6 +98,7 @@ public:
     // caller validates their lifetime and owns flags and chronology; no Entry
     // is synthesized, and reactivation must publish its fresh stamp first.
     bool externalRegistered(InstanceHandle h)const{
+        DW_TERRAIN_SLOT_READ(terrainRegistrationRead,h.slot,TerrainFirst,TerrainLast);
         std::uint32_t generation;int object;
         return h.generation&&registration_.read(h.slot,generation,object)&&generation==h.generation;
     }
@@ -120,6 +125,7 @@ public:
     }
     int sprite(unsigned slot)const{return slot<Capacity?entries_[slot].sprite:-1;}
     InstanceHandle currentHandle(unsigned slot)const{
+        DW_TERRAIN_SLOT_READ(terrainTableRead,slot,TerrainFirst,TerrainLast);
         return slot<Capacity&&entries_[slot].generation?InstanceHandle{slot,entries_[slot].generation}:InstanceHandle{};
     }
     std::uint32_t bindingRevision()const{return bindingRevision_;}
@@ -194,6 +200,7 @@ public:
     template<class ExternalFlags,class Visit> bool visitRegistrationRange(unsigned first,unsigned last,
         ExternalFlags externalFlags,Visit visit)const{
         const auto emit=[&](unsigned slot,std::uint32_t generation,int object){
+            DW_TERRAIN_SLOT_READ(terrainRegistrationRead,slot,TerrainFirst,TerrainLast);
             const InstanceHandle h{slot,generation};std::uint32_t value;
             if(live(h))value=entries_[slot].flags;
             else if(!externalFlags(h,value))return false;
@@ -212,6 +219,7 @@ public:
     template<class ExternalFlags,class Visit> bool visitObjectRegistrationRange(unsigned first,unsigned last,
         int selected,ExternalFlags externalFlags,Visit visit)const{
         const auto emit=[&](unsigned slot,std::uint32_t generation,int object){
+            DW_TERRAIN_SLOT_READ(terrainRegistrationRead,slot,TerrainFirst,TerrainLast);
             if(object!=selected)return true;
             const InstanceHandle h{slot,generation};std::uint32_t value;
             if(live(h))value=entries_[slot].flags;

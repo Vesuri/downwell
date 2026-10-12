@@ -13,7 +13,7 @@ case "$mode" in
     export PROFILE_IDLE=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     ;;
-  quiet-fall|quiet-window)
+  quiet-fall|quiet-window|terrain-reads)
     flags=(PROBES=0 FPSCOUNT=1 TRACE_FRAMES=165); script=profile_quiet_cadence.gdb
     ready_marker=DOWNWELL_QUIET_CADENCE_READY
     export DETERMINISTIC=1
@@ -21,6 +21,11 @@ case "$mode" in
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
     export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-90}"
+    if [[ $mode == terrain-reads ]]; then
+      flags+=(TERRAIN_READ_CENSUS=1)
+      script=profile_terrain_reads.gdb
+      ready_marker=DOWNWELL_TERRAIN_READS_READY
+    fi
     if [[ $mode == quiet-window ]]; then
       # Same binary and trajectory as quiet-fall. The trace starts one mark
       # before the measured interval; its first/last partial frames are excluded.
@@ -123,7 +128,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-window|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -131,6 +136,7 @@ fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
+  unset TERRAIN_READ_CENSUS
   unset PROBES FPSCOUNT
   unset PROFILE_ENTRY
   unset PROFILE_SHOP
@@ -266,7 +272,9 @@ if [[ $mode == trace || $mode == quiet-window ]]; then
   echo "Traces: $trace_out (report: python3 tools/amiga-trace-report.py $trace_out)"
   exit 0
 fi
-if [[ $mode == quiet-fall ]]; then
+if [[ $mode == terrain-reads ]]; then
+  python3 ../tools/report-terrain-reads.py .run/terrain-read-census.bin
+elif [[ $mode == quiet-fall ]]; then
   # edaaa369 repeats at 191 fields. Allow 3% (rounded up) for timing noise;
   # this is a regression guard, NOT the historical 181-field restoration target.
   python3 ../tools/verify-quiet-fall.py ".run/profile-${mode}.log" --max-fields 197

@@ -114,11 +114,11 @@ after each item.
   (0.52 ms per row, 2.3–4.2 ms per burst) and raster invalidation (0.50 ms
   per row) are publication of the same rows; include them.
 - **Approach:**
-  1. **Census:** for each of those structures, count the reads of terrain
-     slots during the fall and the landing, using counters in a probe build
-     rather than timing. Walls skip animation, have no generic selector and
-     dispatch no wall events in the external backend, so several structures
-     may be written and never read here.
+  1. **Use the [terrain-read census](amiga-frame-cost.md#terrain-api-read-census-for-section-0-a):**
+     preserve the observed animation-skip, cutoff and retirement-proof
+     consumers while removing construction-only duplicate records. The
+     unobserved mutation/lifecycle queries must still be derivable from the
+     segment owner; zero reads in this route do not remove their semantics.
   2. **One table:** make the prepared segment the one authoritative record:
      first identity, row and cell bytes, appended once to a segment table
      owned by `NativeTerrainLifetimes`. Each consumer reads that table:

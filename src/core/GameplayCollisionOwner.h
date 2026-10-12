@@ -2633,7 +2633,7 @@ public:
            playerControllers_.size()||corpses_.size()||shopInstances_.size())return true;
         const auto* terrain=world_->nativeTerrainInstances();
         if(!terrain||!boxRetirementWindow_.contains(topQ12,world_->captureBoxAlarms().lastLifetime)||
-           !thinRetirementWindow_.contains(topQ12,terrain->lastLifetime()))return true;
+           !DW_TERRAIN_OBSERVE(terrainThinWindowRead,thinRetirementWindow_.contains(topQ12,terrain->lastLifetime())))return true;
         if(topQ12<(-2147483647L-1)||topQ12>2147483647L)return true;
         const ProjectileViewInterior interior(static_cast<std::int32_t>(topQ12));
         retireBullets=retireBullets&&world_->usesBulletDestruction(
@@ -2834,7 +2834,7 @@ private:
     }
     bool retireThinPlatforms(long topQ12,std::uint32_t cutoff){
         const bool retain=native_&&world_->nativeTerrainInstances();
-        if(retain&&thinRetirementWindow_.contains(topQ12,cutoff))return true;
+        if(retain&&DW_TERRAIN_OBSERVE(terrainThinWindowRead,thinRetirementWindow_.contains(topQ12,cutoff)))return true;
         auto proof=thinRetirementWindow_.begin(cutoff);
         // Pinned object 93 End Step has only scrOutofview, with no inherited
         // Destroy/Clean Up. Marking leaves registration intact, so this known
