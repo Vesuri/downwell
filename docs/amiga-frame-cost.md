@@ -32,6 +32,35 @@ Reports and cadence/state witnesses: `tmp/quiet-dither-phase-*`.
 
 ### Middle of the quiet fall: updates 91–110
 
+Single-frame decomposition at `56945ecc`: a five-field capture starting at
+mark 92 contains complete frame 93, **187,870 cycles / 26.44 ms**. The source
+border publication calls `appendPreparedCells` once. Its relevant inclusive
+costs are:
+
+| Frame-93 work | ms |
+| --- | ---: |
+| Whole Step | 14.49 |
+| Prepared terrain callback | 2.93 |
+| Native lifetime construction, inside that callback | 2.43 |
+| Collision-owner span publication, inside construction | 1.40 |
+| Layer admission, inside span publication | 0.21 |
+| Layer publication, inside span publication | 0.26 |
+| Room membership, inside span publication | 0.25 |
+| Fresh registry admission, inside span publication | 0.10 |
+| Chronology publication, inside span publication | 0.09 |
+| Retained identity-run insertion, outside span publication | 0.29 |
+
+Do not add nested rows. Room membership is only about one tenth of the
+construction cost: replacing that list alone cannot remove the regression.
+The source confirms that the registry already publishes chronology as a span,
+and no generic collision geometry/index is constructed on this external-backend
+path. Any further architectural replacement must address the combined
+publication transaction, not tune these submillisecond components separately.
+No runtime change accompanies this capture. Reproduce using the frozen
+`6eb1e3c2` profile ELF above, ignore 91 frame marks, capture five fields and
+report `--frames=93 --tree-min=0 --focus constructTerrainSpan
+--lines constructTerrainSpan`. Full breakdown: `tmp/quiet-birth-cost.txt`.
+
 Matched deterministic 26-field captures beginning at mark 90 compare historical
 `13e08ca2` with `bad8bd33`, using the frozen profile ELFs identified below.
 Both comparison arms use 1 MiB Chip because the rebuilt historical asset pack
