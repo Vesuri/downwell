@@ -31,6 +31,7 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
     inline static const Publication initialPublication_{};
     Slot locator_[Capacity]{};
     unsigned head_=End,tail_=End,free_=End,used_=0,population_=0;
+    unsigned reserved_=End;
     unsigned allocate(){if(free_!=End){unsigned n=free_;free_=runs_[n].next;return n;}return used_++;}
     // Split only at an actual mutation boundary. Geometry, lifetime and
     // publication share this descriptor and locator; no parallel per-cell
@@ -65,6 +66,7 @@ public:
         std::uint32_t source=0;
     };
     unsigned size()const{return population_;}
+    bool reservationPending()const{return reserved_!=End;}
     bool contains(InstanceHandle h)const{
         if(h.slot>=Capacity||!h.generation||!locator_[h.slot])return false;
         const auto& r=runs_[locator_[h.slot]-1];
@@ -110,12 +112,12 @@ public:
     // Exclusive constructor writer. Borrow only until the next structural
     // operation; a shared descriptor must keep the split-aware mutation path.
     Publication* singletonPublication(InstanceHandle h){
-        if(!contains(h))return nullptr;
+        if(reserved_!=End||!contains(h))return nullptr;
         auto& r=runs_[locator_[h.slot]-1];
         return r.count==1?static_cast<Publication*>(&r):nullptr;
     }
     bool changePublication(InstanceHandle h,const Publication& value){
-        if(!contains(h))return false;
+        if(reserved_!=End||!contains(h))return false;
         unsigned n=locator_[h.slot]-1;
         const unsigned offset=h.slot-runs_[n].first;
         if(static_cast<const Publication&>(runs_[n]).shifted(offset).same(value))return true;
@@ -129,7 +131,7 @@ public:
         out=(static_cast<const Publication&>(r).*member).shifted(h.slot-r.first);return true;
     }
     template<class Part> bool changePublicationPart(InstanceHandle h,Part Publication::* member,const Part& value){
-        if(!contains(h))return false;
+        if(reserved_!=End||!contains(h))return false;
         unsigned n=locator_[h.slot]-1;const unsigned offset=h.slot-runs_[n].first;
         if((static_cast<const Publication&>(runs_[n]).*member).shifted(offset).same(value))return true;
         if(offset)n=split(n,offset);
@@ -139,7 +141,7 @@ public:
     bool append(InstanceHandle h,int object,int x,int y,std::uint32_t source=0,int creationCode=-1,
                 const Publication& publication=initialPublication_,bool inheritPublication=false,bool* inherited=nullptr){
         if(inherited)*inherited=false;
-        if(h.slot>=Capacity||!h.generation||occupied(h.slot)||population_==Capacity||
+        if(reserved_!=End||h.slot>=Capacity||!h.generation||occupied(h.slot)||population_==Capacity||
             (object!=60&&object!=93&&object!=99))return false;
         // Only generated, adjacent horizontal cells share a descriptor.
         // Authored source identities and creation scripts remain singleton.
@@ -176,6 +178,7 @@ public:
     // geometry index: exceptional publication changes still split it normally.
     bool appendRetainedCells(InstanceHandle first,const unsigned char* cells,int y,unsigned count,
                              const Publication& publication){
+        if(reserved_!=End)return false;
         if(!count)return true;
         if(!cells||first.slot>=Capacity||count>Capacity-first.slot||count>Capacity-population_||
            !first.generation||count-1>0xffffffffu-first.generation)return false;
@@ -190,12 +193,36 @@ public:
         for(unsigned i=0;i<count;++i)locator_[first.slot+i]=Slot(n+1);
         population_+=count;return true;
     }
+    // Reserve the authoritative descriptor before a callback-free birth
+    // transaction. It is not live: no locator, population or traversal link
+    // is published until commit. All structural mutations are excluded while
+    // the writer is borrowed. The ordinary append above remains the oracle.
+    Publication* reserveRetainedCells(InstanceHandle first,const unsigned char* cells,int y,unsigned count){
+        if(reserved_!=End||!count||!cells||first.slot>=Capacity||count>Capacity-first.slot||
+           count>Capacity-population_||!first.generation||count-1>0xffffffffu-first.generation)return nullptr;
+        for(unsigned i=0;i<count;++i)if(occupied(first.slot+i))return nullptr;
+        const unsigned n=allocate();auto& r=runs_[n];
+        static_cast<Publication&>(r)=initialPublication_;
+        r.object=-2;r.cells=cells;r.x=r.step=0;r.y=y;r.creationCode=-1;
+        r.generation=first.generation;r.first=Slot(first.slot);r.count=Slot(count);r.live=0;
+        r.next=End;r.previous=End;reserved_=n;return &r;
+    }
+    bool commitRetainedCells(unsigned completed){
+        if(reserved_==End||completed>runs_[reserved_].count)return false;
+        const unsigned n=reserved_;auto& r=runs_[n];reserved_=End;
+        if(!completed){r.next=Slot(free_);free_=n;return true;}
+        r.count=r.live=Slot(completed);r.previous=Slot(tail_);
+        if(tail_==End)head_=n;else runs_[tail_].next=Slot(n);
+        tail_=n;
+        for(unsigned i=0;i<completed;++i)locator_[r.first+i]=Slot(n+1);
+        population_+=completed;return true;
+    }
     // An admitted callback-free constructor publishes one complete horizontal
     // span. Keep the scalar append as its oracle; don't rebuild a Publication
     // and revalidate the run geometry for every cell.
     bool appendSpan(InstanceHandle first,int object,int x,int y,int step,unsigned count,
                     const Publication& publication){
-        if(!count||count>Capacity||first.slot>=Capacity||count>Capacity-first.slot||
+        if(reserved_!=End||!count||count>Capacity||first.slot>=Capacity||count>Capacity-first.slot||
            count>Capacity-population_||!first.generation||count-1>0xffffffffu-first.generation||
            (object!=60&&object!=93)||(step!=16&&step!=-16))return false;
         const int distance=int(count-1)*16;
@@ -217,7 +244,7 @@ public:
         population_+=count-1;return true;
     }
     bool retire(InstanceHandle h){
-        if(!contains(h))return false;
+        if(reserved_!=End||!contains(h))return false;
         const unsigned n=locator_[h.slot]-1;auto& r=runs_[n];
         locator_[h.slot]=0;--population_;
         if(--r.live==0){

@@ -572,6 +572,7 @@ static void preparedSpanConstruction(){
     struct Observer {
         Native* live;unsigned next=100,spanCalls=0,spanCells=0,begins=0,ends=0,directMisses=0;
         downwell::RunnerRegistrationOrder clock{0xfffffffcu,7};int fail=-1;
+        bool clearDuringPublication=false;
     };
     auto binding=[](Observer& observer,bool spans){
         Native::Binding b;
@@ -588,6 +589,7 @@ static void preparedSpanConstruction(){
         if(spans)b.constructSpan=[](void* p,const Native::Identity& id,Native::PreparedCells cells,int,unsigned& completed,
             std::uint32_t& stamp,std::uint32_t* flags,downwell::RunnerRetainedLayerState& layer){
             auto& o=*static_cast<Observer*>(p);++o.spanCalls;
+            if(o.clearDuringPublication)require(!o.live->clear());
             const unsigned count=cells.count;completed=count;
             if(o.fail>=0&&unsigned(o.fail)>=id.handle.slot&&unsigned(o.fail)<id.handle.slot+count)
                 completed=unsigned(o.fail)-id.handle.slot;
@@ -625,7 +627,72 @@ static void preparedSpanConstruction(){
             require(scalar.appearance(h,as,ai,ac)&&bulk.appearance(h,bs,bi,bc)&&as==bs&&ai==bi&&ac==bc);
         }
     }
+    Native terminal;Observer observer{&terminal};observer.clearDuringPublication=true;
+    require(terminal.bind(binding(observer,true)));
+    const unsigned char one[]={32,0};bool effects=true;
+    require(!terminal.constructPrepared(51,effects,{one,1,0,true})&&!terminal.valid());
     std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
+}
+static void reservedIdentitySegments(){
+    using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
+    unsigned char cells[128]{};
+    for(unsigned i=0;i<64;++i)cells[2*i]=32+(i%20)+(i%3==1?128:0);
+    const Publication value{{0xfffffff0u,3},0x8208};
+    {
+        Runs invalid;
+        require(!invalid.reserveRetainedCells({0,1},nullptr,0,1));
+        require(!invalid.reserveRetainedCells({0,1},cells,0,0));
+        require(!invalid.reserveRetainedCells({0,0},cells,0,1));
+        require(!invalid.reserveRetainedCells({64,1},cells,0,1));
+        require(!invalid.reserveRetainedCells({63,1},cells,0,2));
+        require(!invalid.reserveRetainedCells({0,0xffffffffu},cells,0,2));
+        require(!invalid.reservationPending()&&invalid.size()==0);
+    }
+    for(unsigned completed=0;completed<=56;++completed){
+        Runs reference,reserved;
+        require(reference.appendRetainedCells({0,1},cells,0,8,value));
+        require(reserved.appendRetainedCells({0,1},cells,0,8,value));
+        require(!reserved.reserveRetainedCells({4,9},cells,32,8));
+        auto* writer=reserved.reserveRetainedCells({8,9},cells+16,32,56);
+        require(writer&&writer->same(Publication{}));
+        *writer=value.shifted(8);
+        require(reserved.size()==8&&reserved.runCount()==1&&!reserved.occupied(8));
+        require(!reserved.currentHandle(8).generation);
+        require(!reserved.reserveRetainedCells({8,9},cells,32,1));
+        require(!reserved.append({63,100},60,0,0));
+        require(!reserved.retire({0,1}));
+        require(!reserved.changePublication({0,1},value));
+        require(!reserved.singletonPublication({0,1}));
+        require(!reserved.commitRetainedCells(57));
+        // A rejected commit does not expose or destroy the reservation.
+        require(reserved.size()==8&&!reserved.occupied(8));
+        require(reserved.commitRetainedCells(completed));
+        require(!reserved.commitRetainedCells(0));
+        require(reference.appendRetainedCells({8,9},cells+16,32,completed,value.shifted(8)));
+        require(reserved.size()==reference.size()&&reserved.runCount()==reference.runCount());
+        unsigned n=0;
+        require(reserved.visit([&](const auto& id){
+            const auto h=reference.handle(n++);typename Runs::Identity other;
+            Publication a,b;
+            require(reference.read(h,other)&&id.handle.slot==other.handle.slot&&
+                id.handle.generation==other.handle.generation&&id.object==other.object&&id.x==other.x&&id.y==other.y);
+            require(reserved.publication(id.handle,a)&&reference.publication(h,b)&&a.same(b));return true;
+        }));
+        require(n==8+completed);
+        while(reserved.size())require(reserved.retire(reserved.handle(0)));
+        // Abort must return the descriptor to the pool and reset its fields
+        // before a new writer is borrowed, including after slot reuse.
+        for(unsigned attempt=0;attempt<100;++attempt){
+            writer=reserved.reserveRetainedCells({0,100+attempt},cells,64,64);
+            require(writer&&writer->same(Publication{}));*writer=value;
+            require(reserved.commitRetainedCells(0)&&reserved.size()==0&&reserved.runCount()==0);
+        }
+        writer=reserved.reserveRetainedCells({0,300},cells,64,64);
+        require(writer);*writer=value;
+        require(reserved.commitRetainedCells(64)&&reserved.size()==64);
+        require(!reserved.reserveRetainedCells({0,400},cells,64,1));
+    }
+    std::puts("Reserved identity segments: hidden reservations, exclusion, prefixes, abort and reuse agree");
 }
 static void retainedIdentitySegments(){
     using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
@@ -676,7 +743,7 @@ static void retainedIdentitySegments(){
     std::puts("Retained immutable identity segments: mutation, reuse, holes and order agree");
 }
 int main(){
-    retainedIdentitySegments();
+    retainedIdentitySegments();reservedIdentitySegments();
     bulkPublicationRuns();
     preparedSpanConstruction();
     constructedSegments();

@@ -349,19 +349,24 @@ private:
         if(contiguous)for(unsigned i=0;i<count;++i)if(runs_.occupied(slot+i)){contiguous=false;break;}
         const auto construct=direct?binding_.constructDirectSpan:binding_.constructSpan;
         if(construct&&contiguous&&canAppend(count)){
-            Order order;unsigned completed=0;std::uint32_t spatial[2]{};
+            Order temporary;Order* order=&temporary;
+            if(cells.retained){
+                order=runs_.reserveRetainedCells({slot,next_},cells.bytes,cells.y,count);
+                if(!order)return good_=false;
+            }
+            unsigned completed=0;std::uint32_t spatial[2]{};
             const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.y,-1,0};
             const auto result=construct(binding_.context,first,cells,tile,
-                                                    completed,order.stamp,spatial,order.layer);
+                                                    completed,order->stamp,spatial,order->layer);
             if(result!=SpanResult::unsupported){
                 if(admitted)*admitted=true;
-                if(completed>count)return good_=false;
+                if(completed>count){if(cells.retained)runs_.commitRetainedCells(0);return good_=false;}
+                if(cells.retained&&!runs_.commitRetainedCells(completed))return good_=false;
                 unsigned i=0;
                 if(cells.retained&&completed){
-                    if(!runs_.appendRetainedCells({slot,next_},cells.bytes,cells.y,completed,order))return good_=false;
                     for(;i<completed;++i){
                         const auto kind=cells.kind(i),value=spatial[kind];
-                        if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot+i,true);
+                        if(order->layer.bound()&&order->layer.inactive)selectLayerCutoff(slot+i,true);
                         flags_[slot+i]=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
                         createSprite_[slot+i]=static_cast<std::int16_t>(tile);walls_[slot+i]=PackedWallState{};
                         if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
@@ -372,8 +377,8 @@ private:
                     int step=16;if(i+1<completed&&cells.x(i+1)==x-16)step=-16;
                     unsigned n=1;
                     while(i+n<completed&&cells.kind(i+n)==kind&&cells.x(i+n)==x+int(n)*step)++n;
-                    if(!runs_.appendSpan({slot+i,next_+i},object,x,cells.y,step,n,order.shifted(i)))return good_=false;
-                    if(order.layer.bound()&&order.layer.inactive)
+                    if(!runs_.appendSpan({slot+i,next_+i},object,x,cells.y,step,n,order->shifted(i)))return good_=false;
+                    if(order->layer.bound()&&order->layer.inactive)
                         for(unsigned j=0;j<n;++j)selectLayerCutoff(slot+i+j,true);
                     const auto value=spatial[kind];
                     const unsigned char flags=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
@@ -388,8 +393,9 @@ private:
                 // This callback can fail only in birth publication. Like the
                 // scalar birth path, do not report it as a Create failure by
                 // overwriting the caller's separate effects flag.
-                return good_=result==SpanResult::success&&completed==count;
+                return good_=good_&&result==SpanResult::success&&completed==count;
             }
+            if(cells.retained&&!runs_.commitRetainedCells(0))return good_=false;
         }
         if(direct)return true;
         for(unsigned i=0;i<count;++i){
@@ -458,7 +464,7 @@ public:
     // Room teardown invalidates every old key without resetting generations.
     // No bulk temporary on the Amiga task stack.
     bool clear(){
-        if(stepping_)return good_=false;
+        if(stepping_||runs_.reservationPending())return good_=false;
         if(!good_)return false;
         // Releasing retained layers can split publication runs. Reacquire by
         // ordinal rather than mutating a borrowed descriptor traversal.

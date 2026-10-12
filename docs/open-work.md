@@ -34,8 +34,8 @@ The immediate priority is the **no-input initial fall to the first platform**:
 
 1. Use the matched 164-update no-input fall through first landing in
    `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
-   191 in the current measured build. Retain the complete updates 57–121
-   interval as the quiet-frame guard: matched mean/worst are now
+   191 in the frozen regression control (`edaaa369`). Retain the complete
+   updates 57–121 interval as the quiet-frame guard: control mean/worst are
    20.58/27.5 ms versus historical 20.13/27.4 ms. Do not restart
    sub-millisecond helper tuning to force exact equality. The first remaining
    generation burst, update 122, costs 54.9 ms versus 28.2 historically;
@@ -49,9 +49,8 @@ The immediate priority is the **no-input initial fall to the first platform**:
 2. Replace duplicated terrain publication at its owner, preserving source event
    order and behavior. Evaluate one shared lifetime/layer/room descriptor rather
    than three independently maintained publications:
-   - Reserve a descriptor before callback-free prepared construction, publish
-     only its completed prefix, and preserve the scalar failure oracle.
-   - Reuse its slot locator for room membership instead of building a second
+   - Use the reserved lifetime descriptor and its slot locator for room
+     membership instead of building a second
      room span and locator. Keep room insertion/deactivation chronology and
      layer Draw chronology independent; they are not interchangeable clocks.
    - Maintain room links through descriptor splits, retirement, slot reuse and
@@ -59,7 +58,8 @@ The immediate priority is the **no-input initial fall to the first platform**:
      during animation, activation or cleanup (the earlier observed-room path).
    - Differentially check mixed actors/terrain, mutation and failure boundaries,
      then measure 57–121, 122, 136 and 163 before broader validation. Price the
-     complete replacement against the 21.73 ms construction region at 122;
+     complete replacement against the frozen control's 21.73 ms construction
+     region at 122, not an intermediate preparatory build;
      removing room insertion alone (2.38 ms) is not that replacement.
    Accept against matched historical costs, not a new 20 ms requirement. Leave
    initial-state, recipe-cache and cross-row grouping variants closed.
