@@ -1,0 +1,184 @@
+diff --git a/src/core/RunnerRunRoomMembership.h b/src/core/RunnerRunRoomMembership.h
+index 9f272e0e..84dbce1a 100644
+--- a/src/core/RunnerRunRoomMembership.h
++++ b/src/core/RunnerRunRoomMembership.h
+@@ -10,19 +10,34 @@ template<unsigned Capacity,unsigned First,unsigned Last> class RunnerRunRoomMemb
+     static_assert(First<=Last&&Last<=Capacity&&Capacity<65534,"Invalid room run domain");
+     using Slot=std::uint16_t;
+     struct Run {RunnerImageValue key{};Slot first=0,count=0,next=Capacity,previous=Capacity,marks=0,list=0;};
+-    Run runs_[Capacity?Capacity:1]{};
+-    Slot locator_[Capacity?Capacity:1]{};
++    mutable Run runs_[Capacity?Capacity:1]{};
++    mutable Slot locator_[Capacity?Capacity:1]{};
+     std::uint32_t marks_[(Capacity+31)/32?(Capacity+31)/32:1]{};
+-    unsigned head_[2]={Capacity,Capacity},tail_[2]={Capacity,Capacity};
+-    unsigned used_=0,free_=Capacity,markedCount_=0;
++    mutable unsigned head_[2]={Capacity,Capacity},tail_[2]={Capacity,Capacity};
++    mutable unsigned used_=0,free_=Capacity;
++    unsigned markedCount_=0;
++    // An admitted active suffix is already room membership. Only its linked
++    // representation is deferred. Every ordering mutation materializes it
++    // first; contains/active can answer without creating per-slot locators.
++    mutable unsigned pendingFirst_=0,pendingCount_=0;
++    mutable RunnerImageValue pendingKey_{};
++    bool pending(unsigned s)const{return pendingCount_&&s>=pendingFirst_&&s-pendingFirst_<pendingCount_;}
++    void materialize()const{
++        if(!pendingCount_)return;
++        insertActive(pendingFirst_,pendingKey_);
++        const unsigned n=locator_[pendingFirst_]-1;
++        runs_[n].count=Slot(unsigned(runs_[n].count)+pendingCount_-1);
++        for(unsigned s=pendingFirst_+1;s<pendingFirst_+pendingCount_;++s)locator_[s]=Slot(n+1);
++        pendingCount_=0;
++    }
+     bool terrain(unsigned s)const{return s>=First&&s<Last;}
+-    unsigned allocate(){if(free_!=End){const unsigned n=free_;free_=runs_[n].next;return n;}return used_++;}
++    unsigned allocate()const{if(free_!=End){const unsigned n=free_;free_=runs_[n].next;return n;}return used_++;}
+     void release(unsigned n){runs_[n].next=Slot(free_);free_=n;}
+     unsigned first(unsigned list)const{return head_[list]==End?End:runs_[head_[list]].first;}
+     unsigned after(unsigned n)const{return runs_[n].next==End?End:runs_[runs_[n].next].first;}
+     unsigned next(unsigned s)const{const auto& r=runs_[locator_[s]-1];
+         return s+1<unsigned(r.first)+r.count?s+1:after(locator_[s]-1);}
+-    void insertAfter(unsigned slot,RunnerImageValue key,unsigned list,unsigned previous){
++    void insertAfter(unsigned slot,RunnerImageValue key,unsigned list,unsigned previous)const{
+         if(previous!=End){auto& r=runs_[previous];
+             if(terrain(slot)&&terrain(r.first)&&unsigned(r.first)+r.count==slot&&r.key.bits==key.bits){
+                 ++r.count;locator_[slot]=Slot(previous+1);return;
+@@ -34,7 +49,7 @@ template<unsigned Capacity,unsigned First,unsigned Last> class RunnerRunRoomMemb
+         if(following==End)tail_[list]=n;else runs_[following].previous=Slot(n);
+         locator_[slot]=Slot(n+1);
+     }
+-    void insertActive(unsigned slot,RunnerImageValue key){
++    void insertActive(unsigned slot,RunnerImageValue key)const{
+         unsigned previous=tail_[0],forward=head_[0];
+         while(previous!=End&&RunnerSpatialSplit::less(key,runs_[previous].key)){
+             if(RunnerSpatialSplit::less(key,runs_[forward].key)){previous=runs_[forward].previous;break;}
+@@ -53,7 +68,11 @@ public:
+         unsigned current_,skipFirst_,skipLast_;
+     public:
+         AnimationCursor(const RunnerRunRoomMembership& room,unsigned first,unsigned last)
+-            :room_(room),current_(room.first(0)),skipFirst_(first),skipLast_(last){}
++            :room_(room),current_(End),skipFirst_(first),skipLast_(last){
++            if(room.pendingCount_&&!(first<=room.pendingFirst_&&
++                last>=room.pendingFirst_+room.pendingCount_))room.materialize();
++            current_=room.first(0);
++        }
+         unsigned slot(){
+             while(current_!=End&&current_>=skipFirst_&&current_<skipLast_){
+                 const auto n=room_.locator_[current_]-1;
+@@ -65,16 +84,18 @@ public:
+         bool within(unsigned first,unsigned last){const auto s=slot();return s>=first&&s<last;}
+         unsigned take(){const auto s=slot();if(s!=End)current_=room_.next(s);return s;}
+     };
+-    bool contains(unsigned s)const{return s<Capacity&&locator_[s]!=0;}
+-    bool active(unsigned s)const{return contains(s)&&runs_[locator_[s]-1].list==0;}
++    bool contains(unsigned s)const{return pending(s)||(s<Capacity&&locator_[s]!=0);}
++    bool active(unsigned s)const{return pending(s)||(s<Capacity&&locator_[s]&&runs_[locator_[s]-1].list==0);}
+     bool marked(unsigned s)const{return contains(s)&&((marks_[s>>5]>>(s&31))&1u);}
+     bool mark(unsigned s){
+         if(!contains(s))return false;
++        materialize();
+         if(!marked(s)){marks_[s>>5]|=1u<<(s&31);++runs_[locator_[s]-1].marks;++markedCount_;}
+         return true;
+     }
+     bool bind(unsigned s,RunnerImageValue key){
+         if(s>=Capacity||!RunnerSpatialSplit::valid(key))return false;
++        materialize();
+         remove(s);insertActive(s,key);return true;
+     }
+     // A callback-free, freshly allocated terrain segment. One ordered
+@@ -83,6 +104,16 @@ public:
+         if(!count)return true;
+         if(first<First||first>=Last||count>Last-first||!RunnerSpatialSplit::valid(key))return false;
+         for(unsigned s=first;s<first+count;++s)if(contains(s))return false;
++        if(pendingCount_&&(first!=pendingFirst_+pendingCount_||key.bits!=pendingKey_.bits))materialize();
++        if(!pendingCount_){pendingFirst_=first;pendingKey_=key;}
++        pendingCount_+=count;
++        return true;
++    }
++    bool bindTerrainSpanReference(unsigned first,unsigned count,RunnerImageValue key){
++        if(!count)return true;
++        if(first<First||first>=Last||count>Last-first||!RunnerSpatialSplit::valid(key))return false;
++        for(unsigned s=first;s<first+count;++s)if(contains(s))return false;
++        materialize();
+         insertActive(first,key);
+         const unsigned n=locator_[first]-1;
+         auto& run=runs_[n];
+@@ -92,6 +123,7 @@ public:
+     }
+     bool remove(unsigned s){
+         if(!contains(s))return false;
++        materialize();
+         const unsigned n=locator_[s]-1;auto& r=runs_[n];
+         if(marked(s)){marks_[s>>5]&=~(1u<<(s&31));--r.marks;--markedCount_;}
+         if(r.count==1){
+@@ -114,6 +146,7 @@ public:
+         locator_[s]=0;return true;
+     }
+     void clear(){
++        pendingCount_=0;
+         // Whole-room teardown has no mutation callbacks. Keep descriptor
+         // release order, but do not shrink/relink each cell of a terrain run.
+         for(unsigned list=0;list<2;++list){
+@@ -129,8 +162,9 @@ public:
+         if(markedCount_)for(auto& word:marks_)word=0;
+         markedCount_=0;
+     }
+-    void clearReference(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(first(list));}
++    void clearReference(){materialize();for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(first(list));}
+     unsigned runCount()const{
++        materialize();
+         unsigned count=0;
+         for(unsigned list=0;list<2;++list){
+             for(unsigned n=head_[list];n!=End;n=runs_[n].next)++count;
+@@ -138,9 +172,11 @@ public:
+         return count;
+     }
+     template<class Visit> bool visitAnimationChecked(Visit visit)const{
++        materialize();
+         for(unsigned s=first(0);s!=End;s=next(s))if(!visit(s))return false;return true;
+     }
+     template<class Visit> bool visitDrawChecked(Visit visit)const{
++        materialize();
+         for(unsigned n=tail_[0];n!=End;n=runs_[n].previous){const auto& r=runs_[n];
+             for(unsigned i=r.count;i;--i)if(!visit(r.first+i-1))return false;
+         }return true;
+@@ -151,6 +187,7 @@ public:
+     }
+     template<class Visit> bool visitAnimationRetainedChecked(unsigned a,unsigned b,bool& dirty,Visit visit)const{
+         if(a>b||b>Capacity)return false;
++        materialize();
+         bool full=dirty;dirty=false;
+         if(full){DW_PROFILE_COUNT(counterAnimationFullPass);}else{DW_PROFILE_COUNT(counterAnimationProjectedPass);}
+         for(unsigned s=first(0);s!=End;){
+@@ -162,6 +199,7 @@ public:
+         }return true;
+     }
+     template<class Visit> bool visitCleanupChecked(Visit visit){
++        materialize();
+         for(unsigned list=0;list<2;++list){
+             for(unsigned s=first(list);s!=End;){
+                 const unsigned following=next(s);if(!visit(s))return false;s=following;
+@@ -176,6 +214,7 @@ public:
+     // family records can be merged without constructing room nodes at birth.
+     template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
+         if(!markedCount_)return true;
++        materialize();
+         for(unsigned list=0;list<2;++list){
+             for(unsigned s=first(list);s!=End;){
+                 const unsigned n=locator_[s]-1;
+@@ -204,6 +243,7 @@ public:
+     }
+     template<class Visit> bool visitMarkedCleanupOrderedReference(Visit visit){
+         if(!markedCount_)return true;
++        materialize();
+         for(unsigned list=0;list<2;++list){
+             for(unsigned s=first(list);s!=End;){
+                 const unsigned n=locator_[s]-1;
+@@ -219,6 +259,7 @@ public:
+     // or activation flags. Promoted entries may be visited again in list zero.
+     template<class Select,class Inactive,class Publish>
+     bool reconcileSelectedChecked(Select select,Inactive inactive,Publish publish){
++        materialize();
+         for(unsigned list=1;;--list){
+             for(unsigned s=first(list);s!=End;){
+                 const unsigned n=locator_[s]-1;

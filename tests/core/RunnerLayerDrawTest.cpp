@@ -368,6 +368,66 @@ template<bool Runs=false> void retainedAnimationMutations(){
         }
     }
 }
+void coalescedRoomSpans(){
+    // Observe consecutive spans only at membership, cursor and mutation
+    // boundaries. Scalar per-cell insertion remains the independent oracle.
+    using Room=RunnerRunRoomMembership<64,8,56>;
+    const auto scalarSpan=[](Room& room,unsigned first,unsigned count,RunnerImageValue key){
+        if(first<8||first>=56||count>56-first)return false;
+        for(unsigned s=first;s<first+count;++s)if(room.contains(s))return false;
+        for(unsigned s=first;s<first+count;++s)if(!room.bind(s,key))return false;
+        return true;
+    };
+    for(unsigned scenario=0;scenario<8;++scenario){
+        Room room,reference;
+        RunnerImageValue key;key.assignInteger(int(scenario%3)-1);
+        require(room.bind(0,{})&&reference.bind(0,{}),"coalesced prefix actor");
+        for(unsigned first=8;first<40;first+=2){
+            require(room.bindTerrainSpan(first,2,key)&&scalarSpan(reference,first,2,key),"coalesced span birth");
+            require(room.contains(first)&&room.active(first+1)&&!room.marked(first),"span membership is immediately live");
+            Room::AnimationCursor cursor(room,8,56);
+            require(cursor.take()==0&&cursor.take()==Room::End,"animation skips pending terrain");
+        }
+        if(scenario==0){room.clear();reference.clearReference();}
+        if(scenario==1)require(room.remove(19)&&reference.remove(19),"pending interior retirement");
+        if(scenario==2)require(room.bind(1,key)&&reference.bind(1,key),"actor follows pending equal-depth terrain");
+        if(scenario==3){
+            require(room.mark(20)&&reference.mark(20),"pending destruction mark");
+            require(room.bindTerrainSpan(40,2,key)&&scalarSpan(reference,40,2,key),"span after marked prefix");
+            auto cleanup=[](auto& r){return r.visitMarkedCleanupChecked([&](unsigned s){
+                if(s==20&&!r.mark(40))return false;
+                return r.remove(s);
+            });};
+            require(cleanup(room)&&cleanup(reference),"cleanup can mark a pending later member");
+        }
+        if(scenario==4){
+            auto inactive=[](unsigned s){return s%3==0;};
+            auto publish=[](unsigned,bool){return true;};
+            require(room.reconcileChecked(inactive,publish)&&reference.reconcileChecked(inactive,publish),"pending activation reconciliation");
+        }
+        if(scenario==5){
+            RunnerImageValue other;other.assignInteger(3);
+            require(room.bindTerrainSpan(44,2,other)&&scalarSpan(reference,44,2,other),"different-depth span closes suffix");
+        }
+        if(scenario==6){
+            require(!room.bindTerrainSpan(39,2,key)&&!scalarSpan(reference,39,2,key),"overlapping suffix rejected");
+        }
+        if(scenario==7){
+            // A const copy must retain the same logical room order.
+            const auto immutable=room;
+            std::vector<unsigned> a,b;
+            immutable.visitDrawChecked([&](unsigned s){a.push_back(s);return true;});
+            reference.visitDrawChecked([&](unsigned s){b.push_back(s);return true;});
+            require(a==b,"const pending room copy is traversable");
+        }
+        for(unsigned s=0;s<64;++s)require(room.contains(s)==reference.contains(s)&&
+            room.active(s)==reference.active(s)&&room.marked(s)==reference.marked(s),"coalesced membership matches immediate publication");
+        std::vector<unsigned> a,b;
+        room.visitCleanupChecked([&](unsigned s){a.push_back(s);return true;});
+        reference.visitCleanupChecked([&](unsigned s){b.push_back(s);return true;});
+        require(a==b,"coalesced active/inactive source order");
+    }
+}
 void runRoomMutations(){
     RunnerRoomMembership<64> scalar;
     RunnerRunRoomMembership<64,8,56> runs;
@@ -537,4 +597,4 @@ void activationSelection(){
     }
 }
 }
-int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();animationCursorCallbacks();activationSelection();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
+int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();coalescedRoomSpans();runRoomMutations();animationCursorCallbacks();activationSelection();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
