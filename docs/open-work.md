@@ -52,17 +52,6 @@ The immediate priority is the **no-input initial fall to the first platform**:
 3. Verify the restored fall, normal 512 KiB Chip startup, and unchanged replay
    behavior before returning to generation bursts or combat profiling.
 
-For update 122, investigate one complete cross-row publication attempt:
-admit native ownership once for consecutive prepared segments between event
-cells, instead of repeating layer/room/chronology publication for every row.
-The immutable start-pattern programs contain 5–8 nonempty segments but only
-1–4 such groups. This is not permission to defer arbitrary callbacks.
-First prove the native builder-position publication is a reader-free, admitted
-boundary; generic position callbacks, failure prefixes, capacity exhaustion and
-nested event Creates must retain their original observations. Then integrate the
-group into the native owner and measure 122/136/163 plus the full quiet guard.
-Do not ship a planner or metadata cache alone as a performance improvement.
-
 - Enforce scene/level-local residency and execution before adding content:
   1. Replace remaining resident
      gameplay tables/room catalogues and SDL collision masks with explicit

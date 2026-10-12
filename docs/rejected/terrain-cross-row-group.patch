@@ -1,0 +1,581 @@
+diff --git a/src/core/AreaOneBuilder.cpp b/src/core/AreaOneBuilder.cpp
+index 6e302193..3cb4d7f9 100644
+--- a/src/core/AreaOneBuilder.cpp
++++ b/src/core/AreaOneBuilder.cpp
+@@ -222,9 +222,38 @@ bool AreaOneBuilder::emitPreparedPattern(const BuilderPatternPack& patterns,
+         }
+         return true;
+     };
+-    for(unsigned i=0;i<pattern.rowCount;++i){
+-        if(!row(patterns.preparedRow(pattern,i,reversed),y_))return false;
+-        if(i+1<pattern.rowCount&&!advanceRow())return false;
++    unsigned i=0;const std::uint8_t* p=patterns.preparedRow(pattern,0,reversed);
++    while(i<pattern.rowCount){
++        if(!p)return false;
++        if(*p==255){
++            if(++i<pattern.rowCount){if(!advanceRow())return false;p=patterns.preparedRow(pattern,i,reversed);}
++            continue;
++        }
++        if(!*p&&preparedTerrainGroupEmitter_){
++            PreparedTerrainGroup group(*this,random);
++            unsigned nextRow=i;int nextY=y_;const auto* next=p;
++            while(next&&group.count_<16){
++                if(*next==255){
++                    if(nextRow+1==pattern.rowCount)break;
++                    ++nextRow;nextY+=16;next=patterns.preparedRow(pattern,nextRow,reversed);continue;
++                }
++                if(*next)break;
++                group.segments_[group.count_++]={next,nextY};
++                next+=6+unsigned(next[3])*2+unsigned(next[4])*4;
++            }
++            group.finalY_=nextY;bool handled=false;
++            if(!preparedTerrainGroupEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,group,handled))return false;
++            if(handled){if(!group.executed_)return false;i=nextRow;p=next;continue;}
++            if(group.executed_)return false;
++        }
++        if(*p){
++            if(!emitEventCell(char(p[0]),(int(p[1])-32)*16,y_,reversed,random,emit,context,terrainCommand))return false;
++            p+=2;
++        }else{
++            const PreparedTerrain batch(p,y_,random,specialObjectsGenerated_);
++            if(!preparedTerrainEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,batch,emit)||!batch.completed())return false;
++            p=batch.end();
++        }
+     }
+     advancedRows=pattern.rowCount-1;
+     if(appendPillars)for(unsigned i=0;i<3;++i){
+diff --git a/src/core/AreaOneBuilder.h b/src/core/AreaOneBuilder.h
+index d11cad95..f8ac6662 100644
+--- a/src/core/AreaOneBuilder.h
++++ b/src/core/AreaOneBuilder.h
+@@ -37,8 +37,10 @@ public:
+     // (solid 1, landing 2, wall 16, platform 32, contacts in bits 6-7).
+     // Backends may publish together only if they have
+     // no terrain Create handlers/readers within the segment.
++    class PreparedTerrainGroup;
+     class PreparedTerrain {
+         friend class AreaOneBuilder;
++        friend class PreparedTerrainGroup;
+         GameMakerRandom& random_;
+         std::uint32_t& special_;
+         mutable bool started_=false, completed_=false;
+@@ -93,6 +95,36 @@ public:
+     void setPreparedTerrainEmitter(PreparedTerrainFunction emit,void* context=nullptr){
+         preparedTerrainEmitter_=emit;preparedTerrainContext_=context;
+     }
++    class PreparedTerrainGroup {
++        friend class AreaOneBuilder;
++        AreaOneBuilder& owner_;GameMakerRandom& random_;
++        struct Segment {const std::uint8_t* data;int y;};
++        Segment segments_[16]{};unsigned count_=0;int finalY_=0;
++        mutable bool executed_=false;
++        PreparedTerrainGroup(AreaOneBuilder& owner,GameMakerRandom& random):owner_(owner),random_(random){}
++    public:
++        unsigned size()const{return count_;}
++        int x()const{return owner_.x_;}
++        int finalY()const{return finalY_;}
++        PreparedTerrain segment(unsigned i)const{
++            return PreparedTerrain(segments_[i].data,segments_[i].y,random_,owner_.specialObjectsGenerated_);
++        }
++        // Only an admitted backend may call this. Every row setter and RNG
++        // advance remains at its source boundary; arbitrary callbacks must
++        // decline grouping before touching any owner or consuming RNG.
++        template<class Publish> bool execute(Publish publish)const{
++            if(executed_)return false;executed_=true;
++            for(unsigned i=0;i<count_;++i){
++                while(owner_.y_<segments_[i].y)if(!owner_.advanceRow())return false;
++                const auto batch=segment(i);
++                if(!publish(batch)||!batch.completed())return false;
++            }
++            while(owner_.y_<finalY_)if(!owner_.advanceRow())return false;
++            return true;
++        }
++    };
++    using PreparedTerrainGroupFunction=bool (*)(void*,const PreparedTerrainGroup&,bool&);
++    void setPreparedTerrainGroupEmitter(PreparedTerrainGroupFunction emit){preparedTerrainGroupEmitter_=emit;}
+     // A borrowed, deterministic same-row run. Setup may inspect its geometry,
+     // but execute() alone advances the live random stream, one cell immediately
+     // before its synchronous Create callback. Never retain this view.
+@@ -230,6 +262,7 @@ private:
+     void* breakableContext_=nullptr;
+     TerrainRunFunction terrainRunEmitter_=nullptr;
+     PreparedTerrainFunction preparedTerrainEmitter_=nullptr;
++    PreparedTerrainGroupFunction preparedTerrainGroupEmitter_=nullptr;
+     void* preparedTerrainContext_=nullptr;
+     bool emitPreparedPattern(const BuilderPatternPack&,const PackedBuilderPattern&,bool,bool,
+                              GameMakerRandom&,EmitFunction,void*,std::uint32_t&);
+diff --git a/src/core/GameplayBuilderController.h b/src/core/GameplayBuilderController.h
+index 000b5dee..5666e605 100644
+--- a/src/core/GameplayBuilderController.h
++++ b/src/core/GameplayBuilderController.h
+@@ -33,6 +33,15 @@ public:
+         return generate()&&good_;
+     }
+     bool valid()const{return good_;}
++    // A proof for a bounded native generation transaction, not permission to
++    // omit setters. Acquisition must already have succeeded at an ordinary
++    // publication. Looking ahead must never invoke an arbitrary owner callback
++    // early, or turn its failure into a different terrain/RNG prefix.
++    bool hasBorrowedPositionPublication(int x,int y)const{
++        return good_&&record_.lifetimeId&&phase_&&phase_->acquired&&
++            phase_->publication.x&&phase_->publication.y&&phase_->publication.appearance&&
++            x>=-0x7fffff&&x<=0x7fffff&&y>=-0x7fffff&&y<=0x7fffff;
++    }
+     void observeFailure(bool& owner){good_.observe(owner);}
+     InstanceHandle handle()const{return {0,record_.lifetimeId};}
+     const Record* find(InstanceHandle h)const{
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index cd801a3d..d2b6dd31 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -787,6 +787,58 @@ private:
+         return sprite.imageIndex.assignInteger(index);
+     }
+ #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
++    GameplayWorld::NativeTerrain::SpanResult constructTerrainGroup(
++        const GameplayWorld::NativeTerrain::Identity& first,
++        const GameplayWorld::NativeTerrain::PreparedCells* cells,unsigned segments,int tile,
++        unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
++        using Result=GameplayWorld::NativeTerrain::SpanResult;
++        completed=0;
++        if(!valid()||collisionConsumersAdmitted_||nativeTerrainLayerRunActive_||
++           !nativeTerrainLayersBound_||terrainRoomCount_||!cells||!segments||
++           tile!=terrainTileForArea(world_->runStage().area))return Result::unsupported;
++        unsigned count=0,present=0,layerSlot=0;
++        for(unsigned s=0;s<segments;++s){
++            if(!cells[s].retained||!cells[s].bytes||!cells[s].count||
++               cells[s].count>GameplayWorld::NativeTerrain::capacity-count)return Result::unsupported;
++            count+=cells[s].count;
++        }
++        const unsigned slot=View::terrainBase+first.handle.slot;
++        const auto* wall=objectDefaults_.get(60);const auto* thin=objectDefaults_.get(93);
++        if(!wall||!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)||
++           !layers_.admitPreparedTerrainSpan(count,wall->creationDepth,layerSlot)||
++           !table_.canFreshExternalSpan(slot,count))return Result::unsupported;
++        unsigned offset=0;
++        for(unsigned s=0;s<segments;++s)for(unsigned i=0;i<cells[s].count;++i,++offset){
++            present|=1u<<cells[s].kind(i);
++            if(room_.contains(slot+offset))return Result::unsupported;
++        }
++        for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind)){
++            const int object=kind?93:60;const auto* definition=kind?thin:wall;
++            const auto* objectFlags=families_.flags(unsigned(object));
++            const auto* plan=nativeTerrainCreate_.get(object,tile);
++            if(!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||
++               (definition->initialFlags&0x8000u))return Result::unsupported;
++            flags[kind]=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
++        }
++        if(!table_.externalBirthSpan(slot,count,stamp))return Result::unsupported;
++        bool okay=true;
++        for(unsigned s=0;s<segments&&okay;++s){
++            unsigned kinds=0;for(unsigned i=0;i<cells[s].count;++i)kinds|=1u<<cells[s].kind(i);
++            thinRetirementWindow_.appendSpan(cells[s].y,(kinds&2u)!=0,
++                first.handle.generation+completed+cells[s].count-1,cells[s].count);
++            for(unsigned i=0;i<cells[s].count;++i){
++                if(cells[s].kind(i)&&!table_.registerExternalObject(
++                    {slot+completed,first.handle.generation+completed},93,true)){
++                    okay=false;break;
++                }
++                ++completed;
++            }
++        }
++        if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
++        if(!room_.bindTerrainSpan(slot,completed,wall->creationDepth))okay=false;
++        if(!okay){check(false);return Result::failure;}
++        return Result::success;
++    }
+     GameplayWorld::NativeTerrain::SpanResult constructTerrainSpan(
+         const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
+         unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer,bool direct=false){
+@@ -2053,6 +2105,11 @@ public:
+                 unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
+                 return static_cast<GameplayCollisionOwner*>(p)->constructTerrainSpan(first,cells,tile,
+                                                                                    completed,stamp,flags,layer,true);
++            },[](void* p,const GameplayWorld::NativeTerrain::Identity& first,
++                const GameplayWorld::NativeTerrain::PreparedCells* cells,unsigned segments,int tile,
++                unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
++                return static_cast<GameplayCollisionOwner*>(p)->constructTerrainGroup(first,cells,segments,tile,
++                                                                                     completed,stamp,flags,layer);
+             }
+ #endif
+         }))return check(false);
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index 97aa6c73..eee6a253 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -330,6 +330,10 @@ public:
+         return nativeTerrainInstances_&&nativeTerrainInstances_->constructPrepared(
+             downwell::terrainTileForArea(run_.stage.area),run_.effectsSucceeded,cells);
+     }
++    NativeTerrain::SpanResult constructNativeTerrainGroup(const NativeTerrain::PreparedCells* cells,unsigned segments){
++        return nativeTerrainInstances_?nativeTerrainInstances_->constructPreparedGroup(
++            downwell::terrainTileForArea(run_.stage.area),cells,segments):NativeTerrain::SpanResult::unsupported;
++    }
+     bool publishNativeTerrainIndexed(downwell::InstanceHandle h){
+         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
+             nativeTerrainInstances_->publishIndexed(h);
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index 98f7fac1..ccaaa071 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -74,6 +74,10 @@ public:
+         // Complete callback-free admission/publication, with no per-cell run
+         // session. Unsupported must leave every owner untouched.
+         decltype(constructSpan) constructDirectSpan=nullptr;
++        // Several immutable rows in one admitted reader-free transaction.
++        // The caller must retain source RNG/setter ordering outside this owner.
++        SpanResult (*constructGroup)(void*,const Identity&,const PreparedCells*,unsigned,int,unsigned&,
++                                    std::uint32_t&,std::uint32_t*,RunnerRetainedLayerState&)=nullptr;
+     };
+     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
+         if(!contains(h))return false;
+@@ -83,12 +87,12 @@ public:
+     }
+     bool bind(Binding binding){
+         if(!good_)return false;
+-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan))return good_=false;
++        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan||binding.constructGroup))return good_=false;
+         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
+             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
+             binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation&&
+             binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun&&binding_.constructSpan==binding.constructSpan&&
+-            binding_.constructDirectSpan==binding.constructDirectSpan;
++            binding_.constructDirectSpan==binding.constructDirectSpan&&binding_.constructGroup==binding.constructGroup;
+         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
+         binding_=binding;return true;
+     }
+@@ -340,6 +344,49 @@ public:
+             return appendPreparedCells(cells,tile,effectsSucceeded);
+         });
+     }
++    // No scalar fallback is run here: unsupported must leave every owner
++    // untouched so the generator can retain its original per-row transaction.
++    SpanResult constructPreparedGroup(int tile,const PreparedCells* cells,unsigned segments){
++        if(!good_||publicationRun_||pendingPublication_||!cells||!segments||!binding_.constructGroup)
++            return SpanResult::unsupported;
++        unsigned count=0;
++        for(unsigned s=0;s<segments;++s){
++            if(!cells[s].retained||!cells[s].bytes||!cells[s].count||cells[s].count>Capacity-count)
++                return SpanResult::unsupported;
++            count+=cells[s].count;
++        }
++        if(!canAppend(count))return SpanResult::unsupported;
++        unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
++        if(count>Capacity-slot)return SpanResult::unsupported;
++        for(unsigned i=0;i<count;++i)if(runs_.occupied(slot+i))return SpanResult::unsupported;
++        const Identity first{{slot,next_},cells[0].object(0),cells[0].x(0),cells[0].y,-1,0};
++        Order order;unsigned completed=0;std::uint32_t spatial[2]{};
++        publicationRun_=true;
++        const auto result=binding_.constructGroup(binding_.context,first,cells,segments,tile,
++                                                  completed,order.stamp,spatial,order.layer);
++        publicationRun_=false;
++        if(result==SpanResult::unsupported)return result;
++        if(completed>count){good_=false;return SpanResult::failure;}
++        unsigned offset=0;
++        for(unsigned s=0;s<segments&&offset<completed;++s){
++            const unsigned remaining=completed-offset;
++            const unsigned n=cells[s].count<remaining?cells[s].count:remaining;
++            if(!runs_.appendRetainedCells({slot+offset,next_+offset},cells[s].bytes,cells[s].y,n,order.shifted(offset))){
++                good_=false;return SpanResult::failure;
++            }
++            for(unsigned i=0;i<n;++i){
++                const unsigned at=slot+offset+i,kind=cells[s].kind(i),value=spatial[kind];
++                if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(at,true);
++                flags_[at]=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
++                createSprite_[at]=static_cast<std::int16_t>(tile);walls_[at]=PackedWallState{};
++                if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
++            }
++            offset+=n;
++        }
++        next_+=completed;freeHint_=slot+completed;
++        if(result!=SpanResult::success||completed!=count){good_=false;return SpanResult::failure;}
++        return SpanResult::success;
++    }
+ private:
+     bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded,
+                              bool direct=false,bool* admitted=nullptr){
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.cpp b/src/platform/amiga/AmigaGameplayGeneration.cpp
+index 698bc59c..a5679dd4 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.cpp
++++ b/src/platform/amiga/AmigaGameplayGeneration.cpp
+@@ -58,7 +58,45 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
+     if(terrainRuns)builder_.setTerrainRunObserver(createRun);
+ #ifndef DOWNWELL_REFERENCE_PATTERNS
+     if(terrainRuns)builder_.setPreparedTerrainPublisher(createPrepared);
++#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
++    if(terrainRuns)builder_.setPreparedTerrainGroupPublisher(createPreparedGroup);
+ #endif
++#endif
++}
++
++bool AmigaGameplayGeneration::createPreparedGroup(void* opaque,
++    const downwell::AreaOneBuilder::PreparedTerrainGroup& group,bool& handled){
++    auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
++    handled=false;
++    if(self.sourceCreate_||!self.runtime_||!self.lifetimes_||!self.runtime_->terrainCreatesBackendOnly()||
++       self.runtime_->nativeTerrainInstances()!=self.lifetimes_)return true;
++    const auto* controller=self.runtime_->builderController();
++    if(!controller||!controller->hasBorrowedPositionPublication(group.x(),group.finalY()))return true;
++    TerrainLifetimes::PreparedCells rows[16];unsigned count=0,walls=0,platforms=0;
++    for(unsigned i=0;i<group.size();++i){
++        const auto batch=group.segment(i);
++        if(!amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch))return true;
++        platforms+=batch.platforms();walls+=batch.count()-batch.platforms();
++        if(batch.count())rows[count++]={batch.creates(),batch.count(),batch.y,true};
++    }
++    if(count<2||platforms>AmigaTerrainTiles::capacity-self.tiles_.size()||
++       walls>self.index_.extraContacts.capacity()-self.index_.extraContacts.size())return true;
++    // All remaining per-row operations are admitted bounded stores, exact RNG
++    // advances and borrowed controller setters. No external reader runs until
++    // the next event cell. Publish ownership once, retaining each row's geometry.
++    const auto result=self.runtime_->constructNativeTerrainGroup(rows,count);
++    if(result==TerrainLifetimes::SpanResult::unsupported)return true;
++    handled=true;
++    if(result!=TerrainLifetimes::SpanResult::success)return false;
++    return group.execute([&](const downwell::AreaOneBuilder::PreparedTerrain& batch){
++        if(!batch.beginPublication())return false;
++        if(batch.count()){
++            if(batch.y-24<self.dirtyFirst)self.dirtyFirst=batch.y-24;
++            if(batch.y+24>self.dirtyEnd)self.dirtyEnd=batch.y+24;
++        }
++        if(!amigaPublishPreparedTerrain(self.index_,self.tiles_,batch))return false;
++        batch.completePublication();return true;
++    });
+ }
+ 
+ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch,
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.h b/src/platform/amiga/AmigaGameplayGeneration.h
+index ffedc482..2fa8a0c1 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.h
++++ b/src/platform/amiga/AmigaGameplayGeneration.h
+@@ -56,6 +56,7 @@ private:
+     static bool createBreakable(void*,int,int,const downwell::GeneratedBreakableCreate&);
+     static bool createRun(void*,const downwell::AreaOneBuilder::TerrainRun&);
+     static bool createPrepared(void*,const downwell::AreaOneBuilder::PreparedTerrain&,downwell::AreaOneBuilder::EmitFunction);
++    static bool createPreparedGroup(void*,const downwell::AreaOneBuilder::PreparedTerrainGroup&,bool&);
+     AmigaAreaOneTerrainBuilder& builder_;
+     const downwell::BuilderPatternPack& patterns_;
+     const downwell::ObjectPack& objects_;
+diff --git a/src/platform/amiga/AmigaTerrain.cpp b/src/platform/amiga/AmigaTerrain.cpp
+index d9cb2bf3..1d4c11fb 100644
+--- a/src/platform/amiga/AmigaTerrain.cpp
++++ b/src/platform/amiga/AmigaTerrain.cpp
+@@ -215,6 +215,7 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
+     builder_.setTerrainRunEmitter(runObserver_?collectRun:nullptr);
+     builder_.setPreparedTerrainEmitter(preparedPublisher_?preparedPublisher_:(preparedObserver_?collectPrepared:nullptr),
+                                       preparedPublisher_?observerContext_:nullptr);
++    builder_.setPreparedTerrainGroupEmitter(preparedPublisher_?preparedGroupPublisher_:nullptr);
+     if (!builder_.stepVisible(patterns, random, viewBottomCeiling,
+                               collect, this, result)) {
+         failed_ = true;
+diff --git a/src/platform/amiga/AmigaTerrain.h b/src/platform/amiga/AmigaTerrain.h
+index 328d1065..a16d54ee 100644
+--- a/src/platform/amiga/AmigaTerrain.h
++++ b/src/platform/amiga/AmigaTerrain.h
+@@ -92,6 +92,7 @@ public:
+         runObserver_ = nullptr;
+         preparedObserver_ = nullptr;
+         preparedPublisher_ = nullptr;
++        preparedGroupPublisher_ = nullptr;
+         breakablePublisher_ = nullptr;
+     }
+     using RunObserver = bool (*)(void*,const downwell::AreaOneBuilder::TerrainRun&);
+@@ -102,6 +103,7 @@ public:
+     // publisher bypasses the collection adapter; stepVisible still latches
+     // any failed publication before another generation step can run.
+     void setPreparedTerrainPublisher(downwell::AreaOneBuilder::PreparedTerrainFunction publisher){preparedPublisher_=publisher;}
++    void setPreparedTerrainGroupPublisher(downwell::AreaOneBuilder::PreparedTerrainGroupFunction publisher){preparedGroupPublisher_=publisher;}
+     void setBreakablePublisher(downwell::AreaOneBuilder::BreakableEmitter publisher){breakablePublisher_=publisher;}
+     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
+     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
+@@ -147,6 +149,7 @@ private:
+     RunObserver runObserver_ = nullptr;
+     PreparedObserver preparedObserver_ = nullptr;
+     downwell::AreaOneBuilder::PreparedTerrainFunction preparedPublisher_=nullptr;
++    downwell::AreaOneBuilder::PreparedTerrainGroupFunction preparedGroupPublisher_=nullptr;
+     downwell::AreaOneBuilder::BreakableEmitter breakablePublisher_=nullptr;
+ };
+ 
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index 0c06fc94..d944bc5b 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -7448,6 +7448,80 @@ int main(){
+             fieldsOwner->population(371,population)&&population==0&&
+             !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
+     }
++    {
++        // Native row publication can be grouped only after ordinary acquisition
++        // proved that its subsequent setters cannot call arbitrary observers.
++        struct BorrowedBuilder {
++            RunnerImageValue x{},y{};
++            std::uint32_t appearance=0;
++            unsigned acquisitions=0;
++            bool reject=false,empty=false;
++        } mirror;
++        GameplayBuilderController builder({},&mirror,
++            [](void* p,const GameplayBuilderController::Record&,GameplayBuilderController::Publication& out){
++                auto& m=*static_cast<BorrowedBuilder*>(p);++m.acquisitions;
++                if(m.reject)return false;
++                if(!m.empty)out={&m.x,&m.y,&m.appearance};
++                return true;
++            });
++        assert(builder.create(100856,240,1200));
++        assert(!builder.hasBorrowedPositionPublication(240,1216));
++        assert(builder.withGeneration([&]{
++            assert(!builder.hasBorrowedPositionPublication(240,1216)&&!mirror.acquisitions);
++            assert(builder.position(240,1216)&&mirror.acquisitions==1);
++            assert(builder.hasBorrowedPositionPublication(240,1232));
++            assert(!builder.hasBorrowedPositionPublication(240,0x800000));
++            assert(!builder.hasBorrowedPositionPublication(-0x800000,1232));
++            for(int y=1232;y<=1408;y+=16){
++                assert(builder.position(240,y)&&mirror.acquisitions==1);
++                const auto* record=builder.find(builder.handle());
++                assert(record&&record->x.bits==mirror.x.bits&&record->y.bits==mirror.y.bits);
++            }
++            assert(mirror.appearance&8u);
++            return true;
++        }));
++        assert(!builder.hasBorrowedPositionPublication(240,1424));
++        mirror.empty=true;
++        assert(builder.withGeneration([&]{
++            assert(!builder.hasBorrowedPositionPublication(240,1424));
++            assert(builder.position(240,1424)&&mirror.acquisitions==2);
++            assert(!builder.hasBorrowedPositionPublication(240,1440));
++            return true;
++        }));
++        mirror.empty=false;mirror.reject=true;
++        assert(!builder.withGeneration([&]{
++            assert(!builder.hasBorrowedPositionPublication(240,1440)&&mirror.acquisitions==2);
++            return builder.position(240,1440);
++        }));
++        assert(mirror.acquisitions==3&&!builder.valid());
++        assert(!builder.hasBorrowedPositionPublication(240,1440));
++    }
++    {
++        struct ObservingBuilder {
++            unsigned terrainBirths=0,calls=0;
++            bool birth(InstanceHandle,const GameplayBuilderController::Record&){return true;}
++            bool retire(InstanceHandle,const GameplayBuilderController::Record&){return true;}
++            bool activation(InstanceHandle,const GameplayBuilderController::Record&,bool){return true;}
++            bool membership(InstanceHandle,const GameplayBuilderController::Record&,bool){return true;}
++            bool move(InstanceHandle,const GameplayBuilderController::Record& r,RunnerImageValue,RunnerImageValue){
++                ++calls;assert(terrainBirths==calls*2);
++                int oldY;assert(r.y.roundPixel(oldY)&&oldY==1200+int(calls-1)*16);
++                return calls!=2;
++            }
++        } observer;
++        GameplayBuilderController builder(GameplayBuilderController::Binding::bindMovement(observer));
++        assert(builder.create(100856,240,1200));
++        assert(!builder.withGeneration([&]{
++            assert(!builder.hasBorrowedPositionPublication(240,1216)&&!observer.calls);
++            observer.terrainBirths=2;
++            assert(builder.position(240,1216));
++            assert(!builder.hasBorrowedPositionPublication(240,1232)&&observer.calls==1);
++            observer.terrainBirths=4;
++            return builder.position(240,1232);
++        }));
++        int y;assert(observer.calls==2&&observer.terrainBirths==4&&!builder.valid());
++        assert(builder.find(builder.handle())->y.roundPixel(y)&&y==1216);
++    }
+     for(bool rejectCreate:{false,true}){
+         struct RejectedBuilder {
+             unsigned births=0;
+diff --git a/tests/core/TerrainOwnershipRunsTest.cpp b/tests/core/TerrainOwnershipRunsTest.cpp
+index 817ce95c..b6f0eb2a 100644
+--- a/tests/core/TerrainOwnershipRunsTest.cpp
++++ b/tests/core/TerrainOwnershipRunsTest.cpp
+@@ -625,7 +625,44 @@ static void preparedSpanConstruction(){
+             require(scalar.appearance(h,as,ai,ac)&&bulk.appearance(h,bs,bi,bc)&&as==bs&&ai==bi&&ac==bc);
+         }
+     }
+-    std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
++    for(int failure=-1;failure<12;++failure){
++        Native scalar,grouped;Observer a{&scalar},b{&grouped};a.fail=b.fail=failure;
++        auto bb=binding(b,true);
++        bb.constructGroup=[](void* p,const Native::Identity& id,const Native::PreparedCells* cells,unsigned segments,
++            int,unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,downwell::RunnerRetainedLayerState& layer){
++            auto& o=*static_cast<Observer*>(p);++o.spanCalls;
++            unsigned count=0;for(unsigned i=0;i<segments;++i)count+=cells[i].count;
++            completed=count;
++            if(o.fail>=0&&unsigned(o.fail)>=id.handle.slot&&unsigned(o.fail)<id.handle.slot+count)
++                completed=unsigned(o.fail)-id.handle.slot;
++            stamp=o.next;o.next+=completed;flags[0]=flags[1]=0x8208u;o.spanCells+=completed;
++            if(completed)layer={{o.clock.shifted(1),false},21,2,false};
++            o.clock=o.clock.shifted(completed);
++            return completed==count?Native::SpanResult::success:Native::SpanResult::failure;
++        };
++        require(scalar.bind(binding(a,false))&&grouped.bind(bb));
++        unsigned char source[24]{};
++        for(unsigned i=0;i<12;++i)source[2*i]=32+i+(i%3?128:0);
++        const Native::PreparedCells rows[]={{source,3,32,true},{source+6,4,64,true},{source+14,5,112,true}};
++        require(grouped.constructPreparedGroup(51,nullptr,3)==Native::SpanResult::unsupported&&!b.spanCalls);
++        auto invalid=rows[0];invalid.retained=false;
++        require(grouped.constructPreparedGroup(51,&invalid,1)==Native::SpanResult::unsupported&&!b.spanCalls);
++        bool effects=true,expected=true;
++        for(const auto& row:rows)if(!(expected=scalar.constructPrepared(51,effects,row)))break;
++        const auto result=grouped.constructPreparedGroup(51,rows,3);
++        require((result==Native::SpanResult::success)==expected&&b.spanCalls==1);
++        require(scalar.size()==grouped.size()&&scalar.lastLifetime()==grouped.lastLifetime());
++        require(a.next==b.next&&a.clock.low==b.clock.low&&a.clock.high==b.clock.high);
++        if(expected)for(unsigned i=0;i<12;++i){
++            const auto h=scalar.handle(i);Native::Identity x,y;bool xa,xd,ya,yd;
++            require(scalar.read(h,x,xa,xd)&&grouped.read(h,y,ya,yd));
++            require(x.object==y.object&&x.x==y.x&&x.y==y.y&&xa==ya&&xd==yd);
++            require(scalar.registrationOrder(h)==grouped.registrationOrder(h));
++            require(scalar.layerState(h)->same(*grouped.layerState(h)));
++            unsigned xf,yf;require(scalar.spatialFlags(h,xf)&&grouped.spatialFlags(h,yf)&&xf==yf);
++        }
++    }
++    std::puts("Prepared span/group construction: publication clocks, final fields and failed prefixes agree");
+ }
+ static void retainedIdentitySegments(){
+     using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
+diff --git a/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp b/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp
+index 7b52088f..a97861ca 100644
+--- a/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp
++++ b/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp
+@@ -377,6 +377,43 @@ int main(int argc,char** argv){
+                 "prepared partial room cannot retry");
+         }
+     }
++    {
++        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
++        entry.skipToGameForTesting();
++        auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,entry,Ownership::nativeScenery,true,true,true,true);
++        auto grouped=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,entry,Ownership::nativeScenery,true,true,true,true);
++        using Native=GameplayWorld::NativeTerrain;
++        const unsigned char seed[]={42,0,52,0};
++        require(reference->world->constructNativeTerrainPrepared({seed,2,1392,true})&&
++            grouped->world->constructNativeTerrainPrepared({seed,2,1392,true}),"establish generated terrain layer");
++        const unsigned char first[]={42,0,43,0,180,0},second[]={44,0,45,0},third[]={174,0,47,0,52,0};
++        const Native::PreparedCells rows[]={{first,3,1408,true},{second,2,1424,true},{third,3,1440,true}};
++        const unsigned old=reference->lifetimes->size();
++        for(const auto& row:rows)require(reference->world->constructNativeTerrainPrepared(row),"reference row birth");
++        require(grouped->world->constructNativeTerrainGroup(rows,3)==Native::SpanResult::success,"grouped row birth");
++        require(reference->lifetimes->size()==grouped->lifetimes->size(),"group population");
++        auto compare=[&]{
++            require(reference->digest()==grouped->digest(),"group actor projections and checkpoint");
++            for(unsigned i=old;i<reference->lifetimes->size();++i){
++                const auto h=reference->lifetimes->handle(i);
++                Native::Identity a,b;bool aa,ad,ba,bd;
++                require(reference->lifetimes->read(h,a,aa,ad)&&grouped->lifetimes->read(h,b,ba,bd)&&
++                    a.x==b.x&&a.y==b.y&&a.object==b.object&&aa==ba&&ad==bd,"group identity and flags");
++                require(reference->lifetimes->registrationOrder(h)==grouped->lifetimes->registrationOrder(h)&&
++                    reference->lifetimes->layerState(h)->same(*grouped->lifetimes->layerState(h)),"group independent clocks");
++                const downwell::InstanceHandle shared{View::terrainBase+h.slot,h.generation};bool ar,br;
++                require(reference->owner->roomMembershipActive(shared,ar)&&grouped->owner->roomMembershipActive(shared,br)&&
++                    ar==br,"group room membership");
++            }
++        };
++        compare();
++        const auto middle=reference->lifetimes->handle(old+3);
++        for(bool active:{false,true}){
++            require(reference->lifetimes->activation(middle,active)&&grouped->lifetimes->activation(middle,active)&&
++                reference->owner->reconcileActivation()&&grouped->owner->reconcileActivation(),"group mutation boundary");
++            compare();
++        }
++    }
+     for(unsigned scenario=0;scenario<5;++scenario){
+         const auto expected=cleanupOrder(objects,sprites,Ownership::reference,scenario);
+         require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario)==expected,
