@@ -1031,6 +1031,34 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
         for(unsigned i=0;i<3;++i)assert(phases[0][i]==phases[1][i]&&remainders[0][i]==remainders[1][i]);
     }
 }
+static void checkNativeAnimationPopulation(const ObjectPack& objects,const SpriteCollisionPack& sprites){
+    auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
+        GameplayTerrainInstances::WallCollision{},nullptr,GameplayCollisionOwner::Ownership::native);
+    auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+        owner->playerBinding(),&owner->terrain());
+    assert(owner->attach(*world)&&owner->nativeAnimationPopulation()==0);
+    // Unrelated non-animated content must not make an empty phase execute.
+    for(unsigned i=0;i<8;++i){
+        assert(world->createGeneratedInstance({92,240+int(i)*16,512},objects,[](const auto&){return true;}));
+        assert(owner->nativeAnimationPopulation()==0);
+    }
+    for(unsigned pass=0;pass<2;++pass){
+        InstanceHandle keys[3];
+        for(unsigned i=0;i<3;++i){
+            assert(world->createGeneratedInstance({112,240+int(i)*16,512},objects,[](const auto&){return true;}));
+            const auto& enemy=world->enemyAt(i);keys[i]={enemy.identitySlot,enemy.lifetimeId};
+            assert(owner->nativeAnimationPopulation()==i+1);
+        }
+        assert(owner->enemyBinding().activation(keys[1],world->enemyAt(1),false)&&owner->reconcileActivation());
+        assert(owner->nativeAnimationPopulation()==3); // Conservative: inactive still counts.
+        for(unsigned i=0;i<3;++i){
+            assert(world->markEnemyDestroyed(keys[i]));
+            assert(owner->nativeAnimationPopulation()==3-i); // Mark is not retirement.
+            assert(owner->prepareDraw()&&owner->nativeAnimationPopulation()==2-i);
+        }
+        assert(world->enemyCount()==0); // Second pass also tests reused slots.
+    }
+}
 int main(){
     assert(downwell::RunnerBindingRevisionVerification::run());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
@@ -3205,6 +3233,7 @@ int main(){
     }
     checkEnemySlotDirectory(objects,sprites);
     checkNativeAnimationBatches(objects,sprites);
+    checkNativeAnimationPopulation(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned contact=0;contact<6;++contact){

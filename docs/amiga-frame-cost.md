@@ -4,7 +4,31 @@
 
 ### Complete fall through first landing
 
-Current target-memory result: **210 PAL fields for 164 updates (39.05 FPS)**,
+Current target-memory result: **205 PAL fields for 164 updates (40.00 FPS)**,
+independently repeated with deterministic emulation and 512 KiB Chip. The
+historical target remains 181 fields (45.30 FPS), not a new 50 FPS requirement.
+The current normal stripped build passes the 512 KiB Chip startup check; this
+configuration still has 8 MiB Fast and 512 KiB slow RAM.
+
+The empty native animation phase now has a lifetime-maintained population
+guard. Inactive and marked lifetimes remain counted until retirement; new
+families conservatively participate. The reference walk remains available.
+The estimated removable cost was 1.09 ms/update in the onset window. Matched
+frames 57–63 cost 1,151,940 → 1,129,010 cycles (23.16 → 22.70 ms/update,
+including waits); animation traversal itself falls from about 1.09 to 0.08 ms.
+Some saved work becomes publication waiting, rather than elapsed-time savings.
+The window's worst interval falls from 27.4 to 26.5 ms. Frames 161–166, where
+enemies require the walk, cost 2,465,170 → 2,468,890 cycles (noise); frame 163
+is 140.6 → 140.9 ms. Full-fall cadence changes 208 → 205 fields, below the FPS
+noise threshold by itself; the traced eliminated traversal is the evidence.
+All 165 selected state samples and the 18,000-frame ownership replay agree.
+The population costs four ordinary bytes and no Chip allocation. Normal Hunk:
+1,768,832 bytes, SHA-256
+`f429730d9ac7b123617ba9a5e7bac26c5c417a14a1bcd1a511e81e392a5fa742`.
+Profile ELF SHA-256:
+`9867a0f8dec545b0324ff458d91d342cd9fbd9dcfe1e5a9a47c89efc1fbcbf32`.
+
+Earlier RNG-preparation comparison (`e0e3f138`): **210 fields / 39.05 FPS**,
 independently repeated. Idle-time preparation of the existing RNG ring reduces
 frame 163 from **155.76 to 141.3 ms**. The historical 181-field result is still
 not restored. The ring remains 4 KiB; no new asset or buffer is allocated.

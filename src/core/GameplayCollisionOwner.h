@@ -434,6 +434,20 @@ private:
     }
     unsigned animationSkipFirst()const{return native_?View::breakableBase:View::terrainBase;}
     unsigned animationSkipLast()const{return native_?View::bulletBase:View::timeFieldBase;}
+    // Native owners take no previous-position snapshots. These families have
+    // no handler in the room-animation dispatcher below. Whitelist only
+    // proven no-ops: a newly introduced family conservatively participates.
+    static constexpr bool nativeAnimationParticipant(View::Kind kind){
+        switch(kind){
+            case View::Kind::player:case View::Kind::breakable:case View::Kind::terrain:
+            case View::Kind::timeField:case View::Kind::goalField:case View::Kind::exitController:
+            case View::Kind::timeChange:case View::Kind::entryDither:case View::Kind::ditherAbove:
+            case View::Kind::builder:case View::Kind::runController:case View::Kind::result:
+            case View::Kind::levelNumber:case View::Kind::sideCameraLocker:
+            case View::Kind::scattered:case View::Kind::spawner:return false;
+            default:return true;
+        }
+    }
     int objectOf(InstanceHandle h)const{
         if(!native_)return owner_.objectId(h);
         const int object=table_.objectId(h);if(object>=0)return object;
@@ -1220,6 +1234,7 @@ private:
                     parent.layers_.birthScenery(depth));
             }
             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
+            if constexpr(nativeAnimationParticipant(Kind))++parent.nativeAnimationPopulation_;
             if(!parent.nativeBirthQueues(h.slot,object(r)))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
@@ -1286,6 +1301,10 @@ private:
             }
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
             if(!parent.check(parent.native_?parent.table_.retire(h):parent.owner_.retire(h)))return false;
+            if constexpr(nativeAnimationParticipant(Kind))if(parent.native_){
+                if(!parent.check(parent.nativeAnimationPopulation_!=0))return false;
+                --parent.nativeAnimationPopulation_;
+            }
             if(parent.native_&&!parent.nativeRetireQueues(h.slot))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.remove(h.slot)))return false;
@@ -1538,6 +1557,7 @@ private:
     const bool terrainRegistered_;
     bool unregisteredTerrainCleanup_=false;
     NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
+    unsigned nativeAnimationPopulation_=0; // Includes inactive and marked lifetimes until retirement.
     std::uint32_t nativeBoxFlags_=0;
     std::uint32_t nativeFieldFlags_=0;
     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
@@ -1548,6 +1568,7 @@ private:
     GameplayTerrainInstances::Presentation nativeTerrainPresentation_;
     GameplayTerrainInstances::WallCollision nativeTerrainCollision_;
 public:
+    unsigned nativeAnimationPopulation()const{return nativeAnimationPopulation_;}
     // Registered terrain is the complete runner reference: every wall owns a
     // lifetime, room/layer entry, object membership and spatial history, as
     // required by wall End Step and terrain-selector queries. Native gameplay
@@ -2267,6 +2288,9 @@ public:
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
+#if !defined(DOWNWELL_REFERENCE_ANIMATION) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+            if(self.native_&&!self.nativeAnimationPopulation_)return true;
+#endif
             auto visitOne=[&](unsigned slot){
                 const auto shared=self.handleAt(slot);
                 // The conservative dirty fallback keeps terrain snapshots in
