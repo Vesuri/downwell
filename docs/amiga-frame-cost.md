@@ -63,6 +63,27 @@ Reports and cadence/state witnesses: `tmp/quiet-dither-phase-*`.
 
 ### Middle of the quiet fall: updates 91–110
 
+The same constructor also explains much of the later no-input stall. A separate
+ten-field capture at mark 135 of the shipping-specialization profile above
+contains complete frame 136: **671,400 cycles / 94.5 ms**, versus 50.4 ms in
+the historical fall. Current Step is 85.8 ms (historical 41.7 ms). Within that
+Step, generation costs 75.4 ms; its prepared-terrain callbacks cost 40.7 ms,
+including **31.8 ms of native lifetime construction**. Owner span publication
+is 18.6 ms inside that construction. These are nested costs, not additive.
+Draw collection is 3.5 ms and display row synchronization 1.2 ms. This is
+not evidence of a renderer regression or a change in the recurring quiet
+frame target. Report: `tmp/quiet-136.txt`; reproduce with the frozen profile
+ELF above, ignore 134 marks, capture ten fields, report `--frames=136`.
+
+The batching boundary matters: `AreaOneBuilder::emitPreparedPattern` invokes
+source event Creates between prepared segments and publishes the builder's
+position at each row advance. Those callbacks must see all earlier births
+and none of the later ones. Initial-border Steps already publish both walls
+in one segment before advancing the row. Deferring whole patterns or several
+Steps is therefore not an equivalent replacement for the measured constructor.
+A replacement must remove work within the existing admitted segment, or prove
+and preserve each intervening observation and failure prefix.
+
 Single-frame decomposition at `56945ecc`: a five-field capture starting at
 mark 92 contains complete frame 93, **187,870 cycles / 26.44 ms**. The source
 border publication calls `appendPreparedCells` once. Its relevant inclusive
