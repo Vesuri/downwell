@@ -6,6 +6,7 @@
 #include "core/RunnerObservedRegistration.h"
 #include "core/RunnerObservedRoomMembership.h"
 #include "core/RunnerRoomMembership.h"
+#include "core/RunnerRunRoomMembership.h"
 #include <tuple>
 #include <vector>
 #include <cstdio>
@@ -742,7 +743,49 @@ static void retainedIdentitySegments(){
     require(!retained.runCount());
     std::puts("Retained immutable identity segments: mutation, reuse, holes and order agree");
 }
+// Publication splits are not room mutations. In the initial-fall workload,
+// tying the room cursor to those splits made skipping scenery cost ~65 ms.
+// Require bounded room representation as well as identical visited actors.
+static void independentRoomSkipTopology(){
+    using Terrain=downwell::TerrainOwnershipRuns<64,Publication>;
+    using Room=downwell::RunnerRunRoomMembership<68,2,66>;
+    Terrain terrain;Room room;downwell::RunnerRoomMembership<68> reference;
+    downwell::RunnerImageValue wallDepth,frontDepth,backDepth;
+    require(wallDepth.assignInteger(100)&&frontDepth.assignInteger(0)&&backDepth.assignInteger(200));
+    require(room.bind(0,backDepth)&&reference.bind(0,backDepth));
+    require(room.bind(67,frontDepth)&&reference.bind(67,frontDepth));
+    const Publication basis{{1,0},0};
+    for(unsigned i=0;i<64;++i){
+        require(terrain.append({i,i+1},60,int(i)*16,128,0,-1,basis.shifted(i)));
+        require(reference.bind(i+2,wallDepth));
+    }
+    require(room.bindTerrainSpan(2,64,wallDepth)&&terrain.runCount()==1);
+    auto compare=[&]{
+        require(room.runCount()==3);
+        std::vector<unsigned> actual,expected;
+        Room::AnimationCursor cursor(room,2,66);
+        while(cursor.slot()!=Room::End)actual.push_back(cursor.take());
+        require(reference.visitAnimationChecked([&](unsigned s){if(s<2||s>=66)expected.push_back(s);return true;}));
+        require(actual==expected&&actual.size()==2);
+        actual.clear();expected.clear();
+        require(room.visitDrawChecked([&](unsigned s){actual.push_back(s);return true;}));
+        require(reference.visitDrawChecked([&](unsigned s){expected.push_back(s);return true;}));
+        require(actual==expected);
+    };
+    compare();
+    for(unsigned i=0;i<64;++i){
+        require(terrain.changePublication({i,i+1},{{1000+i,3},i+1}));compare();
+    }
+    require(terrain.runCount()==64);
+    // Repeated source-order/layer changes cannot silently build a second
+    // per-cell room traversal, even after every native descriptor is isolated.
+    for(unsigned pass=0;pass<3;++pass)for(unsigned i=0;i<64;++i){
+        require(terrain.changePublication({i,i+1},{{2000+pass*64+i,4},pass}));compare();
+    }
+    std::puts("Terrain publication fragmentation leaves room skip topology and Draw order unchanged");
+}
 int main(){
+    independentRoomSkipTopology();
     retainedIdentitySegments();reservedIdentitySegments();
     bulkPublicationRuns();
     preparedSpanConstruction();

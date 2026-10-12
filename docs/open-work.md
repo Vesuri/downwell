@@ -48,19 +48,18 @@ The immediate priority is the **no-input initial fall to the first platform**:
    average and 19.45 ms firing frame are not acceptance targets for this fall.
 2. Remove unnecessary terrain publication at its consumer boundary, preserving
    source event order and behavior:
-   - Compare the historical and current `AmigaGameplayGeneration::createPrepared`
-     paths. The historical backend published occupancy/landing candidates and
-     tile runs; the added native-lifetime branch is the construction region to
-     remove or substantially reduce, not the already-small raster publication.
-   - Before another implementation, identify the actual world-1 consumers of
-     identity, room membership, layer membership, activation and cleanup. For
-     each, distinguish required source chronology from an unused generic
-     traversal. Keep thin-platform End Step registration: omitting that consumer
-     already caused an expensive replacement room scan.
-   - Use that evidence to bypass whole unused publication stages under the
-     admitted scene contract, retaining required order/state and mutation
-     behavior. Do not simply disable the lifetime branch, assume the historical
-     implementation was complete, or replace it with full order reconstruction.
+   - Target the added native-lifetime branch of
+     `AmigaGameplayGeneration::createPrepared`, not the already-small raster
+     publication. Preserve its actual consumers: reconciled room activity,
+     cleanup chronology and inactive-layer Draw cutoffs. These are not unused
+     state just because walls skip animation. Generic wall collision registration
+     is already omitted; retain thin-platform End Step registration.
+   - Remove whole redundant construction stages while retaining required
+     order/state and mutation behavior. The consumer audit does not justify
+     simply dropping room or layer publication. Do not disable the lifetime
+     branch, assume the historical implementation was complete, or replace it
+     with full order reconstruction. See the ownership-consumer evidence in
+     [the quiet-fall audit](amiga-frame-cost.md#middle-of-the-quiet-fall-updates-91110).
      The plan must remove a named substantial part of the frozen control's
      21.73 ms construction region at 122 before another performance experiment.
    - Differentially check mixed actors/terrain, mutation and failure boundaries,
