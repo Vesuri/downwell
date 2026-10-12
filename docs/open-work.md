@@ -49,8 +49,9 @@ The immediate priority is the **no-input initial fall to the first platform**:
 2. Identify and remove the added per-frame work in that sequence, preserving
    source event order and behavior. Accept against the matched historical
    mean and worst-frame costs, not a new 20 ms requirement.
-3. Verify the restored fall, normal 512 KiB Chip startup, and unchanged replay
-   behavior before returning to generation bursts or combat profiling.
+3. Verify the restored complete fall (including its generation bursts), normal
+   512 KiB Chip startup, and unchanged replay behavior before returning to
+   later gameplay or combat optimization.
 
 - Enforce scene/level-local residency and execution before adding content:
   1. Replace remaining resident
@@ -77,10 +78,13 @@ The immediate priority is the **no-input initial fall to the first platform**:
      unchanged current-scene residency and work counts, alongside replay and
      bounded native timing gates. Transition-only preparation must not run in
      gameplay frames. Check failure, Retry and all scene handoffs.
-- Extend the bounded SKIP_TO_GAME contact audit with a comparable pre-regression
-  workload; distinguish behavior/input-path changes from increased per-frame work.
-  Report quiet, firing/combat, generation and field windows with worst-frame
-  costs and coverage. Old section 5 numbers are not a current baseline.
+- After the initial fall, use the matched early contact prefix to investigate
+  firing: updates 51–70 measure 23.98/34.42 ms historical mean/worst versus
+  28.00/42.03 ms current. Do not use later historical frame numbers as equal
+  workloads: reward Step eligibility changes RNG timing from sample 464 and
+  player motion diverges at 652 (see `amiga-frame-cost.md`). Establish equivalent
+  workloads before comparing later combat, generation or field windows.
+  Old section 5 numbers are not a current baseline.
 - Remove the measured regression at its architectural cause. Compare the same
   workload and behavior checks before/after, preserving hardware scrolling,
   offline assets and native terrain ownership. Do not resume micro-optimization

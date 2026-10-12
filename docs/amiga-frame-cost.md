@@ -42,6 +42,43 @@ and `tmp/quiet-full-window-{current,historical}-next.txt`, with independent
 target-memory report `tmp/quiet-full-window-122-recheck.txt`; raw traces are
 disposable once the figures are committed.
 
+### Historical contact comparison boundary
+
+The unchanged `GameplayContactProfileInput` function does not guarantee the
+same workload across `13e08ca2` and the current game code. Separate 1,800-sample
+state-only runs match player/camera position, velocity, health, ammo, enemy and
+bullet counts, RNG draw count, seed and index through sample 463. Sample 464
+has two fewer RNG draws in the current build; the counters reconverge at 465.
+The same transient occurs at 650, then player velocity diverges at 652 and
+position at 653. These samples are not full entity/RNG-word digests.
+
+An independent eight-field instruction capture from mark 462 identifies the
+first difference: the historical update executes two `CurrencyStepSound::begin`
+choices for newly born gems. The current Step cutoff defers them until the
+next update; these draws are delayed, not lost. `b98178ee` introduced this
+reward birth/Step correction; its source contract and tests are in
+`runner-step-eligibility.md`. Do not undo it to reproduce the historical FPS.
+The later motion divergence has not been isolated to this single change.
+
+The early firing window 51–70 is before the observed divergence: historical
+mean/worst **23.984/34.418 ms**, current **28.002/42.033 ms**. In contrast,
+same-number comparisons at 676–681 and 1305–1314 do not establish regression
+size: the player has reached different positions and encounters. The no-input
+fall above remains the immediate restoration target.
+
+Both contact comparison arms use deterministic A500/68000, 1 MiB Chip,
+512 KiB slow and 8 MiB Fast; current 512 KiB Chip captures agree with its
+1 MiB control to rounding. Trace flags are `SKIP_TO_GAME=1 PROFILE_CONTACT=1
+PROFILE_AUTORUN=1 FPSCOUNT=1 TRACE_FRAMES=50,675,1304`, 35 fields per mark,
+90-second run deadlines. Historical code was rebuilt against its generated
+snapshot, not an archived historical executable. Frozen ELF hashes:
+historical `da1e49f2f0712ab6ef0efa6583a194becf0f0f57e136ba960248a6fb9ac669ca`,
+current `c76084cbed92616b2b48e46d0ee4b27b4d28b5a0a3b89ff8241c82dfa60ed613`.
+Reports: `tmp/contact-historical-13e08-report.txt`,
+`tmp/contact-current-1m-6817-report.txt`, `tmp/contact-divergence-{historical,current}.txt`;
+state-only witnesses: `tmp/contact-state-{historical,current}.log`.
+The state-only breakpoints are not used for timing.
+
 ### Authored-entrance seam
 
 Corridor admission now ignores offscreen diagonals: only the vertical neighbours
