@@ -258,6 +258,7 @@ if [[ $mode == trace || $mode == quiet-window ]]; then
       --frame-summary="$trace_out/frames.json" --causes > "$trace_out/quiet.txt"
     python3 ../tools/amiga-trace-report.py "$trace_out" --frames=122 --require-complete \
       --causes > "$trace_out/generation-122.txt"
+    python3 ../tools/verify-quiet-window.py "$trace_out/frames.json" "$trace_out/Downwell.elf"
     echo "Quiet updates 57–121: $trace_out/quiet.txt"
     echo "First generation burst 122: $trace_out/generation-122.txt"
     echo "Exact complete-frame cycles and build hash: $trace_out/frames.json"

@@ -2686,6 +2686,11 @@ generate-amiga-game: generate-amiga-clear
 test-quiet-fall-witness:
 	python3 tests/quiet-fall-witness-test.py
 test: test-quiet-fall-witness
+
+.PHONY: test-quiet-window-guard
+test-quiet-window-guard:
+	python3 tests/quiet-window-guard-test.py
+test: test-quiet-window-guard
 test-scene-asset-admission: generate-amiga-game generate-amiga-clear
 	python3 tests/scene-asset-admission-test.py
 test: test-scene-asset-admission

@@ -1,0 +1,281 @@
+{
+  "schema": "downwell-frame-cycles/v1",
+  "elf_sha256": "f8b656c909c636b0607c7c5ef468959b748893e3deaf1c211a3f14a1ec4b004a",
+  "pal_field_cycles": 142102,
+  "frames": [
+    {
+      "frame": 57,
+      "cycles": 137690
+    },
+    {
+      "frame": 58,
+      "cycles": 155000
+    },
+    {
+      "frame": 59,
+      "cycles": 136010
+    },
+    {
+      "frame": 60,
+      "cycles": 112820
+    },
+    {
+      "frame": 61,
+      "cycles": 176270
+    },
+    {
+      "frame": 62,
+      "cycles": 115400
+    },
+    {
+      "frame": 63,
+      "cycles": 176180
+    },
+    {
+      "frame": 64,
+      "cycles": 110740
+    },
+    {
+      "frame": 65,
+      "cycles": 179140
+    },
+    {
+      "frame": 66,
+      "cycles": 110760
+    },
+    {
+      "frame": 67,
+      "cycles": 181290
+    },
+    {
+      "frame": 68,
+      "cycles": 180700
+    },
+    {
+      "frame": 69,
+      "cycles": 195630
+    },
+    {
+      "frame": 70,
+      "cycles": 152660
+    },
+    {
+      "frame": 71,
+      "cycles": 172370
+    },
+    {
+      "frame": 72,
+      "cycles": 172790
+    },
+    {
+      "frame": 73,
+      "cycles": 180420
+    },
+    {
+      "frame": 74,
+      "cycles": 155670
+    },
+    {
+      "frame": 75,
+      "cycles": 131440
+    },
+    {
+      "frame": 76,
+      "cycles": 117940
+    },
+    {
+      "frame": 77,
+      "cycles": 171670
+    },
+    {
+      "frame": 78,
+      "cycles": 113810
+    },
+    {
+      "frame": 79,
+      "cycles": 173920
+    },
+    {
+      "frame": 80,
+      "cycles": 110790
+    },
+    {
+      "frame": 81,
+      "cycles": 175260
+    },
+    {
+      "frame": 82,
+      "cycles": 110780
+    },
+    {
+      "frame": 83,
+      "cycles": 176940
+    },
+    {
+      "frame": 84,
+      "cycles": 110790
+    },
+    {
+      "frame": 85,
+      "cycles": 156190
+    },
+    {
+      "frame": 86,
+      "cycles": 150940
+    },
+    {
+      "frame": 87,
+      "cycles": 133270
+    },
+    {
+      "frame": 88,
+      "cycles": 155720
+    },
+    {
+      "frame": 89,
+      "cycles": 132030
+    },
+    {
+      "frame": 90,
+      "cycles": 154050
+    },
+    {
+      "frame": 91,
+      "cycles": 131520
+    },
+    {
+      "frame": 92,
+      "cycles": 115960
+    },
+    {
+      "frame": 93,
+      "cycles": 173420
+    },
+    {
+      "frame": 94,
+      "cycles": 113820
+    },
+    {
+      "frame": 95,
+      "cycles": 172250
+    },
+    {
+      "frame": 96,
+      "cycles": 110780
+    },
+    {
+      "frame": 97,
+      "cycles": 176970
+    },
+    {
+      "frame": 98,
+      "cycles": 110800
+    },
+    {
+      "frame": 99,
+      "cycles": 175190
+    },
+    {
+      "frame": 100,
+      "cycles": 110730
+    },
+    {
+      "frame": 101,
+      "cycles": 156200
+    },
+    {
+      "frame": 102,
+      "cycles": 152610
+    },
+    {
+      "frame": 103,
+      "cycles": 131970
+    },
+    {
+      "frame": 104,
+      "cycles": 153900
+    },
+    {
+      "frame": 105,
+      "cycles": 131920
+    },
+    {
+      "frame": 106,
+      "cycles": 155600
+    },
+    {
+      "frame": 107,
+      "cycles": 131380
+    },
+    {
+      "frame": 108,
+      "cycles": 116080
+    },
+    {
+      "frame": 109,
+      "cycles": 171610
+    },
+    {
+      "frame": 110,
+      "cycles": 113700
+    },
+    {
+      "frame": 111,
+      "cycles": 173790
+    },
+    {
+      "frame": 112,
+      "cycles": 110720
+    },
+    {
+      "frame": 113,
+      "cycles": 175160
+    },
+    {
+      "frame": 114,
+      "cycles": 110750
+    },
+    {
+      "frame": 115,
+      "cycles": 175170
+    },
+    {
+      "frame": 116,
+      "cycles": 112360
+    },
+    {
+      "frame": 117,
+      "cycles": 175210
+    },
+    {
+      "frame": 118,
+      "cycles": 168780
+    },
+    {
+      "frame": 119,
+      "cycles": 131950
+    },
+    {
+      "frame": 120,
+      "cycles": 155600
+    },
+    {
+      "frame": 121,
+      "cycles": 131990
+    },
+    {
+      "frame": 122,
+      "cycles": 390230
+    }
+  ],
+  "partial_frames": [],
+  "tool": "amiga-trace-report/frame-summary-v1",
+  "tool_sha256": "31f3a06e9214514b4e6ef9b251123c74479f4ff2453d4daed659322fff8ebb44",
+  "inputs": {
+    "trace-56.bin": "2f965b2e6d8f150cb6767888e83985c5f676b170f5bc4adf7c2d65ea0dc924a9"
+  },
+  "workload": "no-input initial fall, first gameplay room",
+  "source_commit": "edaaa369",
+  "configuration": "A500/68000 PAL, 512 KiB Chip, 512 KiB slow, 8 MiB Fast; deterministic",
+  "flags": "STRIP=1 PROBES=0 FPSCOUNT=1 PROFILE_IDLE=1 PROFILE_AUTORUN=1 PROFILE_FRAMES=600 TRACE_FRAMES=165 SKIP_TO_GAME=1"
+}

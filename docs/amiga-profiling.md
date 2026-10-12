@@ -47,6 +47,13 @@ binary. The latter captures 75 PAL fields from mark 56, without debugger stops
 inside the window, in a fresh `tmp/trace/quiet-window.*` directory. It writes
 `quiet.txt` for complete updates 57–121, `generation-122.txt` for the first
 generation burst, and `frames.json` containing exact cycles and the ELF hash.
+`verify-quiet-window.py` checks that hash against the frozen ELF and compares
+against `docs/amiga-quiet-frame-baseline.json`: quiet mean may rise by at most
+0.5 ms, quiet worst and update 122 by at most 1 ms. These are regression
+tolerances around the recovered build, not the historical restoration target
+or a 20 ms requirement. The guard judges whole windows, not which update owns
+a redistributed publication wait. Its sabotage tests are
+`python3 tests/quiet-window-guard-test.py`.
 Missing even one requested complete update fails the report: a slow run must
 not silently turn into a shorter, easier sample. Keep reports with the measured
 commit and delete disposable raw traces afterward. Neither command establishes
