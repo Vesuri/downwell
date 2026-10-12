@@ -198,6 +198,41 @@ by these frozen-binary captures.
 
 ### Where the remaining fall loses fields — `e0e3f138`
 
+Active prepared terrain spans now preserve the actor Draw cache: the span
+publisher admits an existing layer and appends only active, nonprojected
+scenery. It cannot change actor order or insert an inactive cutoff. The full
+layer revision still advances; activation, depth and retirement retain their
+invalidation paths. The ordinary/reference Draw traversal remains available.
+
+Against the frozen `e0e3f138` control, onset marks 57–63 change from
+1,168,550 to 1,151,890 cycles (**23.50 → 23.16 ms/frame**). Draw collection on
+affected marks 58/61/63 drops from 2.8/3.0/2.8 to 1.7/1.7/1.7 ms, meeting the
+roughly 1 ms affected-update estimate. Mark 59 grows 1 ms entirely in the
+publication-wait path; the window's worst interval improves 28.5 → 27.4 ms.
+The landing control/candidate window 161–166 changes 2,468,150 → 2,465,150
+cycles, with frame 163 at 141.3 → 140.6 ms and other changes within 0.3 ms.
+Do not claim that small landing movement as a structural burst improvement.
+
+Two complete 512 KiB Chip candidate runs give **208 fields / 39.423 FPS** for
+164 updates, versus the parent's 210 fields and historical 181. The two-field
+aggregate difference alone is below the FPS noise threshold; the accepted
+evidence is eliminated Draw-order reconstruction on affected updates. All
+165 selected state samples match. Native/reference ownership agrees across
+18,000 frames including actor Draw order. The focused fixture checks stable
+actor projection through active span birth, invalidation and cutoff on
+deactivation, reactivation, retirement and re-entry. Normal startup passes
+with a 1,767,312-byte stripped Hunk and unchanged 512 KiB Chip setting.
+
+Candidate profile ELF SHA-256:
+`934d6f24c542e87320adea6f6494c47c3dd40748ff463aa70c0d69c065798476`.
+Normal Hunk SHA-256:
+`25a62fdb67cfe1b8f8601b2d2248c4c30e4241153d67e4ff2c0fac083038c67a`.
+Reports: `tmp/quiet-projection-{control-onset,onset,control-stall,stall}-report.txt`;
+cadence/state: `tmp/quiet-projection-{fall-gdb,repeat-gdb,state}.log`.
+Capture onset at mark 56 for 12 fields and landing at mark 160 for 20 fields,
+using the same frozen build/flags and bounded verification command below.
+Raw traces are deleted after these measurements are committed.
+
 The cadence probe now prints the existing missed-field ledger after the run,
 without adding any timed instrumentation. Historical `13e08ca2` records 13
 updates taking more than one field; current `e0e3f138` records 36. The current

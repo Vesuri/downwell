@@ -93,11 +93,59 @@ static void compare(const RoomPack& pack,bool expectedReady){
 static void put(std::vector<unsigned char>& data,unsigned at,unsigned value){
     for(unsigned i=0;i<4;++i)data[at+i]=value>>(i*8);
 }
+struct ProjectionTerrain {
+    static constexpr unsigned capacity=4;
+    RunnerRetainedLayerState states[capacity]{};
+    RunnerRetainedLayerRead layerState(unsigned slot)const{
+        return slot<capacity?RunnerRetainedLayerRead(states[slot]):nullptr;
+    }
+    RunnerRetainedLayerRead layerState(InstanceHandle h)const{
+        return h.generation==1?layerState(h.slot):nullptr;
+    }
+    void setLayerState(unsigned slot,const RunnerRetainedLayerState& value){states[slot]=value;}
+    template<class Visit> bool visitLayerStates(Visit visit){
+        for(unsigned i=0;i<capacity;++i)if(!visit(InstanceHandle{i,1},states[i]))return false;
+        return true;
+    }
+    template<class Visit> bool visitLayerCutoffs(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
+        for(const auto& s:states)if(s.bound()&&s.layer==layer&&s.inactive&&(!after||after->before(s.order)))
+            if(!visit(s.order))return false;
+        return true;
+    }
+};
+static void activeTerrainProjection(const RoomPack& pack){
+    ProjectionTerrain terrain;
+    GameplayRoomLayers<32,true,ProjectionTerrain> layers(&pack);
+    require(layers.bindTerrain(terrain,16),"projection terrain binding");
+    layers.enablePreparedDraw();require(layers.prepare(),"projection room preparation");
+    RunnerImageValue depth;depth.assignInteger(0);
+    require(layers.birth({1,1},0,depth,false)&&
+        layers.publishPreparedDraw({1,1},7,RunnerLayerDraw::Action::sprite),"projection actor");
+    const auto draw=[&]{
+        std::vector<unsigned> tokens;
+        require(layers.visitPreparedDraw([&](unsigned token,auto){tokens.push_back(token);return true;}),"projection visit");
+        return tokens;
+    };
+    require(draw()==std::vector<unsigned>{7},"initial actor projection");
+    const auto revision=layers.preparedDrawRevision();
+    const auto fullRevision=layers.drawRevision();unsigned layer;
+    require(layers.admitPreparedTerrainSpan(2,depth,layer)&&
+        layers.publishPreparedTerrainSpan(layer,2,terrain.states[0]),"active prepared span");
+    terrain.states[1]=terrain.states[0].shifted(1);
+    require(layers.drawRevision()!=fullRevision&&layers.preparedDrawRevision()==revision&&
+        draw()==std::vector<unsigned>{7},"active scenery preserves actor cache but advances full revision");
+    require(layers.activation({16,1},false),"terrain deactivation");
+    require(layers.preparedDrawRevision()!=revision&&draw().empty(),"inactive terrain invalidates and blocks actor");
+    require(layers.activation({16,1},true)&&draw()==std::vector<unsigned>{7},"reactivation restores actor");
+    require(layers.retire({16,1})&&layers.retire({17,1})&&layers.retire({1,1}),"projection retirement");
+    require(layers.prepare()&&draw().empty(),"projection reentry discards cache");
+}
 int main(int argc,char** argv){
     require(argc==2,"supply generated room pack");
     std::ifstream input(argv[1],std::ios::binary);
     std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(input),{}};
     RoomPack original(bytes.data(),bytes.size());require(original.valid(),"original room pack");compare(original,true);
+    activeTerrainProjection(original);
     constexpr unsigned instance=RoomPack::headerSize+RoomPack::roomRecordSize;
     constexpr unsigned layer=instance+4*RoomPack::instanceRecordSize;
     constexpr unsigned member=layer+3*RoomPack::layerRecordSize;

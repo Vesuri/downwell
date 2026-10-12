@@ -284,7 +284,10 @@ public:
         if(!layers_.retainConstructedSpan(layer,count,first))return fail();
         live_+=count;
         drawRevision_=drawRevision_>0xffffffffu-count?0xffffffffu:drawRevision_+count;
-        if(preparedDrawEnabled_)preparedDraw_.invalidateOrder();
+        // retainConstructedSpan appends active, nonprojected scenery to an
+        // existing layer. It changes neither actor order nor inactive cuts.
+        // Keep the actor projection cached; subsequent activation/depth/
+        // retirement mutations retain their ordinary invalidation paths.
         return true;
     }
     bool birthInheritedTerrain(InstanceHandle h,TerrainRunBirth& run){
