@@ -72,7 +72,11 @@ The immediate priority is the **no-input initial fall to the first platform**:
    native construction region, with no complete-fall cadence improvement. Do
    not pursue room-state packing/accessor or sparse-list variants. Initial-state,
    recipe-cache, cross-row grouping and observed-room reconstruction variants
-   also remain closed. Another attempt must replace a larger construction stage,
+   also remain closed. The persistent multi-row identity replacement is closed
+   after global-index and source-ordered traversal measurements: it removes
+   per-row constructors but does not improve fall cadence and worsens the
+   landing spike. Do not retry group formats, cursors or admission-loop variants.
+   Another attempt must replace a larger construction stage,
    not repackage room membership alone.
 3. Verify the restored complete fall (including its generation bursts), normal
    512 KiB Chip startup, and unchanged replay behavior before returning to

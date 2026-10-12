@@ -1,0 +1,1215 @@
+diff --git a/docs/builder-pattern-pack.md b/docs/builder-pattern-pack.md
+index 719efe3c..4306eff3 100644
+--- a/docs/builder-pattern-pack.md
++++ b/docs/builder-pattern-pack.md
+@@ -5,8 +5,10 @@ level fragments recovered from GameMaker GML. The generated payload is
+ copyrighted derived game data and remains ignored under `generated/`; only the
+ generator, reader, tests, and format specification are committed.
+ 
+-Format revision 4 contains the entrance, regular, right-room, shop and ending
+-fragments recovered for area one, plus prepared row programs. It preserves row lengths individually;
++Format revision 6 contains the entrance, regular, right-room, shop and ending
++fragments recovered for area one, prepared row programs, and immutable multi-row
++identity geometry. The reader also accepts the revision 4 row-only reference.
++It preserves row lengths individually;
+ notably, one recovered shop row is 21 cells wide while its neighbours are 19.
+ 
+ Run:
+@@ -24,7 +26,7 @@ mapping native structures over the bytes. No compiler padding is present.
+ | Offset | Type | Meaning |
+ | ---: | --- | --- |
+ | 0 | char[4] | `DWBP` magic |
+-| 4 | u16 | Format version, currently 4 |
++| 4 | u16 | Format version, currently 6 (4 is the row-only reference; 5 is the separate literal format) |
+ | 6 | u16 | Header size, 32 |
+ | 8 | u32 | Source manifest schema, currently 3 |
+ | 12 | u32 | Pattern count |
+@@ -92,6 +94,44 @@ segment must never be replayed. This transaction is valid only for backend-only
+ terrain with no intra-segment Create readers and enough reserved capacity;
+ otherwise the ordered scalar executor supplies the exact failure prefix.
+ 
++## Multi-row identity extension (revision 6)
++
++After the final `DWPR` program comes `DWPG`, a `u32 groupCount` and a
++`u32 geometryBytes`, followed by 24-byte group records and the geometry payload.
++Each record is:
++
++`u32 startProgramOffset, endProgramOffset, geometryOffset, firstProgramIndex;`
++`u16 createCount, rowDelta, nonemptySegments, reservedZero;`
++
++Program offsets are relative to the `DWPR` program payload, geometry offsets
++to the new geometry payload. `firstProgramIndex` includes the mirrored bit,
++as in `DWPR`. Records are sorted by start offset. A source-ordered cursor walks
++them once per selected pattern; the independent lookup remains a test oracle.
++
++Each geometry cell has two bytes: column/kind with the same encoding as the
++original Create stream, then an unsigned row offset relative to the group's
++first row, in units of 16 pixels. The second byte is **not** a draw count.
++Groups contain at least two nonempty segments, never cross a source event
++cell or pattern boundary, and do not include the optional repeated pillar tail.
++The loader verifies every coordinate and endpoint against the validated row
++programs before exposing a group.
++
++One admitted group creates one authoritative lifetime descriptor, retaining
++the geometry pointer for its lifetime. Publication mutations may split that
++descriptor; row-filtered consumers use each cell's row offset, not the group's
++origin. Room and layer clocks remain independent. Thin-platform retirement
++uses the extrema of platform rows only, with the same lifetime ceiling and
++revision changes as individual notifications.
++
++The backend may publish this ownership transaction before the source row
++programs only after proving that the whole group is allocation-free, has no
++intervening observers, and that row setters use an already-acquired borrowed
++position publication which cannot fail. RNG draws, occupancy, platform art,
++special-border counts and every builder row setter still execute in source
++order before the next event cell. Declined admission changes no ownership and
++falls back at the original row boundaries. No runtime geometry scratch array
++or per-row lifetime constructor is part of the grouped path.
++
+ ## Portable reader
+ 
+ `src/core/BuilderPatternPack` decodes each field byte-by-byte. Construction
+diff --git a/src/core/AreaOneBuilder.cpp b/src/core/AreaOneBuilder.cpp
+index 6e302193..8bcbd9bf 100644
+--- a/src/core/AreaOneBuilder.cpp
++++ b/src/core/AreaOneBuilder.cpp
+@@ -222,9 +222,32 @@ bool AreaOneBuilder::emitPreparedPattern(const BuilderPatternPack& patterns,
+         }
+         return true;
+     };
+-    for(unsigned i=0;i<pattern.rowCount;++i){
+-        if(!row(patterns.preparedRow(pattern,i,reversed),y_))return false;
+-        if(i+1<pattern.rowCount&&!advanceRow())return false;
++    unsigned i=0;const auto* p=patterns.preparedRow(pattern,0,reversed);
++    unsigned groupCursor=preparedTerrainGroupEmitter_?patterns.preparedGroupCursor(p):0;
++    while(i<pattern.rowCount){
++        if(!p)return false;
++        if(*p==255){
++            if(++i<pattern.rowCount){if(!advanceRow())return false;p=patterns.preparedRow(pattern,i,reversed);}
++            continue;
++        }
++        if(!*p&&preparedTerrainGroupEmitter_){
++            BuilderPatternPack::PreparedGroup geometry;
++            if(patterns.nextPreparedGroup(groupCursor,p,geometry)&&y_<=0x7fffffff-int(geometry.rows)*16){
++                const PreparedTerrainGroup group(*this,patterns,pattern,random,p,i,reversed,geometry);
++                bool handled=false;
++                if(!preparedTerrainGroupEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,group,handled))return false;
++                if(handled){if(!group.executed())return false;i+=geometry.rows;p=geometry.end;continue;}
++                if(group.executed())return false;
++            }
++        }
++        if(*p){
++            if(!emitEventCell(char(p[0]),(int(p[1])-32)*16,y_,reversed,random,emit,context,terrainCommand))return false;
++            p+=2;
++        }else{
++            const PreparedTerrain batch(p,y_,random,specialObjectsGenerated_);
++            if(!preparedTerrainEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,batch,emit)||!batch.completed())return false;
++            p=batch.end();
++        }
+     }
+     advancedRows=pattern.rowCount-1;
+     if(appendPillars)for(unsigned i=0;i<3;++i){
+diff --git a/src/core/AreaOneBuilder.h b/src/core/AreaOneBuilder.h
+index d11cad95..b9c47048 100644
+--- a/src/core/AreaOneBuilder.h
++++ b/src/core/AreaOneBuilder.h
+@@ -93,6 +93,46 @@ public:
+     void setPreparedTerrainEmitter(PreparedTerrainFunction emit,void* context=nullptr){
+         preparedTerrainEmitter_=emit;preparedTerrainContext_=context;
+     }
++    class PreparedTerrainGroup {
++        friend class AreaOneBuilder;
++        AreaOneBuilder& owner_;const BuilderPatternPack& pack_;const PackedBuilderPattern& pattern_;
++        GameMakerRandom& random_;const std::uint8_t* start_;
++        unsigned firstRow_;bool reversed_;int firstY_;mutable bool executed_=false;
++        PreparedTerrainGroup(AreaOneBuilder& owner,const BuilderPatternPack& pack,
++            const PackedBuilderPattern& pattern,GameMakerRandom& random,const std::uint8_t* start,
++            unsigned row,bool reversed,BuilderPatternPack::PreparedGroup geometry)
++            :owner_(owner),pack_(pack),pattern_(pattern),random_(random),start_(start),
++             firstRow_(row),reversed_(reversed),firstY_(owner.y_),geometry(geometry){}
++    public:
++        const BuilderPatternPack::PreparedGroup geometry;
++        int x()const{return owner_.x_;}
++        int y()const{return firstY_;}
++        int finalY()const{return firstY_+int(geometry.rows)*16;}
++        bool executed()const{return executed_;}
++        template<class Visit> bool visitSegments(Visit visit)const{
++            const auto* p=start_;unsigned row=0;
++            while(p!=geometry.end||row!=geometry.rows){
++                if(*p==255){p=pack_.preparedRow(pattern_,firstRow_+(++row),reversed_);continue;}
++                const PreparedTerrain batch(p,firstY_+int(row)*16,random_,owner_.specialObjectsGenerated_);
++                if(!visit(batch))return false;
++                p=batch.end();
++            }
++            return true;
++        }
++        // The admitted caller must prove row setters cannot fail or observe
++        // future terrain. Keep every setter and RNG advance at its source row.
++        template<class Publish> bool execute(Publish publish)const{
++            if(executed_)return false;executed_=true;
++            if(!visitSegments([&](const PreparedTerrain& batch){
++                while(owner_.y_<batch.y)if(!owner_.advanceRow())return false;
++                return publish(batch)&&batch.completed();
++            }))return false;
++            while(owner_.y_<finalY())if(!owner_.advanceRow())return false;
++            return true;
++        }
++    };
++    using PreparedTerrainGroupFunction=bool (*)(void*,const PreparedTerrainGroup&,bool&);
++    void setPreparedTerrainGroupEmitter(PreparedTerrainGroupFunction emit){preparedTerrainGroupEmitter_=emit;}
+     // A borrowed, deterministic same-row run. Setup may inspect its geometry,
+     // but execute() alone advances the live random stream, one cell immediately
+     // before its synchronous Create callback. Never retain this view.
+@@ -230,6 +270,7 @@ private:
+     void* breakableContext_=nullptr;
+     TerrainRunFunction terrainRunEmitter_=nullptr;
+     PreparedTerrainFunction preparedTerrainEmitter_=nullptr;
++    PreparedTerrainGroupFunction preparedTerrainGroupEmitter_=nullptr;
+     void* preparedTerrainContext_=nullptr;
+     bool emitPreparedPattern(const BuilderPatternPack&,const PackedBuilderPattern&,bool,bool,
+                              GameMakerRandom&,EmitFunction,void*,std::uint32_t&);
+diff --git a/src/core/BuilderPatternPack.cpp b/src/core/BuilderPatternPack.cpp
+index 7bfc4173..8c5c863c 100644
+--- a/src/core/BuilderPatternPack.cpp
++++ b/src/core/BuilderPatternPack.cpp
+@@ -28,7 +28,7 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+         error_ = BuilderPatternPackError::badMagic; return;
+     }
+     const bool literals = u16(bytes + 4) == literalFormatVersion;
+-    if (u16(bytes + 4) != formatVersion && !literals) {
++    if (u16(bytes + 4) != formatVersion && u16(bytes + 4) != rowFormatVersion && !literals) {
+         error_ = BuilderPatternPackError::unsupportedVersion; return;
+     }
+     if (u16(bytes + 6) != headerSize || u32(bytes + 8) != manifestSchema) {
+@@ -81,10 +81,24 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+     }
+     preparedOffsets_ = bytes + extension + 4;
+     preparedPrograms_ = preparedOffsets_ + tableBytes;
+-    const std::size_t programBytes = size - (preparedPrograms_ - bytes);
+-    if (u32(preparedOffsets_ + tableBytes - 4) != programBytes) {
++    const std::size_t availablePrograms = size - (preparedPrograms_ - bytes);
++    const std::size_t programBytes = preparedSize_ = u32(preparedOffsets_ + tableBytes - 4);
++    if (programBytes>availablePrograms ||
++        (u16(bytes+4)==rowFormatVersion && programBytes!=availablePrograms)) {
+         error_ = BuilderPatternPackError::wrongSize; return;
+     }
++    if(u16(bytes+4)==formatVersion){
++        const auto* group=preparedPrograms_+programBytes;
++        const auto remaining=availablePrograms-programBytes;
++        if(remaining<12||group[0]!='D'||group[1]!='W'||group[2]!='P'||group[3]!='G'){
++            error_=BuilderPatternPackError::wrongSize;return;
++        }
++        groupCount_=u32(group+4);groupGeometrySize_=u32(group+8);
++        if(groupCount_>(remaining-12)/24||groupGeometrySize_!=remaining-12-std::size_t(groupCount_)*24){
++            error_=BuilderPatternPackError::wrongSize;return;
++        }
++        groupRecords_=group+12;groupGeometry_=groupRecords_+std::size_t(groupCount_)*24;
++    }
+     if (u32(preparedOffsets_)) {
+         error_ = BuilderPatternPackError::badPattern; return;
+     }
+@@ -180,6 +194,96 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+             }
+         }
+     }
++    if(groupRecords_&&!validateGroups(groupGeometrySize_))error_=BuilderPatternPackError::badPattern;
++}
++
++bool BuilderPatternPack::validateGroups(std::uint32_t geometrySize)const{
++    std::uint32_t previous=0;
++    for(unsigned i=0;i<groupCount_;++i){
++        const auto* record=groupRecords_+i*24;
++        const auto start=u32(record),end=u32(record+4),geometry=u32(record+8),index=u32(record+12);
++        const unsigned count=u16(record+16),rows=u16(record+18),segments=u16(record+20);
++        if((i&&start<=previous)||start>=preparedSize_||end>=preparedSize_||index>=rowCount_*2||
++           rows>=256||!count||segments<2||u16(record+22)||!range(geometry,count*2,geometrySize))return false;
++        previous=start;
++        bool inPattern=false;
++        for(unsigned p=0;p<patternCount_;++p){
++            PackedBuilderPattern pattern;if(!this->pattern(p,pattern))return false;
++            if(index/2>=pattern.firstRow&&index/2-pattern.firstRow<pattern.rowCount&&
++               rows<pattern.rowCount-(index/2-pattern.firstRow)){inPattern=true;break;}
++        }
++        if(!inPattern)return false;
++        // Prove that start is a genuine segment boundary, not a zero byte in
++        // another record's payload. Row programs were validated above.
++        auto offset=u32(preparedOffsets_+index*4);
++        while(offset<start&&preparedPrograms_[offset]!=255){
++            const auto* p=preparedPrograms_+offset;
++            offset+=*p?2:6+unsigned(p[3])*2+unsigned(p[4])*4;
++        }
++        if(offset!=start||preparedPrograms_[offset])return false;
++        unsigned row=0,cells=0,nonempty=0;
++        while(offset!=end||row!=rows){
++            const auto* p=preparedPrograms_+offset;
++            if(*p==255){
++                if(row==rows)return false;
++                offset=u32(preparedOffsets_+(index+(++row)*2)*4);continue;
++            }
++            if(*p)return false; // A source event must never be crossed.
++            if(p[3])++nonempty;
++            for(unsigned c=0;c<p[3];++c){
++                if(cells==count||groupGeometry_[geometry+cells*2]!=p[6+c*2]||
++                   groupGeometry_[geometry+cells*2+1]!=row)return false;
++                ++cells;
++            }
++            offset+=6+unsigned(p[3])*2+unsigned(p[4])*4;
++        }
++        if(cells!=count||nonempty!=segments)return false;
++    }
++    return true;
++}
++
++bool BuilderPatternPack::preparedGroup(const std::uint8_t* start,PreparedGroup& out)const{
++    if(!valid()||!groupRecords_||!start)return false;
++    static_assert(sizeof(std::size_t)>=sizeof(void*),"pattern pointer range");
++    const auto address=reinterpret_cast<std::size_t>(start),base=reinterpret_cast<std::size_t>(preparedPrograms_);
++    if(address<base||address-base>=preparedSize_)return false;
++    const auto key=std::uint32_t(address-base);
++    unsigned low=0,high=groupCount_;
++    while(low<high){
++        const unsigned middle=low+(high-low)/2;const auto* record=groupRecords_+middle*24;
++        const auto candidate=u32(record);
++        if(candidate<key)low=middle+1;
++        else if(candidate>key)high=middle;
++        else{out={preparedPrograms_+u32(record+4),groupGeometry_+u32(record+8),
++                  u16(record+16),u16(record+18),u16(record+20)};return true;}
++    }
++    return false;
++}
++
++unsigned BuilderPatternPack::preparedGroupCursor(const std::uint8_t* start)const{
++    if(!valid()||!groupRecords_||!start)return groupCount_;
++    const auto address=reinterpret_cast<std::size_t>(start),base=reinterpret_cast<std::size_t>(preparedPrograms_);
++    if(address<base||address-base>=preparedSize_)return groupCount_;
++    const auto key=std::uint32_t(address-base);
++    unsigned low=0,high=groupCount_;
++    while(low<high){
++        const unsigned middle=low+(high-low)/2;
++        if(u32(groupRecords_+middle*24)<key)low=middle+1;else high=middle;
++    }
++    return low;
++}
++
++bool BuilderPatternPack::nextPreparedGroup(unsigned& cursor,const std::uint8_t* start,PreparedGroup& out)const{
++    if(!valid()||!groupRecords_||cursor>=groupCount_)return false;
++    const auto address=reinterpret_cast<std::size_t>(start),base=reinterpret_cast<std::size_t>(preparedPrograms_);
++    if(address<base||address-base>=preparedSize_)return false;
++    const auto key=std::uint32_t(address-base);
++    const auto* record=groupRecords_+cursor*24;
++    while(cursor<groupCount_&&u32(record)<key){++cursor;record+=24;}
++    if(cursor==groupCount_||u32(record)!=key)return false;
++    out={preparedPrograms_+u32(record+4),groupGeometry_+u32(record+8),
++         u16(record+16),u16(record+18),u16(record+20)};
++    ++cursor;return true;
+ }
+ 
+ bool BuilderPatternPack::pattern(std::uint32_t id,
+diff --git a/src/core/BuilderPatternPack.h b/src/core/BuilderPatternPack.h
+index 2730d278..7f3c8608 100644
+--- a/src/core/BuilderPatternPack.h
++++ b/src/core/BuilderPatternPack.h
+@@ -33,7 +33,8 @@ struct PackedBuilderPattern {
+ 
+ class BuilderPatternPack {
+ public:
+-    static constexpr std::uint16_t formatVersion = 4;
++    static constexpr std::uint16_t formatVersion = 6;
++    static constexpr std::uint16_t rowFormatVersion = 4;
+     // Catacomb literal rows only; no cavern-specific prepared terrain programs.
+     static constexpr std::uint16_t literalFormatVersion = 5;
+     static constexpr std::uint32_t manifestSchema = 3;
+@@ -69,12 +70,27 @@ public:
+     const std::uint8_t* preparedRow(const PackedBuilderPattern& pattern,
+                                   unsigned row, bool reversed) const;
+     const std::uint8_t* preparedPillars(bool reversed) const;
++    struct PreparedGroup {
++        const std::uint8_t* end=nullptr;
++        const std::uint8_t* geometry=nullptr;
++        unsigned count=0, rows=0, segments=0;
++    };
++    // Lookup by an actual row-program boundary. No runtime geometry building.
++    bool preparedGroup(const std::uint8_t* start,PreparedGroup& out)const;
++    // One source-ordered walk per pattern, rather than a global lookup for
++    // every row segment. The ordinary lookup remains the independent oracle.
++    unsigned preparedGroupCursor(const std::uint8_t* start)const;
++    bool nextPreparedGroup(unsigned& cursor,const std::uint8_t* start,PreparedGroup& out)const;
+ 
+ private:
++    bool validateGroups(std::uint32_t geometrySize)const;
+     const std::uint8_t* bytes_ = nullptr;
+     std::size_t patternsOffset_ = 0, rowsOffset_ = 0, cellsOffset_ = 0;
+     const std::uint8_t* preparedOffsets_ = nullptr;
+     const std::uint8_t* preparedPrograms_ = nullptr;
++    const std::uint8_t* groupRecords_ = nullptr;
++    const std::uint8_t* groupGeometry_ = nullptr;
++    std::uint32_t groupCount_ = 0, preparedSize_ = 0, groupGeometrySize_ = 0;
+     const std::uint8_t* literalOffsets_ = nullptr;
+     const std::uint8_t* literalBytes_ = nullptr;
+     std::uint32_t patternCount_ = 0, rowCount_ = 0, cellCount_ = 0;
+diff --git a/src/core/GameplayBuilderController.h b/src/core/GameplayBuilderController.h
+index 000b5dee..d56f5533 100644
+--- a/src/core/GameplayBuilderController.h
++++ b/src/core/GameplayBuilderController.h
+@@ -33,6 +33,11 @@ public:
+         return generate()&&good_;
+     }
+     bool valid()const{return good_;}
++    bool hasBorrowedPositionPublication(int x,int y)const{
++        return good_&&record_.lifetimeId&&phase_&&phase_->acquired&&
++            phase_->publication.x&&phase_->publication.y&&phase_->publication.appearance&&
++            x>=-0x7fffff&&x<=0x7fffff&&y>=-0x7fffff&&y<=0x7fffff;
++    }
+     void observeFailure(bool& owner){good_.observe(owner);}
+     InstanceHandle handle()const{return {0,record_.lifetimeId};}
+     const Record* find(InstanceHandle h)const{
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index cd801a3d..7719b2a6 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -792,6 +792,9 @@ private:
+         unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer,bool direct=false){
+         using Result=GameplayWorld::NativeTerrain::SpanResult;
+         completed=0;const unsigned count=cells.count;
++        // The generic collision journal below admits a horizontal envelope.
++        // Its reference path must retain scalar births for multi-row geometry.
++        if(cells.rowOffsets&&collisionConsumersAdmitted_)return Result::unsupported;
+         const unsigned slot=View::terrainBase+first.handle.slot;
+         const auto* wall=objectDefaults_.get(60);unsigned layerSlot=0;
+         if(!valid()||!count||count>GameplayWorld::NativeTerrain::capacity||
+@@ -809,10 +812,15 @@ private:
+             // This backend observes source identities/layers, not generic
+             // collision geometry or index membership. Admit the whole source
+             // span before publishing its same synchronous failure prefix.
+-            unsigned present=0;
++            unsigned present=0;int firstPlatform=0x7fffffff,lastPlatform=(-2147483647-1);
+             for(unsigned i=0;i<count;++i){
+                 present|=1u<<cells.kind(i);
+                 if(room_.contains(slot+i))return Result::unsupported;
++                if(cells.rowOffsets&&cells.kind(i)){
++                    const int y=cells.row(i);
++                    if(y<firstPlatform)firstPlatform=y;
++                    if(y>lastPlatform)lastPlatform=y;
++                }
+             }
+             for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind)){
+                 const int object=kind?93:60;
+@@ -828,7 +836,9 @@ private:
+             // cannot fail for these fresh slots. No callback observes a cell
+             // prefix, so publish chronology and retirement proof once.
+             if(!table_.externalBirthSpan(slot,count,stamp))return Result::unsupported;
+-            thinRetirementWindow_.appendSpan(cells.y,(present&2u)!=0,
++            if(cells.rowOffsets)thinRetirementWindow_.appendRange(firstPlatform,lastPlatform,(present&2u)!=0,
++                first.handle.generation+count-1,count);
++            else thinRetirementWindow_.appendSpan(cells.y,(present&2u)!=0,
+                 first.handle.generation+count-1,count);
+             if(!direct){terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;}
+             bool okay=true;
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index 97aa6c73..d369bc74 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -330,6 +330,10 @@ public:
+         return nativeTerrainInstances_&&nativeTerrainInstances_->constructPrepared(
+             downwell::terrainTileForArea(run_.stage.area),run_.effectsSucceeded,cells);
+     }
++    NativeTerrain::SpanResult tryConstructNativeTerrainPattern(NativeTerrain::PreparedCells cells){
++        return nativeTerrainInstances_?nativeTerrainInstances_->tryConstructPreparedPattern(
++            downwell::terrainTileForArea(run_.stage.area),cells):NativeTerrain::SpanResult::unsupported;
++    }
+     bool publishNativeTerrainIndexed(downwell::InstanceHandle h){
+         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
+             nativeTerrainInstances_->publishIndexed(h);
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index 50804b11..aa1dfad4 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -53,9 +53,14 @@ public:
+         // Optional lifetime promise, never inferred from a raw pointer: bytes
+         // remain immutable until these terrain lifetimes have all been cleared.
+         bool retained=false;
++        // Pattern geometry has row offsets instead of the builder program's
++        // per-cell RNG counts in its second byte. It is a separate immutable
++        // view; never reinterpret a prepared row's RNG bytes as coordinates.
++        bool rowOffsets=false;
+         unsigned kind(unsigned i)const{return bytes[i*2]>>7;}
+         int object(unsigned i)const{return kind(i)?93:60;}
+         int x(unsigned i)const{return (int(bytes[i*2]&127)-32)*16;}
++        int row(unsigned i)const{return rowOffsets?y+int(bytes[i*2+1])*16:y;}
+     };
+     struct Binding {
+         void* context=nullptr;
+@@ -327,6 +332,11 @@ public:
+     // layer or a journal service boundary, keep the scalar birth sequence.
+     bool constructPrepared(int tile,bool& effectsSucceeded,PreparedCells cells){
+         if(cells.count&&!cells.bytes)return good_=false;
++        if(cells.rowOffsets){
++            if(cells.count>Capacity)return good_=false;
++            for(unsigned i=0;i<cells.count;++i)
++                if(cells.y>0x7fffffff-int(cells.bytes[2*i+1])*16)return good_=false;
++        }
+         if(!good_||publicationRun_||pendingPublication_)return good_=false;
+         if(cells.retained&&cells.count&&binding_.constructDirectSpan){
+             bool admitted=false;
+@@ -340,6 +350,20 @@ public:
+             return appendPreparedCells(cells,tile,effectsSucceeded);
+         });
+     }
++    // Generation may decline this transaction before touching RNG/row state.
++    // Never execute scalar fallback here: it belongs at the original source
++    // segment boundaries, not ahead of their individual draws and setters.
++    SpanResult tryConstructPreparedPattern(int tile,PreparedCells cells){
++        if(!good_)return SpanResult::failure;
++        if(!cells.retained||!cells.rowOffsets||!cells.bytes||!cells.count||cells.count>Capacity||
++           publicationRun_||pendingPublication_||!binding_.constructDirectSpan)return SpanResult::unsupported;
++        for(unsigned i=0;i<cells.count;++i)
++            if(cells.y>0x7fffffff-int(cells.bytes[2*i+1])*16)return SpanResult::unsupported;
++        bool admitted=false,effects=true;publicationRun_=true;
++        const bool okay=appendPreparedCells(cells,tile,effects,true,&admitted);
++        publicationRun_=false;
++        return !okay?SpanResult::failure:admitted?SpanResult::success:SpanResult::unsupported;
++    }
+ private:
+     bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded,
+                              bool direct=false,bool* admitted=nullptr){
+@@ -351,11 +375,13 @@ private:
+         if(construct&&contiguous&&canAppend(count)){
+             Order temporary;Order* order=&temporary;
+             if(cells.retained){
+-                order=runs_.reserveRetainedCells({slot,next_},cells.bytes,cells.y,count);
++                order=cells.rowOffsets?
++                    runs_.reserveRetainedPatternCells({slot,next_},cells.bytes,cells.y,count):
++                    runs_.reserveRetainedCells({slot,next_},cells.bytes,cells.y,count);
+                 if(!order)return good_=false;
+             }
+             unsigned completed=0;std::uint32_t spatial[2]{};
+-            const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.y,-1,0};
++            const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.row(0),-1,0};
+             const auto result=construct(binding_.context,first,cells,tile,
+                                                     completed,order->stamp,spatial,order->layer);
+             if(result!=SpanResult::unsupported){
+@@ -373,11 +399,11 @@ private:
+                     }
+                 }
+                 while(i<completed){
+-                    const unsigned kind=cells.kind(i);const int x=cells.x(i),object=cells.object(i);
++                    const unsigned kind=cells.kind(i);const int x=cells.x(i),object=cells.object(i),y=cells.row(i);
+                     int step=16;if(i+1<completed&&cells.x(i+1)==x-16)step=-16;
+                     unsigned n=1;
+-                    while(i+n<completed&&cells.kind(i+n)==kind&&cells.x(i+n)==x+int(n)*step)++n;
+-                    if(!runs_.appendSpan({slot+i,next_+i},object,x,cells.y,step,n,order->shifted(i)))return good_=false;
++                    while(i+n<completed&&cells.kind(i+n)==kind&&cells.row(i+n)==y&&cells.x(i+n)==x+int(n)*step)++n;
++                    if(!runs_.appendSpan({slot+i,next_+i},object,x,y,step,n,order->shifted(i)))return good_=false;
+                     if(order->layer.bound()&&order->layer.inactive)
+                         for(unsigned j=0;j<n;++j)selectLayerCutoff(slot+i+j,true);
+                     const auto value=spatial[kind];
+@@ -399,7 +425,7 @@ private:
+         }
+         if(direct)return true;
+         for(unsigned i=0;i<count;++i){
+-            if(!appendConstructed(cells.object(i),cells.x(i),cells.y,true,0,-1,&effectsSucceeded,tile))return false;
++            if(!appendConstructed(cells.object(i),cells.x(i),cells.row(i),true,0,-1,&effectsSucceeded,tile))return false;
+         }
+         return true;
+     }
+diff --git a/src/core/StationaryRetirementWindow.h b/src/core/StationaryRetirementWindow.h
+index c2dc1614..c00a8f54 100644
+--- a/src/core/StationaryRetirementWindow.h
++++ b/src/core/StationaryRetirementWindow.h
+@@ -54,6 +54,17 @@ public:
+         proof_.cutoff=cutoff;proof_.revision=revision_;
+         valid_=proof_.supported&&revision_!=0xffffffffu;
+     }
++    // A callback-free multi-row publication. Intersecting the endpoint
++    // intervals is exactly the same as including every selected member;
++    // callers supply extrema of platforms only, not of unrelated walls.
++    void appendRange(int first,int last,bool selected,std::uint32_t cutoff,unsigned count) {
++        if(!count)return;
++        revision_=revision_>0xffffffffu-count?0xffffffffu:revision_+count;
++        if(!valid_)return;
++        if(selected){proof_.include(first);proof_.include(last);}
++        proof_.cutoff=cutoff;proof_.revision=revision_;
++        valid_=proof_.supported&&revision_!=0xffffffffu;
++    }
+     Proof begin(std::uint32_t cutoff)const {
+         Proof p;p.revision=revision_;p.cutoff=cutoff;return p;
+     }
+diff --git a/src/core/TerrainOwnershipRuns.h b/src/core/TerrainOwnershipRuns.h
+index 5983e578..e9495bed 100644
+--- a/src/core/TerrainOwnershipRuns.h
++++ b/src/core/TerrainOwnershipRuns.h
+@@ -18,14 +18,18 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
+     struct Run:Publication {
+         int object=0,x=0,y=0,step=0,creationCode=-1;
+         std::uint32_t generation=0;
+-        // object == -2 borrows an immutable prepared-cell stream. Authored
++        // object == -2 borrows an immutable prepared-cell stream; -3 borrows
++        // pattern geometry (column/kind, row offset in units of 16 pixels).
++        // Both streams use two bytes per cell, but only -2 contains RNG data.
++        // Authored
+         // identities instead retain their numeric source ID in the same space.
+         union { std::uint32_t source=0; const unsigned char* cells; };
+         Slot first=0,count=0,live=0,next=End,previous=End;
+-        int objectAt(unsigned i)const{return object==-2?((cells[2*i]&128)?93:60):object;}
+-        int xAt(unsigned i)const{return object==-2?(int(cells[2*i]&127)-32)*16:x+int(i)*step;}
+-        std::uint32_t sourceId()const{return object==-2?0:source;}
+-        void advance(unsigned n){if(object==-2)cells+=2*n;else x+=int(n)*step;}
++        int objectAt(unsigned i)const{return object<0?((cells[2*i]&128)?93:60):object;}
++        int xAt(unsigned i)const{return object<0?(int(cells[2*i]&127)-32)*16:x+int(i)*step;}
++        int yAt(unsigned i)const{return object==-3?y+int(cells[2*i+1])*16:y;}
++        std::uint32_t sourceId()const{return object<0?0:source;}
++        void advance(unsigned n){if(object<0)cells+=2*n;else x+=int(n)*step;}
+     };
+     Run runs_[Capacity]{};
+     inline static const Publication initialPublication_{};
+@@ -102,7 +106,7 @@ public:
+         if(!contains(h))return false;
+         const auto& r=runs_[locator_[h.slot]-1];
+         const unsigned offset=h.slot-r.first;
+-        out={h,r.objectAt(offset),r.xAt(offset),r.y,r.creationCode,r.sourceId()};return true;
++        out={h,r.objectAt(offset),r.xAt(offset),r.yAt(offset),r.creationCode,r.sourceId()};return true;
+     }
+     bool publication(InstanceHandle h,Publication& out)const{
+         if(!contains(h))return false;
+@@ -146,7 +150,7 @@ public:
+         // Only generated, adjacent horizontal cells share a descriptor.
+         // Authored source identities and creation scripts remain singleton.
+         if(tail_!=End&&!source&&creationCode==-1){auto& r=runs_[tail_];
+-            if(r.object!=-2&&!r.source&&r.creationCode==-1&&r.object==object&&r.y==y&&
++            if(r.object>=0&&!r.source&&r.creationCode==-1&&r.object==object&&r.y==y&&
+                 unsigned(r.first)+r.count==h.slot&&r.generation+r.count==h.generation){
+                 // Avoid subtraction overflow, including unusual caller coordinates.
+                 const int last=r.x+int(r.count-1)*r.step;
+@@ -207,6 +211,19 @@ public:
+         r.generation=first.generation;r.first=Slot(first.slot);r.count=Slot(count);r.live=0;
+         r.next=End;r.previous=End;reserved_=n;return &r;
+     }
++    // One actual authoritative descriptor across rows, not a collection of
++    // same-row constructors. The immutable geometry must outlive the store.
++    // RNG/source row publication is deliberately NOT encoded or executed here.
++    // Callers must retain those source boundaries before committing identities.
++    Publication* reserveRetainedPatternCells(InstanceHandle first,const unsigned char* cells,int y,unsigned count){
++        if(!cells||!count||count>Capacity)return nullptr;
++        unsigned lastRow=0;
++        for(unsigned i=0;i<count;++i)if(cells[2*i+1]>lastRow)lastRow=cells[2*i+1];
++        if(y>0x7fffffff-int(lastRow)*16)return nullptr;
++        auto* publication=reserveRetainedCells(first,cells,y,count);
++        if(publication)runs_[reserved_].object=-3;
++        return publication;
++    }
+     bool commitRetainedCells(unsigned completed){
+         if(reserved_==End||completed>runs_[reserved_].count)return false;
+         const unsigned n=reserved_;auto& r=runs_[n];reserved_=End;
+@@ -258,13 +275,17 @@ private:
+     template<bool Rows,class Visit> bool visitSelected(int first,int end,Visit visit)const{
+         // No structural mutation during this borrowed traversal.
+         for(unsigned n=head_;n!=End;n=runs_[n].next){const auto& r=runs_[n];
+-            // Select geometry before expanding identities: every cell in a run
+-            // shares Y. The margin admits the bounded wall artwork overhang.
+-            if(Rows&&((r.y<first&&unsigned(first)-unsigned(r.y)>=16u)||
++            // Same-row geometry can be selected before expanding identities.
++            // Pattern geometry requires each cell's retained row offset. The
++            // margin admits the bounded wall artwork overhang.
++            if(Rows&&r.object!=-3&&((r.y<first&&unsigned(first)-unsigned(r.y)>=16u)||
+                 (r.y>=end&&unsigned(r.y)-unsigned(end)>=16u)))continue;
+             int x=r.x;
+             for(unsigned i=0;i<r.count;++i){const unsigned slot=r.first+i;
+-                if(locator_[slot]==n+1&&!visit(Identity{{slot,r.generation+i},r.objectAt(i),r.object==-2?r.xAt(i):x,r.y,r.creationCode,r.sourceId()}))return false;
++                const int y=r.yAt(i);
++                if(Rows&&r.object==-3&&((y<first&&unsigned(first)-unsigned(y)>=16u)||
++                    (y>=end&&unsigned(y)-unsigned(end)>=16u)))continue;
++                if(locator_[slot]==n+1&&!visit(Identity{{slot,r.generation+i},r.objectAt(i),r.object<0?r.xAt(i):x,y,r.creationCode,r.sourceId()}))return false;
+                 if(i+1<r.count)x+=r.step;
+             }
+         }
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.cpp b/src/platform/amiga/AmigaGameplayGeneration.cpp
+index 698bc59c..03633edb 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.cpp
++++ b/src/platform/amiga/AmigaGameplayGeneration.cpp
+@@ -58,7 +58,43 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
+     if(terrainRuns)builder_.setTerrainRunObserver(createRun);
+ #ifndef DOWNWELL_REFERENCE_PATTERNS
+     if(terrainRuns)builder_.setPreparedTerrainPublisher(createPrepared);
++#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
++    if(terrainRuns)builder_.setPreparedTerrainGroupPublisher(createPreparedGroup);
+ #endif
++#endif
++}
++
++bool AmigaGameplayGeneration::createPreparedGroup(void* opaque,
++    const downwell::AreaOneBuilder::PreparedTerrainGroup& group,bool& handled){
++    auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);handled=false;
++    if(self.sourceCreate_||!self.runtime_||!self.lifetimes_||!self.runtime_->terrainCreatesBackendOnly()||
++       self.runtime_->nativeTerrainInstances()!=self.lifetimes_)return true;
++    const auto* controller=self.runtime_->builderController();
++    if(!controller||!controller->hasBorrowedPositionPublication(group.x(),group.finalY()))return true;
++    unsigned platforms=0,walls=0;
++    if(!group.visitSegments([&](const downwell::AreaOneBuilder::PreparedTerrain& batch){
++        if(!amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch))return false;
++        platforms+=batch.platforms();walls+=batch.count()-batch.platforms();return true;
++    }))return true;
++    if(platforms>AmigaTerrainTiles::capacity-self.tiles_.size()||
++       walls>self.index_.extraContacts.capacity()-self.index_.extraContacts.size())return true;
++    // One native lifetime descriptor and owner publication, using geometry
++    // prepared on the host. No per-row identity constructors or scratch arrays.
++    // Admission excludes callbacks/readers until the next source event cell.
++    const auto result=self.runtime_->tryConstructNativeTerrainPattern(
++        {group.geometry.geometry,group.geometry.count,group.y(),true,true});
++    if(result==TerrainLifetimes::SpanResult::unsupported)return true;
++    handled=true;
++    if(result!=TerrainLifetimes::SpanResult::success)return false;
++    return group.execute([&](const downwell::AreaOneBuilder::PreparedTerrain& batch){
++        if(!batch.beginPublication())return false;
++        if(batch.count()){
++            if(batch.y-24<self.dirtyFirst)self.dirtyFirst=batch.y-24;
++            if(batch.y+24>self.dirtyEnd)self.dirtyEnd=batch.y+24;
++        }
++        if(!amigaPublishPreparedTerrain(self.index_,self.tiles_,batch))return false;
++        batch.completePublication();return true;
++    });
+ }
+ 
+ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch,
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.h b/src/platform/amiga/AmigaGameplayGeneration.h
+index ffedc482..2fa8a0c1 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.h
++++ b/src/platform/amiga/AmigaGameplayGeneration.h
+@@ -56,6 +56,7 @@ private:
+     static bool createBreakable(void*,int,int,const downwell::GeneratedBreakableCreate&);
+     static bool createRun(void*,const downwell::AreaOneBuilder::TerrainRun&);
+     static bool createPrepared(void*,const downwell::AreaOneBuilder::PreparedTerrain&,downwell::AreaOneBuilder::EmitFunction);
++    static bool createPreparedGroup(void*,const downwell::AreaOneBuilder::PreparedTerrainGroup&,bool&);
+     AmigaAreaOneTerrainBuilder& builder_;
+     const downwell::BuilderPatternPack& patterns_;
+     const downwell::ObjectPack& objects_;
+diff --git a/src/platform/amiga/AmigaTerrain.cpp b/src/platform/amiga/AmigaTerrain.cpp
+index d9cb2bf3..1d4c11fb 100644
+--- a/src/platform/amiga/AmigaTerrain.cpp
++++ b/src/platform/amiga/AmigaTerrain.cpp
+@@ -215,6 +215,7 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
+     builder_.setTerrainRunEmitter(runObserver_?collectRun:nullptr);
+     builder_.setPreparedTerrainEmitter(preparedPublisher_?preparedPublisher_:(preparedObserver_?collectPrepared:nullptr),
+                                       preparedPublisher_?observerContext_:nullptr);
++    builder_.setPreparedTerrainGroupEmitter(preparedPublisher_?preparedGroupPublisher_:nullptr);
+     if (!builder_.stepVisible(patterns, random, viewBottomCeiling,
+                               collect, this, result)) {
+         failed_ = true;
+diff --git a/src/platform/amiga/AmigaTerrain.h b/src/platform/amiga/AmigaTerrain.h
+index 328d1065..a16d54ee 100644
+--- a/src/platform/amiga/AmigaTerrain.h
++++ b/src/platform/amiga/AmigaTerrain.h
+@@ -92,6 +92,7 @@ public:
+         runObserver_ = nullptr;
+         preparedObserver_ = nullptr;
+         preparedPublisher_ = nullptr;
++        preparedGroupPublisher_ = nullptr;
+         breakablePublisher_ = nullptr;
+     }
+     using RunObserver = bool (*)(void*,const downwell::AreaOneBuilder::TerrainRun&);
+@@ -102,6 +103,7 @@ public:
+     // publisher bypasses the collection adapter; stepVisible still latches
+     // any failed publication before another generation step can run.
+     void setPreparedTerrainPublisher(downwell::AreaOneBuilder::PreparedTerrainFunction publisher){preparedPublisher_=publisher;}
++    void setPreparedTerrainGroupPublisher(downwell::AreaOneBuilder::PreparedTerrainGroupFunction publisher){preparedGroupPublisher_=publisher;}
+     void setBreakablePublisher(downwell::AreaOneBuilder::BreakableEmitter publisher){breakablePublisher_=publisher;}
+     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
+     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
+@@ -147,6 +149,7 @@ private:
+     RunObserver runObserver_ = nullptr;
+     PreparedObserver preparedObserver_ = nullptr;
+     downwell::AreaOneBuilder::PreparedTerrainFunction preparedPublisher_=nullptr;
++    downwell::AreaOneBuilder::PreparedTerrainGroupFunction preparedGroupPublisher_=nullptr;
+     downwell::AreaOneBuilder::BreakableEmitter breakablePublisher_=nullptr;
+ };
+ 
+diff --git a/tests/core/AreaOneBuilderTest.cpp b/tests/core/AreaOneBuilderTest.cpp
+index 1bd5beec..74c8010a 100644
+--- a/tests/core/AreaOneBuilderTest.cpp
++++ b/tests/core/AreaOneBuilderTest.cpp
+@@ -207,15 +207,21 @@ int main(int argc, char** argv) {
+     for(unsigned seed:{2u,4u,8u}){
+         std::vector<int> expected;
+         GameMakerRandom expectedRandom;
+-        for(unsigned mode=0;mode<3;++mode){
++        for(unsigned mode=0;mode<4;++mode){
+             AreaOneBuilder builder;
+             GameMakerRandom random(seed);
+             builder.reset(-16,704,random);
+             RowPublication publication{&builder};
+             builder.setPositionPublisher(RowPublication::position,&publication);
+             builder.enableTerrainRuns(mode==1);
+-            if(mode==2)builder.setPreparedTerrainEmitter([](void* p,const AreaOneBuilder::PreparedTerrain& row,
++            if(mode>=2)builder.setPreparedTerrainEmitter([](void* p,const AreaOneBuilder::PreparedTerrain& row,
+                 AreaOneBuilder::EmitFunction emit){return row.executeReference(emit,p);});
++            if(mode==3)builder.setPreparedTerrainGroupEmitter([](void* p,const AreaOneBuilder::PreparedTerrainGroup& group,bool& handled){
++                handled=true;
++                return group.execute([&](const AreaOneBuilder::PreparedTerrain& row){
++                    return row.executeReference(RowPublication::create,p);
++                });
++            });
+             for(unsigned tick=0;tick<128&&!builder.endReached();++tick){
+                 AreaOneBuilderStep result;
+                 require(builder.step(pack,random,RowPublication::create,&publication,result),
+@@ -242,7 +248,7 @@ int main(int argc, char** argv) {
+     }
+     unsigned runs=0,runCells=0;
+     for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
+-    for(unsigned executor:{0u,1u,2u,3u,4u})for(unsigned failAt:{0u,1u,2u,17u,101u,701u}){
++    for(unsigned executor:{0u,1u,2u,3u,4u,5u})for(unsigned failAt:{0u,1u,2u,17u,101u,701u}){
+         AreaOneBuilder scalar,grouped;GameMakerRandom a(seed),b(seed);
+         scalar.reset(240,704,a,{level,seed%5,true,false});
+         grouped.reset(240,704,b,{level,seed%5,true,false});
+@@ -324,6 +330,19 @@ int main(int argc, char** argv) {
+                     sameRandom(after,p.random)&&calls==p.count,"prepared segment cannot be replayed");
+             return ok;
+         });
++        if(executor==5){
++            right.callback=emit;
++            grouped.setPreparedTerrainGroupEmitter([](void* context,const AreaOneBuilder::PreparedTerrainGroup& group,bool& handled){
++                auto& p=*static_cast<RunProbe*>(context);handled=true;
++                const bool okay=group.execute([&](const AreaOneBuilder::PreparedTerrain& batch){
++                    ++p.runs;p.cells+=batch.count();return batch.executeReference(p.callback,context);
++                });
++                const auto after=p.random;const unsigned calls=p.count;
++                require(!group.execute([](const auto&){return true;})&&sameRandom(after,p.random)&&calls==p.count,
++                    "group cannot be replayed after completion or failure");
++                return okay;
++            });
++        }
+         bool terminated=false;
+         for(unsigned tick=0;tick<128&&!terminated;++tick){
+             for(unsigned j=0;j<tick%5;++j){a.nextU32();b.nextU32();}
+diff --git a/tests/core/BuilderPatternPackTest.cpp b/tests/core/BuilderPatternPackTest.cpp
+index 3a9c23de..3b18b036 100644
+--- a/tests/core/BuilderPatternPackTest.cpp
++++ b/tests/core/BuilderPatternPackTest.cpp
+@@ -114,8 +114,11 @@ int main(int argc, char** argv) {
+                              pattern) && pattern.rowCount == 10,
+             "last recovered area-one ending is addressable");
+ 
++    unsigned groupsChecked=0,groupCells=0;
+     for (unsigned id = 0; id < pack.patternCount(); ++id) {
+         require(pack.pattern(id, pattern), "enumerate row-view pattern");
++        unsigned cursors[]={pack.preparedGroupCursor(pack.preparedRow(pattern,0,false)),
++                            pack.preparedGroupCursor(pack.preparedRow(pattern,0,true))};
+         for (unsigned y = 0; y < pattern.rowCount; ++y) {
+             const std::uint8_t* row = nullptr;
+             std::uint32_t width = 0, expectedWidth = 0;
+@@ -153,6 +156,32 @@ int main(int argc, char** argv) {
+                 require(p,"prepared row exists");
+                 while(*p!=255){
+                     if(*p){actual.push_back(0x10000u|(unsigned(p[0])<<8)|p[1]);p+=2;continue;}
++                    downwell::BuilderPatternPack::PreparedGroup group;
++                    downwell::BuilderPatternPack::PreparedGroup ordered;
++                    const bool found=pack.preparedGroup(p,group);
++                    require(pack.nextPreparedGroup(cursors[reversed],p,ordered)==found,
++                            "source-ordered cursor matches independent group lookup");
++                    if(found){
++                        require(group.end==ordered.end&&group.geometry==ordered.geometry&&group.count==ordered.count&&
++                            group.rows==ordered.rows&&group.segments==ordered.segments,"cursor returns exact group metadata");
++                        ++groupsChecked;groupCells+=group.count;
++                        require(group.rows<pattern.rowCount-y&&group.segments>=2,
++                                "group remains inside this pattern and replaces several row segments");
++                        const auto* q=p;unsigned rowDelta=0,cell=0,segments=0;
++                        while(q!=group.end||rowDelta!=group.rows){
++                            if(*q==255){
++                                require(rowDelta<group.rows,"group endpoint is reachable");
++                                q=pack.preparedRow(pattern,y+(++rowDelta),reversed);continue;
++                            }
++                            require(!*q,"group never crosses a source event");
++                            if(q[3])++segments;
++                            for(unsigned c=0;c<q[3];++c,++cell)
++                                require(cell<group.count&&group.geometry[cell*2]==q[6+c*2]&&
++                                    group.geometry[cell*2+1]==rowDelta,"group geometry matches ordered row births");
++                            q+=6+unsigned(q[3])*2+unsigned(q[4])*4;
++                        }
++                        require(cell==group.count&&segments==group.segments,"group counts are exact");
++                    }
+                     unsigned consumed=0, flags[128]={},walls[128]={},seen[128]={};
+                     for(unsigned i=0;i<p[3];++i){
+                         const unsigned item=p[6+i*2],n=p[7+i*2]&127;
+@@ -192,6 +221,33 @@ int main(int argc, char** argv) {
+         require(!pack.rowData(invalid, 0, row, width), "row view rejects excessive row width");
+     }
+ 
++    if(bytes[4]==6){
++        require(groupsChecked>0&&groupCells>groupsChecked,"all offline group lookups exercised");
++        const auto u32=[&](unsigned at){return unsigned(bytes[at])|(unsigned(bytes[at+1])<<8)|
++            (unsigned(bytes[at+2])<<16)|(unsigned(bytes[at+3])<<24);};
++        const unsigned extension=32+pack.patternCount()*20+pack.rowCount()*8+pack.cellCount();
++        const unsigned offsets=extension+4,tableBytes=(pack.rowCount()*2+3)*4;
++        const unsigned groupStart=offsets+tableBytes+u32(offsets+tableBytes-4);
++        require(u32(groupStart+4)==groupsChecked,"each serialized group has exactly one source lookup");
++        const unsigned records=groupStart+12,geometry=records+groupsChecked*24;
++        for(unsigned field:{0u,4u,8u,12u,16u,18u,20u,22u}){
++            auto bad=bytes;
++            if(field<16)for(unsigned i=0;i<4;++i)bad[records+field+i]=255;
++            else if(field==22)bad[records+field]=1;
++            else {bad[records+field]=0;bad[records+field+1]=0;}
++            // Zero rows can be valid for multiple segments in one row; use an
++            // impossible row range for that field instead.
++            if(field==18){bad[records+18]=255;bad[records+19]=255;}
++            require(!downwell::BuilderPatternPack(bad.data(),bad.size()).valid(),"malformed group record rejected");
++        }
++        for(unsigned byte:{0u,1u}){
++            auto bad=bytes;bad[geometry+byte]^=1;
++            require(!downwell::BuilderPatternPack(bad.data(),bad.size()).valid(),"geometry mismatch rejected");
++        }
++        auto legacy=bytes;legacy.resize(groupStart);legacy[4]=4;
++        require(downwell::BuilderPatternPack(legacy.data(),legacy.size()).valid(),"unchanged row program remains a v4 reference");
++        std::cout<<"prepared groups: "<<groupsChecked<<", identities: "<<groupCells<<'\n';
++    }
+     std::vector<std::uint8_t> damaged = bytes;
+     damaged[40] = 0xff;
+     damaged[41] = 0xff;
+diff --git a/tests/core/GameplayCollisionContractTest.cpp b/tests/core/GameplayCollisionContractTest.cpp
+index f56bde0b..d4108325 100644
+--- a/tests/core/GameplayCollisionContractTest.cpp
++++ b/tests/core/GameplayCollisionContractTest.cpp
+@@ -52,4 +52,53 @@ int main() {
+         auto incompatible=create(kind,true);
+         assert(!incompatible->valid());
+     }
++    // Exercise the real external owner, not a stand-in span callback. One
++    // pattern descriptor must publish the same identities, independent layer
++    // clock, registrations and flags as the retained scalar birth path.
++    const auto rb=read("generated/downwell-rooms.dwrm");
++    RoomPack rooms(rb.data(),rb.size());assert(rooms.valid());
++    const auto patternWitness=[&](bool grouped){
++        auto owner=std::make_unique<Owner>(objects,sprites,
++            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},
++            &rooms,Owner::Ownership::nativeScenery,true,true);
++        assert(owner->declareExternalCollisionBackend());
++        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
++            owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
++        assert(owner->attach(*world));
++        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
++        assert(world->bindNativeTerrain(*terrain));
++        // First birth installs the owner/layer link as it does during room
++        // entry, before the builder's prepared generation transactions.
++        assert(world->constructNativeTerrainRun([](auto birth){return birth(60,16,32);}));
++        unsigned char cells[24];
++        for(unsigned i=0;i<12;++i){
++            cells[2*i]=static_cast<unsigned char>(32+(i%6)|((i%3==0)?128:0));
++            cells[2*i+1]=static_cast<unsigned char>(i/3);
++        }
++        if(grouped)assert(world->constructNativeTerrainPrepared({cells,12,64,true,true}));
++        else assert(world->constructNativeTerrainRun([&](auto birth){
++            for(unsigned i=0;i<12;++i)
++                if(!birth(i%3==0?93:60,int(i%6)*16,64+int(i/3)*16))return false;
++            return true;
++        }));
++        assert(owner->valid()&&terrain->size()==13);
++        if(grouped)assert(terrain->runCount()==2); // Entry + one multi-row record.
++        std::vector<std::uint32_t> result;
++        for(unsigned i=0;i<terrain->size();++i){
++            const auto h=terrain->handle(i);GameplayWorld::NativeTerrain::Identity id;
++            bool active,destroyed;std::uint32_t flags;
++            assert(terrain->read(h,id,active,destroyed)&&terrain->spatialFlags(h,flags));
++            const auto layer=terrain->layerState(h);assert(layer&&layer->bound());
++            result.insert(result.end(),{h.slot,h.generation,unsigned(id.object),unsigned(id.x),unsigned(id.y),
++                unsigned(active),unsigned(destroyed),flags,terrain->registrationOrder(h),
++                layer->order.serial.low,layer->order.serial.high,unsigned(layer->order.tail),
++                unsigned(layer->layer),unsigned(layer->inactive)});
++        }
++        assert(owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t flags){
++            result.insert(result.end(),{h.slot,h.generation,unsigned(object),flags});return true;
++        }));
++        assert(terrain->clear()&&owner->valid());
++        return result;
++    };
++    assert(patternWitness(false)==patternWitness(true));
+ }
+diff --git a/tests/core/StationaryRetirementWindowTest.cpp b/tests/core/StationaryRetirementWindowTest.cpp
+index efecdc4c..ffaa6d41 100644
+--- a/tests/core/StationaryRetirementWindowTest.cpp
++++ b/tests/core/StationaryRetirementWindowTest.cpp
+@@ -63,6 +63,27 @@ int main() {
+         scalar.complete(stale);batch.complete(stale);
+         assert(!scalar.contains(0,1)&&!batch.contains(0,1));
+     }
++    // Multi-row groups retain the exact scalar proof, including mixed walls,
++    // stale completions and domain failures. Test camera pixels immediately
++    // either side of both retirement boundaries, not just ordinary interiors.
++    for(int origin:{-521300,-10000,0,524120})for(unsigned count=1;count<=16;++count)
++    for(unsigned selection:{0u,1u,2u,3u}){
++        StationaryRetirementWindow scalar,group;
++        scalar.complete(scalar.begin(1));group.complete(group.begin(1));
++        int low=0x7fffffff,high=(-2147483647-1);bool any=false;
++        for(unsigned i=0;i<count;++i){
++            const int y=origin+int((i*7)%16)*16;
++            const bool selected=selection==3||(selection&&i%3==selection-1);
++            scalar.append(y,selected,i+2);
++            if(selected){any=true;if(y<low)low=y;if(y>high)high=y;}
++        }
++        group.appendRange(low,high,any,count+1,count);
++        assert(scalar.begin(count+1).revision==group.begin(count+1).revision);
++        for(int i=0;i<16;++i)for(int offset:{-3000,160})for(int adjacent:{-1,0,1}){
++            const long top=(long(origin)+i*16+offset)*4096+adjacent;
++            assert(scalar.contains(top,count+1)==group.contains(top,count+1));++checks;
++        }
++    }
+     StationaryRetirementWindow saturated;
+     saturated.complete(saturated.begin(1));
+     saturated.appendSpan(0,false,2,0xffffffffu);
+diff --git a/tests/core/TerrainOwnershipRunsTest.cpp b/tests/core/TerrainOwnershipRunsTest.cpp
+index 348dbf69..529f576b 100644
+--- a/tests/core/TerrainOwnershipRunsTest.cpp
++++ b/tests/core/TerrainOwnershipRunsTest.cpp
+@@ -33,6 +33,84 @@ struct Publication {
+         return order.low==b.order.low&&order.high==b.order.high&&flags==b.flags;
+     }
+ };
++static void patternGeometryRuns(){
++    using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
++    unsigned char geometry[128];
++    // Includes coincident identities, reverse X, mixed kinds and nonmonotonic
++    // rows. The storage representation must not assume a sorted spatial list.
++    for(unsigned i=0;i<64;++i){
++        geometry[2*i]=static_cast<unsigned char>((63-i/2)|((i&1)?128:0));
++        geometry[2*i+1]=static_cast<unsigned char>((i*37)%256);
++    }
++    unsigned comparisons=0;
++    for(unsigned prefix=0;prefix<=64;++prefix){
++        Runs actual,scalar;
++        const Publication base{{0xffffffe0u,7},8};
++        auto* pending=actual.reserveRetainedPatternCells({0,100},geometry,-256,64);
++        require(pending&&actual.reservationPending()&&!actual.size()&&!actual.runCount());
++        *pending=base;
++        require(!actual.reserveRetainedPatternCells({0,100},geometry,0,64));
++        require(!actual.commitRetainedCells(65)&&actual.reservationPending());
++        require(actual.commitRetainedCells(prefix));
++        require(actual.runCount()==(prefix?1u:0u));
++        for(unsigned i=0;i<prefix;++i)
++            require(scalar.append({i,100+i},i&1?93:60,(int(geometry[2*i]&127)-32)*16,
++                -256+int(geometry[2*i+1])*16,0,-1,base.shifted(i)));
++        auto compare=[&]{
++            require(actual.size()==scalar.size());
++            std::vector<Runs::Identity> expected;
++            require(scalar.visit([&](const auto& id){expected.push_back(id);return true;}));
++            unsigned ordinal=0;
++            require(actual.visit([&](const auto& id){
++                const auto& e=expected.at(ordinal++);
++                require(id.handle.slot==e.handle.slot&&id.handle.generation==e.handle.generation&&
++                    id.x==e.x&&id.y==e.y&&id.object==e.object&&id.source==e.source&&id.creationCode==e.creationCode);
++                Runs::Identity read;require(actual.read(id.handle,read)&&read.x==id.x&&read.y==id.y);
++                Publication a,b;require(actual.publication(id.handle,a)&&scalar.publication(id.handle,b)&&a.same(b));
++                return true;
++            }));
++            require(ordinal==expected.size());
++            for(int first=-272;first<3840;first+=127){
++                std::vector<unsigned> a,b;
++                auto capture=[](auto& out){return [&](const auto& id){out.push_back(id.handle.slot);return true;};};
++                require(actual.visitRows(first,first+80,capture(a))&&scalar.visitRows(first,first+80,capture(b))&&a==b);
++                unsigned stopped=0;
++                require(actual.visitRows(first,first+80,[&](const auto&){++stopped;return false;})==a.empty());
++                require(stopped==(a.empty()?0u:1u));
++            }
++            ++comparisons;
++        };
++        compare();
++        // Retire/reuse holes before publication splits: the retained pointer
++        // must advance on a split without rebasing its absolute row origin.
++        for(unsigned i=1;i<prefix;i+=2){
++            require(actual.retire({i,100+i})&&scalar.retire({i,100+i}));
++            require(actual.append({i,1000+i},60,32,48)&&scalar.append({i,1000+i},60,32,48));
++        }
++        compare();
++        for(unsigned i=0;i<prefix;i+=2){
++            const Publication changed{{i,19},i};
++            require(actual.changePublication({i,100+i},changed)&&scalar.changePublication({i,100+i},changed));
++            compare();
++        }
++        while(actual.size()){
++            const auto h=actual.handle(0);
++            require(actual.retire(h)&&scalar.retire(h));
++        }
++        compare();
++        require(actual.reserveRetainedPatternCells({0,2000},geometry,-256,64));
++        require(actual.commitRetainedCells(0)&&!actual.size()&&!actual.runCount());
++    }
++    Runs limits;
++    const unsigned char edge[]={32,255};
++    require(!limits.reserveRetainedPatternCells({0,1},edge,0x7fffffff-4079,1));
++    require(limits.reserveRetainedPatternCells({0,1},edge,0x7fffffff-4080,1));
++    require(limits.commitRetainedCells(1));
++    Runs::Identity id;require(limits.read({0,1},id)&&id.y==0x7fffffff);
++    require(!limits.reserveRetainedPatternCells({1,2},nullptr,0,1));
++    require(!limits.reserveRetainedPatternCells({1,2},edge,0,65));
++    std::printf("Multi-row retained identities: %u scalar comparisons passed\n",comparisons);
++}
+ static void publicationRuns(){
+     using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
+     Runs runs;
+@@ -601,7 +679,7 @@ static void preparedSpanConstruction(){
+         };
+         return b;
+     };
+-    for(unsigned direct:{0u,1u,2u})for(bool retained:{false,true})for(int failure:{-1,0,1,5,11}){
++    for(unsigned direct:{0u,1u,2u})for(bool retained:{false,true})for(bool rows:{false,true})for(int failure:{-1,0,1,5,11}){
+         Native scalar,bulk;Observer a{&scalar},b{&bulk};a.fail=b.fail=failure;
+         auto bindings=binding(b,true);
+         if(direct==1)bindings.constructDirectSpan=bindings.constructSpan;
+@@ -612,9 +690,12 @@ static void preparedSpanConstruction(){
+         require(scalar.bind(binding(a,false))&&bulk.bind(bindings));
+         bool af=true,bf=true;
+         unsigned char source[24]{};
+-        for(unsigned i=0;i<12;++i)source[i*2]=32+(i<6?i:11-i)+(i%3==1?128:0);
+-        const bool expected=scalar.constructPrepared(51,af,{source,12,32});
+-        const bool actual=bulk.constructPrepared(51,bf,{source,12,32,retained});
++        for(unsigned i=0;i<12;++i){
++            source[i*2]=32+(i<6?i:11-i)+(i%3==1?128:0);
++            source[i*2+1]=static_cast<unsigned char>((i*7)%19);
++        }
++        const bool expected=scalar.constructPrepared(51,af,{source,12,32,false,rows});
++        const bool actual=bulk.constructPrepared(51,bf,{source,12,32,retained,rows});
+         require(expected==actual&&scalar.size()==bulk.size()&&scalar.lastLifetime()==bulk.lastLifetime());
+         require(af==bf&&a.next==b.next&&a.clock.low==b.clock.low&&a.clock.high==b.clock.high);
+         require(b.spanCalls==1&&b.spanCells==(failure<0?12u:unsigned(failure)));
+@@ -622,6 +703,10 @@ static void preparedSpanConstruction(){
+         require(b.directMisses==(retained&&direct==2?1u:0u));
+         if(actual)for(unsigned i=0;i<scalar.size();++i){
+             const auto h=scalar.handle(i);std::uint32_t ap=0,bp=0;int as=0,bs=0;unsigned ai=0,bi=0;bool ac=false,bc=false;
++            Native::Identity aId,bId;bool aa,ad,ba,bd;
++            require(scalar.read(h,aId,aa,ad)&&bulk.read(h,bId,ba,bd));
++            require(aId.x==bId.x&&aId.y==bId.y&&aId.object==bId.object&&aa==ba&&ad==bd);
++            require(bId.y==32+(rows?int(source[i*2+1])*16:0));
+             require(scalar.registrationOrder(h)==bulk.registrationOrder(h));
+             require(scalar.layerState(h)->same(*bulk.layerState(h)));
+             require(scalar.spatialFlags(h,ap)&&bulk.spatialFlags(h,bp)&&ap==bp);
+@@ -632,6 +717,32 @@ static void preparedSpanConstruction(){
+     require(terminal.bind(binding(observer,true)));
+     const unsigned char one[]={32,0};bool effects=true;
+     require(!terminal.constructPrepared(51,effects,{one,1,0,true})&&!terminal.valid());
++    Native overflow;Observer overflowObserver{&overflow};
++    require(overflow.bind(binding(overflowObserver,true)));
++    const unsigned char high[]={32,1};
++    require(!overflow.constructPrepared(51,effects,{high,1,0x7fffffff,true,true}));
++    require(!overflow.size()&&!overflowObserver.spanCalls&&!overflowObserver.begins);
++    for(bool accept:{false,true}){
++        Native candidate;Observer observed{&candidate};
++        auto b=binding(observed,true);
++        if(accept)b.constructDirectSpan=b.constructSpan;
++        else b.constructDirectSpan=[](void*,const Native::Identity&,Native::PreparedCells,int,
++            unsigned&,std::uint32_t&,std::uint32_t*,downwell::RunnerRetainedLayerState&){
++            return Native::SpanResult::unsupported;
++        };
++        require(candidate.bind(b));
++        const unsigned char geometry[]={32,0,160,1,33,2};
++        const auto result=candidate.tryConstructPreparedPattern(51,{geometry,3,64,true,true});
++        require(result==(accept?Native::SpanResult::success:Native::SpanResult::unsupported));
++        require(candidate.valid()&&candidate.size()==(accept?3u:0u)&&
++            !observed.begins&&!observed.ends&&observed.spanCalls==unsigned(accept));
++        if(!accept){
++            // Declining a group must release its hidden reservation so the
++            // original per-row path can still publish the same source births.
++            require(candidate.constructPrepared(51,effects,{geometry,3,64,false,true}));
++            require(candidate.size()==3&&observed.begins==1&&observed.ends==1);
++        }
++    }
+     std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
+ }
+ static void reservedIdentitySegments(){
+@@ -874,6 +985,7 @@ int main(){
+         require(live.runCount()==1&&!live.canAppend(1)&&!live.append(60,0,0)&&!live.valid());
+     }
+     constructorPublication();
++    patternGeometryRuns();
+     publicationRuns();
+     combinedPublicationBoundaries();
+     runCutoffs();
+diff --git a/tools/generate-amiga-transient-banks.py b/tools/generate-amiga-transient-banks.py
+index c15cd019..0cc0094b 100644
+--- a/tools/generate-amiga-transient-banks.py
++++ b/tools/generate-amiga-transient-banks.py
+@@ -5,13 +5,15 @@ import json
+ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+-VERSION = 'generate-amiga-transient-banks/v5'
++VERSION = 'generate-amiga-transient-banks/v6'
+ # Budgets are deliberately not inferred from payload sizes. Growth must be
+ # reviewed against scene peak residency, not silently enlarge an allocation.
+ # Upgrade owns the living player's DMA poses (16 KiB allowance), allowing the
+ # entire 221282-byte cavern CPU pack and 106574-byte DMA pack to retire.
++# Multi-row identity geometry adds 21,540 ordinary bytes to the cavern pack.
++# It uses the existing gameplay-only Fast allocation, never the Chip arena.
+ BANKS = {'results': 24576, 'shop': 16384, 'clear': 188416,
+-         'patterns': 72 * 1024, 'exitmask': 31104, 'selectionmask': 14256,
++         'patterns': 96 * 1024, 'exitmask': 31104, 'selectionmask': 14256,
+          'hud': 16 * 1024, 'entrymask': 31104}
+ 
+ 
+diff --git a/tools/generate-builder-pattern-pack.py b/tools/generate-builder-pattern-pack.py
+index a893cf75..98aadd0b 100755
+--- a/tools/generate-builder-pattern-pack.py
++++ b/tools/generate-builder-pattern-pack.py
+@@ -12,7 +12,7 @@ from pathlib import Path
+ 
+ 
+ MAGIC = b"DWBP"
+-VERSION = 4
++VERSION = 6
+ MANIFEST_SCHEMA = 3
+ SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
+ AREA_ONE_START = 1
+@@ -32,6 +32,7 @@ EXPECTED_CELLS = 8435
+ HEADER = struct.Struct("<4sHHIIIQI")
+ PATTERN = struct.Struct("<HHHHIII")
+ ROW = struct.Struct("<II")
++GROUP = struct.Struct("<IIIIHHHH")
+ 
+ # Every other symbol has only the unconditional cavern cutoff draw. Event
+ # cells retain the runtime VM-derived implementation and exact draw order.
+@@ -213,8 +214,50 @@ def build_pack(manifest, start_source, main_source, right_source, shop_source,
+         offsets.append(struct.pack("<I", len(programs)))
+         programs.extend(program)
+     offsets.append(struct.pack("<I", len(programs)))
++    # Immutable multi-row identity geometry. A group stops before every source
++    # event cell, even one that does not happen to create an actor this time.
++    # The original row programs still own RNG counts, occupancy and row setters.
++    groups = []
++    for record in records:
++        _, _, _, rows, first_row, _, _ = PATTERN.unpack(record)
++        for reversed in (False, True):
++            pending = []
++            def finish(end, end_row):
++                if sum(bool(item[2]) for item in pending) < 2:
++                    return
++                start, start_row, _, program_index = pending[0]
++                geometry = bytearray()
++                for _, row, creates, _ in pending:
++                    require(row-start_row < 256, "pattern group row offset overflow")
++                    for column in creates:
++                        geometry.extend((column, row-start_row))
++                require(len(geometry)//2 < 65536, "pattern group identity count overflow")
++                groups.append((start, end, program_index, end_row-start_row,
++                               sum(bool(item[2]) for item in pending), bytes(geometry)))
++            for row in range(rows):
++                index = (first_row+row)*2+int(reversed)
++                program = prepared[index]
++                origin = struct.unpack("<I", offsets[index])[0]
++                p = 0
++                while program[p] != 255:
++                    if program[p]:
++                        finish(origin+p, row)
++                        pending = []
++                        p += 2
++                    else:
++                        count, words = program[p+3], program[p+4]
++                        pending.append((origin+p, row, program[p+6:p+6+count*2:2], index))
++                        p += 6+count*2+words*4
++            finish(origin+p, rows-1)
++    group_records, geometry = [], bytearray()
++    for start, end, index, row_delta, segments, payload in sorted(groups):
++        group_records.append(GROUP.pack(start, end, len(geometry), index,
++                                        len(payload)//2, row_delta, segments, 0))
++        geometry.extend(payload)
++    extension = b"DWPG" + struct.pack("<II", len(groups), len(geometry))
+     return b"".join((header, b"".join(records), b"".join(row_records), cells,
+-                     b"DWPR", b"".join(offsets), programs))
++                     b"DWPR", b"".join(offsets), programs, extension,
++                     b"".join(group_records), geometry))
+ 
+ 
+ def atomic_write(path, payload):
