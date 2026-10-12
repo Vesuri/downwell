@@ -4,6 +4,7 @@ cd "$(dirname "$0")"
 . ./env.sh
 mode="${1:-probes}"
 transition=0
+ready_marker=DOWNWELL_PROFILE_READY
 case "$mode" in
   probes) flags=(PROBES=1); script=profile.gdb ;;
   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
@@ -11,6 +12,14 @@ case "$mode" in
     flags=(FPSCOUNT=1); script=profile_fps.gdb
     export PROFILE_IDLE=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
+    ;;
+  quiet-fall)
+    flags=(FPSCOUNT=1 TRACE_FRAMES=165); script=profile_quiet_cadence.gdb
+    ready_marker=DOWNWELL_QUIET_CADENCE_READY
+    export STRIP=1 PROFILE_IDLE=1 PROFILE_FRAMES=600 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
+    export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
+    export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
+    export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-90}"
     ;;
   overflow-state)
     flags=(FPSCOUNT=1 OVERFLOW_VERIFY=1); script=verify_overflow.gdb
@@ -104,7 +113,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -209,7 +218,7 @@ if [[ ${PREPARED_FIELDS:-0} == 1 ]]; then
   shasum -a 256 .run/profile-text.dump
 fi
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
-GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
+GDB_SOURCE="$script" READY_MARKER="$ready_marker" \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 if [[ ${PROFILE_ENTRY:-0} == 1 ]]; then
   cmp .run/entry-hud.bin ../generated/amiga-hud.dwap
@@ -237,7 +246,9 @@ if [[ $mode == trace ]]; then
   echo "Traces: $trace_out (report: python3 tools/amiga-trace-report.py $trace_out)"
   exit 0
 fi
-if [[ $mode == draw-cache ]]; then
+if [[ $mode == quiet-fall ]]; then
+  grep '^QUIET_' ".run/profile-${mode}.log"
+elif [[ $mode == draw-cache ]]; then
   grep '^DRAW_CACHE' ".run/profile-${mode}.log"
 elif [[ $mode == draw-order ]]; then
   grep '^DRAW_ORDER' ".run/profile-${mode}.log"

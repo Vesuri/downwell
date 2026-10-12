@@ -4,6 +4,22 @@
 
 ### Complete fall through first landing
 
+Reproduce the current target-memory cadence from the repository root with:
+
+```sh
+bash amiga/profile.sh quiet-fall
+```
+
+This cleans/builds a stripped no-input profiling executable, defaults to
+512 KiB Chip, stops at first landing after 164 updates, prints its executable
+hash and `QUIET_CADENCE`/`QUIET_LANDING`, and restores the normal stripped
+build on exit. The emulator run has a 90-second deadline; build time is
+separate. The raw debugger result remains in
+`amiga/.run/profile-quiet-fall.log`. `VERIFY_CHIP_KB=1024` explicitly selects
+the expanded-memory historical-comparison configuration; it is not the default.
+This is a cadence measurement, not a pixel oracle or a passing performance
+threshold. A successful run still needs comparison with the historical target.
+
 The complete no-input fall is 164 updates. `13e08ca2` and `f5c7705f`
 match all 165 pre-Step observations through tick 164 using
 `amiga/profile_quiet_landing.gdb`. At landing: X=0, Y=1024 pixels,
