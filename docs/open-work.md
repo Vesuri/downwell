@@ -32,11 +32,12 @@ behavior, both backend integrations and relevant original-game verification.
 Restore pre-regression performance, not the separate section 5 goal of 50 FPS.
 The immediate priority is the **no-input initial fall to the first platform**:
 
-1. Establish matching old/current motion and landing boundaries, then measure
-   those same complete frames on the same A500 configuration. Use `13e08ca2`
-   as the historical implementation, changing only the profiling input and
-   launcher as needed. The historical 32.14 FPS contact average and 19.45 ms
-   firing frame are context, not acceptance targets for a no-input fall.
+1. Use the matched 164-update no-input fall through first landing in
+   `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
+   222 at `f5c7705f`. Trace the remaining fall beyond the short early windows
+   to separate steady-frame regression from generation stalls. Keep the same
+   configuration and no-input trajectory. The historical 32.14 FPS contact
+   average and 19.45 ms firing frame are not acceptance targets for this fall.
 2. Identify and remove the added per-frame work in that sequence, preserving
    source event order and behavior. Accept against the matched historical
    mean and worst-frame costs, not a new 20 ms requirement.

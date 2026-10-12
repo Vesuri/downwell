@@ -2,6 +2,52 @@
 
 ## No-input initial-fall comparison
 
+### Complete fall through first landing
+
+The complete no-input fall is 164 updates. `13e08ca2` and `f5c7705f`
+match all 165 pre-Step observations through tick 164 using
+`amiga/profile_quiet_landing.gdb`. At landing: X=0, Y=1024 pixels,
+vertical speed=0, grounded, health=4, ammo=8, enemies=3, RNG draws=1371.
+These are selected observable states, not full-state or pixel equivalence.
+
+Separate runs with **no debugger stops inside the fall** give:
+
+| Complete-fall cadence | Historical `13e08ca2` | Current `f5c7705f` |
+| --- | ---: | ---: |
+| PAL fields for 164 updates | 181 | 222 |
+| Elapsed emulated time | 3.62 s | 4.44 s |
+| Mean interval, including waits and generation | 22.07 ms | 27.07 ms |
+| Update rate | 45.30 FPS | 36.94 FPS |
+| Worst field gap (frame 163, both builds) | 5 fields | 8 fields |
+
+An independent repeat of each frozen build reproduces its field count,
+worst gap and final observation exactly.
+
+The short steady windows below do **not** establish restored performance
+through landing. The full fall still takes 0.82 seconds longer. Worst gaps
+are field-quantized, not instruction-traced work costs; do not attribute the
+whole difference to frame 163 without tracing the rest of the fall.
+
+Build both arms with `TRACE_FRAMES=165 PROFILE_FRAMES=600`, keeping the
+no-input flags and symmetric memory configuration described below. Run
+`profile_quiet_landing.gdb` separately for state, then
+`profile_quiet_cadence.gdb` for timing. The latter stops only at trace-ready
+frame 165 and requires 164 completed gameplay updates and a grounded player.
+For either probe use `GDB_SOURCE=profile_quiet_<landing|cadence>.gdb
+VERIFY_CHIP_KB=1024 VERIFY_TIMEOUT_SECONDS=90 ./verify_startup.sh`, with
+`READY_MARKER=DOWNWELL_QUIET_LANDED` or
+`READY_MARKER=DOWNWELL_QUIET_CADENCE_READY`, respectively.
+Do not attempt to extend a short run by writing the frame limit through gdb:
+the FS-UAE stub silently drops guest-memory writes. Rebuild with the limit;
+the landing probe rejects limits below 600.
+
+Complete-fall ELF SHA-256:
+
+- Historical: `d1d1c64d3690c89ac343545c979946cd917543825ada4834c18a12c324f2a115`.
+- Current: `8e16974d7fb84a9fa6954c547fa3b42ca573d350884fa46b91698a515b4b8ff5`.
+
+### Short instruction-traced windows
+
 The immediate regression target is the quiet fall, not the contact tape or
 the separate 50 FPS goal. Rebuilt `13e08ca2` and `06d1a583` match all 160
 pre-Step observations (ticks 0–159): player position/velocity/grounded state,
