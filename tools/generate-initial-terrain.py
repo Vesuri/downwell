@@ -16,7 +16,7 @@ def main():
     sha = lambda path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
     provenance = json.loads((ROOT / "generated/amiga-game.packing.json").read_text())
     assert sha(INPUTS[0]) == provenance["packSha256"], "stale game-pack provenance"
-    manifest = dict(schemaVersion=1, generator="generate-initial-terrain.py/v1",
+    manifest = dict(schemaVersion=1, generator="generate-initial-terrain.py/v2",
                     sourceSha256=provenance["sourceSha256"], extractor=provenance["extractor"],
                     inputs={name: sha(name) for name in INPUTS},
                     tools={name: sha(name) for name in ["tools/generate-initial-terrain.py",
@@ -27,7 +27,7 @@ def main():
                            "src/platform/amiga/AmigaTerrainRunSurface.h", "src/platform/amiga/AmigaInitialTerrain.h"]},
                     roomId=11, spriteId=51, outputSha256=sha(OUTPUT),
                     bytes=(ROOT / OUTPUT).stat().st_size,
-                    format="DWIT v1: big-endian rows, 3 column-major row references, 22-word row dictionary")
+                    format="DWIT v2: big-endian rows, 3 column-major row references, 22-word row dictionary, 16 periodic corridor rows")
     (ROOT / OUTPUT).with_suffix(".json").write_text(json.dumps(manifest, indent=2)+"\n")
 
 

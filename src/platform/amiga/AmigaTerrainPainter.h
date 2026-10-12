@@ -9,6 +9,8 @@ class AmigaTerrainPainter {
 public:
     static bool bindBatch(const UBYTE* pack, const UBYTE* end, UBYTE* scratch, unsigned bytes);
     static bool bindPrepared(const UBYTE* data,unsigned bytes);
+    static bool corridorRows(const AmigaTerrainIndex& index,const AmigaTerrainTiles& tiles,
+                             int first,int end);
     // Transactional direct-cache attempt. False means the caller must repaint
     // with the retained compositor; no Chip pixels have been modified.
     static bool paintCached(UWORD* rows, AmigaRenderer* renderer,

@@ -65,18 +65,18 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
             if (pipeline && count > 128) count = 128;
             UBYTE* row = renderer->game + physical * downwellBytesPerPlaneLine + x / 8;
 #ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
-            if(initial_&&unsigned(worldY)<initial_->rows()){
+            if(initial_){
                 UWORD scratch[AmigaInitialTerrain::words];
                 unsigned done=0;
                 while(done<count){
-                    if(dirty_[column][worldY+done]&2){
-                        const auto* source=initial_->row(column,worldY+done,scratch);
+                    if(dirty_[column][worldY+done]&6){
+                        const auto* source=readRow(column,worldY+done,scratch);
                         copyTerrainRows68000(source,row+done*48,
                             row+downwellGameRingPlaneBytes+done*48,1);
                         ++done;
                     }else{
                         const unsigned first=done;
-                        do{++done;}while(done<count&&!(dirty_[column][worldY+done]&2));
+                        do{++done;}while(done<count&&!(dirty_[column][worldY+done]&6));
                         copyTerrainRows68000(cachedRow+first*words*2,row+first*48,
                             row+downwellGameRingPlaneBytes+first*48,done-first);
                     }

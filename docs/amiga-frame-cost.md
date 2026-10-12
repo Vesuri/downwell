@@ -2,6 +2,36 @@
 
 ## No-input initial-fall comparison
 
+### Borrowed corridor pixels
+
+The complete fall independently repeats at **191 fields / 164 updates
+(42.93 FPS)**, versus 195 before corridor borrowing and the historical 181.
+Only two of the ten extra fields are now in updates 57–121. The cadence
+improvement alone is below 3%; the removed-work trace is the stronger evidence.
+Matched marks 91–110 total **3,078,280 → 2,805,770 cycles (21.66 → 19.75
+ms/update)**. Corridor paint spans fall from 4.9–5.6 to 2.9–3.2 ms; across
+the whole window, `drawMainWorldSpan` falls **2.67 → 1.48 ms/update**.
+The live shape check costs 0.15 ms/update. This saves somewhat less paint
+work than the initial estimate of about 3 ms per eligible frame; it removes
+composition/cache writes as a whole, not a sequence of helper optimizations.
+Remaining marker-interval savings include redistributed publication waits.
+
+Marks 161–166 total 2,403,370 → 2,412,320 cycles (56.38 → 56.59 ms/update,
+noise). The worst complete frame, 163, is **136.1 → 135.9 ms**; its observed
+field gap moves from six to seven through phase alignment, not added work.
+All 165 native state samples match. Scalar pixels match at all sixteen
+corridor phases; borrowed-raster tests pass 324 mixed transfers plus 4,800
+store/load/wrap/pipeline cases. The normal build starts with 512 KiB Chip;
+the emulator still has 8 MiB Fast and 512 KiB slow RAM. No Chip allocation
+is added. Normal Hunk: 1,606,228 bytes (+2,236), including 704 extra prepared
+pixel bytes. Profile ELF SHA-256:
+`3392076defcae614d8f52e2dee3200a0faa52a67bab21d358cf0ed2c3fa75326`.
+Normal Hunk SHA-256:
+`e8de74f3c4b5b594863a7d9e5ff83b7000f9a7d0132eb73480ee84b74e6bd562`.
+Reports and witnesses: `tmp/quiet-corridor-*`, using mark-90/26-field and
+mark-160/20-field captures. The original painter remains the unsupported-shape
+fallback and the pixel oracle. The performance-restoration goal is still open.
+
 ### Shipping ownership specialization
 
 The shipping external-collision contract now fixes native/scenery/box ownership

@@ -1401,6 +1401,12 @@ static void drawMainWorldSpan(
             return;
         }
         refresh = firstWorldY < finalWorldY && terrainRaster.dirty(column, firstWorldY);
+        if(refresh&&column==1&&clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+           !decorationCount&&runtime&&!runtime->terrainInstances()&&
+           (!runtime->nativeTerrainInstances()||!runtime->nativeTerrainInstances()->hasWallPresentationState())&&
+           !runtime->shops().allocatedCount&&terrainCollision.index&&
+           AmigaTerrainPainter::corridorRows(*terrainCollision.index,terrainTiles,firstWorldY,finalWorldY)&&
+           terrainRaster.borrowCorridor(firstWorldY,clipHeight))refresh=false;
         if (!refresh) {
             downwellProfileTerrainSpan(viewX, firstWorldY, clipHeight, clipX, clipWidth, 0, refreshCause);
             transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, false);

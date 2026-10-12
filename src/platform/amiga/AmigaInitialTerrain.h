@@ -8,23 +8,39 @@
 class AmigaInitialTerrain {
     const std::uint8_t* references_=nullptr;
     const std::uint8_t* dictionary_=nullptr;
+    const std::uint8_t* corridor_=nullptr;
     unsigned rows_=0;
     static unsigned word(const std::uint8_t* p){return unsigned(p[0])*256+p[1];}
 public:
     static constexpr unsigned columns=3,words=22,rowBytes=44;
     bool bind(const std::uint8_t* data,unsigned bytes){
-        references_=dictionary_=nullptr;rows_=0;
+        references_=dictionary_=corridor_=nullptr;rows_=0;
 #ifdef DOWNWELL_PLATFORM_AMIGA
         if(reinterpret_cast<unsigned long>(data)&1)return false;
 #endif
         if(!data||bytes<12||data[0]!='D'||data[1]!='W'||data[2]!='I'||data[3]!='T'||
-           word(data+4)!=1||word(data+10))return false;
+           (word(data+4)!=1&&word(data+4)!=2)||word(data+10))return false;
         const unsigned rows=word(data+6),count=word(data+8);
-        if(!rows||rows>8192||!count||bytes!=12+rows*6+count*rowBytes)return false;
+        const unsigned extra=word(data+4)==2?16*rowBytes:0;
+        if(!rows||rows>8192||!count||bytes!=12+rows*6+count*rowBytes+extra)return false;
         for(unsigned i=0;i<rows*columns;++i)if(word(data+12+i*2)>=count)return false;
-        references_=data+12;dictionary_=references_+rows*6;rows_=rows;return true;
+        references_=data+12;dictionary_=references_+rows*6;rows_=rows;
+        if(extra)corridor_=dictionary_+count*rowBytes;
+        return true;
     }
     unsigned rows()const{return rows_;}
+    bool hasCorridor()const{return corridor_!=nullptr;}
+    const std::uint16_t* corridorRow(unsigned y,std::uint16_t* scratch)const{
+        if(!corridor_)return nullptr;
+        const auto* source=corridor_+(y&15)*rowBytes;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+        (void)scratch;return reinterpret_cast<const std::uint16_t*>(source);
+#else
+        if(!scratch)return nullptr;
+        for(unsigned i=0;i<words;++i)scratch[i]=std::uint16_t(word(source+i*2));
+        return scratch;
+#endif
+    }
     // Borrow native words from immutable, word-aligned offline storage. The
     // host oracle decodes byte order into caller-owned scratch instead.
     const std::uint16_t* row(unsigned column,unsigned y,std::uint16_t* scratch)const{

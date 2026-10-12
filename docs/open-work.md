@@ -34,8 +34,8 @@ The immediate priority is the **no-input initial fall to the first platform**:
 
 1. Use the matched 164-update no-input fall through first landing in
    `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
-   195 in the current measured build. Target updates
-   57–121 next: the current missed-field ledger attributes 6 of 14 extra fields
+   191 in the current measured build. Target updates
+   57–121 next: the current missed-field ledger attributes 2 of 10 extra fields
    to this interval, before the larger generation bursts. Separate ordinary phase work and
    small border-generation updates using the onset trace in the audit. Keep the same
    configuration and no-input trajectory. The matched middle-fall capture

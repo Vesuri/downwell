@@ -94,6 +94,26 @@ int main() {
                 assert(!std::memcmp(borrowed->readRow(c,y,scratch),initial.row(c,y,oracle),44));
         }
         compare();
+        // Version 2 adds periodic corridor pixels. Exercise borrowing across
+        // the initial dictionary end, mutation replacement and ring wrapping.
+        assert(!borrowed->borrowCorridor(20,160));
+        const auto corridorOffset=pack.size();pack.resize(pack.size()+16*44);put(4,2);
+        for(unsigned y=0;y<16;++y)for(unsigned w=0;w<22;++w)
+            put(corridorOffset+y*44+w*2,0x8123+y*131+w*37);
+        assert(initial.bind(pack.data(),pack.size()));
+        assert(borrowed->borrowCorridor(20,160));
+        assert(!borrowed->borrowCorridor(8192,1)&&!borrowed->borrowCorridor(8191,2));
+        for(unsigned y=20;y<180;++y){
+            UWORD scratch[22];
+            std::memcpy(materialized->writeRows(1,y,1),initial.corridorRow(y,scratch),44);
+        }
+        compare();
+        borrowed->invalidate(40,60);compare();
+        std::fill_n(borrowed->writeRows(1,40,20),20*22,0xcafe);
+        std::fill_n(materialized->writeRows(1,40,20),20*22,0xcafe);compare();
+        assert(borrowed->borrowInitial(initial));
+        for(unsigned c=0;c<3;++c)assert(initial.copy(c,materialized->writeRows(c,0,initialRows)));
+        compare();
         std::printf("Borrowed initial raster: %u exact transfers, replacement and reborrow lifecycle\n",comparisons);
     }
     auto raster=std::make_unique<AmigaTerrainRaster>();

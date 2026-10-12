@@ -10,7 +10,8 @@ class AmigaTerrainRaster {
     using PixelColumn = UWORD[8192][2][AmigaGameplayRows::terrainWords];
     PixelColumn* pixels_=nullptr;
     // Bit 0: repaint required. Bit 1: current pixels belong to the immutable
-    // initial-room dictionary, not pixels_. Writes replace a complete row.
+    // initial-room dictionary, not pixels_. Bit 2: verified corridor row.
+    // Writes replace a complete row; mutations invalidate either borrowed form.
     unsigned char dirty_[3][8192]{};
     const AmigaInitialTerrain* initial_=nullptr;
     unsigned shopRevision_[downwell::ShopWorld::capacity]{};
@@ -43,12 +44,24 @@ public:
     }
     UWORD* row(unsigned column, unsigned y) { return writeRows(column,y,1); }
     const UWORD* readRow(unsigned column,unsigned y,UWORD* scratch)const{
+        if(dirty_[column][y]&4)return initial_->corridorRow(y,scratch);
         return (dirty_[column][y]&2)?initial_->row(column,y,scratch):&pixels_[column][y][0][0];
+    }
+    // Caller has verified the live index and all additional paint producers.
+    // This only publishes pixels, never terrain instances or future geometry.
+    bool borrowCorridor(unsigned first,unsigned height){
+#ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+        (void)first;(void)height;return false;
+#else
+        if(!initial_||!initial_->hasCorridor()||first>=rows||height>rows-first)return false;
+        for(unsigned y=first;y<first+height;++y)dirty_[1][y]=4;
+        return true;
+#endif
     }
     bool borrowInitial(const AmigaInitialTerrain& initial){
         if(!pixels_||!initial.rows()||initial.rows()>rows)return false;
         initial_=&initial;
-        for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initial.rows();++y)dirty_[c][y]|=2;
+        for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initial.rows();++y)dirty_[c][y]=(dirty_[c][y]&1)|2;
         return true;
     }
     bool dirty(unsigned column, unsigned y)const { return (dirty_[column][y]&1)!=0; }
@@ -56,7 +69,7 @@ public:
 #ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
         dirty_[column][y]=value;
 #else
-        dirty_[column][y]=(dirty_[column][y]&2)|(value?1:0);
+        dirty_[column][y]=(dirty_[column][y]&6)|(value?1:0);
 #endif
     }
     // First row after the homogeneous clean/dirty run. Invalid/empty requests

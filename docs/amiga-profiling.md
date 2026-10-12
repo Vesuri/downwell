@@ -774,8 +774,8 @@ separate pool-allocation oracle. Both selectors are unset when profiling
 restores the normal build.
 
 `REFERENCE_INITIAL_TERRAIN=1` retains runtime composition of pristine room
-terrain. The default copies a host-prepared row dictionary into the existing
-Fast raster only at a fresh room-load boundary, before generated terrain,
+terrain. The default borrows a host-prepared row dictionary at a fresh
+room-load boundary, before generated terrain,
 decorations or shops exist. The bank owns pixels, not instances; source Create
 effects and RNG remain at entry. Invalid banks and non-pristine terrain use
 the retained painter. `make generate-initial-terrain` compares every generated
@@ -784,6 +784,20 @@ manifest. `bash amiga/profile.sh terrain-shop` checks native pixels on both
 entries of the source-checked natural shop tape. Pair `profile.sh shop` with
 the reference selector for uninstrumented timing, and `PROBES=1` for entry
 phase attribution. Restoration unsets the selector.
+
+DWIT v2 additionally contains sixteen periodic corridor rows (704 bytes of
+ordinary-memory artwork, no Chip allocation). Dirty central-well spans may
+borrow them only after checking the live wall neighbourhood, including
+offscreen neighbours which select the border frames, and excluding tile,
+decoration, shop and retained wall-presentation producers. This eliminates
+composition and mutable-raster writes, not the final circular-buffer transfer.
+Geometry, lifetimes and RNG are never prepared ahead of their source events.
+Invalidation leaves borrowed pixels dirty until re-admitted or repainted;
+both CPU composition and Chip readback retire the borrowed row representation.
+Version 1 banks remain readable and take the retained painter for corridors.
+The generator checks all sixteen phase offsets against scalar pixels and
+sabotages wall neighbours/platforms; `test-amiga-terrain-raster` covers mixed
+borrowed/modified rows, ring wrapping, publication debts and room re-entry.
 
 `REFERENCE_INITIAL_RASTER=1` retains initial terrain preparation through
 scratch Chip pixels followed by readback into the retained Fast raster. The
