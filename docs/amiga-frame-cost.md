@@ -4,11 +4,36 @@
 
 ### Complete fall through first landing
 
-Current target-memory result: **200 PAL fields for 164 updates (41.00 FPS)**,
+Current target-memory result: **199 PAL fields for 164 updates (41.21 FPS)**,
 independently repeated with deterministic emulation and 512 KiB Chip. The
 historical target remains 181 fields (45.30 FPS), not a new 50 FPS requirement.
 The current normal stripped build passes the 512 KiB Chip startup check; this
 configuration still has 8 MiB Fast and 512 KiB slow RAM.
+
+Empty prepared terrain segments now use their reference RNG-only executor,
+without terrain admission or a lifetime/layer publication session. A bounded
+state-only probe found seven empty segments among twenty in frame 163; their
+draw counts were 8/2/1/3/4/2/3. They contain no Create callbacks. The measured
+empty publication-session cost was about 3 ms in that frame, with additional
+admission overhead. Non-empty terrain publication is unchanged.
+
+Matched parent/current 512 KiB Chip captures: frame 163 **141.2 → 137.0 ms**,
+Step 118.8 → 114.9 ms; marks 161–166 total **2,470,670 → 2,442,890 cycles**.
+The empty `publishRun` path disappears from the profile. Marks 57–63 are
+1,024,260 → 1,024,330 cycles, noise. The complete fall independently repeats
+at 199 fields versus 200; this cadence difference alone is below the noise
+threshold. The burst's removed work is the performance evidence, not the
+one-field change. All 165 native state samples match, the 18,000-frame terrain
+replay agrees, and builder fixtures verify complete RNG state at each Create,
+failure prefixes and empty segments consuming draws without callbacks.
+Normal Hunk: 1,769,680 bytes; no memory allocation added. Profile ELF SHA-256:
+`84ed8c0c219340f6331448c1fd29e367a858f38f8cea5aff3223bd6eb95d0156`.
+Normal Hunk SHA-256:
+`297662d5ebc6d4d5899bd86b2c19d37e56d7948ad971afd86af3fef07930a3ab`.
+Reports: `tmp/quiet-empty-terrain-{control-onset,control-stall,onset,stall}.txt`;
+cadence: `tmp/quiet-empty-terrain-{cadence,repeat}.log`.
+
+Previous empty-alarm-phase comparison (200 fields):
 
 The captured alarm phase retains whether its sole event owner is the player.
 When no external box/enemy alarms participate and the live player damage

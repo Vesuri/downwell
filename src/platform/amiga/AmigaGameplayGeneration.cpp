@@ -64,7 +64,10 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
 bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch,
     downwell::AreaOneBuilder::EmitFunction){
     auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
-    if(self.sourceCreate_)return batch.executeReference(create,opaque);
+    // Empty segments still own RNG draws between source event cells, but
+    // have no occupancy, lifetime, layer or Create publication to perform.
+    // Use the scalar RNG-only executor; never enter an empty terrain session.
+    if(self.sourceCreate_||!batch.count())return batch.executeReference(create,opaque);
     if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch)||
         (self.lifetimes_&&!self.lifetimes_->canAppend(batch.count())))
         return batch.executeReference(create,opaque);

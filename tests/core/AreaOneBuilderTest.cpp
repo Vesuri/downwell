@@ -17,6 +17,7 @@ std::uint64_t emissionDigest = 14695981039346656037ULL;
 std::uint64_t legacyDigest = 14695981039346656037ULL;
 std::uint64_t preBoxDigest = 14695981039346656037ULL;
 unsigned initialBorderPairs = 0;
+unsigned emptyPreparedSegments = 0;
 void mix(std::uint32_t value,bool newFieldPayload=false,bool boxPayload=false) {
     auto legacy=(newFieldPayload||boxPayload)?0u:value;
     auto preBox=boxPayload?0u:value;
@@ -308,7 +309,15 @@ int main(int argc, char** argv) {
                     std::memcmp(batch.words(),words,sizeof words)==0,
                     "initial border pair has exact occupancy, contacts and landing bits");
             }
+            const auto beforeCalls=p.count;
+            auto expectedRandom=p.random;
+            if(!batch.count())expectedRandom.advance(batch.draws());
             const bool ok=batch.executeReference(emit,context);
+            if(!batch.count()){
+                ++emptyPreparedSegments;
+                require(ok&&batch.completed()&&p.count==beforeCalls&&sameRandom(expectedRandom,p.random),
+                    "empty prepared segment consumes exactly its RNG words without a Create callback");
+            }
             require(batch.completed()==ok,"prepared segment completion tracks callback failure");
             const auto after=p.random;const unsigned calls=p.count;
             require(!batch.executeReference(emit,context)&&!batch.executeSpan([]{return true;})&&!batch.beginPublication()&&
@@ -340,6 +349,7 @@ int main(int argc, char** argv) {
     }
     require(runs>100&&runCells>runs*2,"terrain run corpus covers repeated wall/platform spans");
     require(initialBorderPairs>0,"prepared initial border pair path exercised");
+    require(emptyPreparedSegments>0,"RNG-only prepared segments exercised");
     std::cout<<"ordered terrain runs "<<runs<<", candidate cells "<<runCells<<'\n';
     {
         AreaOneBuilder invalid;GameMakerRandom random(1);
