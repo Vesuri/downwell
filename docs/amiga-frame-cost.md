@@ -2,6 +2,41 @@
 
 ## No-input initial-fall comparison
 
+### Complete recurring quiet interval
+
+Matched 75-field captures starting at mark 56 cover every update 57–121,
+not just the middle sample. Historical `13e08ca2` totals 9,295,120 cycles;
+accepted `edaaa369` totals 9,505,010: **20.13 versus 20.58 ms/update**,
+including publication waits. Worst intervals are **27.4 versus 27.5 ms**,
+both at update 69. This is a roughly 2.3% mean difference, not evidence of
+a remaining broad quiet-frame collapse or a new 50 FPS guarantee.
+
+The same captures cover update 122: **28.2 versus 54.9 ms**, with Step
+**20.5 versus 48.0 ms**. Updates 122–126 total 783,070 versus 952,290 cycles
+(22.04 versus 26.81 ms/update). This isolates a materially larger remaining
+initial-fall regression at generation, after the recurring quiet interval.
+An independent eight-field capture starting at mark 121, with **512 KiB Chip**,
+confirms frame 122 at **390,230 cycles / 54.9 ms**. Nine prepared segments
+cost 26.77 ms; native lifetime construction inside them costs 21.73 ms,
+including 12.56 ms in span-owner publication. Room-span insertion is 2.38 ms
+and layer publication 2.08 ms, nested inside that owner cost. These are not
+independent savings to sum; no single small helper removes the regression.
+The complete fall remains 181 versus 191 PAL fields; this audit does not
+close the restoration goal.
+
+Both arms use deterministic A500/68000, 1 MiB Chip, 512 KiB slow and 8 MiB
+Fast for compatibility with the historical regenerated assets. Current normal
+startup is separately verified at 512 KiB Chip; no shipping memory increase.
+Frozen ELF hashes: historical
+`d1d1c64d3690c89ac343545c979946cd917543825ada4834c18a12c324f2a115`, current
+`f8b656c909c636b0607c7c5ef468959b748893e3deaf1c211a3f14a1ec4b004a`.
+Reproduce with the existing no-input profile build, ignore 55 frame marks,
+capture 75 fields, then report `--frames=57-121 --causes` and `--frames=122-126`.
+Each run is capped at 90 seconds. Reports: `tmp/quiet-full-window-{current,historical}.txt`
+and `tmp/quiet-full-window-{current,historical}-next.txt`, with independent
+target-memory report `tmp/quiet-full-window-122-recheck.txt`; raw traces are
+disposable once the figures are committed.
+
 ### Authored-entrance seam
 
 Corridor admission now ignores offscreen diagonals: only the vertical neighbours

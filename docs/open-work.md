@@ -34,17 +34,17 @@ The immediate priority is the **no-input initial fall to the first platform**:
 
 1. Use the matched 164-update no-input fall through first landing in
    `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
-   191 in the current measured build. Target updates
-   57–121 next: the current missed-field ledger attributes 2 of 10 extra fields
-   to this interval, before the larger generation bursts. Separate ordinary phase work and
-   small border-generation updates using the onset trace in the audit. Keep the same
-   configuration and no-input trajectory. The matched middle-fall capture
-   (91–110) identifies small border births, not scrolling/painting: eight
-   generation Steps cost 14.7–15.7 ms versus 10.9–11.3 historically.
-   Remove redundant ownership publication at that boundary; hoisting admission
-   checks alone cannot deliver the measured saving. Preserve required
-   DitherAbove behavior and keep the large frame-163 burst secondary to this
-   recurring quiet workload. The historical 32.14 FPS contact
+   191 in the current measured build. Retain the complete updates 57–121
+   interval as the quiet-frame guard: matched mean/worst are now
+   20.58/27.5 ms versus historical 20.13/27.4 ms. Do not restart
+   sub-millisecond helper tuning to force exact equality. The first remaining
+   generation burst, update 122, costs 54.9 ms versus 28.2 historically;
+   remove duplicated construction/publication there before the later bursts
+   at 136 and 163. Keep the same configuration and no-input trajectory.
+   Hoisted metadata/layer admission is insufficient (see rejected approaches);
+   target the owning representation rather than another cache. Preserve
+   required DitherAbove behavior and keep the full quiet interval as a guard
+   against moving generation work into ordinary updates. The historical 32.14 FPS contact
    average and 19.45 ms firing frame are not acceptance targets for this fall.
 2. Identify and remove the added per-frame work in that sequence, preserving
    source event order and behavior. Accept against the matched historical
