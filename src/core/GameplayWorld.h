@@ -2193,6 +2193,7 @@ private:
 public:
     std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
     const downwell::GameMakerRandom& randomState() const { return enemyRandom_; }
+    bool prepareRandomIdleWord(){return run_.effectsSucceeded&&enemyRandom_.prepareIdleWord();}
 
     // Pure query of the implemented area-one snapshot, in room coordinates.
     downwell::LaserSightRay traceLaserSight(downwell::LaserSightRay::Coordinate x,

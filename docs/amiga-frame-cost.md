@@ -4,6 +4,28 @@
 
 ### Complete fall through first landing
 
+Current target-memory result: **210 PAL fields for 164 updates (39.05 FPS)**,
+independently repeated. Idle-time preparation of the existing RNG ring reduces
+frame 163 from **155.76 to 141.3 ms**. The historical 181-field result is still
+not restored. The ring remains 4 KiB; no new asset or buffer is allocated.
+One producer word is prepared only during an already-required publication
+wait, with an eight-raster-line scheduling margin. Consumer draws, state and
+the ordinary on-demand fallback are unchanged.
+
+Matched 512 KiB Chip captures: frames 91–96 cost 1,056,390 → 1,056,210 cycles
+(noise); frames 161–166 cost 2,572,340 → 2,468,170 cycles. Following frames
+164–166 remain about 51.8/52.1/42.5 ms: the saving is not a stall deferred to
+the next update. The full-fall one-field improvement alone is below the FPS
+noise threshold; the accepted evidence is the traced worst-frame reduction.
+Treat producer work inside the wait as CPU work, not as eliminated arithmetic.
+All 165 sampled states match; the RNG oracle checks every output and all
+consumer state words across variable idle budgets, wrap, copies and reseeding.
+The restored normal 1,767,540-byte Hunk passes 512 KiB Chip startup.
+Profile ELF SHA-256:
+`56b1fea95865a0f17fb1e91b9fb03baca8c0c95911f4ff35eb5e3fce3ed921e4`.
+Normal Hunk SHA-256:
+`05de8b71e111b879bf4883eb9657c1de992fdd51d25833216b4cd90540ad9d62`.
+
 Reproduce the current target-memory cadence from the repository root with:
 
 ```sh

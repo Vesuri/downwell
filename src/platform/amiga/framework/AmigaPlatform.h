@@ -25,6 +25,7 @@ public:
     // is live, so the previously displayed buffers are free) and `since`.
     // Returns the count it observed, for the next call's `since`.
     UWORD waitPublished(UWORD since) const;
+    UWORD waitPublished(UWORD since,bool (*idleWork)(void*),void* context,unsigned reserveLines) const;
     // PAL idle work only. A callback performs one bounded unit, returns false
     // when idle/failed, and must not touch display state or simulation state.
     // reserveLines is a scheduling margin, not a preemptive execution limit.
@@ -42,6 +43,7 @@ private:
     AmigaPlatform& operator=(const AmigaPlatform&);
 
     static ULONG vblankHandler();
+    void serviceIdleUntilVblank(UWORD start,bool (*idleWork)(void*),void* context,unsigned reserveLines) const;
     void beginIo();
     void endIo();
     static volatile UWORD vblankCount_;

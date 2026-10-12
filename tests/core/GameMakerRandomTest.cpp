@@ -277,10 +277,13 @@ void testLookahead() {
     for (unsigned seed = 0; seed < 32; ++seed) {
         Random::Lookahead storage, replacement;
         Random actual(seed), oracle(seed);
+        require(!actual.prepareIdleWord(),"unbound RNG has no idle work");
         actual.bindLookahead(storage);
+        auto* activeStorage=&storage;
         actual.refill(Random::Lookahead::aheadCapacity);
         require(storage.available == Random::Lookahead::aheadCapacity, "test exercises populated ring, not fallback");
         equal(actual, oracle);
+        require(!actual.prepareIdleWord(),"full ring stops idle work");
         for (unsigned tick = 0; tick < 1800; ++tick) {
             require(actual.nextU32() == oracle.nextU32(), "buffered draw matches direct WELL output");
             equal(actual, oracle);
@@ -289,6 +292,13 @@ void testLookahead() {
                 actual.advance(count);
                 for (unsigned i = 0; i < count; ++i) oracle.nextU32();
                 equal(actual, oracle);
+            }
+            for(unsigned idle=0;idle<tick%17;++idle){
+                const auto before=activeStorage->available;
+                const bool didWork=actual.prepareIdleWord();
+                require(didWork==(before<Random::Lookahead::aheadCapacity)&&
+                    activeStorage->available==before+unsigned(didWork),"idle work prepares at most one word");
+                equal(actual,oracle);
             }
             actual.refill(tick % 3 ? 4 : Random::Lookahead::aheadCapacity);
             equal(actual, oracle); // Producer progress is not a consumed draw.
@@ -300,6 +310,7 @@ void testLookahead() {
                 equal(snapshot, expected);
                 equal(actual, oracle);
                 actual.bindLookahead(replacement);
+                activeStorage=&replacement;
                 equal(actual, oracle);
             }
         }

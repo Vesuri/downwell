@@ -186,6 +186,21 @@ UWORD AmigaPlatform::waitPublished(UWORD since) const
 void AmigaPlatform::waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const
 {
     const UWORD start=vblankCount_;
+    serviceIdleUntilVblank(start,idleWork,context,reserveLines);
+    // If work crossed the boundary, do not accidentally wait another field.
+    while(vblankCount_==start){}
+}
+
+UWORD AmigaPlatform::waitPublished(UWORD since,bool (*idleWork)(void*),void* context,unsigned reserveLines) const
+{
+    const UWORD start=vblankCount_;
+    if(start==publishedVblank_||start==since)
+        serviceIdleUntilVblank(start,idleWork,context,reserveLines);
+    return waitPublished(since);
+}
+
+void AmigaPlatform::serviceIdleUntilVblank(UWORD start,bool (*idleWork)(void*),void* context,unsigned reserveLines) const
+{
     while(idleWork && vblankCount_==start){
         // Stable nine-bit vertical position across the 255/256 boundary.
         // A single longword read can combine the old high bit and new low byte.
@@ -199,8 +214,6 @@ void AmigaPlatform::waitVblank(bool (*idleWork)(void*),void* context,unsigned re
         // after sampling so a wrapped beam never looks like a new work budget.
         if(vblankCount_!=start || line>=312u || reserveLines>=312u-line || !idleWork(context))break;
     }
-    // If work crossed the boundary, do not accidentally wait another field.
-    while(vblankCount_==start){}
 }
 
 void AmigaPlatform::restore()

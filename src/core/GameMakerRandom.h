@@ -34,6 +34,11 @@ public:
     // and filling do not consume a draw. Copies never borrow another cache.
     void bindLookahead(Lookahead& storage);
     void refill(unsigned steps = 4);
+    // Producer-only bounded idle work. No consumer state or draw is advanced.
+    bool prepareIdleWord() {
+        if(!lookahead_||lookahead_->available==Lookahead::aheadCapacity)return false;
+        refill(1);return true;
+    }
     void prepareLookahead(Lookahead& storage) {
 #ifndef DOWNWELL_REFERENCE_RANDOM
         bindLookahead(storage);

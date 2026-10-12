@@ -2681,7 +2681,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             displayFenced = true;
             if (overlapStep) {
                 DW_PROFILE_SCOPE(profileWait);
-                fencedVblank = platform.waitPublished(fencedVblank);
+                // Only prepare RNG output during an already-required wait.
+                // One word is bounded; stop well before the PAL VBlank edge.
+                fencedVblank = platform.waitPublished(fencedVblank,[](void* context){
+                    return static_cast<AmigaPortRuntime*>(context)->prepareRandomIdleWord();
+                },&port,8);
             }
             // The preceding detached list has crossed the publication boundary.
             // Only now may another overlay overwrite an entry cover's DMA bank.
