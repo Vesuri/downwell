@@ -40,6 +40,24 @@ remove the measured regression; the surviving ownership publication is the
 relevant structure. Terrain drawing, restoration and player movement are not
 the regressed work. Required DitherAbove behavior must remain.
 
+The historical source explains this difference: `13e08ca2`'s
+`AmigaGameplayGeneration::createPrepared` ends after occupancy/landing and
+`tiles_.appendPrepared`; it does not construct native terrain lifetimes.
+`NativeTerrainLifetimes.h` first appears in `f6f7d448`, with registration
+chronology connected in `92bfda6e` and deferred room membership in `1eada70a`.
+The current lifetime-construction cost (0.97 ms/update) accounts for about
+91% of the generation callback increase (1.07 ms/update). This is added
+semantic state, not evidence that the old terrain painter became slower.
+
+Nor is the whole room copy unused. `eligibilityFlags` reads its reconciled
+active state for externally handled walls; `reconcileActivation` changes
+registration chronology and layers at the source phase boundary;
+`cleanupDestroyed` merges marked terrain with native boxes in room order.
+Layer state separately supplies inactive Draw cutoffs. An ownership
+replacement must preserve these distinctions; deleting wall registration
+or substituting an always-active lease is not equivalent. These consumers
+rule out removing room binding without replacing its observable state.
+
 Reproduce with the frozen quiet-fall build and memory configurations below:
 ignore 89 hits of `downwellTraceFrameMark`, delete the breakpoint, capture
 26 fields, then report `--frames=91-110 --causes`; `--focus createPrepared`
