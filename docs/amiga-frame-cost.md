@@ -48,6 +48,41 @@ Complete-fall ELF SHA-256:
 
 ### Short instruction-traced windows
 
+Matched later-fall captures (same complete-fall ELFs above), starting at
+frame 90 for 100 PAL fields, expose a recurring row-publication regression.
+Both reports select **91–157**, 67 complete updates; the current capture
+ends before the first landing and does not measure frame 163.
+
+| Inclusive cost | Historical | Current |
+| --- | ---: | ---: |
+| Frames 91–157 mean, including wait | 22.73 ms | 29.35 ms |
+| Frame 93 total | 23.83 ms | 34.03 ms |
+| Frame 93 terrain generation | 3.36 ms | 10.06 ms |
+| Frame 93 builder emitObject | 0.91 ms | 6.92 ms |
+| Frame 93 terrain painting | 2.90 ms | 2.90 ms |
+| Frame 93 actor Draw collection | 1.30 ms | 2.83 ms |
+
+Totals for the matched window are 10,821,280 and 13,970,220 CPU cycles.
+An independent 12-field current capture reproduces frame 93 exactly:
+241,790 cycles. Current generation includes 5.93 ms in native birth,
+4.53 ms in lifetime append, and 2.98 ms in collision-owner terrain birth;
+these are **nested**, not additive costs. The latter includes 1.51 ms of
+generic layer birth. The source builder's `generationCount_ < -1` branch
+advances its RNG, then emits two wall Creates at X=160 and X=320 before
+advancing the row. This path still uses separate scalar lifetime/layer
+publication, unlike admitted prepared terrain segments. Source identity,
+Create order and failure prefixes remain required; dropping wall ownership
+is not an acceptable restoration. Any replacement must remove these two
+scalar publications as a whole, not tune the nested lookup/copy helpers.
+
+Reproduction: use the complete-fall build, break at
+`downwellTraceFrameMark`, ignore its first 89 hits, continue, then delete
+that breakpoint before `monitor profile 100 "" ".../trace-90.bin"`.
+Report `--frames=91-157` and `--frames=93` with the matching ELF. There are
+no debugger stops inside the capture. Use a separate 12-field capture from
+the same boundary to confirm frame 93. The normal build is not replaced
+by these frozen-binary captures.
+
 The immediate regression target is the quiet fall, not the contact tape or
 the separate 50 FPS goal. Rebuilt `13e08ca2` and `06d1a583` match all 160
 pre-Step observations (ticks 0–159): player position/velocity/grounded state,
