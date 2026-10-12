@@ -127,13 +127,18 @@ build on exit. The emulator run has a 90-second deadline; build time is
 separate. The raw debugger result remains in
 `amiga/.run/profile-quiet-fall.log`. `VERIFY_CHIP_KB=1024` explicitly selects
 the expanded-memory historical-comparison configuration; it is not the default.
-This is a cadence measurement, not a pixel oracle or a passing performance
-threshold. A successful run still needs comparison with the historical target.
+This is a cadence measurement, not a pixel oracle or a goal-completion verdict.
+The harness rejects more than 206 PAL fields: the repeated `f8113b6c` baseline
+of 200 plus 3% timing allowance. This guards against a new regression; it does
+not replace the historical 181-field restoration target. Tighten the ceiling
+only after repeatable native evidence, never raise it merely to pass a run.
 `tools/verify-quiet-fall.py` checks the complete printed landing witness
 (position, velocity, camera, grounded state, health, ammo, enemy/bullet counts
 and consumed RNG count), unique completion records and cadence accounting.
-It rejects mismatched or incomplete measurements; it does not impose a speed
-threshold or prove full-state/pixel equivalence. Its sabotage fixtures are
+It rejects mismatched or incomplete measurements. Its optional `--max-fields`
+argument applies an explicit ceiling after the correctness checks; without
+that argument it judges only the witness. Neither mode proves full-state/pixel
+equivalence. Its sabotage fixtures are
 run by `make test-quiet-fall-witness`.
 
 The earlier launcher left FS-UAE deterministic mode unset. An unchanged

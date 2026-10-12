@@ -248,7 +248,9 @@ if [[ $mode == trace ]]; then
   exit 0
 fi
 if [[ $mode == quiet-fall ]]; then
-  python3 ../tools/verify-quiet-fall.py ".run/profile-${mode}.log"
+  # f8113b6c repeats at 200 fields. Allow 3% for end-to-end timing noise;
+  # this is a regression guard, NOT the historical 181-field restoration target.
+  python3 ../tools/verify-quiet-fall.py ".run/profile-${mode}.log" --max-fields 206
   grep '^QUIET_' ".run/profile-${mode}.log"
 elif [[ $mode == draw-cache ]]; then
   grep '^DRAW_CACHE' ".run/profile-${mode}.log"

@@ -24,6 +24,31 @@ class Witness(unittest.TestCase):
         for fields in (181, 208, 400):
             self.assertEqual(quiet.verify(witness(fields)), fields)
 
+    def test_explicit_regression_ceiling(self):
+        for fields in (181, 200, 206):
+            self.assertEqual(quiet.verify(witness(fields), 206), fields)
+        for fields in (207, 208, 400):
+            with self.assertRaisesRegex(ValueError, 'cadence regression'):
+                quiet.verify(witness(fields), 206)
+        with self.assertRaises(ValueError):
+            quiet.verify(witness(181), 163)
+        with self.assertRaisesRegex(ValueError, 'landing mismatch'):
+            quiet.verify(witness(181).replace('health=4', 'health=3'), 206)
+
+    def test_ceiling_command_exit_status(self):
+        with tempfile.TemporaryDirectory(prefix='downwell-quiet-ceiling-') as directory:
+            path = Path(directory) / 'run.log'
+            for fields, accepted in ((200, True), (206, True), (207, False), (400, False)):
+                path.write_text(witness(fields))
+                result = subprocess.run([sys.executable, spec.origin, str(path), '--max-fields', '206'],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                self.assertEqual('goal completion not judged' in result.stdout, accepted)
+            for ceiling in ('bad', '0', '-1', '163'):
+                result = subprocess.run([sys.executable, spec.origin, str(path), '--max-fields', ceiling],
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+
     def test_every_state_component_is_checked(self):
         for expected in (quiet.LANDING, quiet.MOTION):
             for key, value in expected.items():

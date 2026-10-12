@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Check the historical no-input landing witness, not a performance threshold."""
+"""Check the no-input landing witness and an optional explicit cadence ceiling."""
+import argparse
 import math
 from pathlib import Path
-import sys
 
 LANDING = dict(tick=164, x=0, y=262144, health=4, ammo=8, enemies=3, rng=1371)
 MOTION = dict(vx=0, vy=0, camera_x=0, camera_y=1024, grounded=1, bullets=0)
@@ -21,7 +21,9 @@ def record(text, name):
     return result
 
 
-def verify(text):
+def verify(text, max_fields=None):
+    if max_fields is not None and max_fields < 164:
+        raise ValueError('field ceiling must allow at least 164 updates')
     if text.splitlines().count('DOWNWELL_QUIET_CADENCE_READY') != 1 or 'DOWNWELL_QUIET_INVALID' in text:
         raise ValueError('missing or invalid completion witness')
     for name, expected in [('QUIET_LANDING', LANDING), ('QUIET_MOTION', MOTION)]:
@@ -38,14 +40,20 @@ def verify(text):
         raise ValueError('invalid cadence counters')
     if not math.isfinite(fps) or abs(fps - 50 * frames / fields) > 0.00051:
         raise ValueError('FPS does not match field counters')
+    if max_fields is not None and fields > max_fields:
+        raise ValueError(f'cadence regression: {fields} fields exceeds ceiling {max_fields}')
     return fields
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise SystemExit('usage: verify-quiet-fall.py GDB_LOG')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('gdb_log', type=Path)
+    parser.add_argument('--max-fields', type=int, help='regression ceiling, not a goal-completion verdict')
+    args = parser.parse_args()
     try:
-        fields = verify(Path(sys.argv[1]).read_text())
+        fields = verify(args.gdb_log.read_text(), args.max_fields)
     except (ValueError, OSError) as error:
         raise SystemExit(f'Quiet-fall witness rejected: {error}')
-    print(f'Quiet-fall landing witness verified: 164 updates / {fields} fields; performance not judged')
+    verdict = ('performance not judged' if args.max_fields is None else
+               f'within {args.max_fields}-field regression ceiling; goal completion not judged')
+    print(f'Quiet-fall landing witness verified: 164 updates / {fields} fields; {verdict}')
