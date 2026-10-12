@@ -1,0 +1,80 @@
+diff --git a/src/core/GameMakerRandom.h b/src/core/GameMakerRandom.h
+index 81990de2..0f427187 100644
+--- a/src/core/GameMakerRandom.h
++++ b/src/core/GameMakerRandom.h
+@@ -49,7 +49,8 @@ public:
+     }
+     struct FrameRefill {
+         GameMakerRandom& random;
+-        ~FrameRefill() { random.refill(); }
++        unsigned steps=4;
++        ~FrameRefill() { if(steps)random.refill(steps); }
+     };
+ 
+     void setSeed(std::uint32_t seed);
+diff --git a/src/core/GameplayWorld.cpp b/src/core/GameplayWorld.cpp
+index 791746b7..0cfd97f3 100644
+--- a/src/core/GameplayWorld.cpp
++++ b/src/core/GameplayWorld.cpp
+@@ -1489,7 +1489,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
+     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
+     boneViewLeft_=160+cameraPixelX_;
+     boneViewTopQ8_=34L*256+viewCameraYQ8();
+-    downwell::GameMakerRandom::FrameRefill refill{enemyRandom_};
++    downwell::GameMakerRandom::FrameRefill refill{enemyRandom_,idleRandomPreparation_?0u:4u};
+     if(scriptSpawnInstances_&&scriptSpawnInstances_->size())scriptEffectsBinding_.beginAnimation();
+     else scriptEffectsBinding_={};
+     if(debrisInstances_&&debrisInstances_->size())debrisBinding_.beginAnimation();
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index 97aa6c73..9240b018 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -2194,6 +2194,10 @@ public:
+     std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
+     const downwell::GameMakerRandom& randomState() const { return enemyRandom_; }
+     bool prepareRandomIdleWord(){return run_.effectsSucceeded&&enemyRandom_.prepareIdleWord();}
++    // A frontend with bounded idle service can prepare future output there,
++    // rather than charging every Step for producer work. Empty caches still
++    // generate exact output on demand; this changes scheduling, not RNG state.
++    void useIdleRandomPreparation(){idleRandomPreparation_=true;}
+ 
+     // Pure query of the implemented area-one snapshot, in room coordinates.
+     downwell::LaserSightRay traceLaserSight(downwell::LaserSightRay::Coordinate x,
+@@ -2758,6 +2762,7 @@ private:
+     unsigned enemyCount_;
+     downwell::GameMakerRandom::Lookahead randomLookahead_;
+     downwell::GameMakerRandom enemyRandom_;
++    bool idleRandomPreparation_=false;
+     int health_;
+     unsigned invulnerability_;
+     downwell::PlayerDeathSequence death_;
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 97aca237..06d12ba0 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -1896,6 +1896,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+ #endif
+ #endif
+     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
++    port.useIdleRandomPreparation();
+ #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+     {
+         // Explicit-ID lifecycle fixture, not automatic production admission.
+diff --git a/tests/core/GameMakerRandomTest.cpp b/tests/core/GameMakerRandomTest.cpp
+index e065ab95..cae9afb9 100644
+--- a/tests/core/GameMakerRandomTest.cpp
++++ b/tests/core/GameMakerRandomTest.cpp
+@@ -300,7 +300,12 @@ void testLookahead() {
+                     activeStorage->available==before+unsigned(didWork),"idle work prepares at most one word");
+                 equal(actual,oracle);
+             }
+-            actual.refill(tick % 3 ? 4 : Random::Lookahead::aheadCapacity);
++            const unsigned budget=tick%3?0u:4u;
++            const unsigned beforeFrame=activeStorage->available;
++            {Random::FrameRefill frame{actual,budget};}
++            const unsigned expectedRoom=Random::Lookahead::aheadCapacity-beforeFrame;
++            require(activeStorage->available==beforeFrame+(budget<expectedRoom?budget:expectedRoom),
++                "idle-owned frames do no mandatory preparation; reference frames retain their budget");
+             equal(actual, oracle); // Producer progress is not a consumed draw.
+             if (tick % 211 == 0) {
+                 Random snapshot(actual), expected(oracle);

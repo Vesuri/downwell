@@ -300,7 +300,12 @@ void testLookahead() {
                     activeStorage->available==before+unsigned(didWork),"idle work prepares at most one word");
                 equal(actual,oracle);
             }
-            actual.refill(tick % 3 ? 4 : Random::Lookahead::aheadCapacity);
+            const unsigned budget=tick%3?0u:4u;
+            const unsigned beforeFrame=activeStorage->available;
+            if(budget){Random::FrameRefill frame{actual};}
+            const unsigned expectedRoom=Random::Lookahead::aheadCapacity-beforeFrame;
+            require(activeStorage->available==beforeFrame+(budget<expectedRoom?budget:expectedRoom),
+                "idle-only simulation skips frame preparation; ordinary frames retain their budget");
             equal(actual, oracle); // Producer progress is not a consumed draw.
             if (tick % 211 == 0) {
                 Random snapshot(actual), expected(oracle);
