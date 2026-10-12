@@ -32,6 +32,14 @@ Reference implementations inspected:
 - `Revs/src/platform/amiga`
 - `dA JoRMaS/Template/C++`
 
+Framework base: AmigaXDev commit 2e02af5, the canonical tree in
+`$AMIGA_FRAMEWORK`. Compare with it and take fixes from it with
+`python3 -m amigaxdev.framework diff Downwell` (run from the directory above
+this repository, after `. amiga/env.sh`); Downwell's copy has no name prefixes.
+`AmigaMemory`, `AmigaPlatform`, `BitmapCopyPlan.h` and `GCCRuntime.cpp` are not
+in the canonical tree; its `Palette24Bit`, `daj_math.h` and `*Assembler.s` files
+are not taken (`NO_ASSEMBLER`, above).
+
 The freestanding compiler support is supplied by the shared Amiga toolchain at
 build time (`~/.local/support/gcc8_{a,c}_support.*`), as in the existing ports.
 The framework's `GCCRuntime.cpp` supplies the C++ heap and runtime shims used by

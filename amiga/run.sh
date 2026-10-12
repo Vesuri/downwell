@@ -18,7 +18,7 @@ DH1="$RUN/dh1"
 # it can observe the new file while cp is still writing it (or leave the user
 # looking at the old AmigaDOS prompt).
 # DEBUG=1 also opens the gdb stub, on a port no other project holds.
-if [ "${DEBUG:-0}" = 1 ]; then fsuae_claim_port; else fsuae_stop_previous; fi
+fsuae_prepare
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
