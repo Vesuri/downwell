@@ -34,9 +34,9 @@ The immediate priority is the **no-input initial fall to the first platform**:
 
 1. Use the matched 164-update no-input fall through first landing in
    `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
-   205 in the current measured build. Target updates
-   57–121 next: the pre-cache-fix audit attributed 17 of 29 extra fields to
-   this interval, before the larger generation bursts. Separate ordinary phase work and
+   200 in the current measured build. Target updates
+   57–121 next: the current missed-field ledger attributes 8 of 19 extra fields
+   to this interval, before the larger generation bursts. Separate ordinary phase work and
    small border-generation updates using the onset trace in the audit. Keep the same
    configuration and no-input trajectory. The historical 32.14 FPS contact
    average and 19.45 ms firing frame are not acceptance targets for this fall.

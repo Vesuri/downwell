@@ -1031,6 +1031,30 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
         for(unsigned i=0;i<3;++i)assert(phases[0][i]==phases[1][i]&&remainders[0][i]==remainders[1][i]);
     }
 }
+static void checkEmptyPlayerAlarmPhase(const ObjectPack& objects,const SpriteCollisionPack& sprites){
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        for(int value:{-2,-1,0,1,2,-1,2}){
+            assert(world->setPlayerDamageAlarm(world->playerHandle(),value));
+            world->step(0);
+            assert(world->effectsSucceeded());
+            const auto* player=world->findPlayer(world->playerHandle());
+            assert(player&&player->damageAlarm==(value<0?value:value-1));
+        }
+        // A new captured family must revoke the empty-player proof even
+        // while the player's own alarm remains negative.
+        assert(world->setPlayerDamageAlarm(world->playerHandle(),-1));
+        assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
+        const auto& box=world->breakableSlot(0);
+        const InstanceHandle key{0,box.lifetimeId};
+        assert(world->publishBoxAlarm0(key,2));world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1);
+    }
+}
 static void checkNativeAnimationPopulation(const ObjectPack& objects,const SpriteCollisionPack& sprites){
     auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
         GameplayTerrainInstances::WallCollision{},nullptr,GameplayCollisionOwner::Ownership::native);
@@ -3234,6 +3258,7 @@ int main(){
     checkEnemySlotDirectory(objects,sprites);
     checkNativeAnimationBatches(objects,sprites);
     checkNativeAnimationPopulation(objects,sprites);
+    checkEmptyPlayerAlarmPhase(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned contact=0;contact<6;++contact){

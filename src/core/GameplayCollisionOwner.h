@@ -229,6 +229,8 @@ private:
     bool combatAlarmPhaseInUse_=false;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
+    bool combatAlarmPlayerOnly_=false;
+    InstanceHandle combatAlarmPlayer_{};
     bool combatAlarmCaptureValid_=false;
     bool nativeBoxAlarmPrefix_=false;
     using EnemyAlarmRoster=NativeEnemyAlarmRoster<GameplayWorld::enemyCapacity>;
@@ -3757,6 +3759,7 @@ private:
         // Binding changes during dispatch still disable absent-column skips.
         if(!alreadySorted||!retainedMask){
             if(projected&&!check(combatAlarmProjection_.reset(count)))return false;
+            if(projected){combatAlarmPlayerOnly_=true;combatAlarmPlayer_={};}
             int previousObject=-1;
             unsigned mask=0;bool boxFence=false,enemyFence=false;
             for(unsigned i=0;i<count;++i){
@@ -3769,6 +3772,11 @@ private:
                     if(!check(alarmMetadata_.mask(object,mask)))return false;
                 if(typedCombat&&object==35&&snapshot.handle(i).slot<View::enemyBase)
                     mask&=GameplayWorld::playerDamageAlarmColumns;
+                if(projected&&mask){
+                    const auto h=snapshot.handle(i);
+                    if(object==35&&h.slot<View::enemyBase)combatAlarmPlayer_=h;
+                    else combatAlarmPlayerOnly_=false;
+                }
                 capturedAlarms|=mask;previousObject=object;
                 if(projected){
                     unsigned selection=mask;
@@ -3778,6 +3786,21 @@ private:
                 }
             }
             if(retainedMask)*retainedMask=capturedAlarms;
+        }
+        // This is a proof about the captured event owners, not cached live
+        // counters. With no external boxes/enemies and only the player's
+        // Alarm 1 admitted, a negative live counter makes the entire phase
+        // empty. Nothing can run and arm a later column. New owners invalidate
+        // the capture; an armed player or any other owner keeps the full path.
+        // Scalar ownership retains that path as the reference.
+        if(projected&&combatAlarmPlayerOnly_&&combatAlarmPlayer_.generation&&!boxes.end
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+           &&!enemies.alarms
+#endif
+        ){
+            bool pending=true;
+            if(!check(world_->playerDamageAlarmPending(combatAlarmPlayer_,1,pending)))return false;
+            if(!pending)return true;
         }
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
           bool boxesPending=alarm==0&&boxes.end;

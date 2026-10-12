@@ -4,11 +4,42 @@
 
 ### Complete fall through first landing
 
-Current target-memory result: **205 PAL fields for 164 updates (40.00 FPS)**,
+Current target-memory result: **200 PAL fields for 164 updates (41.00 FPS)**,
 independently repeated with deterministic emulation and 512 KiB Chip. The
 historical target remains 181 fields (45.30 FPS), not a new 50 FPS requirement.
 The current normal stripped build passes the 512 KiB Chip startup check; this
 configuration still has 8 MiB Fast and 512 KiB slow RAM.
+
+The captured alarm phase retains whether its sole event owner is the player.
+When no external box/enemy alarms participate and the live player damage
+counter is negative, no callback can arm another column: skip the empty phase.
+Counter zero still runs, as do positive counters and captures with other event
+owners. Birth/capture invalidation revokes the proof; scalar ownership retains
+the full dispatcher. This is phase removal, not another alarm-group/roster
+variant. A read-only state probe at the onset found objects 35/61/65, event
+mask 2, player counter -1, and no player-controller/run-controller instances.
+
+The estimated removable cost was 1.3 ms/update. Matched parent/current native
+captures give alarm phase **1.57 → 0.29 ms** and marks 57–63 totals
+**1,129,010 → 1,024,260 cycles** (22.70 → 20.59 ms/update including waits).
+Worst interval is 26.5 → 25.2 ms. The complete fall repeats at 200 fields,
+versus the parent's 205; cadence alone is below the 3% significance threshold.
+The changed phase's traced cost establishes the saving. Landing marks 161–166
+are 2,468,890 → 2,470,670 cycles, noise; frame 163 is 140.9 → 141.2 ms, with
+unchanged 118.8 ms Step. The normal stripped Hunk is 1,770,056 bytes; no Chip
+allocation is added. Negative/zero/positive counters and subsequent box birth
+have explicit fixtures; the owner suite, 18,000-frame replay and all 165
+native state samples agree. Profile ELF SHA-256:
+`d59a937292632e4f75dc60ea5229935efd3a886be69f8b1aadc4f6999307f746`.
+Normal Hunk SHA-256:
+`935b2bdad3677a68145080b07388f7f20af757803211cb5f99fcf53c8b79200f`.
+Reports: `tmp/quiet-empty-alarm-{control-onset,control-stall,onset,stall}.txt`;
+cadence: `tmp/quiet-empty-alarm-{cadence,repeat}.log`.
+The complete current ledger has 26 missed updates (no overflow). Updates
+57–121 contribute eight extra fields versus zero historically, leaving this
+interval responsible for eight of the remaining 19 extra full-fall fields.
+
+Previous animation-phase comparison (205 fields):
 
 The empty native animation phase now has a lifetime-maintained population
 guard. Inactive and marked lifetimes remain counted until retirement; new
