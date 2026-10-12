@@ -12,8 +12,9 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Immediate priority: restore the runnable, measured A500 baseline in section 0.
-Do not add further section 1 functionality while this regression is unresolved.
+Immediate priority: section 0, every update of the A500 initial fall within
+20 ms, worked in its A–E order. Do not add further section 1 functionality
+while this regression is unresolved.
 After that, finish live skeleton encounters (section 1), following its numbered
 integration tasks: production ownership, generation/query/dispatch, time-stop
 and damage chains, then natural encounter verification. The A500 frame-budget work in
@@ -27,60 +28,265 @@ not deferred cleanup phases.
 Supporting helpers alone do not close an item. Completion requires the shared
 behavior, both backend integrations and relevant original-game verification.
 
-## 0. Restore a runnable, measured A500 baseline
+## 0. Restore the A500 initial fall: every update within 20 ms
 
-Restore pre-regression performance, not the separate section 5 goal of 50 FPS.
-The immediate priority is the **no-input initial fall to the first platform**:
+The immediate priority is the **no-input initial fall from the top of the well
+to the first platform**, updates 1–164. The goal is that every update fits one
+PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
+earlier target of matching the historical 181 fields; reaching that is a
+milestone on the way, not completion.
 
-1. Use the matched 164-update no-input fall through first landing in
-   `amiga-frame-cost.md`: historical `13e08ca2` takes 181 PAL fields versus
-   191 in the frozen regression control (`edaaa369`). Retain the complete
-   updates 57–121 interval as the quiet-frame guard: control mean/worst are
-   20.58/27.5 ms versus historical 20.13/27.4 ms. Do not restart
-   sub-millisecond helper tuning to force exact equality. The first remaining
-   generation burst, update 122, costs 54.9 ms versus 28.2 historically;
-   remove duplicated construction/publication there before the later bursts
-   at 136 and 163. Keep the same configuration and no-input trajectory.
-   Hoisted metadata/layer admission is insufficient (see rejected approaches);
-   target the owning representation rather than another cache. Preserve
-   required DitherAbove behavior and keep the full quiet interval as a guard
-   against moving generation work into ordinary updates. The historical 32.14 FPS contact
-   average and 19.45 ms firing frame are not acceptance targets for this fall.
-2. Remove unnecessary terrain publication at its consumer boundary, preserving
-   source event order and behavior:
-   - Target the added native-lifetime branch of
-     `AmigaGameplayGeneration::createPrepared`, not the already-small raster
-     publication. Preserve its actual consumers: reconciled room activity,
-     cleanup chronology and inactive-layer Draw cutoffs. These are not unused
-     state just because walls skip animation. Generic wall collision registration
-     is already omitted; retain thin-platform End Step registration.
-   - Remove whole redundant construction stages while retaining required
-     order/state and mutation behavior. The consumer audit does not justify
-     simply dropping room or layer publication. Do not disable the lifetime
-     branch, assume the historical implementation was complete, or replace it
-     with full order reconstruction. See the ownership-consumer evidence in
-     [the quiet-fall audit](amiga-frame-cost.md#middle-of-the-quiet-fall-updates-91110).
-     The plan must remove a named substantial part of the frozen control's
-     21.73 ms construction region at 122 before another performance experiment.
-   - Differentially check mixed actors/terrain, mutation and failure boundaries,
-     then measure 57–121, 122, 136 and 163 before broader validation. Accept
-     against matched historical costs, not a new 20 ms requirement.
-   Leave shared intrusive room/lifetime descriptors closed: publication splits
-   fragment the room animation skip traversal. Do not tune their accessors or
-   add another skip projection. The sparse-change room-owner attempt is also
-   closed: it removes that traversal cost but saves under 1 ms in the measured
-   native construction region, with no complete-fall cadence improvement. Do
-   not pursue room-state packing/accessor or sparse-list variants. Initial-state,
-   recipe-cache, cross-row grouping and observed-room reconstruction variants
-   also remain closed. The persistent multi-row identity replacement is closed
-   after global-index and source-ordered traversal measurements: it removes
-   per-row constructors but does not improve fall cadence and worsens the
-   landing spike. Do not retry group formats, cursors or admission-loop variants.
-   Another attempt must replace a larger construction stage,
-   not repackage room membership alone.
-3. Verify the restored complete fall (including its generation bursts), normal
-   512 KiB Chip startup, and unchanged replay behavior before returning to
-   later gameplay or combat optimization.
+The current baseline is the complete trace in
+[the frame-cost audit](amiga-frame-cost.md#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12),
+taken at `45e96a9c`. It runs 192 fields for 164 updates, with a worst update
+of 136 ms. "Work" excludes the publication wait.
+
+| Window | Work mean ms | Worst ms (update) | Updates over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Authored entrance, 2–55 | 16.2 | 20.5 (19) | 1 | 0 |
+| Quiet generation, 56–121 | 20.2 | 27.7 (56) | 32 | 115 |
+| First burst, 122–135 | 22.5 | 55.0 (122) | 8 | 54 |
+| Enemies, 136–162 | 31.4 | 94.3 (136) | 27 | 308 |
+| Landing, 163–164 | 93.7 | 136.0 (163) | 2 | 147 |
+
+Five owners account for the excess. The items below remove them in order of
+how much over-budget work each one removes. Each item names:
+
+- the measured work it removes;
+- its target;
+- the structural change;
+- its gate.
+
+The estimates are from the trace and are not additive guarantees; re-measure
+after each item.
+
+### How to work this section
+
+- **Measure the whole fall with the three-capture method** in the audit.
+  `tools/amiga-fall-budget.py` prints the window table above.
+- **Gate on all of these together:**
+  - the window table: work mean, worst update, number over 20 ms and excess;
+  - the specific updates each item names;
+  - the `quiet-fall` pace and its landing witness.
+- **Do not reject a change on pace alone** when it removes the measured work.
+  Display buffering absorbs and redistributes alternating overruns. A
+  better mean likewise does not excuse a worse window worst update.
+- **Before writing code,** state which measured work the change removes,
+  using this profile. Then compare the same windows after the change.
+- **Behaviour gates:**
+  - all 165 native state samples;
+  - the landing witness (tick 164, y 262,144, health 4, ammo 8, 3 enemies,
+    1,371 RNG draws);
+  - the 18,000-frame terrain replay;
+  - mutation and failure fixtures for whatever the item touches;
+  - normal startup at 512 KiB Chip;
+  - unchanged replay behaviour.
+
+  Preserve source event order, RNG order, instance identities, DitherAbove
+  behaviour and hardware scrolling. Keep the portable implementation as the
+  oracle (`REFERENCE_*` selector) until the native path is accepted, then make
+  the native path the default.
+- **Re-check any surprising per-update number** with a short capture of that
+  update before committing it.
+- **Clean up after each item:** delete your own traces once their numbers are
+  in a commit. Stop every owned emulator before handoff.
+
+### A. One owner for generated terrain records
+
+- **Removes:**
+  - about 16,000 cycles (2.2–2.3 ms) per prepared row segment, at a
+    border-only row and in every burst alike;
+  - 2.42 ms on every quiet row update;
+  - 21.9, 32.3 and 32.6 ms in the bursts at 122, 136 and 163;
+  - the 7.35 ms scalar fallback at 56.
+- **Where that cost goes:** about ten structures each record the same span:
+  - identity table admission and birth;
+  - room membership (`bindTerrainSpan`);
+  - logical layer admission and order;
+  - retained cells (`reserveRetainedCells`, `commitRetainedCells`);
+  - the thin-platform retirement window and external registration;
+  - per-cell flags and sprites.
+
+  This is the duplicated per-block terrain ownership that AGENTS.md says to
+  replace first.
+- **Target:** at most 2,500 cycles per segment for all terrain-record work,
+  and at most 4 ms of records in each burst. Builder position publication
+  (0.52 ms per row, 2.3–4.2 ms per burst) and raster invalidation (0.50 ms
+  per row) are publication of the same rows; include them.
+- **Approach:**
+  1. **Census:** for each of those structures, count the reads of terrain
+     slots during the fall and the landing, using counters in a probe build
+     rather than timing. Walls skip animation, have no generic selector and
+     dispatch no wall events in the external backend, so several structures
+     may be written and never read here.
+  2. **One table:** make the prepared segment the one authoritative record:
+     first identity, row and cell bytes, appended once to a segment table
+     owned by `NativeTerrainLifetimes`. Each consumer reads that table:
+     - identity resolution by slot range;
+     - room activity by row range;
+     - cleanup chronology by segment order;
+     - inactive-layer Draw cutoffs by segment index;
+     - thin-platform End Step by its kind bits.
+  3. **Per-cell state:** materialise per-cell runner state only for cells
+     that change (destroy, activation, appearance, wall event), at that
+     change.
+  4. **Remove the old structures** for native terrain slots.
+- **How this differs from the closed attempts** (listed below): those
+  replaced one structure (room membership alone, a registration encoding,
+  multi-row identity groups) and kept the others. This item removes them
+  together, and is judged on per-segment cycles and the window table, not on
+  pace alone.
+- **Gate:**
+  - the quiet row update (99 type) at or under 20.5 ms;
+  - quiet generation window excess at or under 30 ms;
+  - 122 at or under 35 ms, 136 at or under 65 ms;
+  - the behaviour gates plus destroy, activation and failure-prefix fixtures
+    on generated terrain.
+
+### B. Native enemy updates for the fall's families
+
+- **Removes about 8.3 ms per update per crawler.** Step is 17.1 ms in
+  137–162 against 8.8 ms on a quiet update:
+  - alarm dispatch 3.0–4.5 ms for one enemy alarm (the crawler's own alarm
+    body is 2.45, `updateCrawler` and `meetsTiles`);
+  - room effect, the enemy Step, 3.05 ms;
+  - native enemy animations 1.36 ms;
+  - contacts 0.25 ms.
+
+  At landing (164) the new crawlers, snails and frogs cost 15.4 ms in room
+  effects and 8.3 ms in alarms.
+- **Target:** at most 2.5 ms per update per crawler; 137–162 Step mean at or
+  under 11 ms.
+- **Approach:**
+  - **Family arrays:** the crawler, snail and frog keep their state and
+    countdown alarms in per-family arrays. They step in source order with
+    direct tile queries.
+  - **Generic machinery only when needed:** the captured-alarm projection,
+    dispatcher and record publication run only when a non-native owner
+    participates, or when a consumer reads the record. Section 5 E (quiet
+    frames and alarms) is the same work for later scenes; do the fall's
+    families here.
+- **Gate:**
+  - 137–162 has no update over 20 ms, given C;
+  - 164 Step at or under 20 ms;
+  - enemy-state fixtures, including alarm-time births and deaths.
+
+### C. Row painting and the two-update row period
+
+- **Removes:**
+  - corridor row painting, 2.85 ms per row in the quiet window;
+  - cave row painting, 8.9 ms per row on average in 137–162 (`paintCached`
+    5.17), with 16.6 and 17.9 ms at 141 and 143;
+  - breakables drawn through the generic masked asset path (2.5 ms at 141).
+
+  In the quiet window, generation and painting land in the same update of
+  each two-update row period (15.6 versus 24.6 ms).
+- **Target:**
+  - at most 4 ms to paint a row, and at most 6 ms in the worst update;
+  - row work split so neither update of a period carries both generation
+    and painting.
+- **Approach:**
+  - **Paint ahead:** paint the next row into the hidden scroll margin in the
+    update without a new row. Its terrain is generated before it is visible.
+  - **Prepared pattern rows:** extend the borrowed-corridor method to the
+    builder's patterns. Use offline per-pattern row images, with live fix-ups
+    only at segment seams, autotile neighbours and breakables. The live
+    painter remains the oracle and the fallback.
+- **Gate:**
+  - no row update over 20 ms in 122–135 or 137–162 with A and B;
+  - scalar pixel comparison across all pattern rows and seams.
+
+### D. Fixed per-update cost
+
+- **Removes part of the 15.6 ms a quiet update costs with nothing to do:**
+  - Step 8.8 ms;
+  - draw-list collection 1.73 ms (a room-actor walk of 1.20);
+  - display row sync 1.23 ms;
+  - frame loop body 1.39 ms;
+  - the rest.
+
+  Step's parts include:
+  - six per-update clears, 0.50 ms;
+  - phase reconciliation 0.53 ms;
+  - End Step interior 0.35 ms;
+  - an empty alarm phase 0.28 ms;
+  - enemy Step-order capture 0.24 ms;
+  - weapon level recomputed every update 0.20 ms;
+  - camera 0.50 ms;
+  - DitherAbove 0.66–1.09 ms;
+  - RNG refill 0.44 ms.
+- **Target:** a quiet update at or under 11 ms. This leaves room for a row's
+  work and for one enemy.
+- **Approach:** do work only when its inputs change. Not instruction tuning:
+  - keep a retained draw list, updated at birth, death and movement, instead
+    of a walk every update;
+  - recompute derived values when their inputs change: the weapon level when
+    the streak changes, the camera when the player moves;
+  - replace per-update clears with dirty tracking;
+  - skip phases with no participants entirely: alarms, Step-order capture,
+    End Step interior, shop End Step.
+
+  List every item that runs on a quiet update. Keep each one only where a
+  source event requires it.
+- **Gate:**
+  - update 98 type at or under 11.5 ms;
+  - the entrance window mean at or under 12 ms;
+  - unchanged state samples.
+
+### E. Stage generation bursts ahead of their trigger
+
+- **What remains:** even with A, the bursts keep about 20, 45 and 65 ms of
+  builder and event-cell work at 122, 136 and 163. Event cells at 163 are
+  43.3 ms:
+  - breakables 16.1 ms for 21, 5,458 cycles each;
+  - enemy adoption 11.4 ms, of which runner birth and binding is 8.5;
+  - breakable random evaluation 5.1 ms;
+  - enemy choice 3.8 ms.
+- **Target:** 122, 136 and 163 each at or under 20 ms.
+- **Approach:**
+  1. **Cheaper event cells:** breakables publish as records with A's
+     segment method, and enemy adoption binds through B's family arrays.
+  2. **Stage the builder's next pattern** in slack time on earlier updates,
+     once its trigger row is known: pattern choice, consumed RNG values, cell
+     bytes and breakable outputs. Key the staged result on:
+     - RNG draw count and state index;
+     - builder state;
+     - the next instance identity;
+     - the occupied rows.
+  3. **At the trigger update,** verify the key and commit the staged records
+     in source order. Advance the RNG by the staged draw count, and run live
+     only the Create events that observe the world, such as enemy Create.
+  4. **On a key mismatch** (another RNG consumer or birth intervened),
+     discard the staged result and run the normal path, which stays the
+     oracle.
+- **Depends on A–D,** which provide the slack. Do E last.
+- **Gate:**
+  - the three bursts at or under 20 ms;
+  - a fixture that forces a key mismatch;
+  - unchanged state samples and replay.
+
+### Closed approaches (do not retry)
+
+Measured and rejected during the earlier restoration attempts. The evidence
+is in the audit and the git log.
+
+- Shared intrusive room and lifetime descriptors, accessor tuning and
+  another room-animation skip projection.
+- The sparse-change room owner, room-state packing and sparse-list variants.
+- Initial-state, recipe-cache, cross-row grouping and observed-room
+  reconstruction variants.
+- The persistent multi-row identity replacement (group formats, cursors,
+  admission loops).
+- Hoisted metadata or layer admission caches.
+- Standalone registration-owner replacements and registry encodings.
+- Fresh-cell default preinitialisation and copy-loop variants.
+- Immutable-row and copy-on-write spatial encodings.
+
+Item A is not a variant of these: it removes all the per-span structures
+together, behind one owner. Its census must show that each removed structure
+is either unread in the fall or derivable from the segment table.
+
+### Other regression work (after the fall)
 
 - Enforce scene/level-local residency and execution before adding content:
   1. Replace remaining resident
@@ -148,10 +354,10 @@ The immediate priority is the **no-input initial fall to the first platform**:
   contract; its absence in the current contact workload does not prove those
   scenes fit. Continue removing unrelated resident resources and code without
   moving the same always-resident bytes into startup allocations.
-- Close this goal only with a normally runnable build, repeatable measured
-  baseline, explained/resolved recent regressions and meaningful startup failure
-  codes. Retain any remaining absolute 20 ms shortfall explicitly in section 5;
-  do not claim 50 FPS or stock total-memory fit without evidence. Restore a normal
+- Close this section only with every initial-fall update within 20 ms (items
+  A–E), a normally runnable build, explained/resolved recent regressions and
+  meaningful startup failure codes. Retain any 20 ms shortfall outside the
+  initial fall explicitly in section 5; do not claim 50 FPS or stock total-memory fit without evidence. Restore a normal
   non-profile build and stop every owned emulator run before handoff.
 
 ## 1. Finish live skeleton and bone integration

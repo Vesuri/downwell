@@ -1,5 +1,133 @@
 # Amiga gameplay frame-cost audit
 
+## Complete initial fall against the 20 ms budget — `45e96a9c`, 2026-10-12
+
+This is the current baseline for open-work section 0. The sections after it
+are earlier measurements, kept for their evidence; do not quote their numbers
+as the current state.
+
+**Pace:** `bash amiga/profile.sh quiet-fall` gives **192 PAL fields for 164
+updates (42.7 FPS)**, with a worst gap of 7 fields at update 163. 18 updates
+miss at least one field: 1, 67, 72, 122 (3 fields), 136 (5), eleven updates
+between 138 and 161 (2 fields each, 143 3), 163 (7) and 164. The landing witness passes: tick
+164, y 262,144, health 4, ammo 8, 3 enemies, 1,371 RNG draws. Every update
+within 20 ms would mean 164 fields.
+
+**Traces:** cycle-exact traces of every update from 2 to 164, deterministic
+A500 with 512 KiB Chip, 512 KiB slow and 8 MiB Fast. There are three
+100-field captures because one capture holds at most 100 fields. Update 1 is
+the scene-entry update and is excluded.
+
+| Window | Updates | Work mean ms | Worst ms (update) | Over 20 ms | Excess over 20 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Authored entrance, 2–55 | 54 | 16.2 | 20.5 (19) | 1 | 0 |
+| Quiet generation, 56–121 | 66 | 20.2 | 27.7 (56) | 32 | 115 |
+| First burst, 122–135 | 14 | 22.5 | 55.0 (122) | 8 | 54 |
+| Enemies, 136–162 | 27 | 31.4 | 94.3 (136) | 27 | 308 |
+| Landing, 163–164 | 2 | 93.7 | 136.0 (163) | 2 | 147 |
+| Whole fall, 2–164 | 163 | 21.8 | 136.0 (163) | 70 | 626 |
+
+"Work" is the time from one frame mark to the next, minus the publication
+wait (`AmigaPlatform::waitPublished`). Display buffering absorbs part of the
+alternating over-budget updates in the quiet window, so the pace loses
+fewer fields than the per-update excess suggests. The target is still every
+update within 20 ms.
+
+### What one update costs
+
+**Quiet update without a new row (98): 15.6 ms.** No enemies and no
+generation, only the player falling past the walls:
+
+- **Step: 8.8 ms.** Player motion and landing 2.0, Step's own body 1.0,
+  DitherAbove Begin Step 0.66, phase reconciliation 0.53, six per-update
+  clears (`memset`) 0.50, RNG refill 0.44, End Step interior 0.35, copies
+  0.29, an empty alarm phase 0.28, camera 0.50, Consumables 0.23, weapon
+  level recomputed from the streak 0.20, enemy Step-order capture 0.24, shop
+  End Step 0.15.
+- **Outside Step: 6.8 ms.** Draw-list collection 1.73 (a room-actor walk of
+  1.20), display row sync 1.23, frame loop body 1.39, sprite assignment 0.43
+  and copper update 0.25.
+
+**Row update in the quiet window (99): 24.6 ms.** The camera advances one
+16-pixel row every second update, and generation and painting of the new
+row happen in the same update. That adds:
+
+- **Generation: 6.0 ms.** Native terrain records for one row segment 2.42
+  (`constructNativeTerrainPrepared`, of which `constructTerrainSpan` is
+  1.40), 20 RNG draws at about 510 cycles each 1.44, builder position
+  publication 0.52 and raster invalidation 0.50.
+- **Painting: 2.85 ms,** borrowed corridor rows.
+
+Across the 12 row updates in 98–121, generation averages 5.24 ms and painting
+2.84 ms per row.
+
+**Generation bursts:**
+
+| Update | Generation ms | Native terrain records ms (segments) | Event cells ms (count) | Builder position ms | Update total ms |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 56 | 10.9 | 7.35 (scalar fallback) | – | – | 27.7 |
+| 122 | 39.3 | 21.90 (8) | 5.94 (4) | 2.28 | 55.0 |
+| 136 | 75.3 | 32.34 (13) | 22.04 (15) | 3.87 | 94.3 |
+| 163 | 97.0 | 32.60 (13) | 43.32 (32) | 4.17 | 136.0 |
+
+- **Native records:** they cost about 16,000 cycles (2.2–2.3 ms) per
+  prepared row segment, at a border-only row (99) and in every burst alike.
+  The work is split over about ten structures that each record the same
+  span:
+  - identity table admission and birth;
+  - room membership (`bindTerrainSpan`);
+  - logical layer admission and order (`admitPreparedTerrainSpan`,
+    `publishPreparedTerrainSpan`);
+  - retained cells (`reserveRetainedCells`, `commitRetainedCells`);
+  - the thin-platform retirement window and external registration;
+  - per-cell flags and sprites.
+- **Event cells at 163:** breakables 16.1 ms for 21 (5,458 cycles each),
+  enemy adoption 11.4 ms, of which runner birth and binding is 8.5, the
+  breakable random evaluation 5.1 ms and the enemy choice 3.8 ms.
+- **Update 164**, the landing update, spends 39.9 ms in Step on the enemies
+  generated at 163: their room effects 15.4 ms and alarms 8.3 ms.
+
+**Ordinary updates with an enemy (137–162): 29.3 ms mean.** No generation
+runs in this window, because the 136 burst generated these rows ahead of
+the camera:
+
+- **Step: 17.1 ms.** It is 8.8 ms on a quiet update; one crawler adds about
+  8.3 ms. Its alarm dispatch is 3.0–4.5 ms, of which the crawler's own alarm
+  is 2.45; the room effect (enemy Step) 3.05; native enemy animations 1.36;
+  and contacts 0.25.
+- **Painting: 8.9 ms per new row,** 13 rows, mostly live tile painting
+  (`paintCached` 5.17). Updates 141 and 143 paint 16.6 and 17.9 ms.
+
+### Reproduce
+
+Build and environment are as in `quiet-fall`, using trace builds:
+
+```sh
+export DETERMINISTIC=1 STRIP=1 PROFILE_IDLE=1 PROFILE_FRAMES=600 SKIP_TO_GAME=1 \
+  SKIP_INTRO=0 SKIP_LEVEL=0 PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 \
+  PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0 VERIFY_CHIP_KB=512 \
+  VERIFY_TIMEOUT_SECONDS=300 TRACE_FIELDS=100
+for s in 1 60 120; do
+  TRACE_FRAMES=$s TRACE_OUTPUT=$PWD/tmp/trace/fall-$s bash amiga/profile.sh trace
+done
+python3 tools/amiga-trace-report.py tmp/trace/fall-1 --frames=1-96 --causes > tmp/fall/report-1.txt
+python3 tools/amiga-trace-report.py tmp/trace/fall-60 --frames=97-121 --causes > tmp/fall/report-60.txt
+python3 tools/amiga-trace-report.py tmp/trace/fall-120 --frames=122-164 --causes > tmp/fall/report-120.txt
+python3 tools/amiga-fall-budget.py tmp/fall/report-{1,60,120}.txt
+```
+
+- **Captures:** the three captures complete updates 1–97, 60–146 and
+  120–178. Each run takes about five minutes and writes about 4 GB.
+- **Per-update detail:** use `--frames=N --collapsed=FILE` for one update's
+  folded stacks.
+- **ELF SHA-256 of the trace builds** (each differs only in its trace
+  marker):
+  - start 1: `4d9ba62d412725ff7a48bb33a785eb8b027dc172662970ec8ca8540d17b1f99c`;
+  - start 60: `ce94130b27b0498c439df5b529f10b164e1a9f774ee131bfaaf6f25f18542bec`;
+  - start 120: `a76cedcf2e677dd220d280cc5bf651e76f8621692cb38948fa06a812773ee88d`.
+- **Pace build executable SHA-256:**
+  `173315759dd7be7ddc0decf0ac5c1b6162ecdefd23474330aa09f2808eef4625`.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
