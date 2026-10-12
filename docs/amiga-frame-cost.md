@@ -2191,6 +2191,29 @@ named holds the numbers. Do not retry a row without removing the reason in its l
 | Fields | Prepared transfer-list batches | 32.4 → 40.0 ms | Queue scheduling overhead | e558b6a3, [`field-batch-rejected.patch`](rejected/field-batch-rejected.patch) |
 | Terrain | All-phase CPU tile bank (80 KB) | 844 painting 26 → 15 ms | Superseded by direct run composition | 947e8004, [`terrain-words-experiment.patch`](rejected/terrain-words-experiment.patch) |
 
+## Prepared terrain: scene-entry versus live publication
+
+The existing preparation boundary is important when pricing another initial-fall
+change. These are source contracts, not additional measured savings:
+
+| Input or effect | Existing owner | May be moved to scene entry? |
+| --- | --- | --- |
+| Cell kinds/columns, RNG draw counts, occupancy words | `AreaOneBuilder::PreparedTerrain` / builder pack | Already prepared offline. |
+| Area-specific wall/platform Create effects | `PreparedTerrainCreate::prepare` | Already prepared; ordinary plans require zero RNG and zero image speed. |
+| Generic spatial publication branch | `GameplayCollisionOwner::collisionConsumersAdmitted_` | Already compile-time false in `DOWNWELL_EXTERNAL_COLLISION_BACKEND`; it is not a runtime generic collision service to remove. |
+| RNG advancement and special-cell counter | `PreparedTerrain::beginPublication` / `completePublication` | No: these bracket the source segment's live publication and its failure boundary. |
+| Slot/generation, descriptor and room position | `NativeTerrainLifetimes` / `TerrainOwnershipRuns` / room owner | No unconditional reservation: retirement, reuse and interleaved actor births affect them. A hidden descriptor reservation also excludes structural mutations until commit. |
+| Global birth clock, layer population and order | `NativeInstanceTable::externalBirthSpan` / `GameplayRoomLayers::publishPreparedTerrainSpan` | Must be published at the live boundary; interleaved births and layer retirement consume/change this state. |
+
+Consequently, preparing the current constructor's fixed inputs earlier is not a
+new architectural saving. The 21.73 ms update-122 construction measurement is
+inclusive: its 12.56 ms `constructTerrainSpan` region already includes room
+binding (2.38 ms), layer publication (2.08 ms) and layer admission (1.83 ms).
+Do not add those children to the parent or price removal of the compiled-out
+generic spatial branch. A replacement must reduce live ownership/publication
+work while preserving the listed boundaries; moving it into ordinary falling
+updates is not elimination.
+
 ## Measurement notes
 
 - A capture's first frame is partial, because FS-UAE starts recording at the
