@@ -196,6 +196,46 @@ no debugger stops inside the capture. Use a separate 12-field capture from
 the same boundary to confirm frame 93. The normal build is not replaced
 by these frozen-binary captures.
 
+### Where the remaining fall loses fields — `e0e3f138`
+
+The cadence probe now prints the existing missed-field ledger after the run,
+without adding any timed instrumentation. Historical `13e08ca2` records 13
+updates taking more than one field; current `e0e3f138` records 36. The current
+ledger holds only the first 32, through update 157: its final four entries are
+not available, and must not be inferred from this listing.
+
+Updates **57–121** account for **17 extra fields** in current versus none in
+historical. This is 340 ms of the full fall's 580 ms excess (210 versus 181
+fields), before the larger bursts at 122, 136 and 163. The current missed
+updates in this interval are 57, 63, 67, 71, 74, 79, 83, 87, 91, 95, 99,
+103, 107, 111, 115, 118 and 121. The expanded-memory control and target-memory
+current run have identical totals and saved entries. Historical requires
+1 MiB Chip with the rebuilt assets; current was checked with both 512 KiB
+and 1 MiB Chip, keeping the other machine settings unchanged.
+
+A 12-field instruction capture beginning at mark 56 checks the onset on
+current 512 KiB Chip. Complete marks 57–63 average **23.50 ms**, with 18.7–28.5
+ms marker intervals. Gameplay Step averages 14.05 ms, including 2.79 ms in
+builder dispatch, 2.05 ms in player movement, 1.55 ms in alarms, 1.17 ms in
+DitherAbove and 1.09 ms in animation dispatch. Draw collection averages
+2.22 ms; row transfer/drawing 1.84 ms; restoration 1.18 ms. These are inclusive
+boundaries, not additive leaf costs. Small initial-border generation is
+already running here: this is not a generation-free window. The ledger's
+field count and marker-to-marker CPU interval have different boundaries;
+do not identify the expensive handler from a ledger entry alone.
+
+This prioritizes the recurring 57–121 workload over further isolated
+first-landing burst work. It does not establish a new performance improvement
+or justify changing individual sub-millisecond helpers.
+
+Reproduce the ledger with `profile_quiet_cadence.gdb` and the complete-fall
+build above. For the onset trace, ignore 55 hits of `downwellTraceFrameMark`,
+delete the breakpoint, then capture 12 fields and report `--frames=57-63`.
+Current ELF SHA-256:
+`56b1fea95865a0f17fb1e91b9fb03baca8c0c95911f4ff35eb5e3fce3ed921e4`.
+Reports are `tmp/quiet-misses-{old,current,current-1m}-gdb.log` and
+`tmp/quiet-onset-report.txt`; raw trace removed after recording these figures.
+
 The immediate regression target is the quiet fall, not the contact tape or
 the separate 50 FPS goal. Rebuilt `13e08ca2` and `06d1a583` match all 160
 pre-Step observations (ticks 0–159): player position/velocity/grounded state,
