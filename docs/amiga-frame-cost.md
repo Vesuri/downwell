@@ -70,6 +70,36 @@ Candidate profile ELF SHA-256:
 Normal Hunk SHA-256:
 `0cef6f2a03d9f78aab9f9ee20c2bca23bdf58b1fbe7f0715c68f1b59fab984b6`.
 
+The same frozen candidate also completes the **entire fall with 512 KiB
+Chip**, using `VERIFY_CHIP_KB=512` with `profile_quiet_cadence.gdb`:
+164 updates, 211 fields, worst gap 8 at frame 163; landing tick 164,
+X=0/Y=262144 Q8, health 4, ammo 8, three enemies, 1,371 RNG draws.
+This is gameplay evidence beyond the normal splash/menu startup gate.
+It still uses 8 MiB Fast and 512 KiB slow RAM; it is not a stock-total-memory
+fit claim. Its result matches the symmetric 1 MiB Chip comparison.
+
+A separate 20-field capture from frame 150 isolates the last steady frames
+**151–162**, excluding the frame-163 generation burst. Both builds provide
+12 complete frames: historical 2,157,990 cycles (25.31 ms/frame), prepared
+pair 2,471,990 (28.99 ms/frame). Inclusive matched costs are:
+
+| Last steady fall, ms/frame | Historical | Prepared pair |
+| --- | ---: | ---: |
+| Gameplay Step | 13.30 | 17.98 |
+| Alarms, within Step | 2.66 | 3.48 |
+| Crawler update, across Step/Alarm | 1.72 | 1.71 |
+| Player movement, within Step | 2.06 | 1.97 |
+| DitherAbove Begin Step | absent | 1.17 |
+| Terrain painting | 2.39 | 2.41 |
+| Actor Draw collection | 1.79 | 2.24 |
+| Scrolling-row synchronization | 1.18 | 1.16 |
+
+Do not blame terrain painting or crawler collision arithmetic for this
+remaining regression. The controller/dispatch/publication contracts need to
+be separated from redundant bookkeeping; the absent historical DitherAbove
+event is not removable source behavior. These inclusive rows overlap and
+must not be summed as independent phases.
+
 Matched later-fall captures (same complete-fall ELFs above), starting at
 frame 90 for 100 PAL fields, expose a recurring row-publication regression.
 Both reports select **91–157**, 67 complete updates; the current capture
