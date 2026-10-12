@@ -45,6 +45,17 @@ public:
         const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency = false,
         const AmigaActorFrames* prepared = nullptr);
     bool entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const;
+    // Conservative presence gate for controller surfaceFx work. Counts keep
+    // inactive/marked/off-screen records until their owners retire them. Shade
+    // is only a subtractor: it cannot produce pixels on an empty surface.
+    bool hasControllerProducers(const GameplayWorld& world)const{
+        return entryCoverVisible||world.gemSlotEnd()||world.smokeEffects().size()||
+            (world.registeredSmoke()&&world.registeredSmoke()->size())||
+            (world.registeredCorpses()&&world.registeredCorpses()->size())||
+            (world.debrisInstances()&&world.debrisInstances()->size())||
+            (world.timeShardInstances()&&world.timeShardInstances()->size())||
+            (world.levelNumbers()&&world.levelNumbers()->size());
+    }
     // Currency Draw walks slots newest to oldest. Promote only its topmost
     // contiguous suffix when shade requires a retained raster. A completely
     // unshaded pass uses the actor compositor, including BOB channel overflow.

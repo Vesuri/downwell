@@ -90,8 +90,13 @@ int main(){
         if(tick%3)colors.visit(expectedWord);
         else surface.visit([&](unsigned sx,unsigned sy,std::uint16_t bits){expectedWord(sx,sy,bits,bits,0);});
         const auto other=pixels[1-b];const unsigned before=drains;
-        if(tick%3)AmigaGameplayEffects::draw(renderer,display[b],b,origin,colors,rows);
-        else AmigaGameplayEffects::draw(renderer,display[b],b,origin,surface,rows);
+        // With no producers the renderer skips publication altogether. Prior
+        // pixels must still have been restored by rows.sync above, in either
+        // display buffer and across circular-buffer wrap.
+        if(tick%5){
+            if(tick%3)AmigaGameplayEffects::draw(renderer,display[b],b,origin,colors,rows);
+            else AmigaGameplayEffects::draw(renderer,display[b],b,origin,surface,rows);
+        }
         assert(drains-before==unsigned(visible));
         assert(pixels[b]==expected && pixels[1-b]==other && backing==pristine);
         for(unsigned yrow=0;yrow<320;++yrow)for(unsigned slot=0;slot<2;++slot)

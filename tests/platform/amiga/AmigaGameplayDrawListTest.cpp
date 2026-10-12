@@ -20,6 +20,9 @@ static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell:
     assert(world.visitRegisteredEffectSurfaces<false>(assets,view,[&](const auto& art,auto x,auto y){
         reference.push_back({art,x,y});return true;
     }));
+    // A producer emitted by the retained reference must never be suppressed
+    // by the scene's empty-surface gate, including future producer families.
+    if(!reference.empty())assert(AmigaGameplayDrawList{}.hasControllerProducers(world));
     // Repeat after capture, and compare each failing emission prefix too.
     for(unsigned stop=0;stop<=reference.size()+1;++stop){
         unsigned count=0;
@@ -42,6 +45,15 @@ int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD sprite,UWORD,int x,
     *left=x-8; *top=y-8; *width=*height=16; return boundsOK;
 }
 int main() {
+    {
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        auto list=std::make_unique<AmigaGameplayDrawList>();
+        assert(!list->hasControllerProducers(*world));
+        list->entryCoverVisible=true;
+        assert(list->hasControllerProducers(*world));
+        list->entryCoverVisible=false;
+        assert(!list->hasControllerProducers(*world));
+    }
     {
         auto read=[](const char* path){std::ifstream f(path,std::ios::binary);
             return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(f),{});};

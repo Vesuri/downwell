@@ -4166,8 +4166,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                 frameReady = false;
             }
             using Real = downwell::MotionBinary64;
-            const downwell::EffectSurfacePlacement::View effectView{Real::fromInteger(worldViewX),Real::fromInteger(worldViewY),
-                Real::fromInteger(160),Real::fromInteger(284)};
             bool hardwareEntryCover=false;
             // Immutable cover DMA cannot reproduce shade-subtracted alpha.
             if(!actorList.entryCoverHardwareEligible(port,worldViewX,worldViewY,hardwareEntryCover)){
@@ -4175,19 +4173,21 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
             bool hardwareCurrency=false;
 #if !defined(DOWNWELL_REFERENCE_EFFECT_COMPOSITION) && !defined(DOWNWELL_BOB_VERIFY) && !defined(DOWNWELL_REPLAY_VERIFY) && !defined(DOWNWELL_REFERENCE_ACTOR_PREFIX)
-            if(compositeCurrency){
+            if(compositeCurrency&&port.gemSlotEnd()){
                 DW_PROFILE_SCOPE(profileControllerComposition);
                 hardwareCurrency=actorList.promoteCurrency(port,worldViewX,worldViewY,effectAssets,actorFrames);
             }
 #endif
-            const bool compositeEffects=(compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
+            const bool compositeEffects=actorList.hasControllerProducers(port)&&((compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
                 (port.registeredSmoke()&&port.registeredSmoke()->size())||
                 (port.registeredCorpses()&&port.registeredCorpses()->size())||
                 (port.timeShardInstances()&&port.timeShardInstances()->size())))||
                 (actorList.entryCoverVisible&&!hardwareEntryCover)||
-                (port.levelNumbers()&&port.levelNumbers()->size());
+                (port.levelNumbers()&&port.levelNumbers()->size()));
             if(compositeEffects){
                 DW_PROFILE_SCOPE(profileControllerComposition);
+                const downwell::EffectSurfacePlacement::View effectView{Real::fromInteger(worldViewX),Real::fromInteger(worldViewY),
+                    Real::fromInteger(160),Real::fromInteger(284)};
                 downwell::CurrencySmokeComposition::Settings settings;
                 bool shadesSucceeded=true;
                 settings.noControl=port.shops().noControl;settings.death=!compositeCurrency;

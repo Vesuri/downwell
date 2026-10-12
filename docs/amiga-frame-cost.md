@@ -11,14 +11,14 @@ the player has not landed by the last observation.
 
 Separate uninterrupted instruction captures give these matched-frame means:
 
-| Work, ms/frame | Historical | Before pixel controller | Pixel controller |
+| Work, ms/frame | Historical | Before pixel controller | Current |
 | --- | ---: | ---: | ---: |
-| Frames 11–20, including publication wait | 20.35 | 22.03 | 20.85 |
-| Frames 11–20, excluding that wait | 15.78 | 21.53 | 20.67 |
-| Frames 51–55, including publication wait | 20.64 | 23.69 | 23.27 |
-| Frames 51–55, excluding that wait | 17.12 | 23.01 | 22.10 |
+| Frames 11–20, including publication wait | 20.35 | 22.03 | 20.68 |
+| Frames 11–20, excluding that wait | 15.78 | 21.53 | 18.51 |
+| Frames 51–55, including publication wait | 20.64 | 23.69 | 20.48 |
+| Frames 51–55, excluding that wait | 17.12 | 23.01 | 19.97 |
 | Gameplay Step, frames 51–55 | 7.43 | 12.00 | 11.08 |
-| Player movement, inside Step | 2.10 | 2.04 | 2.06 |
+| Player movement, inside Step | 2.10 | 2.04 | 2.04 |
 | Alarm phase, inside Step | 0.91 | 1.55 | 1.55 |
 | Actor Draw collection | 1.30 | 1.75 | 1.75 |
 
@@ -38,7 +38,24 @@ unchanged. Its inclusive cost is 2.08 → 1.15 ms in frames 51–55. All 160
 observations still match, and the native/scalar/snapshot ownership witnesses
 agree. This restores about 0.9 ms of work, not the historical baseline.
 
-Candidate worst marker-to-marker times are 25.1 ms for 11–20 and 25.8 ms
+The current column also skips controller composition when all producer owners
+are empty, and currency-promotion admission when there are no currency slots.
+This removes the empty surface preparation, shade-admission traversal, view
+setup and publication: 22.10 → 19.97 ms work in 51–55, 20.67 → 18.51 ms in
+11–20. Presence is conservative (including pending retirement and off-screen
+records); shade alone only subtracts pixels. Existing row damage restores old
+effect pixels before the gate, and a later nonempty pass clears/rebuilds the
+retained surface before reading it. These savings are not a claim that the
+historical quiet baseline or the whole goal has been restored.
+
+With this gate, worst marker intervals are 26.3 ms in 11–20 and 22.6 ms in
+51–55. The early maximum includes 3.57 ms publication waiting in frame 19
+(22.76 ms work); an independent 12-field recapture reproduces all ten frame
+totals exactly, 1,469,450 cycles. The normal 1,767,508-byte stripped executable
+passes the 512 KiB Chip startup gate. Producer coverage and 1,024 alternating
+buffer/wrap/retirement frames check that omitted publication leaves no trails.
+
+Before the empty-producer gate, worst marker-to-marker times are 25.1 ms for 11–20 and 25.8 ms
 for 51–55. The latter rises from 25.0 ms because frame 54's publication wait
 moves from 3.34 to 5.83 ms: that frame's work falls from 20.54 to 20.00 ms.
 Independent 12-field re-captures of control and candidate reproduce all five
@@ -84,11 +101,14 @@ Measured ELF SHA-256:
 - Historical: `784563b8b4e74de6f00c66b5feb34a47d4b1ef1186137922a0ac0fc1f29f9be9`.
 - Current: `3c2847e4781903b7a7db5f1c18313f3219476830679c39c9050485ea96391982`.
 - Pixel controller: `bb2721d775e78242376cc4beb788bd222d4bf8bf29095f6eb92f68f3c182314f`.
+- Empty-producer gate: `40ef410c89f409b5bb7cd211533763c74e4ad563cc3a91f81096f89f9e654e94`.
 
 The normal stripped executable was restored byte-identically after capture
 (`c8bf6211b9ad2c965fe46f27c1e9268e75ac4e710e51ad9f0d824a90f9f4fa28`).
 After the pixel-controller run the restored normal Hunk hash is
 `01ec13a2fec8e0125290cd4e1a92058750aad633d3f4f2457cfc4421f6334a2b`.
+After the empty-producer gate the normal Hunk hash is
+`cc67e7b42c20c4d373b1b0a2b983681aabb5275bb648dcdb9ce34d08e2de1c24`.
 
 ## Regression comparison baseline
 
