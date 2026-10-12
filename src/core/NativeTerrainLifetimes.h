@@ -6,23 +6,25 @@
 #include "PackedWallState.h"
 #include "WallFootprint.h"
 #include "RunnerLogicalLayerOrder.h"
+#include "NativeTerrainSourceRuns.h"
 namespace downwell {
 // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
 // raster cache. Generated source IDs remain unknown until the shared global
 // allocation stream is connected; family-local generations are never VM IDs.
-template<unsigned Capacity> class NativeTerrainLifetimes {
+template<unsigned Capacity,bool SourceRecords=false> class NativeTerrainLifetimes {
     struct Order {
         std::uint32_t stamp=0;
         RunnerRetainedLayerState layer;
         Order shifted(unsigned n)const{return {stamp?stamp+n:0,layer.shifted(n)};}
         bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer);}
     };
-    using Runs=TerrainOwnershipRuns<Capacity,Order>;
+    using Runs=typename NativeTerrainRunsStorage<Capacity,Order,SourceRecords>::Type;
+    using ChangedCell=NativeTerrainChangedCell<Order>;
     Runs runs_;
     unsigned next_=1,freeHint_=0;
-    unsigned char flags_[Capacity]{};
-    std::int16_t createSprite_[Capacity]{};
-    PackedWallState walls_[Capacity]{};
+    NativeTerrainField<Capacity,Runs,Order,unsigned char,&ChangedCell::flags,SourceRecords> flags_{runs_};
+    NativeTerrainField<Capacity,Runs,Order,std::int16_t,&ChangedCell::sprite,SourceRecords> createSprite_{runs_};
+    NativeTerrainField<Capacity,Runs,Order,PackedWallState,&ChangedCell::wall,SourceRecords> walls_{runs_};
     WallEndStepState* stepping_=nullptr;
     InstanceHandle steppingHandle_{};
     bool good_=true;
@@ -44,6 +46,35 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     }
 public:
     static constexpr unsigned capacity=Capacity;
+    static constexpr bool sourceRecords=SourceRecords;
+    unsigned sourcePopulation()const{
+        if constexpr(SourceRecords)return runs_.sourcePopulation();
+        return 0;
+    }
+    bool sourceOwned(InstanceHandle h)const{
+        if constexpr(SourceRecords)return runs_.sourceOwned(h);
+        return false;
+    }
+    bool nextSourceRegistration(unsigned after,InstanceHandle& handle,int& object,unsigned& order)const{
+        if constexpr(SourceRecords)return runs_.nextSourceRegistration(after,handle,object,order);
+        return false;
+    }
+    unsigned sourcePublicationCount()const{
+        if constexpr(SourceRecords)return runs_.sourcePublicationCount();
+        return 0;
+    }
+    bool sourceRoomState(unsigned slot,RunnerRoomOrderState& out)const{
+        if constexpr(SourceRecords)return runs_.sourceRoomState(slot,out);
+        return false;
+    }
+    bool setSourceRoomState(unsigned slot,const RunnerRoomOrderState& state){
+        if constexpr(SourceRecords)return good_=good_&&runs_.setSourceRoomState(slot,state);
+        return good_=false;
+    }
+    template<class Visit> bool visitSourceRoomStates(Visit visit)const{
+        if constexpr(SourceRecords)return runs_.visitSourceRoomStates(visit);
+        return true;
+    }
     using Identity=typename Runs::Identity;
     enum class SpanResult { unsupported, success, failure };
     // Borrowed AreaOneBuilder prepared-cell stream: two bytes per cell, with
@@ -74,6 +105,10 @@ public:
         // Complete callback-free admission/publication, with no per-cell run
         // session. Unsupported must leave every owner untouched.
         decltype(constructSpan) constructDirectSpan=nullptr;
+        // Only the callback-free native backend can admit these source facts.
+        // Unsupported leaves all consumers unchanged. On success it has
+        // admitted the complete segment; installing it cannot fail.
+        SpanResult (*constructSourceSpan)(void*,const Identity&,PreparedCells,int,TerrainBirthFacts&)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         DW_TERRAIN_READ(terrainFlagsRead);
@@ -84,12 +119,12 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan||binding.constructSourceSpan))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
             binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation&&
             binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun&&binding_.constructSpan==binding.constructSpan&&
-            binding_.constructDirectSpan==binding.constructDirectSpan;
+            binding_.constructDirectSpan==binding.constructDirectSpan&&binding_.constructSourceSpan==binding.constructSourceSpan;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -157,6 +192,10 @@ public:
         return true;
     }
     template<class Visit> bool visitLayerCutoffsReference(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
+        if constexpr(SourceRecords)return visitLayerStates([&](InstanceHandle,const RunnerRetainedLayerState& state){
+            return !state.bound()||state.layer!=layer||!state.inactive||
+                (after&&!after->before(state.order))||visit(state.order);
+        });
         return runs_.visitPublicationRuns([&](const auto& run){
             const auto& basis=run.publication().layer;
             if(!basis.bound()||basis.layer!=layer||!basis.inactive)return true;
@@ -342,6 +381,37 @@ public:
         DW_TERRAIN_READ_ADD(terrainPreparedCells,cells.count);
         if(cells.count&&!cells.bytes)return good_=false;
         if(!good_||publicationRun_||pendingPublication_)return good_=false;
+        if constexpr(SourceRecords){
+            if(cells.retained&&cells.count&&cells.count<=64&&binding_.constructSourceSpan){
+                // This allocator keeps freeHint_ at the first possible free
+                // slot. Equality with population proves a dense live prefix:
+                // the whole suffix is free, regardless of which run format
+                // owns the prefix. Admit that suffix once, not once per cell
+                // through both the authored and generated identity stores.
+                const bool dense=freeHint_==runs_.size();
+                unsigned slot=freeHint_;
+                if(!dense)while(slot<Capacity&&runs_.occupied(slot))++slot;
+                const InstanceHandle first{slot,next_};
+                bool free=cells.count<=Capacity-slot&&cells.count<=available();
+                if(!dense)for(unsigned i=0;free&&i<cells.count;++i)if(runs_.occupied(slot+i))free=false;
+                if(free&&runs_.sources().canAppend(first,cells.count)){
+                    TerrainBirthFacts facts{};
+                    const Identity identity{first,cells.object(0),cells.x(0),cells.y,-1,0};
+                    const auto result=binding_.constructSourceSpan(binding_.context,identity,cells,tile,facts);
+                    if(result==SpanResult::failure)return good_=false;
+                    if(result==SpanResult::success){
+                        // The immutable coordinates and identity are supplied
+                        // by this owner, not trusted to a consumer callback.
+                        facts.cells=cells.bytes;facts.slot=slot;facts.generation=next_;
+                        facts.y=cells.y;facts.tile=tile;
+                        if(!runs_.sources().append(facts,cells.count))return good_=false;
+                        next_+=cells.count;freeHint_=slot+cells.count;
+                        if(wallRadius(tile)<0||wallRadius(tile)>16)unboundedWallArt_=true;
+                        return true;
+                    }
+                }
+            }
+        }
         if(cells.retained&&cells.count&&binding_.constructDirectSpan){
             bool admitted=false;
             publicationRun_=true;
@@ -485,7 +555,8 @@ public:
         // ordinal rather than mutating a borrowed descriptor traversal.
         if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
             if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
-        runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;
+        if constexpr(SourceRecords)runs_.clear();else{runs_.~Runs();new(&runs_) Runs;}
+        freeHint_=0;wallPresentationState_=unboundedWallArt_=false;
         for(auto& byte:layerCutoffSlots_)byte=0;layerCutoffCount_=0;return true;
     }
 private:

@@ -302,7 +302,11 @@ public:
                               PlayerBirthTiming playerBirthTiming = PlayerBirthTiming::construction);
     bool awaitingPlayerBirth()const{return playerBirthPending_;}
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+    using NativeTerrain=downwell::NativeTerrainLifetimes<downwell::GameplayTerrainInstances::capacity,true>;
+#else
     using NativeTerrain=downwell::NativeTerrainLifetimes<downwell::GameplayTerrainInstances::capacity>;
+#endif
     const NativeTerrain* nativeTerrainInstances()const{return nativeTerrainInstances_;}
     NativeTerrain* nativeTerrainInstances(){return nativeTerrainInstances_;}
     bool bindNativeTerrain(NativeTerrain& terrain){

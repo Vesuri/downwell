@@ -7,9 +7,15 @@
 #include "RunnerLayerDraw.h"
 #include "RunnerPreparedDrawList.h"
 #include "RunnerLogicalLayerOrder.h"
+#include "TerrainBirthRecords.h"
 namespace downwell {
 template<unsigned I,class Terrain> struct GameplayLayerStorage {
     using Type=RunnerLogicalLayerOrder<64,I+256,Terrain>;
+    static constexpr bool retained=true;
+};
+template<unsigned Capacity,bool Source> class NativeTerrainLifetimes;
+template<unsigned I,unsigned Capacity,bool Source> struct GameplayLayerStorage<I,NativeTerrainLifetimes<Capacity,Source>> {
+    using Type=RunnerLogicalLayerOrder<64,I+256,NativeTerrainLifetimes<Capacity,Source>,Source>;
     static constexpr bool retained=true;
 };
 template<unsigned I> struct GameplayLayerStorage<I,void> {
@@ -288,6 +294,26 @@ public:
         // existing layer. It changes neither actor order nor inactive cuts.
         // Keep the actor projection cached; subsequent activation/depth/
         // retirement mutations retain their ordinary invalidation paths.
+        return true;
+    }
+    bool admitSourceTerrainSpan(unsigned count,RunnerImageValue depth,unsigned& layer,std::int32_t& integer)const{
+        if(!enabled()||!valid()||!prepared_||!count||count>layers_.retainedAvailable()||
+           !RunnerDepthService::integerDepth(depth,integer))return false;
+        layer=layers_.findDynamic(integer);if(layer!=Layers::End)return true;
+        if(ids_.loadedMaximum<0||ids_.dynamicMaximum<0||ids_.loadedMaximum==0x7fffffff||ids_.dynamicMaximum==0x7fffffff)return false;
+        for(unsigned i=0;i<L;++i)if(!layers_.get(i))return true;
+        return false;
+    }
+    bool publishSourceTerrainSpan(unsigned layer,std::int32_t integer,unsigned count,TerrainBirthFacts& facts){
+        const bool created=layer==Layers::End;
+        if(created&&!ids_.createDynamic(layers_,integer,layer))return fail();
+        const auto basis=layers_.sourcePublicationBasis();
+        facts.layer=layer;facts.layerId=layers_.get(layer)->id;
+        facts.layerLow=basis.low;facts.layerHigh=basis.high;
+        if(!layers_.retainSourceCount(layer,count))return fail();
+        live_+=count;
+        if(created){changedDraw();projectionValid_[layer]=false;--count;}
+        drawRevision_=drawRevision_>0xffffffffu-count?0xffffffffu:drawRevision_+count;
         return true;
     }
     bool birthInheritedTerrain(InstanceHandle h,TerrainRunBirth& run){

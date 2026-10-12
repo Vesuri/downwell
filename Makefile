@@ -1369,6 +1369,20 @@ build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/c
 verify-terrain-ownership-runs: build/terrain-ownership-runs-test
 	./build/terrain-ownership-runs-test
 .PHONY: verify-terrain-ownership-runs
+.PHONY: verify-terrain-source-records
+build/terrain-publication-clock-test: tests/core/TerrainPublicationClockTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+build/terrain-birth-records-test: tests/core/TerrainBirthRecordsTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+build/native-terrain-source-records-test: tests/core/NativeTerrainSourceRecordsTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+verify-terrain-source-records: build/terrain-publication-clock-test build/terrain-birth-records-test build/native-terrain-source-records-test
+	./build/terrain-publication-clock-test
+	./build/terrain-birth-records-test
+	./build/native-terrain-source-records-test
 .PHONY: verify-terrain-read-census
 build/terrain-read-census-off: tests/core/TerrainReadCensusTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
@@ -3400,6 +3414,9 @@ test-amiga-trace-report:
 -include $(DEPS)
 
 TERRAIN_OWNERSHIP_TEST_SOURCES := tests/platform/amiga/AmigaTerrainOwnershipTest.cpp src/platform/amiga/AmigaGameplayGeneration.cpp src/platform/amiga/AmigaTerrain.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
+build/amiga-terrain-source-ownership-test: $(TERRAIN_OWNERSHIP_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TERRAIN_SOURCE_RECORDS -o $@ $(TERRAIN_OWNERSHIP_TEST_SOURCES)
 .PHONY: verify-terrain-ownership
 build/amiga-terrain-ownership-test: $(TERRAIN_OWNERSHIP_TEST_SOURCES) $(HOST_CHECK_HEADERS)
 	@mkdir -p build

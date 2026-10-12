@@ -2,6 +2,7 @@
 #define DOWNWELL_RUNNER_LOGICAL_LAYER_ORDER_H
 #include "RunnerLayers.h"
 #include "RunnerRegistrationOrder.h"
+#include "TerrainPublicationClock.h"
 #include "InstanceHandle.h"
 namespace downwell {
 struct RunnerLayerOrderKey {
@@ -45,7 +46,8 @@ public:
 // Terrain supplies layerState(slot/handle) and visitLayerStates(handle,state).
 // Its records own retained state; this adapter owns only physical order keys,
 // per-layer cutoffs and scratch used at logical merge/normalization boundaries.
-template<unsigned L,unsigned E,class Terrain> class RunnerLogicalLayerOrder:public RunnerLayers<L,E,true> {
+template<unsigned L,unsigned E,class Terrain,bool SourceRecords=false> class RunnerLogicalLayerOrder:
+    public RunnerLayers<L,E,true>,private TerrainPublicationClockStorage<SourceRecords> {
     using Base=RunnerLayers<L,E,true>;
     static constexpr unsigned Virtual=0x80000000u;
     static_assert(E<Virtual&&Terrain::capacity<Virtual,"Logical layer tokens");
@@ -57,13 +59,32 @@ template<unsigned L,unsigned E,class Terrain> class RunnerLogicalLayerOrder:publ
     unsigned work_[E?E:1]{},count_=0;
     std::uint8_t inactivePhysical_[(E+7)/8?(E+7)/8:1]{};
     FailureSignal<> good_=true;
-    RunnerLayerOrderKey stamp(bool tail){clock_.advance();return {clock_,tail};}
+    unsigned sourcePublications()const{
+        if constexpr(SourceRecords)return terrain_?terrain_->sourcePublicationCount():0;
+        return 0;
+    }
+    RunnerLayerOrderKey stamp(bool tail){
+        if constexpr(SourceRecords)return {this->sourceClock_.advance(sourcePublications()),tail};
+        clock_.advance();return {clock_,tail};
+    }
+    void publishPhysical(unsigned element,RunnerLayerOrderKey value){
+        // The 68000 compiler can lose the member displacement on one byte
+        // of an aggregate key copy here. Publish the naturally aligned words
+        // explicitly; the key and its ordering semantics are unchanged.
+        physical_[element].serial.low=value.serial.low;
+        physical_[element].serial.high=value.serial.high;
+        physical_[element].tail=value.tail;
+    }
+    void advanceOrdinary(unsigned count){
+        if constexpr(SourceRecords)this->sourceClock_.advanceOther(count);
+        else clock_=clock_.shifted(count);
+    }
     bool fail(){good_=false;return false;}
     auto state(unsigned token)const{return terrain_->layerState(token&~Virtual);}
     RunnerLayerOrderKey key(unsigned token)const{return token&Virtual?state(token)->order:physical_[token];}
     void setKey(unsigned token,RunnerLayerOrderKey value){
         if(token&Virtual){auto s=*state(token);s.order=value;terrain_->setLayerState(token&~Virtual,s);}
-        else physical_[token]=value;
+        else publishPhysical(token,value);
     }
     bool collect(unsigned layer){
         const unsigned first=count_;
@@ -104,6 +125,17 @@ template<unsigned L,unsigned E,class Terrain> class RunnerLogicalLayerOrder:publ
         return Base::normalizePhysicalInstances(layer,[&](unsigned e){return (inactivePhysical_[e>>3]&(1u<<(e&7)))!=0;});
     }
 public:
+    RunnerRegistrationOrder sourcePublicationBasis()const{
+        static_assert(SourceRecords,"Only the source-record owner borrows a publication basis");
+        return this->sourceClock_.basis();
+    }
+    // Population admission remains synchronous. The source owner publishes
+    // its cumulative count and immutable birth facts immediately afterwards;
+    // this boundary has no per-cell callbacks or retained-state construction.
+    bool retainSourceCount(unsigned layer,unsigned count){
+        static_assert(SourceRecords,"Only the source-record owner publishes source counts");
+        return count&&succeeded()&&Base::retain(layer,count);
+    }
     bool bindTerrain(Terrain& terrain){if(terrain_)return false;terrain_=&terrain;return true;}
     bool succeeded()const{return good_&&Base::succeeded();}
     void observeFailure(bool& owner){good_.observe(owner);Base::observeFailure(owner);}
@@ -119,15 +151,15 @@ public:
         // Resource backgrounds are loaded before retained births.
         if(!instance&&Base::retainedCount(layer))return fail();
         if(!Base::attach(layer,e,instance,append,active))return false;
-        if(instance)physical_[e]=stamp(append);
-        else if(!Base::visitElements(layer,[&](unsigned n){physical_[n]=stamp(true);return true;}))return fail();
+        if(instance)publishPhysical(e,stamp(append));
+        else if(!Base::visitElements(layer,[&](unsigned n){publishPhysical(n,stamp(true));return true;}))return fail();
         return true;
     }
     bool detach(unsigned e){if(!succeeded()||!Base::detach(e))return false;physical_[e]={};return true;}
     bool detachForRebind(unsigned e){if(!succeeded()||!Base::detachForRebind(e))return false;physical_[e]={};return true;}
     bool reconcileInstanceActivation(unsigned e,bool inactive){
         if(!succeeded()||!Base::reconcileInstanceActivation(e,inactive))return false;
-        physical_[e]=stamp(inactive);return true;
+        publishPhysical(e,stamp(inactive));return true;
     }
     bool retainInstance(InstanceHandle h,unsigned layer,bool inactive){
         auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
@@ -137,18 +169,21 @@ public:
     }
     bool retainAllocated(unsigned slot,unsigned layer,bool inactive,bool inherited=false){
         if(!Base::retain(layer,1))return false;
-        if(inherited){clock_.advance();terrain_->publishInheritedLayer(slot);}
+        if(inherited){
+            if constexpr(SourceRecords)stamp(false);else clock_.advance();
+            terrain_->publishInheritedLayer(slot);
+        }
         else terrain_->setLayerState(slot,{stamp(false),Base::get(layer)->id,layer,inactive});
         cutoffs_[layer].dirty=true;return true;
     }
     bool retainInheritedCount(unsigned layer,unsigned count){
         if(!Base::retain(layer,count))return false;
-        clock_=clock_.shifted(count);cutoffs_[layer].dirty=true;return true;
+        advanceOrdinary(count);cutoffs_[layer].dirty=true;return true;
     }
     bool retainConstructedSpan(unsigned layer,unsigned count,RunnerRetainedLayerState& first){
         if(!count||!succeeded()||!Base::get(layer)||!Base::retain(layer,count))return false;
         first={stamp(false),Base::get(layer)->id,layer,false};
-        clock_=clock_.shifted(count-1);cutoffs_[layer].dirty=true;return true;
+        advanceOrdinary(count-1);cutoffs_[layer].dirty=true;return true;
     }
     bool releaseInstance(InstanceHandle h){
         auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};

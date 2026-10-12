@@ -131,7 +131,8 @@ struct Scene {
     Scene(const downwell::BuilderPatternPack& patterns,const downwell::ObjectPack& objects,
           const downwell::SpriteCollisionPack& sprites,const downwell::RoomPack& rooms,
           const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership,
-          bool nativeBoxes=true,bool nativeFields=true,bool nativeLifetimes=false,bool noQueries=false)
+          bool nativeBoxes=true,bool nativeFields=true,bool nativeLifetimes=false,bool noQueries=false,
+          bool startField=false)
         :collision{nullptr,nullptr,&patterns,nullptr,0,nullptr},
          lifetimes(nativeLifetimes?std::make_unique<AmigaGameplayGeneration::TerrainLifetimes>():nullptr),
          generation(builder,patterns,objects,index,tiles,lifetimes.get()){
@@ -147,19 +148,32 @@ struct Scene {
         // native lifetime store; the latter is bound during loadRoom below.
         world=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),
-            (ownership==Ownership::native||ownership==Ownership::nativeScenery)?nullptr:&owner->terrain(),&rooms);
+            (ownership==Ownership::native||ownership==Ownership::nativeScenery)?nullptr:&owner->terrain(),&rooms,
+            startField?GameplayWorld::PlayerBirthTiming::authoredRoom:GameplayWorld::PlayerBirthTiming::construction);
         require(world->effectsSucceeded()&&owner->attach(*world),"owner attaches");
         world->initializeEntryInput(false);
         tiles.clear();
         require(amigaBuildTerrainIndex(collision,index),"index initializes");
         auto prepared=std::make_unique<downwell::PreparedRoomTerrain>();
         require(prepared->prepare(rooms,room),"room terrain resource admission");
-        require(generation.loadRoom(*world,rooms,room,
+        if(startField){
+            auto backend=std::make_unique<AmigaRoomTerrainPlan>();
+            backend->prepare(*prepared,index);
+            require(generation.loadRoomWithStartField(*world,rooms,room,prepared.get(),backend.get(),
+                [](AmigaPortRuntime& runtime,AmigaAreaOneTerrainBuilder& generator,
+                   const downwell::PackedRoomInstance&,void*){
+                    downwell::GameMakerRandom random;
+                    generator.resetInitialCheckpointBeforeEntrance(random);
+                    runtime.configureEnemyRandom(random);return true;
+                }),"production prepared room and start field load");
+        }else require(generation.loadRoom(*world,rooms,room,
             ownership==Ownership::reference?nullptr:prepared.get()),"room terrain loads");
         collision.index=&index;collision.runtime=world.get();
         const int none=0;world->configureBreakables(&none,&none,0);
-        require(builder.resetFromRoomEntry(entry.mainBuilderState()),"builder imports entry");
-        world->configureEnemyRandom(entry.randomState());
+        if(!startField){
+            require(builder.resetFromRoomEntry(entry.mainBuilderState()),"builder imports entry");
+            world->configureEnemyRandom(entry.randomState());
+        }
         generation.bind(*world);
         world->configureGenerationStep([](void* p,AmigaPortRuntime&,downwell::GameMakerRandom& random,int bottom){
             return static_cast<Scene*>(p)->generation.step(random,bottom);
@@ -623,6 +637,18 @@ int main(int argc,char** argv){
             <<" bytes; external scenes retain only a pointer\n";
         std::cout<<"optional collision geometry: "<<sizeof(downwell::GameplayCollisionOwner::CollisionGeometryStorage)<<" bytes\n";
     }
+    {
+        auto entry=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,
+            &rooms,&objects,2,&patterns);
+        entry->skipToGameForTesting();
+        auto scene=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*entry,
+            Ownership::nativeScenery,true,true,true,true,true);
+        for(frame=0;frame<165;++frame){
+            scene->world->step(0);
+            require(scene->world->effectsSucceeded()&&scene->world->generationSucceeded()&&
+                scene->owner->prepareDraw(),"production start-field initial fall succeeds");
+        }
+    }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){
         auto host=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,
@@ -714,6 +740,10 @@ int main(int argc,char** argv){
             if(reference->owner->terrain().size()>maxTerrain)maxTerrain=reference->owner->terrain().size();
             ++frames;
         }
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+        require(others[7]->lifetimes->sourcePublicationCount()>0,
+            "production replay exercised source-owned prepared terrain");
+#endif
         ++tapes;
     }
     std::cout<<"native ownership: "<<tapes<<" tapes, "<<frames<<" frames, up to "<<maxTerrain

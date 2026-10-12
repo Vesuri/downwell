@@ -94,6 +94,14 @@ public:
     }
     void externalRetire(unsigned slot){changedBinding(slot,false);}
     void externalFlagsChanged(unsigned slot){changedCapture(slot,false);}
+    void externalRegistrationPublications(unsigned first,unsigned count){
+        // Native source records own these registrations; retain only the
+        // externally observed publication revision, not registry nodes.
+        if(!count)return;
+        const auto remaining=count-1;
+        changedCapture(first,false);
+        captureRevision_=captureRevision_>0xffffffffu-remaining?0xffffffffu:captureRevision_+remaining;
+    }
     // Run-owned lifetimes borrow only the existing registration links. The
     // caller validates their lifetime and owns flags and chronology; no Entry
     // is synthesized, and reactivation must publish its fresh stamp first.

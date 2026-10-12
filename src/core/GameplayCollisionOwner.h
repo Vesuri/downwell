@@ -13,6 +13,7 @@
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
+#include "RunnerSourceRoomMembership.h"
 #include "RunnerActivationChanges.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
@@ -260,6 +261,8 @@ private:
     }
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     RunnerRoomMembership<View::capacity> room_;
+#elif defined(DOWNWELL_TERRAIN_SOURCE_RECORDS)
+    RunnerSourceRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase,GameplayWorld::NativeTerrain> room_;
 #else
     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
 #endif
@@ -513,8 +516,9 @@ private:
                     const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
                     std::uint32_t spatial;
                     if(!world_->nativeTerrainInstances()->spatialFlags(id.handle,spatial))return false;
+                    const bool sourceOwned=world_->nativeTerrainInstances()->sourceOwned(id.handle);
                     out=(definition->initialFlags&~8u)|spatial|
-                        (((collisionConsumersAdmitted_||id.object==93)?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
+                        (((collisionConsumersAdmitted_||id.object==93)&&!sourceOwned?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
                 }
             }
             return false;
@@ -537,6 +541,33 @@ private:
 #endif
     }
     template<class Visit> bool visitNativeRegistered(unsigned first,unsigned last,Visit visit)const{
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+        const auto* terrain=world_?world_->nativeTerrainInstances():nullptr;
+        if(terrain&&terrain->sourcePopulation()&&first<View::timeFieldBase&&last>View::terrainBase){
+            unsigned after=0,order=0;InstanceHandle local;int object=0;
+            bool present=terrain->nextSourceRegistration(after,local,object,order);
+            auto before=[&](unsigned limit){
+                while(present&&(!limit||order<limit)){
+                    const InstanceHandle h{View::terrainBase+local.slot,local.generation};
+                    if(h.slot>=first&&h.slot<last){std::uint32_t flags;
+                        if(!eligibilityFlags(h,flags)||!visit(h,object,flags))return false;
+                    }
+                    after=order;present=terrain->nextSourceRegistration(after,local,object,order);
+                }return true;
+            };
+            return visitNativeOrdinaryRegistered(first,last,[&](InstanceHandle h,int child,std::uint32_t flags){
+                unsigned stamp;
+                if(h.slot>=View::terrainBase&&h.slot<View::timeFieldBase)stamp=terrain->registrationOrder({h.slot-View::terrainBase,h.generation});
+                else if(const auto* box=nativeBox(h))stamp=box->nativeRegistration;
+                else if(const auto* field=nativeField(h))stamp=field->nativeRegistration;
+                else stamp=table_.registrationOrder(h);
+                return before(stamp)&&visit(h,child,flags);
+            })&&before(0);
+        }
+#endif
+        return visitNativeOrdinaryRegistered(first,last,visit);
+    }
+    template<class Visit> bool visitNativeOrdinaryRegistered(unsigned first,unsigned last,Visit visit)const{
         const bool boxes=nativeBoxes_&&last>View::breakableBase&&first<View::terrainBase;
         const bool fields=nativeFields_&&last>View::timeFieldBase&&first<View::goalFieldBase;
         auto flagsOf=[&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);};
@@ -924,6 +955,38 @@ private:
         return Result::success;
     }
 #endif
+#if defined(DOWNWELL_TERRAIN_SOURCE_RECORDS) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+    GameplayWorld::NativeTerrain::SpanResult constructSourceTerrainSpan(
+        const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,
+        int tile,TerrainBirthFacts& facts){
+        using Result=GameplayWorld::NativeTerrain::SpanResult;
+        if(!valid()||!native_||collisionConsumersAdmitted_||!world_||!nativeTerrainLayersBound_||
+           nativeTerrainLayerRunActive_||terrainRoomCount_||!cells.retained||!cells.count||
+           !table_.canExternalBirth(cells.count))return Result::unsupported;
+        const auto* wall=objectDefaults_.get(60);const auto* thin=objectDefaults_.get(93);
+        if(!wall||!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth))return Result::unsupported;
+        for(unsigned kind=0;kind<2;++kind){
+            const int object=kind?93:60;const auto* definition=kind?thin:wall;
+            const auto* objectFlags=families_.flags(object);const auto* plan=nativeTerrainCreate_.get(object,tile);
+            if(!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||(definition->initialFlags&0x8000u))return Result::unsupported;
+            const unsigned spatial=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
+            facts.flags[kind]=32u|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+        }
+        unsigned layer;std::int32_t depth;
+        if(!layers_.admitSourceTerrainSpan(cells.count,wall->creationDepth,layer,depth))return Result::unsupported;
+        // The lifetime owner admitted the free slot interval. No actor owner
+        // may use this domain, so no duplicate table/room admission is needed.
+        const unsigned slot=View::terrainBase+first.handle.slot;
+        if(!table_.externalBirthSpan(slot,cells.count,facts.registration))return Result::unsupported;
+        const auto roomBasis=room_.sourcePublicationBasis();
+        facts.roomLow=roomBasis.low;facts.roomHigh=roomBasis.high;facts.roomDepth=wall->creationDepth.bits;
+        if(!layers_.publishSourceTerrainSpan(layer,depth,cells.count,facts)){check(false);return Result::failure;}
+        unsigned thinCount=0;for(unsigned i=0;i<cells.count;++i)thinCount+=cells.kind(i);
+        thinRetirementWindow_.appendSpan(cells.y,thinCount!=0,first.handle.generation+cells.count-1,cells.count);
+        table_.externalRegistrationPublications(slot,thinCount);
+        return Result::success;
+    }
+#endif
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
         std::uint32_t& order,std::uint32_t& flags){
         thinRetirementWindow_.append(id.y,id.object==93,id.handle.generation);
@@ -932,7 +995,10 @@ private:
         // Bind at the first birth, before any terrain layer publication.
         if(!nativeTerrainLayersBound_){
             if(!world_||!world_->nativeTerrainInstances()||
-               !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
+                !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+            if(!room_.bindTerrain(*world_->nativeTerrainInstances()))return check(false);
+#endif
             nativeTerrainLayersBound_=true;
         }
 #endif
@@ -999,6 +1065,7 @@ private:
         if(!terrain->read(h,id,active,destroyed)||!terrain->spatialFlags(h,flags))return check(false);
         if(id.object==93)thinRetirementWindow_.invalidate();
         const unsigned slot=View::terrainBase+local;
+        const bool sourceRegistered=terrain->sourceOwned(h)&&id.object==93&&room_.active(slot);
         if(flags&0x8000u){
             // Cached geometry may still be constructor state after Create.
             // Never remove using the current appearance before it is flushed.
@@ -1013,7 +1080,9 @@ private:
         }
         if(!check(room_.remove(slot)))return false;
         if(!check(layers_.retire({slot,h.generation})))return false;
-        if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
+        if(terrain->sourceOwned(h)){
+            if(sourceRegistered)table_.externalRegistrationPublications(slot,1);
+        }else if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
         table_.externalRetire(slot);return nativeRetireQueues(slot);
     }
     template<class Record,View::Kind Kind> struct Binding {
@@ -2054,6 +2123,11 @@ public:
                 return static_cast<GameplayCollisionOwner*>(p)->constructTerrainSpan(first,cells,tile,
                                                                                    completed,stamp,flags,layer,true);
             }
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+            ,[](void* p,const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,TerrainBirthFacts& facts){
+                return static_cast<GameplayCollisionOwner*>(p)->constructSourceTerrainSpan(first,cells,tile,facts);
+            }
+#endif
 #endif
         }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
@@ -2866,8 +2940,13 @@ private:
                 });
             };
         // The retained actor projection deliberately excludes terrain.
-        const bool okay=check(native_?table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
+        const bool okay=check(native_?
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+            visitNativeRegistered(View::terrainBase,View::timeFieldBase,visit):
+#else
+            table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
                 [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},visit):
+#endif
             owner_.visitRegistrationRange(View::terrainBase,View::timeFieldBase,
                 [&](InstanceHandle h,int object,const Owner::State& state){return visit(h,object,state.flags);}));
         if(retain&&okay)thinRetirementWindow_.complete(proof);
@@ -4845,6 +4924,10 @@ public:
                         !world_->rebindNativeTerrainOrder({slot-View::terrainBase,h.generation},order))return false;
                 }
                 const int object=objectOf(h);
+                if(world_->nativeTerrainInstances()->sourceOwned({h.slot-View::terrainBase,h.generation})){
+                    if(object==93)table_.externalRegistrationPublications(slot,1);
+                    return layers_.reconcile(h)&&publishPreparedDraw(h);
+                }
                 return ((!collisionConsumersAdmitted_&&object!=93)||table_.registerExternalObject(h,object,registered))&&
                     layers_.reconcile(h)&&publishPreparedDraw(h);
             }

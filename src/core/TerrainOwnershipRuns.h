@@ -66,7 +66,29 @@ public:
         int object=0,x=0,y=0,creationCode=-1;
         std::uint32_t source=0;
     };
+    // Borrowed, read-only chronology cursor. A source-record owner can merge
+    // authored/scalar lifetimes without maintaining a second identity list.
+    class Cursor {
+        const TerrainOwnershipRuns& owner_;
+        unsigned run_,offset_=0;
+    public:
+        explicit Cursor(const TerrainOwnershipRuns& owner):owner_(owner),run_(owner.head_){}
+        bool take(Identity& out){
+            while(run_!=End){const auto& r=owner_.runs_[run_];
+                while(offset_<r.count){const unsigned i=offset_++,slot=r.first+i;
+                    if(owner_.locator_[slot]!=run_+1)continue;
+                    out={{slot,r.generation+i},r.objectAt(i),r.xAt(i),r.y,r.creationCode,r.sourceId()};return true;
+                }
+                run_=r.next;offset_=0;
+            }
+            return false;
+        }
+    };
     unsigned size()const{return population_;}
+    void clear(){
+        for(auto& locator:locator_)locator=0;
+        head_=tail_=free_=reserved_=End;used_=population_=0;
+    }
     bool reservationPending()const{return reserved_!=End;}
     bool contains(InstanceHandle h)const{
         DW_TERRAIN_READ(terrainIdentityRead);

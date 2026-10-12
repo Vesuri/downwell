@@ -13,7 +13,7 @@
 // with the scene owner. No allocations or delayed command queue.
 class AmigaGameplayGeneration {
 public:
-    using TerrainLifetimes=downwell::NativeTerrainLifetimes<2048>;
+    using TerrainLifetimes=GameplayWorld::NativeTerrain;
     static constexpr int worldRows = AmigaTerrainIndex::rows * 16;
     AmigaGameplayGeneration(AmigaAreaOneTerrainBuilder& builder,
         const downwell::BuilderPatternPack& patterns, const downwell::ObjectPack& objects,

@@ -46,6 +46,7 @@ template<unsigned Capacity,unsigned First,unsigned Last> class RunnerRunRoomMemb
 public:
     static constexpr unsigned End=Capacity;
     struct AnimationProjection {}; // Runs themselves supply the skip projection.
+    RunnerImageValue depth(unsigned slot)const{return contains(slot)?runs_[locator_[slot]-1].key:RunnerImageValue{};}
     // A borrowed cursor, not a prepared list. Family consumers may process
     // consecutive entries without changing room order. Save next before each
     // handler; skip non-animated runs only after that handler has returned.
