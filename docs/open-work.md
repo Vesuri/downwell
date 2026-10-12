@@ -46,9 +46,23 @@ The immediate priority is the **no-input initial fall to the first platform**:
    required DitherAbove behavior and keep the full quiet interval as a guard
    against moving generation work into ordinary updates. The historical 32.14 FPS contact
    average and 19.45 ms firing frame are not acceptance targets for this fall.
-2. Identify and remove the added per-frame work in that sequence, preserving
-   source event order and behavior. Accept against the matched historical
-   mean and worst-frame costs, not a new 20 ms requirement.
+2. Replace duplicated terrain publication at its owner, preserving source event
+   order and behavior. Evaluate one shared lifetime/layer/room descriptor rather
+   than three independently maintained publications:
+   - Reserve a descriptor before callback-free prepared construction, publish
+     only its completed prefix, and preserve the scalar failure oracle.
+   - Reuse its slot locator for room membership instead of building a second
+     room span and locator. Keep room insertion/deactivation chronology and
+     layer Draw chronology independent; they are not interchangeable clocks.
+   - Maintain room links through descriptor splits, retirement, slot reuse and
+     reactivation. Do not replace publication with full room-order rebuilds
+     during animation, activation or cleanup (the earlier observed-room path).
+   - Differentially check mixed actors/terrain, mutation and failure boundaries,
+     then measure 57–121, 122, 136 and 163 before broader validation. Price the
+     complete replacement against the 21.73 ms construction region at 122;
+     removing room insertion alone (2.38 ms) is not that replacement.
+   Accept against matched historical costs, not a new 20 ms requirement. Leave
+   initial-state, recipe-cache and cross-row grouping variants closed.
 3. Verify the restored complete fall (including its generation bursts), normal
    512 KiB Chip startup, and unchanged replay behavior before returning to
    later gameplay or combat optimization.
