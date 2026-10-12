@@ -28,6 +28,38 @@ The population costs four ordinary bytes and no Chip allocation. Normal Hunk:
 Profile ELF SHA-256:
 `9867a0f8dec545b0324ff458d91d342cd9fbd9dcfe1e5a9a47c89efc1fbcbf32`.
 
+Matched historical/current onset captures (marks 57–63, 12-field captures
+starting at mark 56, deterministic, both 1 MiB Chip) isolate the remaining
+regression. Historical ELF is the `13e08ca2` hash below; current is the hash
+above. Selected totals are 1,003,630 versus 1,128,990 cycles. The current
+512 KiB capture is 1,129,010 cycles: the expanded comparison is not hiding
+a target-memory slowdown in this window.
+
+| Inclusive cost, ms/update | Historical | Current |
+| --- | ---: | ---: |
+| Whole marker interval, including waits | 20.18 | 22.70 |
+| Gameplay Step | 9.20 | 12.99 |
+| Terrain generation callback, within Step | 1.60 | 2.74 |
+| Player movement, within Step | 2.10 | 2.04 |
+| Alarm phase, within Step | 0.91 | 1.57 |
+| DitherAbove Begin Step, within Step | absent | 1.17 |
+| Actor Draw collection | 1.30 | 1.76 |
+| New-row painting/transfer | 1.89 | 1.84 |
+| Display row restoration | 1.22 | 1.26 |
+
+Do not sum nested rows or interpret the marker interval as work excluding
+waits. Ordinary Step updates 57/59 are 7.8 → 10.3 ms; generation updates
+58/61/63 are 11.0/11.2/10.9 → 16.8/16.0/15.9 ms. The prepared-pair
+publication now costs 1.27 ms averaged over all seven updates, about 2.97 ms
+per call (three calls). Native lifetime construction accounts for 1.06 ms
+of that average, including 0.62 ms in the collision-owner span publication.
+This identifies the surviving border-birth ownership boundary, not an
+individual arithmetic/copy helper, as the next generation investigation.
+The historical absence of source-required DitherAbove is not permission to
+remove it. Scrolling/restore and player movement are not the observed cause.
+Reports: `tmp/quiet-historical-onset-report.txt` and
+`tmp/quiet-current-onset-1m-report.txt`; raw traces removed after commit.
+
 Earlier RNG-preparation comparison (`e0e3f138`): **210 fields / 39.05 FPS**,
 independently repeated. Idle-time preparation of the existing RNG ring reduces
 frame 163 from **155.76 to 141.3 ms**. The historical 181-field result is still
