@@ -32,7 +32,7 @@ template<unsigned Capacity,class Mutable> class TerrainBirthRecords {
     struct Change {alignas(Mutable) unsigned char bytes[sizeof(Mutable)];};
     Change changes_[Capacity];
     std::uint32_t changedGeneration_[Capacity];
-    unsigned used_,population_,highWater_,head_,tail_,free_;
+    unsigned used_,population_,highWater_,head_,tail_,free_,pending_=0,pendingCount_=0;
     std::uint32_t published_,lastGeneration_;
     static std::uint32_t mask(unsigned n){return n>=32?0xffffffffu:n?(1u<<n)-1:0;}
     static bool alive(const Record& r,unsigned offset){return (r.alive[offset>>5]>>(offset&31))&1u;}
@@ -73,11 +73,27 @@ public:
         return true;
     }
     bool append(const TerrainBirthFacts& birth,unsigned count){
-        if(!birth.cells||!birth.registration||count-1>0xffffffffu-birth.registration||
-           !canAppend({birth.slot,birth.generation},count))return false;
-        unsigned n;
-        if(free_!=Capacity){n=free_;free_=records_[n].next;}else n=used_++;
-        auto& r=records_[n];r.birth=birth;r.ordinal=published_+1;
+        auto* facts=reserve({birth.slot,birth.generation},count);
+        if(!facts)return false;
+        *facts=birth;return commit();
+    }
+    // Admit one segment and lend its unpublished record, so the birth owner
+    // writes the facts once in place. Nothing is observable until commit();
+    // abandon() (or another reserve) discards it without side effects.
+    TerrainBirthFacts* reserve(InstanceHandle first,unsigned count){
+        if(!canAppend(first,count))return nullptr;
+        pending_=free_!=Capacity?free_:used_;pendingCount_=count;
+        auto& birth=records_[pending_].birth;
+        birth.slot=first.slot;birth.generation=first.generation;
+        return &birth;
+    }
+    void abandon(){pendingCount_=0;}
+    bool commit(){
+        const unsigned count=pendingCount_,n=pending_;pendingCount_=0;
+        auto& r=records_[n];const auto& birth=r.birth;
+        if(!count||!birth.cells||!birth.registration||count-1>0xffffffffu-birth.registration)return false;
+        if(n==free_)free_=r.next;else ++used_;
+        r.ordinal=published_+1;
         r.count=r.live=count;r.alive[0]=mask(count);r.alive[1]=mask(count>32?count-32:0);
         r.next=Capacity;r.previous=tail_;
         if(tail_!=Capacity)records_[tail_].next=n;else head_=n;

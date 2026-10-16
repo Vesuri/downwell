@@ -956,33 +956,52 @@ private:
     }
 #endif
 #if defined(DOWNWELL_TERRAIN_SOURCE_RECORDS) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-    GameplayWorld::NativeTerrain::SpanResult constructSourceTerrainSpan(
-        const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,
-        int tile,TerrainBirthFacts& facts){
-        using Result=GameplayWorld::NativeTerrain::SpanResult;
-        if(!valid()||!native_||collisionConsumersAdmitted_||!world_||!nativeTerrainLayersBound_||
-           nativeTerrainLayerRunActive_||terrainRoomCount_||!cells.retained||!cells.count||
-           !table_.canExternalBirth(cells.count))return Result::unsupported;
+    // Object defaults, family flags and Create plans are fixed after attach;
+    // only the area's tile selects a plan. Prove the per-kind constructor
+    // facts once per tile, not once per segment.
+    struct SourceTerrainRecipe {
+        int tile=-1;bool supported=false;
+        unsigned char flags[2]{};
+        std::int32_t depth=0;std::uint32_t roomDepth=0;
+    };
+    SourceTerrainRecipe sourceTerrainRecipe_;
+    const SourceTerrainRecipe& sourceTerrainRecipe(int tile){
+        auto& recipe=sourceTerrainRecipe_;
+        if(recipe.tile==tile)return recipe;
+        recipe=SourceTerrainRecipe{};recipe.tile=tile;
         const auto* wall=objectDefaults_.get(60);const auto* thin=objectDefaults_.get(93);
-        if(!wall||!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth))return Result::unsupported;
+        if(!wall||!thin||!RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)||
+           !RunnerDepthService::integerDepth(wall->creationDepth,recipe.depth))return recipe;
         for(unsigned kind=0;kind<2;++kind){
             const int object=kind?93:60;const auto* definition=kind?thin:wall;
             const auto* objectFlags=families_.flags(object);const auto* plan=nativeTerrainCreate_.get(object,tile);
-            if(!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||(definition->initialFlags&0x8000u))return Result::unsupported;
+            if(!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||(definition->initialFlags&0x8000u))return recipe;
             const unsigned spatial=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
-            facts.flags[kind]=32u|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+            recipe.flags[kind]=32u|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         }
-        unsigned layer;std::int32_t depth;
-        if(!layers_.admitSourceTerrainSpan(cells.count,wall->creationDepth,layer,depth))return Result::unsupported;
+        recipe.roomDepth=wall->creationDepth.bits;recipe.supported=true;
+        return recipe;
+    }
+    GameplayWorld::NativeTerrain::SpanResult constructSourceTerrainSpan(
+        InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,
+        int tile,TerrainBirthFacts& facts){
+        using Result=GameplayWorld::NativeTerrain::SpanResult;
+        if(!valid()||!native_||collisionConsumersAdmitted_||!world_||!nativeTerrainLayersBound_||
+           nativeTerrainLayerRunActive_||terrainRoomCount_||!cells.retained||!cells.count)return Result::unsupported;
+        const auto& recipe=sourceTerrainRecipe(tile);
+        if(!recipe.supported)return Result::unsupported;
+        facts.flags[0]=recipe.flags[0];facts.flags[1]=recipe.flags[1];
+        unsigned layer;
+        if(!layers_.admitSourceTerrainSpan(cells.count,recipe.depth,layer))return Result::unsupported;
         // The lifetime owner admitted the free slot interval. No actor owner
         // may use this domain, so no duplicate table/room admission is needed.
-        const unsigned slot=View::terrainBase+first.handle.slot;
+        const unsigned slot=View::terrainBase+first.slot;
         if(!table_.externalBirthSpan(slot,cells.count,facts.registration))return Result::unsupported;
         const auto roomBasis=room_.sourcePublicationBasis();
-        facts.roomLow=roomBasis.low;facts.roomHigh=roomBasis.high;facts.roomDepth=wall->creationDepth.bits;
-        if(!layers_.publishSourceTerrainSpan(layer,depth,cells.count,facts)){check(false);return Result::failure;}
+        facts.roomLow=roomBasis.low;facts.roomHigh=roomBasis.high;facts.roomDepth=recipe.roomDepth;
+        if(!layers_.publishSourceTerrainSpan(layer,recipe.depth,cells.count,facts)){check(false);return Result::failure;}
         unsigned thinCount=0;for(unsigned i=0;i<cells.count;++i)thinCount+=cells.kind(i);
-        thinRetirementWindow_.appendSpan(cells.y,thinCount!=0,first.handle.generation+cells.count-1,cells.count);
+        thinRetirementWindow_.appendSpan(cells.y,thinCount!=0,first.generation+cells.count-1,cells.count);
         table_.externalRegistrationPublications(slot,thinCount);
         return Result::success;
     }
@@ -1718,6 +1737,9 @@ public:
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         if(good_&&geometry_)good_=owner_.bindTerrainGeometry(geometry_->terrain);
 #endif
+#if defined(DOWNWELL_TERRAIN_SOURCE_RECORDS) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+        sourceTerrainRecipe_=SourceTerrainRecipe{};
+#endif
         if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else {
             nativeBoxFlags_=box->initialFlags;
             good_=RunnerDepthService::integerDepth(box->creationDepth,boxLayer_.depth);
@@ -2124,7 +2146,7 @@ public:
                                                                                    completed,stamp,flags,layer,true);
             }
 #ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
-            ,[](void* p,const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,TerrainBirthFacts& facts){
+            ,[](void* p,InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,int tile,TerrainBirthFacts& facts){
                 return static_cast<GameplayCollisionOwner*>(p)->constructSourceTerrainSpan(first,cells,tile,facts);
             }
 #endif

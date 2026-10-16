@@ -31,8 +31,8 @@ template<bool Source> struct Fixture {
         binding.create=[](void*,const typename Terrain::Identity&,int,std::uint32_t& flags){flags=8u;return true;};
         binding.mark=[](void* p,unsigned slot){return static_cast<Fixture*>(p)->room.mark(32+slot);};
         binding.retire=[](void* p,unsigned slot){auto& self=*static_cast<Fixture*>(p);++self.retired;return self.room.remove(32+slot);};
-        if constexpr(Source)binding.constructSourceSpan=[](void* p,const typename Terrain::Identity&,
-                typename Terrain::PreparedCells cells,int,TerrainBirthFacts& out){
+        if constexpr(Source)binding.constructSourceSpan=[](void* p,InstanceHandle,
+                const typename Terrain::PreparedCells& cells,int,TerrainBirthFacts& out){
             auto& self=*static_cast<Fixture*>(p);
             if(!self.supported)return Terrain::SpanResult::unsupported;
             const auto basis=self.layerClock.basis();

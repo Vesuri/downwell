@@ -296,9 +296,8 @@ public:
         // retirement mutations retain their ordinary invalidation paths.
         return true;
     }
-    bool admitSourceTerrainSpan(unsigned count,RunnerImageValue depth,unsigned& layer,std::int32_t& integer)const{
-        if(!enabled()||!valid()||!prepared_||!count||count>layers_.retainedAvailable()||
-           !RunnerDepthService::integerDepth(depth,integer))return false;
+    bool admitSourceTerrainSpan(unsigned count,std::int32_t integer,unsigned& layer)const{
+        if(!enabled()||!valid()||!prepared_||!count||count>layers_.retainedAvailable())return false;
         layer=layers_.findDynamic(integer);if(layer!=Layers::End)return true;
         if(ids_.loadedMaximum<0||ids_.dynamicMaximum<0||ids_.loadedMaximum==0x7fffffff||ids_.dynamicMaximum==0x7fffffff)return false;
         for(unsigned i=0;i<L;++i)if(!layers_.get(i))return true;

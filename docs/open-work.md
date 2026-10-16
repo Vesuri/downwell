@@ -136,8 +136,20 @@ after each item.
   multi-row identity groups) and kept the others. This item removes them
   together, and is judged on per-segment cycles and the window table, not on
   pace alone.
+- **Current candidate:** `REFERENCE_TERRAIN_RECORDS=0` (default 1) selects
+  one source-segment record per prepared row segment, written in place, with
+  the per-kind constructor facts proved once per tile. It is
+  [measured here](amiga-frame-cost.md#source-record-candidate-for-section-0-a):
+  updates 99/122/136 cost 23.3/41.6/75.3 ms against the gates below, and
+  `createPrepared` still costs about 11,200 cycles per segment. The largest
+  remainder is the source span's separate layer, table, room and
+  thin-window publications (about 4,300 cycles), then record
+  reserve/commit (1,700), occupancy (1,500) and glue. Do not promote it until
+  the gates pass on a complete three-capture fall.
 - **Gate:**
-  - the quiet row update (99 type) at or under 20.5 ms;
+  - the quiet row update (99 type) at or under 21.5 ms. All of A's work at
+    99 is 3.4 ms of 24.6 (records 2.42, builder position 0.52, invalidation
+    0.50), so the 2,500-cycle target leaves about 21.5 ms; the rest is D;
   - quiet generation window excess at or under 30 ms;
   - 122 at or under 35 ms, 136 at or under 65 ms;
   - the behaviour gates plus destroy, activation and failure-prefix fixtures

@@ -5,8 +5,21 @@
 void AmigaTerrainRaster::invalidate(int first, int end) {
     if (first < 0) first = 0;
     if (end > int(rows)) end = rows;
+#ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
     for (unsigned column = 0; column < 3; ++column)
         for (int y = first; y < end; ++y) setDirty(column,y,true);
+#else
+    // setDirty(column,y,true) is (state&6)|1 and states use bits 0-2 only:
+    // set bit 0 of every byte in the band, four rows per longword.
+    typedef ULONG DirtyLong __attribute__((aligned(2),may_alias));
+    for (unsigned column = 0; column < 3 && first < end; ++column) {
+        UBYTE* p = &dirty_[column][first];
+        unsigned n = unsigned(end - first);
+        if (reinterpret_cast<__UINTPTR_TYPE__>(p) & 1u) { *p++ |= 1; --n; }
+        for (; n >= 4; n -= 4, p += 4) *reinterpret_cast<DirtyLong*>(p) |= 0x01010101u;
+        while (n--) *p++ |= 1;
+    }
+#endif
 }
 
 void AmigaTerrainRaster::invalidateShops(const downwell::ShopWorld& shops) {

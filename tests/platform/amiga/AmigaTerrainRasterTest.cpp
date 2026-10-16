@@ -45,6 +45,32 @@ int main() {
             assert(initial.copy(c,materialized->writeRows(c,0,initialRows)));
         }
         assert(borrowed->borrowInitial(initial));
+        // Band invalidation equals setDirty(c,y,true) per row: odd starts and
+        // lengths, clamped bounds and borrowed-initial state bits included.
+        {
+            auto banded=std::make_unique<AmigaTerrainRaster>(),rows=std::make_unique<AmigaTerrainRaster>();
+            std::vector<UWORD> bandedPixels(borrowedPixels.size()),rowPixels(borrowedPixels.size());
+            assert(banded->bindStorage(bandedPixels.data(),AmigaTerrainRaster::storageBytes));
+            assert(rows->bindStorage(rowPixels.data(),AmigaTerrainRaster::storageBytes));
+            assert(banded->borrowInitial(initial)&&rows->borrowInitial(initial));
+            unsigned bands=0;
+            for(int first=-3;first<140;first+=7)for(int length=0;length<12;++length){
+                const int end=first+length*5-1;
+                banded->invalidate(first,end);
+                for(unsigned c=0;c<3;++c)for(int y=first<0?0:first;y<end&&y<int(AmigaTerrainRaster::rows);++y)
+                    rows->setDirty(c,unsigned(y),true);
+                UWORD scratchA[22],scratchB[22];
+                for(unsigned c=0;c<3;++c)for(unsigned y=0;y<200;++y){
+                    assert(banded->dirty(c,y)==rows->dirty(c,y));
+                    assert(!std::memcmp(banded->readRow(c,y,scratchA),rows->readRow(c,y,scratchB),44));
+                }
+                for(unsigned c=0;c<3;++c)for(unsigned y=0;y<200;++y)rows->setDirty(c,y,false),banded->setDirty(c,y,false);
+                ++bands;
+            }
+            banded->invalidate(int(AmigaTerrainRaster::rows)-5,int(AmigaTerrainRaster::rows)+9);
+            for(unsigned c=0;c<3;++c)for(unsigned y=AmigaTerrainRaster::rows-5;y<AmigaTerrainRaster::rows;++y)assert(banded->dirty(c,y));
+            std::printf("Terrain raster: %u banded invalidations match per-row dirty publication\n",bands);
+        }
         unsigned comparisons=0;
         auto compare=[&](){
             for(unsigned c=0;c<3;++c)for(unsigned origin : {0u,91u,319u})

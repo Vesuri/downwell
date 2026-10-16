@@ -108,7 +108,8 @@ public:
         // Only the callback-free native backend can admit these source facts.
         // Unsupported leaves all consumers unchanged. On success it has
         // admitted the complete segment; installing it cannot fail.
-        SpanResult (*constructSourceSpan)(void*,const Identity&,PreparedCells,int,TerrainBirthFacts&)=nullptr;
+        // The owner has already written cells, slot, generation, y and tile.
+        SpanResult (*constructSourceSpan)(void*,InstanceHandle,const PreparedCells&,int,TerrainBirthFacts&)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         DW_TERRAIN_READ(terrainFlagsRead);
@@ -394,17 +395,16 @@ public:
                 const InstanceHandle first{slot,next_};
                 bool free=cells.count<=Capacity-slot&&cells.count<=available();
                 if(!dense)for(unsigned i=0;free&&i<cells.count;++i)if(runs_.occupied(slot+i))free=false;
-                if(free&&runs_.sources().canAppend(first,cells.count)){
-                    TerrainBirthFacts facts{};
-                    const Identity identity{first,cells.object(0),cells.x(0),cells.y,-1,0};
-                    const auto result=binding_.constructSourceSpan(binding_.context,identity,cells,tile,facts);
+                auto* facts=free?runs_.sources().reserve(first,cells.count):nullptr;
+                if(facts){
+                    // The immutable coordinates and identity are supplied
+                    // by this owner, not trusted to a consumer callback.
+                    facts->cells=cells.bytes;facts->y=cells.y;facts->tile=tile;facts->registration=0;
+                    const auto result=binding_.constructSourceSpan(binding_.context,first,cells,tile,*facts);
+                    if(result!=SpanResult::success)runs_.sources().abandon();
                     if(result==SpanResult::failure)return good_=false;
                     if(result==SpanResult::success){
-                        // The immutable coordinates and identity are supplied
-                        // by this owner, not trusted to a consumer callback.
-                        facts.cells=cells.bytes;facts.slot=slot;facts.generation=next_;
-                        facts.y=cells.y;facts.tile=tile;
-                        if(!runs_.sources().append(facts,cells.count))return good_=false;
+                        if(!runs_.sources().commit())return good_=false;
                         next_+=cells.count;freeHint_=slot+cells.count;
                         if(wallRadius(tile)<0||wallRadius(tile)>16)unboundedWallArt_=true;
                         return true;

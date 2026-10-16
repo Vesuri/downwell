@@ -43,11 +43,14 @@ public:
         record_={};record_.sourceId=source;record_.lifetimeId=next_++;
         if(!record_.x.assignInteger(x)||!record_.y.assignInteger(y)||
            !binding_.birth(handle(),record_))return fail();
-        return true;
+        integerX_=x;integerY_=y;return true;
     }
     bool position(int x,int y){
-        RunnerImageValue px,py;
-        if(!good_||!record_.lifetimeId||!px.assignInteger(x)||!py.assignInteger(y))return fail();
+        // record_ holds the exact conversion of integerX_/integerY_; rows
+        // usually keep x, so convert only a changed coordinate.
+        RunnerImageValue px=record_.x,py=record_.y;
+        if(!good_||!record_.lifetimeId||(x!=integerX_&&!px.assignInteger(x))||
+           (y!=integerY_&&!py.assignInteger(y)))return fail();
         if(phase_&&!phase_->acquired){
             if(acquire_&&!acquire_(publicationContext_,record_,phase_->publication))return fail();
             const auto& p=phase_->publication;
@@ -60,7 +63,7 @@ public:
                 *p.x=px;*p.y=py;*p.appearance|=8u;
             }
         }else if(binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,px,py))return fail();
-        record_.x=px;record_.y=py;return true;
+        record_.x=px;record_.y=py;integerX_=x;integerY_=y;return true;
     }
     bool clear(){
         if(!good_||(phase_&&phase_->publication.x)||
@@ -70,6 +73,7 @@ public:
 private:
     bool fail(){good_=false;return false;}
     Record record_{};
+    int integerX_=0,integerY_=0;
     Binding binding_{};
     struct Phase {Publication publication{};bool acquired=false;};
     void* publicationContext_=nullptr;

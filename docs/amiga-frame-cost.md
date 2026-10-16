@@ -178,6 +178,58 @@ skip its terrain; that does not justify copying fragmented lifetime topology
 into animation. This census does not change the timing baseline above or close
 item A.
 
+### Source-record candidate for section 0 A
+
+`REFERENCE_TERRAIN_RECORDS=0` selects the candidate; the default (1) keeps the
+retained owner. Each prepared row segment becomes one `TerrainBirthRecords`
+record supplying identity, room and layer chronology and initial state;
+changed cells materialize separately. The record is reserved and written in
+place (no facts or identity temporaries, one admission check), and
+`GameplayCollisionOwner` proves the per-kind flags, Create plan and integer
+depth once per tile. Both arms invalidate the raster band with longword
+writes and convert only a changed builder coordinate.
+
+Short traces of the same no-input fall, ms of work per update:
+
+| Update | Baseline `45e96a9c` | Checkpoint `8fe3b60f` | Candidate now | Item A gate |
+| ---: | ---: | ---: | ---: | ---: |
+| 99, one quiet row | 24.6 | 24.2 | 23.3 | 21.5 |
+| 122, first burst | 55.0 | 48.8 | 41.6 | 35 |
+| 136, enemy burst | 94.3 | 87.2 | 75.3 | 65 |
+
+- **`createPrepared` per call:** 16,984 → 11,304 cycles at 99; 16,186 →
+  11,168 at 122 (nine calls); 12,422 → 8,533 at 136 (19 calls, some empty).
+- **Row publication at 99:** builder position 0.52 → 0.45 ms; raster
+  invalidation 0.50 → 0.39 ms.
+- **Remaining per segment at 122 (cycles):**
+
+  | Part | Cycles |
+  | --- | ---: |
+  | Source span: layer admit/publish, table birth span, room basis, thin window, checks | 4,270 |
+  | Record reserve/commit | 1,690 |
+  | Occupancy and landing publication (`createPrepared` own) | 1,540 |
+  | Other glue (tile lookup, tile append, admission, completion) | 1,480 |
+  | `constructPrepared` own | 880 |
+  | RNG advance of the segment's draws | 680 |
+  | Pre-publication `canAppend` admission | 620 |
+
+The candidate still misses every item A gate. No complete three-capture fall
+has been taken for it, so it is not a window-table result. Captures:
+`TRACE_FRAMES=98,121,135 TRACE_FIELDS=10 REFERENCE_TERRAIN_RECORDS=0` with the
+quiet-fall environment; trace ELF SHA-256
+`c16c25838e582da26fd84bc856b8566887835587ff9cee7b384f90ed270f3f8d`.
+
+Behaviour on this tree: `bash amiga/profile.sh quiet-fall` gives **189
+fields** for the candidate (19 misses, worst gap 5 at 163) and **190** for the
+default (16 misses, worst gap 7 at 163), versus the baseline's 192; both give
+the exact landing witness. These pace changes are small and are not item A
+evidence. All 165 `profile_quiet_landing.gdb` state samples match in both
+arms. The 18,000-frame ownership replay (both arms), source-record,
+raster-band, read-census and collision-owner fixtures pass. The normal
+stripped Hunk (SHA-256
+`d7cecfc2b9b70b285971ce138c7656a2c94df04e7c3905f3dd7c4c53a38900b3`) passes
+512 KiB Chip startup.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
