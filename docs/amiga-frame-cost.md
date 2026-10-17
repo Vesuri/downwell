@@ -493,6 +493,50 @@ debt cases; 10,000 composed-row comparisons; 4,800 raster transfer cases;
 and default selection are unchanged. The normal build is restored after
 both new captures and passes the 68000 instruction/helper audits.
 
+### Cold scalar rows painted ahead — unaccepted follow-up
+
+Same selectors and unchanged 330,024-byte bank as above. A prepared-pattern
+miss now leaves a presentation task for the existing scalar painter, which
+reads live geometry into ordinary-memory raster rows before they become
+visible. No simulation or RNG work is moved. Mutation keeps dirty rows;
+failed painting does not acknowledge them. The task carries no cached art.
+
+Three 100-field captures cover every update 2–164:
+
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance 2–55 | 15.1 | 19.7 (18) | 0 | 0 |
+| Quiet generation 56–121 | 17.9 | 21.5 (62) | 3 | 3 |
+| First burst 122–135 | 18.4 | 33.8 (122) | 2 | 14 |
+| Enemies 136–162 | 21.6 | 62.8 (136) | 12 | 56 |
+| Landing 163–164 | 56.7 | 87.1 (163) | 2 | 73 |
+| Whole fall 2–164 | 18.1 | 87.1 (163) | 19 | 146 |
+
+Update 70 improves **24.3 → 19.2 ms**, independently identical in captures
+starting at 1 and 60; required row painting falls **7.6 → 2.5 ms**.
+However, update 62 now costs **21.5 ms** including a **3.3-ms** scalar
+preparation piece. The existing preparation admission is not a guarantee
+that the next piece fits. Update 136 rises **61.4 → 62.8 ms**, independently
+confirmed by an eight-field capture starting at 135. Step remains 54.1 ms;
+display-row synchronization accounts for the extra 1.4 ms. In 137–162 the
+mean is 20.1 ms, worst 22.8 ms at 160, with eleven over-budget updates.
+This remains experimental, not a completed C or D or an accepted default.
+
+Native verification reports **79 composed rows, zero failures** against the
+portable pixel oracle; all **165 selected state samples** match
+`tmp/d-state-0-gdb.log`, and the exact landing witness passes. This is not
+full-state or whole-frame pixel equivalence. Host raster fixtures pass,
+including partial failure, mutation, task reset and eight-line pieces.
+
+Reports: `tmp/c-fallback-live-{1,60,120}-report.txt`,
+`tmp/c-fallback-live-136-recheck-report.txt`; native observations:
+`tmp/c-fallback-live-state-gdb.log`. ELF SHA-256 by capture start:
+
+- 1: `d158e9ecac1beef522758ccfa403f9e1327435101a541643d245fc3abc0e2ea9`
+- 60: `5cfe2749c544c3600a3329dac5733b701fe023232ca14eb9053e34bcbd7b4e60`
+- 120: `b2b937c0b8f1419c92d1bd5585aa6faf3238d5c0d62bfa4e8ea4fef2fba0567c`
+- 135 recheck: `da5bde711c88b05251b20d1abdf0a6b1f7f0ad79c3da60f24c6acad757ef339b`
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
