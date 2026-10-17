@@ -13,7 +13,7 @@ case "$mode" in
     export PROFILE_IDLE=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     ;;
-  quiet-fall|quiet-window|terrain-reads)
+  quiet-fall|quiet-state|quiet-window|terrain-reads)
     flags=(PROBES=0 FPSCOUNT=1 TRACE_FRAMES=165); script=profile_quiet_cadence.gdb
     ready_marker=DOWNWELL_QUIET_CADENCE_READY
     export DETERMINISTIC=1
@@ -21,6 +21,11 @@ case "$mode" in
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
     export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
     export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-90}"
+    if [[ $mode == quiet-state ]]; then
+      # Stops at every update: state equivalence only, never timing evidence.
+      script=profile_quiet_landing.gdb
+      ready_marker=DOWNWELL_QUIET_LANDED
+    fi
     if [[ $mode == terrain-reads ]]; then
       flags+=(TERRAIN_READ_CENSUS=1)
       script=profile_terrain_reads.gdb
@@ -128,7 +133,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-state|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -173,6 +178,8 @@ restore() {
   unset REFERENCE_INITIAL_RASTER_STORAGE
   unset REFERENCE_ROOM_PREPARE
   unset REFERENCE_TERRAIN_RECORDS
+  unset REFERENCE_ROW_PAINTING
+  unset REFERENCE_FRAME_WORK
   unset REFERENCE_FIELD_BANK
   unset REFERENCE_FIELD_ADMISSION
   unset REFERENCE_ENTRY_ASSETS
@@ -275,6 +282,11 @@ if [[ $mode == trace || $mode == quiet-window ]]; then
 fi
 if [[ $mode == terrain-reads ]]; then
   python3 ../tools/report-terrain-reads.py .run/terrain-read-census.bin
+elif [[ $mode == quiet-state ]]; then
+  grep '^QUIET ' ".run/profile-${mode}.log"
+  [[ $(grep -c '^QUIET ' ".run/profile-${mode}.log") == 165 ]] || {
+    echo "Expected all 165 initial-fall state samples" >&2; exit 1;
+  }
 elif [[ $mode == quiet-fall ]]; then
   # edaaa369 repeats at 191 fields. Allow 3% (rounded up) for timing noise;
   # this is a regression guard, NOT the historical 181-field restoration target.
