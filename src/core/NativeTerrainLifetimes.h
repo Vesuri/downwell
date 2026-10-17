@@ -21,19 +21,20 @@ template<unsigned Capacity,bool SourceRecords=false> class NativeTerrainLifetime
     };
     using Runs=typename NativeTerrainRunsStorage<Capacity,Order,SourceRecords>::Type;
     using ChangedCell=NativeTerrainChangedCell<Order>;
+    // Scalars first: 68000 displacements reach only 32 KiB past the base.
     TerrainSourceLease sourceLease_;
-    Runs runs_;
     unsigned next_=1,freeHint_=0;
-    NativeTerrainField<Capacity,Runs,Order,unsigned char,&ChangedCell::flags,SourceRecords> flags_{runs_};
-    NativeTerrainField<Capacity,Runs,Order,std::int16_t,&ChangedCell::sprite,SourceRecords> createSprite_{runs_};
-    NativeTerrainField<Capacity,Runs,Order,PackedWallState,&ChangedCell::wall,SourceRecords> walls_{runs_};
-    WallEndStepState* stepping_=nullptr;
-    InstanceHandle steppingHandle_{};
     bool good_=true;
     bool wallPresentationState_=false,unboundedWallArt_=false;
     Order* pendingPublication_=nullptr;
     InstanceHandle pendingHandle_{};
     bool publicationRun_=false;
+    Runs runs_;
+    NativeTerrainField<Capacity,Runs,Order,unsigned char,&ChangedCell::flags,SourceRecords> flags_{runs_};
+    NativeTerrainField<Capacity,Runs,Order,std::int16_t,&ChangedCell::sprite,SourceRecords> createSprite_{runs_};
+    NativeTerrainField<Capacity,Runs,Order,PackedWallState,&ChangedCell::wall,SourceRecords> walls_{runs_};
+    WallEndStepState* stepping_=nullptr;
+    InstanceHandle steppingHandle_{};
     RunnerRetainedLayerState inheritedLayer_;
     unsigned inheritedLayerCount_=0;
     // Membership only: retained layer/order state stays authoritative in runs_.
@@ -86,7 +87,13 @@ public:
         // Optional lifetime promise, never inferred from a raw pointer: bytes
         // remain immutable until these terrain lifetimes have all been cleared.
         bool retained=false;
+        // Thin-platform cells as validated by the pack loader, or -1.
+        int platforms=-1;
         unsigned kind(unsigned i)const{return bytes[i*2]>>7;}
+        unsigned thin()const{
+            if(platforms>=0)return unsigned(platforms);
+            unsigned n=0;for(unsigned i=0;i<count;++i)n+=kind(i);return n;
+        }
         int object(unsigned i)const{return kind(i)?93:60;}
         int x(unsigned i)const{return (int(bytes[i*2]&127)-32)*16;}
     };
@@ -394,11 +401,12 @@ public:
                 // the whole suffix is free, regardless of which run format
                 // owns the prefix. Admit that suffix once, not once per cell
                 // through both the authored and generated identity stores.
-                const bool dense=freeHint_==runs_.size();
+                const unsigned population=runs_.size();
+                const bool dense=freeHint_==population;
                 unsigned slot=freeHint_;
                 if(!dense)while(slot<Capacity&&runs_.occupied(slot))++slot;
                 const InstanceHandle first{slot,next_};
-                bool free=cells.count<=Capacity-slot&&cells.count<=available();
+                bool free=cells.count<=Capacity-slot&&cells.count<=Capacity-population;
                 if(!dense)for(unsigned i=0;free&&i<cells.count;++i)if(runs_.occupied(slot+i))free=false;
                 auto* facts=free?runs_.sources().reserve(first,cells.count):nullptr;
                 if(facts){
@@ -407,7 +415,7 @@ public:
                     facts->cells=cells.bytes;facts->y=cells.y;facts->tile=tile;facts->registration=0;
                     // A lease publishes the same span without entering its owners.
                     const bool leased=sourceLease_.admits(tile,cells.count);
-                    if(leased)sourceLease_.publish(cells.count,*facts);
+                    if(leased)sourceLease_.publish(cells.count,cells.thin(),*facts);
                     const auto result=leased?SpanResult::success:
                         binding_.constructSourceSpan(binding_.context,first,cells,tile,*facts,sourceLease_);
                     if(result!=SpanResult::success)runs_.sources().abandon();

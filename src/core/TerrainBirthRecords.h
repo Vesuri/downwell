@@ -31,6 +31,7 @@ template<unsigned Capacity,class Mutable> class TerrainBirthRecords {
     // Scalars first: 68000 displacements reach only 32 KiB past the base.
     unsigned used_,population_,highWater_,head_,tail_,free_,pending_=0,pendingCount_=0;
     std::uint32_t published_,lastGeneration_;
+    Record* pendingRecord_=nullptr;
     Record records_[Capacity];
     struct Change {alignas(Mutable) unsigned char bytes[sizeof(Mutable)];};
     Change changes_[Capacity];
@@ -84,15 +85,17 @@ public:
     TerrainBirthFacts* reserve(InstanceHandle first,unsigned count){
         if(!canAppend(first,count))return nullptr;
         pending_=free_!=Capacity?free_:used_;pendingCount_=count;
-        auto& birth=records_[pending_].birth;
+        pendingRecord_=&records_[pending_];
+        auto& birth=pendingRecord_->birth;
         birth.slot=first.slot;birth.generation=first.generation;
         return &birth;
     }
     void abandon(){pendingCount_=0;}
     bool commit(){
         const unsigned count=pendingCount_,n=pending_;pendingCount_=0;
-        auto& r=records_[n];const auto& birth=r.birth;
-        if(!count||!birth.cells||!birth.registration||count-1>0xffffffffu-birth.registration)return false;
+        if(!count)return false;
+        auto& r=*pendingRecord_;const auto& birth=r.birth;
+        if(!birth.cells||!birth.registration||count-1>0xffffffffu-birth.registration)return false;
         if(n==free_)free_=r.next;else ++used_;
         r.ordinal=published_+1;
         r.count=r.live=count;r.alive[0]=mask(count);r.alive[1]=mask(count>32?count-32:0);

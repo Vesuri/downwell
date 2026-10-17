@@ -5,7 +5,7 @@ namespace downwell {
 // scrInitialize levelTile table, selected by scrNextLevel before room entry.
 // Temporary controller/boxFlash wallTile overrides must be supplied by the caller.
 inline int terrainTileForArea(int area){
-    constexpr int tiles[]={76,51,74,72,70,55};
+    static constexpr int tiles[]={76,51,74,72,70,55};
     return area>=0&&area<6?tiles[area]:-1;
 }
 // Collision-relevant Create property writes from code 985 (wall) and 1090

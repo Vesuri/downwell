@@ -1000,7 +1000,7 @@ private:
         const auto roomBasis=room_.sourcePublicationBasis();
         facts.roomLow=roomBasis.low;facts.roomHigh=roomBasis.high;facts.roomDepth=recipe.roomDepth;
         if(!layers_.publishSourceTerrainSpan(layer,recipe.depth,cells.count,facts)){check(false);return Result::failure;}
-        unsigned thinCount=0;for(unsigned i=0;i<cells.count;++i)thinCount+=cells.kind(i);
+        const unsigned thinCount=cells.thin();
         thinRetirementWindow_.appendSpan(cells.y,thinCount!=0,first.generation+cells.count-1,cells.count);
         table_.externalRegistrationPublications(slot,thinCount);
         lendSourceTerrain(tile,recipe,lease);

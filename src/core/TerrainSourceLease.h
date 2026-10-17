@@ -39,9 +39,10 @@ struct TerrainSourceLease {
     bool admitsBirths(unsigned count)const{
         return good&&*good&&scopes->valid()&&*nextOrder&&(!count||count-1<=0xffffffffu-*nextOrder);
     }
-    // The record owner has written cells, identity, row and tile. Same
-    // effects as the source span: no observer runs between these counters.
-    void publish(unsigned count,TerrainBirthFacts& facts){
+    // The record owner has written cells, identity, row and tile; thinCount
+    // counts the segment's platform cells. Same effects as the source span:
+    // no observer runs between these counters.
+    void publish(unsigned count,unsigned thinCount,TerrainBirthFacts& facts){
         facts.flags[0]=flags[0];facts.flags[1]=flags[1];
         facts.registration=*nextOrder;*nextOrder+=count;
         add(*bindingRevision,count);add(*captureRevision,count);
@@ -49,8 +50,6 @@ struct TerrainSourceLease {
         facts.roomLow=room.low;facts.roomHigh=room.high;facts.roomDepth=roomDepth;
         facts.layer=layer;facts.layerId=layerId;facts.layerLow=order.low;facts.layerHigh=order.high;
         *retained+=count;*logical+=count;*live+=count;add(*drawRevision,count);
-        unsigned thinCount=0;
-        for(unsigned i=0;i<count;++i)thinCount+=facts.cells[2*i]>>7;
         thin->appendSpan(facts.y,thinCount!=0,facts.generation+count-1,count);
         add(*captureRevision,thinCount);
     }

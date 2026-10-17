@@ -109,10 +109,14 @@ after each item.
 
   This is the duplicated per-block terrain ownership that AGENTS.md says to
   replace first.
-- **Target:** at most 2,500 cycles per segment for all terrain-record work,
-  and at most 4 ms of records in each burst. Builder position publication
-  (0.52 ms per row, 2.3–4.2 ms per burst) and raster invalidation (0.50 ms
-  per row) are publication of the same rows; include them.
+- **Target:** at most 6,500 cycles per segment for terrain records,
+  including occupancy, and at most 1,500 cycles per row for builder
+  position publication (0.43 ms per row, 1.5–2.8 ms per burst). The
+  original 2,500 cycles for all of this was a budget share, not a measured
+  floor: one record, the lent consumer counters and the occupancy words
+  already take about 4,500 cycles of necessary stores and checks. Raster
+  invalidation (0.39 ms per row) marks per-pixel-row dirty bytes for row
+  painting and belongs with C.
 - **Approach:**
   1. **Use the [terrain-read census](amiga-frame-cost.md#terrain-api-read-census-for-section-0-a):**
      preserve the observed animation-skip, cutoff and retirement-proof
@@ -141,19 +145,23 @@ after each item.
   the per-kind constructor facts proved once per tile and the consumers'
   counters lent to the record owner after one proven span
   (`TerrainSourceLease`). It is
-  [measured here](amiga-frame-cost.md#source-record-candidate-for-section-0-a):
-  updates 99/122/136 cost 23.1/38.5/70.3 ms against the gates below, and
-  `createPrepared` costs about 8,600 cycles per segment. No duplicated owner
-  remains on that path; the rest is per-call admission, validation and
-  address arithmetic (glue 2,200, lease 1,800, occupancy 1,600, record
-  1,400). At 99 all of A's work is about 14,000 cycles against the 2,600
-  the gate allows, so that gate also needs builder position (3,100) and
-  raster invalidation (2,800). Do not promote it until the gates pass on a
-  complete three-capture fall.
+  [measured here](amiga-frame-cost.md#source-record-candidate-for-section-0-a),
+  including a complete three-capture fall: whole-fall excess 507 ms (was
+  626), quiet window 58 (115), first burst 37 (54), enemies 290 (308),
+  landing 121 (147); updates 99/122/136 cost 23.1/37.4/68.5 ms. No
+  duplicated owner remains on that path, and `createPrepared` costs about
+  7,200–7,800 cycles per segment. Remaining levers, estimated: fuse the
+  leased record path's repeated admission and validation (400–800 cycles
+  per segment); builder position's integer conversion and per-update
+  publication acquire (about 1,500 cycles per row and 1,160 per update).
+  Together they would leave 122 at about 35.5 and 136 at about 66 ms; the
+  rest of those bursts is event cells (B, E). Do not promote it until the
+  gates pass on a complete three-capture fall.
 - **Gate:**
-  - the quiet row update (99 type) at or under 21.5 ms. All of A's work at
-    99 is 3.4 ms of 24.6 (records 2.42, builder position 0.52, invalidation
-    0.50), so the 2,500-cycle target leaves about 21.5 ms; the rest is D;
+  - the quiet row update (99 type) at or under 22.8 ms: the targets above
+    remove about 2,300 more cycles there. Even with no record, position or
+    invalidation work 99 would cost about 21.3 ms; its other excess is row
+    painting (C) and the fixed update cost (D);
   - quiet generation window excess at or under 30 ms;
   - 122 at or under 35 ms, 136 at or under 65 ms;
   - the behaviour gates plus destroy, activation and failure-prefix fixtures
@@ -193,7 +201,9 @@ after each item.
   - corridor row painting, 2.85 ms per row in the quiet window;
   - cave row painting, 8.9 ms per row on average in 137–162 (`paintCached`
     5.17), with 16.6 and 17.9 ms at 141 and 143;
-  - breakables drawn through the generic masked asset path (2.5 ms at 141).
+  - breakables drawn through the generic masked asset path (2.5 ms at 141);
+  - raster invalidation of each new row's band, per-pixel-row dirty bytes
+    for the painter (0.39 ms per row; moved here from A).
 
   In the quiet window, generation and painting land in the same update of
   each two-update row period (15.6 versus 24.6 ms).

@@ -193,56 +193,81 @@ population, the layer and room clocks and the thin-platform retirement
 proof. Later segments of the same tile publish through the lease without
 entering the layer, table, room or window owners. The lease observes owner
 health, borrowed callback status, layer topology and the bounded counters;
-rebinding revokes it. Both arms invalidate the raster band with longword
-writes and convert only a changed builder coordinate.
+rebinding revokes it. Segments carry the pack's validated thin-platform
+count, and the record and lifetime owners keep their counters ahead of their
+arrays. Both arms invalidate the raster band with longword writes and
+convert only a changed builder coordinate.
 
-Short traces of the same no-input fall, ms of work per update:
+**Complete fall, candidate arm** (three 100-field captures from updates 1,
+60 and 120, `tools/amiga-fall-budget.py`), against the
+[baseline](#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12):
 
-| Update | Baseline `45e96a9c` | Checkpoint `8fe3b60f` | Per-tile facts `0d9a8f28` | Lease now | Item A gate |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 99, one quiet row | 24.6 | 24.2 | 23.3 | 23.1 | 21.5 |
-| 122, first burst | 55.0 | 48.8 | 41.6 | 38.5 | 35 |
-| 136, enemy burst | 94.3 | 87.2 | 75.3 | 70.3 | 65 |
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms | Baseline mean / worst / over / excess |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Authored entrance, 2–55 | 16.3 | 20.4 (19) | 1 | 0 | 16.2 / 20.5 / 1 / 0 |
+| Quiet generation, 56–121 | 19.3 | 24.4 (71) | 22 | 58 | 20.2 / 27.7 / 32 / 115 |
+| First burst, 122–135 | 21.4 | 37.4 (122) | 8 | 37 | 22.5 / 55.0 / 8 / 54 |
+| Enemies, 136–162 | 30.7 | 68.5 (136) | 27 | 290 | 31.4 / 94.3 / 27 / 308 |
+| Landing, 163–164 | 80.7 | 110.2 (163) | 2 | 121 | 93.7 / 136.0 / 2 / 147 |
+| Whole fall, 2–164 | 21.1 | 110.2 (163) | 60 | 507 | 21.8 / 136.0 / 70 / 626 |
 
-- **`createPrepared` per call:** 16,984 → 8,056 cycles at 99; 16,186 →
-  8,629 at 122 (nine calls); 12,422 → 6,656 at 136 (19 calls, some empty).
-  The lease removed 3,250, 2,540 and 1,880 cycles per call respectively.
-- **Row publication at 99:** builder position 0.52 → 0.43 ms; raster
-  invalidation 0.50 → 0.39 ms.
+Update 56 no longer takes the scalar fallback (22.7 ms, was 27.7). The quiet
+window's worst update is now 71, whose excess is row painting
+(`drawMainWorldSpan` 6.0, `syncGameRows` 3.8 ms), not records. Capture ELF
+SHA-256: `1eaf9f1f27a26c4bf357e2e86c4a5561cbf67e9a33a2a6d017dea7577cb46552`
+(from 1), `46fe22819e407dd3c0b1f32d39f1924624800371f25c8113bd0735ce5d54297b`
+(60), `0e2ff98a0cc150bc02dee383ce69adcfaa301ea11b6d06672aa0fb062f9365d7`
+(120).
+
+**Per update**, ms of work, with the steps that reached it:
+
+| Update | Baseline `45e96a9c` | Checkpoint `8fe3b60f` | Per-tile facts `0d9a8f28` | Lease `635da95d` | Now | Item A gate |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 99, one quiet row | 24.6 | 24.2 | 23.3 | 23.1 | 23.1 | 21.5 |
+| 122, first burst | 55.0 | 48.8 | 41.6 | 38.5 | 37.4 | 35 |
+| 136, enemy burst | 94.3 | 87.2 | 75.3 | 70.3 | 68.5 | 65 |
+
+- **`createPrepared` per call:** 16,984 → 7,222 cycles at 99; 16,186 →
+  7,785 at 122 (nine calls); 12,422 → 6,025 at 136 (19 calls, some empty).
+  The lease removed 2,500–3,300 cycles per segment; the last step
+  (validated thin count, a static tile table that was rebuilt on the stack
+  per call, hoisted builder reads, layout) removed about 850 more.
+- **Row publication at 99:** builder position 0.52 → 0.43 ms (3,090
+  cycles: a 500–700-cycle integer conversion per row, a 1,160-cycle
+  publication acquire per update, and stores into the collision owner);
+  raster invalidation 0.50 → 0.39 ms (per-pixel-row dirty bytes).
 - **Remaining per segment at 122 (cycles):**
 
   | Part | Cycles |
   | --- | ---: |
-  | Other glue (tile lookup, tile append, builder accessors, admission, completion, one re-proven span per update) | 2,220 |
-  | Lease admission and publication | 1,800 |
-  | Occupancy and landing publication (`createPrepared` own) | 1,580 |
-  | Record reserve/commit | 1,400 |
-  | `constructPrepared` own | 790 |
+  | Occupancy and landing publication (`createPrepared` own) | 1,700 |
+  | Lease admission and publication | 1,300 |
+  | Other glue (tile lookup and append, backend admission, builder begin/complete, contacts, empty segments) | 1,270 |
+  | Record reserve/commit | 1,240 |
+  | The update's one re-proven source span, after a layer topology change | 810 |
+  | `constructPrepared` own | 660 |
   | RNG advance of the segment's draws | 550 |
-  | Pre-publication `canAppend` admission | 290 |
+  | Pre-publication `canAppend` admission | 270 |
 
-  No duplicated owner remains on this path: what is left is per-call
-  admission, validation and address arithmetic, spread over these parts.
-- **At 99 the gate cannot come from records alone.** All item A work there
-  is now about 14,000 cycles (records 8,060, builder position 3,090, raster
-  invalidation 2,770), and the 21.5 ms gate needs about 2,600.
-
-The candidate still misses every item A gate. No complete three-capture fall
-has been taken for it, so it is not a window-table result. Captures:
-`TRACE_FRAMES=98,121,135 TRACE_FIELDS=10 REFERENCE_TERRAIN_RECORDS=0` with the
-quiet-fall environment; trace ELF SHA-256
-`2d5177a665275a7c717e6373b56c6f745f9e85cd1383d36848be2248bbe8a640`.
+  No duplicated owner remains on this path. Each part is admission,
+  validation, stores and address arithmetic that its owner needs; fusing
+  them further is estimated at 400–800 cycles per segment.
+- **At 99 records cannot reach the gate.** All item A work there is about
+  13,100 cycles (records 7,220, builder position 3,090, raster invalidation
+  2,770); the 21.5 ms gate needs about 2,600. Removing all of it would leave
+  99 at about 21.3 ms: its other excess is row painting (2.9 ms) and the
+  fixed update cost.
 
 Behaviour on this tree: `bash amiga/profile.sh quiet-fall` gives **187
 fields** for the candidate (17 misses, worst gap 5 at 163) and **190** for the
-default (16 misses, worst gap 7 at 163), versus the baseline's 192; both give
-the exact landing witness. These pace changes are small and are not item A
-evidence. All 165 `profile_quiet_landing.gdb` state samples match in both
-arms. The 18,000-frame ownership replay (both arms; it fails when the lease's
-chronology is sabotaged), source-record (including leased and unleased
-runs with identical counters after every segment), raster-band, read-census
-and collision-owner fixtures pass. The normal stripped Hunk (SHA-256
-`1a98e04a7867b21e1587c8448474be447481feaed998fc9c9e3a9d946a620ce1`) passes
+default (17 misses, worst gap 6 at 163), versus the baseline's 192; both give
+the exact landing witness. All 165 `profile_quiet_landing.gdb` state samples
+match in both arms. The 18,000-frame ownership replay (both arms) passes and
+fails when the lease's chronology or a segment's thin-platform count is
+sabotaged; source-record (including leased and unleased runs with identical
+counters after every segment), raster-band, read-census and collision-owner
+fixtures pass. The normal stripped Hunk (SHA-256
+`3c9056f15121325bfffff2e32c125cce4da051e06281156f3ba1a036f4a3dc8f`) passes
 512 KiB Chip startup.
 
 ## No-input initial-fall comparison

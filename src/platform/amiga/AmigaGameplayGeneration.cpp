@@ -64,26 +64,27 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
 bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch,
     downwell::AreaOneBuilder::EmitFunction){
     auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
+    // Byte stores below may alias the batch, so read its header once.
+    const unsigned count=batch.count(),words=batch.wordCount();
+    const int y=batch.y;
     // Empty segments still own RNG draws between source event cells, but
     // have no occupancy, lifetime, layer or Create publication to perform.
     // Use the scalar RNG-only executor; never enter an empty terrain session.
-    if(self.sourceCreate_||!batch.count())return batch.executeReference(create,opaque);
+    if(self.sourceCreate_||!count)return batch.executeReference(create,opaque);
     if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch)||
-        (self.lifetimes_&&!self.lifetimes_->canAppend(batch.count())))
+        (self.lifetimes_&&!self.lifetimes_->canAppend(count)))
         return batch.executeReference(create,opaque);
     if(!batch.beginPublication())return false;
-    if(batch.count()){
-        if(batch.y-24<self.dirtyFirst)self.dirtyFirst=batch.y-24;
-        if(batch.y+24>self.dirtyEnd)self.dirtyEnd=batch.y+24;
-    }
+    if(y-24<self.dirtyFirst)self.dirtyFirst=y-24;
+    if(y+24>self.dirtyEnd)self.dirtyEnd=y+24;
     // Occupancy and landing candidates are one publication, in the source
     // segment's order relative to event Creates. No later segment is exposed.
-    const unsigned row=unsigned(batch.y)>>4;
+    const unsigned row=unsigned(y)>>4;
     auto* destination=self.index_.cells+row*AmigaTerrainIndex::columns;
     auto* landing=self.index_.nextLanding.publicationRow(row);
     const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
     const auto* word=batch.words();
-    for(unsigned i=0;i<batch.wordCount();++i,word+=4){
+    for(unsigned i=0;i<words;++i,word+=4){
         auto* target=destination+word[0];
         if(!(target[0]|target[1])){
             target[0]=word[2];target[1]=word[3];
@@ -91,7 +92,7 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
             const unsigned old=target[half],prepared=word[2+half];
             unsigned walls=(old>>6)+(prepared>>6);
             while(walls>3){
-                if(!self.index_.extraContacts.append(60,(int(word[0]+half)-32)*16,batch.y))return false;
+                if(!self.index_.extraContacts.append(60,(int(word[0]+half)-32)*16,y))return false;
                 --walls;
             }
             target[half]=((old|prepared)&63)|(walls<<6);
@@ -111,7 +112,7 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
         if(self.runtime_->nativeTerrainInstances()==self.lifetimes_){
             // The builder pack outlives the world's terrain. Clear lifetimes
             // before unloading/replacing that pack at a scene handoff.
-            if(!self.runtime_->constructNativeTerrainPrepared({batch.creates(),batch.count(),batch.y,true}))return false;
+            if(!self.runtime_->constructNativeTerrainPrepared({batch.creates(),count,y,true,int(batch.platforms())}))return false;
         }else if(!self.lifetimes_->publishRun([&]{
             return produce([&](int object,int x,int y){return self.birth(object,x,y);});
         }))return false;
