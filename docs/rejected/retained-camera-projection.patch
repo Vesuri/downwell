@@ -1,0 +1,113 @@
+diff --git a/src/core/MainCameraMotion.h b/src/core/MainCameraMotion.h
+index 9504bbcf..7c507397 100644
+--- a/src/core/MainCameraMotion.h
++++ b/src/core/MainCameraMotion.h
+@@ -2,6 +2,9 @@
+ #define DOWNWELL_CORE_MAIN_CAMERA_MOTION_H
+ #include "GameMakerRounding.h"
+ namespace downwell {
++#ifdef DOWNWELL_CAMERA_CACHE_AUDIT
++extern unsigned cameraProjectionEvaluations;
++#endif
+ // camMain's default 480-pixel rmMain shaft/side-room rules. Q12 easing
+ // accommodates the serialized 300000-pixel room height in signed 32 bits;
+ // freeCam, focus, autoscroll and ending are separate work.
+@@ -28,8 +31,20 @@ struct MainCameraMotion {
+     }
+     void setLevelExit(int triggerY) { roomEnd = triggerY - 176; }
+     // rmMain's serialized view follows camMain's rounded instance x/y.
+-    int pixelX() const { return static_cast<int>(roundGameMakerQ12(x+shakeX*4096L)); }
+-    int pixelY() const { return static_cast<int>(roundGameMakerQ12(y+shakeY*4096L)); }
++    int pixelX() const {
++#ifdef DOWNWELL_REFERENCE_FRAME_WORK
++        return static_cast<int>(roundGameMakerQ12(x+shakeX*4096L));
++#else
++        return projectedX_.read(x+shakeX*4096L);
++#endif
++    }
++    int pixelY() const {
++#ifdef DOWNWELL_REFERENCE_FRAME_WORK
++        return static_cast<int>(roundGameMakerQ12(y+shakeY*4096L));
++#else
++        return projectedY_.read(y+shakeY*4096L);
++#endif
++    }
+     long viewLeftQ12() const { return (pixelX() - 80L) * 4096; }
+     long viewRightQ12() const { return (pixelX() + 80L) * 4096; }
+     long viewTopQ12() const { return (pixelY() - 142L) * 4096; }
+@@ -88,6 +103,27 @@ struct MainCameraMotion {
+         y += (targetY - y) / slowdownY;
+         if (y < 142L * 4096) y = 142L * 4096;
+     }
++#ifndef DOWNWELL_REFERENCE_FRAME_WORK
++private:
++    // Key the actual published expression, not a frame number or mutation
++    // notification: coordinates are public, and Collision can write them
++    // between ordinary Step and the later source reads.
++    struct PixelProjection {
++        long input=0;
++        int pixel=0;
++        bool valid=false;
++        int read(long value){
++            if(!valid||input!=value){
++#ifdef DOWNWELL_CAMERA_CACHE_AUDIT
++                ++cameraProjectionEvaluations;
++#endif
++                input=value;pixel=static_cast<int>(roundGameMakerQ12(value));valid=true;
++            }
++            return pixel;
++        }
++    };
++    mutable PixelProjection projectedX_,projectedY_;
++#endif
+ };
+ } // namespace downwell
+ #endif
+diff --git a/tests/core/MainCameraMotionTest.cpp b/tests/core/MainCameraMotionTest.cpp
+index bbbf5d61..1f874209 100644
+--- a/tests/core/MainCameraMotionTest.cpp
++++ b/tests/core/MainCameraMotionTest.cpp
+@@ -4,10 +4,43 @@
+ #include <cmath>
+ #include <cstdlib>
+ #include <iostream>
++#ifdef DOWNWELL_CAMERA_CACHE_AUDIT
++namespace downwell { unsigned cameraProjectionEvaluations=0; }
++#endif
+ void require(bool value, const char* text) {
+     if (!value) { std::cerr << text << '\n'; std::exit(1); }
+ }
+ int main() {
++    {
++        downwell::MainCameraMotion projection;
++        for(unsigned i=0;i<10000;++i){
++            projection.x=(long(i)*137%1000000)-500000;
++            projection.y=(long(i)*931%1000000)-500000;
++            projection.shakeX=int(i%9)-4;projection.shakeY=int(i%13)-6;
++            const int x=downwell::roundGameMakerQ12(projection.x+projection.shakeX*4096L);
++            const int y=downwell::roundGameMakerQ12(projection.y+projection.shakeY*4096L);
++#if defined(DOWNWELL_CAMERA_CACHE_AUDIT) && !defined(DOWNWELL_REFERENCE_FRAME_WORK)
++            const auto before=downwell::cameraProjectionEvaluations;
++#endif
++            for(unsigned read=0;read<4;++read){
++                require(projection.pixelX()==x&&projection.pixelY()==y,"retained pixel projection equals scalar rounding");
++                require(projection.viewLeftQ12()==(x-80L)*4096&&projection.viewBottomQ12()==(y+142L)*4096,
++                    "view reads use the current published expression");
++            }
++#if defined(DOWNWELL_CAMERA_CACHE_AUDIT) && !defined(DOWNWELL_REFERENCE_FRAME_WORK)
++            require(downwell::cameraProjectionEvaluations-before==2,"only changed axes evaluate rounding");
++#endif
++            auto copied=projection;
++            copied.shakeX+=1;
++            require(copied.pixelX()==downwell::roundGameMakerQ12(copied.x+copied.shakeX*4096L)&&
++                projection.pixelX()==x,"copied cache follows its own shake input");
++            copied.collideSideLocker(700+int(i%7));
++            require(copied.pixelY()==downwell::roundGameMakerQ12(copied.y+copied.shakeY*4096L),
++                "Collision publication invalidates an earlier projection");
++            copied.reset(-13,176);
++            require(copied.pixelX()==-13&&copied.pixelY()==176,"reset after warm reads publishes fresh coordinates");
++        }
++    }
+     for(unsigned failure=0;failure<4;++failure){
+         downwell::SideCameraLockers lockers;
+         struct Owner {
