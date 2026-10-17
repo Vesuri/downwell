@@ -984,7 +984,7 @@ private:
     }
     GameplayWorld::NativeTerrain::SpanResult constructSourceTerrainSpan(
         InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,
-        int tile,TerrainBirthFacts& facts){
+        int tile,TerrainBirthFacts& facts,TerrainSourceLease& lease){
         using Result=GameplayWorld::NativeTerrain::SpanResult;
         if(!valid()||!native_||collisionConsumersAdmitted_||!world_||!nativeTerrainLayersBound_||
            nativeTerrainLayerRunActive_||terrainRoomCount_||!cells.retained||!cells.count)return Result::unsupported;
@@ -1003,7 +1003,20 @@ private:
         unsigned thinCount=0;for(unsigned i=0;i<cells.count;++i)thinCount+=cells.kind(i);
         thinRetirementWindow_.appendSpan(cells.y,thinCount!=0,first.generation+cells.count-1,cells.count);
         table_.externalRegistrationPublications(slot,thinCount);
+        lendSourceTerrain(tile,recipe,lease);
         return Result::success;
+    }
+    // Native, external collision, world, layer binding and the recipe are
+    // fixed for this binding; runs and room spans exist only inside the
+    // record owner's scalar runs. The lease observes everything else above.
+    void lendSourceTerrain(int tile,const SourceTerrainRecipe& recipe,TerrainSourceLease& lease){
+        TerrainSourceLease offer;
+        if(!failureObserved_||!layers_.lendSourceTerrain(recipe.depth,offer)||
+           !table_.lendSourceBirths(View::terrainBase,View::terrainBase+GameplayWorld::NativeTerrain::capacity,offer))return;
+        offer.flags[0]=recipe.flags[0];offer.flags[1]=recipe.flags[1];offer.roomDepth=recipe.roomDepth;
+        offer.roomClock=&room_.sourcePublicationClock();offer.thin=&thinRetirementWindow_;
+        offer.good=&good_;offer.scopes=&callbackFailures_;offer.tile=tile;
+        lease=offer;
     }
 #endif
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
@@ -2146,8 +2159,9 @@ public:
                                                                                    completed,stamp,flags,layer,true);
             }
 #ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
-            ,[](void* p,InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,int tile,TerrainBirthFacts& facts){
-                return static_cast<GameplayCollisionOwner*>(p)->constructSourceTerrainSpan(first,cells,tile,facts);
+            ,[](void* p,InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,int tile,
+                TerrainBirthFacts& facts,TerrainSourceLease& lease){
+                return static_cast<GameplayCollisionOwner*>(p)->constructSourceTerrainSpan(first,cells,tile,facts,lease);
             }
 #endif
 #endif

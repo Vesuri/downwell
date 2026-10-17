@@ -28,12 +28,13 @@ template<unsigned Capacity,class Mutable> class TerrainBirthRecords {
         unsigned count,live;
         std::uint16_t next,previous;
     };
+    // Scalars first: 68000 displacements reach only 32 KiB past the base.
+    unsigned used_,population_,highWater_,head_,tail_,free_,pending_=0,pendingCount_=0;
+    std::uint32_t published_,lastGeneration_;
     Record records_[Capacity];
     struct Change {alignas(Mutable) unsigned char bytes[sizeof(Mutable)];};
     Change changes_[Capacity];
     std::uint32_t changedGeneration_[Capacity];
-    unsigned used_,population_,highWater_,head_,tail_,free_,pending_=0,pendingCount_=0;
-    std::uint32_t published_,lastGeneration_;
     static std::uint32_t mask(unsigned n){return n>=32?0xffffffffu:n?(1u<<n)-1:0;}
     static bool alive(const Record& r,unsigned offset){return (r.alive[offset>>5]>>(offset&31))&1u;}
     unsigned find(InstanceHandle h)const{

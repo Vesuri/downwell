@@ -15,9 +15,17 @@ template<bool Source> struct Fixture {
     unsigned registration=100,scalarBirths=0,sourceBirths=0,retired=0;
     unsigned failBirth=0;
     bool supported=true;
+    // Counters a source span updates. A lending fixture offers them; any
+    // change to its unsupported condition is a topology change.
+    unsigned retained=0,logical=0,live=0,sourceSpans=0;
+    std::uint32_t drawRevision=0,bindingRevision=0,captureRevision=0,topology=0;
+    StationaryRetirementWindow thin;
+    CallbackFailureScopes scopes;
+    bool good=true,lend=false;
+    typename Terrain::Binding binding;
+    void support(bool value){if(value!=supported)++topology;supported=value;}
     Fixture(){
         if constexpr(Source)assert(room.bindTerrain(terrain));
-        typename Terrain::Binding binding;
         binding.context=this;
         binding.admit=[](void*,unsigned){return true;};
         binding.birth=[](void* p,const typename Terrain::Identity& id,bool active,std::uint32_t& order,std::uint32_t& flags){
@@ -31,8 +39,8 @@ template<bool Source> struct Fixture {
         binding.create=[](void*,const typename Terrain::Identity&,int,std::uint32_t& flags){flags=8u;return true;};
         binding.mark=[](void* p,unsigned slot){return static_cast<Fixture*>(p)->room.mark(32+slot);};
         binding.retire=[](void* p,unsigned slot){auto& self=*static_cast<Fixture*>(p);++self.retired;return self.room.remove(32+slot);};
-        if constexpr(Source)binding.constructSourceSpan=[](void* p,InstanceHandle,
-                const typename Terrain::PreparedCells& cells,int,TerrainBirthFacts& out){
+        if constexpr(Source)binding.constructSourceSpan=[](void* p,InstanceHandle first,
+                const typename Terrain::PreparedCells& cells,int tile,TerrainBirthFacts& out,TerrainSourceLease& lease){
             auto& self=*static_cast<Fixture*>(p);
             if(!self.supported)return Terrain::SpanResult::unsupported;
             const auto basis=self.layerClock.basis();
@@ -40,7 +48,22 @@ template<bool Source> struct Fixture {
             out.layerId=7;out.layer=0;out.layerLow=basis.low;out.layerHigh=basis.high;
             const auto roomBasis=self.room.sourcePublicationBasis();
             out.roomLow=roomBasis.low;out.roomHigh=roomBasis.high;out.roomDepth=0;
-            out.flags[0]=out.flags[1]=36;self.sourceBirths+=cells.count;
+            out.flags[0]=out.flags[1]=36;self.sourceBirths+=cells.count;++self.sourceSpans;
+            unsigned thinCount=0;for(unsigned i=0;i<cells.count;++i)thinCount+=cells.kind(i);
+            TerrainSourceLease::add(self.bindingRevision,cells.count);
+            TerrainSourceLease::add(self.captureRevision,cells.count+thinCount);
+            self.retained+=cells.count;self.logical+=cells.count;self.live+=cells.count;
+            TerrainSourceLease::add(self.drawRevision,cells.count);
+            self.thin.appendSpan(cells.y,thinCount!=0,first.generation+cells.count-1,cells.count);
+            if(self.lend){
+                lease.tile=tile;lease.flags[0]=lease.flags[1]=36;lease.layerId=7;lease.layer=0;lease.roomDepth=0;
+                lease.capacity=4096;lease.retained=&self.retained;lease.logical=&self.logical;lease.live=&self.live;
+                lease.drawRevision=&self.drawRevision;lease.nextOrder=&self.registration;
+                lease.bindingRevision=&self.bindingRevision;lease.captureRevision=&self.captureRevision;
+                lease.layerClock=&self.layerClock;lease.roomClock=&self.room.sourcePublicationClock();
+                lease.thin=&self.thin;lease.good=&self.good;lease.scopes=&self.scopes;
+                lease.topology=&self.topology;lease.topologyRevision=self.topology;
+            }
             return Terrain::SpanResult::success;
         };
         assert(terrain.bind(binding));
@@ -113,10 +136,18 @@ static void compare(const Fixture<false>& scalar,const Fixture<true>& source){
         assert(av==bv);
     }
 }
-int main(){
-    const unsigned char cells[]={32,0,161,0,34,0,163,0};
-    auto a=std::make_unique<Fixture<false>>();auto b=std::make_unique<Fixture<true>>();
-    std::vector<InstanceHandle> retired;
+static const unsigned char cells[]={32,0,161,0,34,0,163,0};
+// The source span's counters after each segment. A lease must leave the
+// same sequence while skipping that span.
+static void snapshot(const Fixture<true>& x,std::vector<std::uint32_t>& out){
+    for(std::uint32_t value:{std::uint32_t(x.registration),std::uint32_t(x.retained),std::uint32_t(x.logical),
+        std::uint32_t(x.live),x.drawRevision,x.bindingRevision,x.captureRevision,x.thin.begin(0).revision})out.push_back(value);
+    for(long top:{-4096L*4000,0L,4096L*100,4096L*600})for(std::uint32_t cutoff:{0u,x.terrain.lastLifetime()})
+        out.push_back(x.thin.contains(top,cutoff));
+}
+static std::vector<std::uint32_t> mixed(bool lend){
+    auto a=std::make_unique<Fixture<false>>();auto b=std::make_unique<Fixture<true>>();b->lend=lend;
+    std::vector<InstanceHandle> retired;std::vector<std::uint32_t> counters;unsigned segments=0;
     for(unsigned round=0;round<20;++round){
         for(unsigned group=0;group<8;++group){
             const RunnerImageValue depth{group%2?0xbf800000u:0u};
@@ -126,8 +157,13 @@ int main(){
             assert(b->terrain.append(99,16,0,true,100000+group));
             assert(a->terrain.createProperties(a->terrain.handle(a->terrain.size()-1),51));
             assert(b->terrain.createProperties(b->terrain.handle(b->terrain.size()-1),51));
-            b->supported=(group%3)!=1;
-            assert(a->segment(cells,4,int(group)*16)&&b->segment(cells,4,int(group)*16));compare(*a,*b);
+            b->support((group%3)!=1);
+            // Rebinding revokes a lease; the next segment proves it again.
+            if(group==5){assert(b->terrain.bind(b->binding));const auto spans=b->sourceSpans;
+                assert(a->segment(cells,2,int(group)*16)&&b->segment(cells,2,int(group)*16));
+                assert(b->sourceSpans==spans+1);compare(*a,*b);snapshot(*b,counters);++segments;}
+            assert(a->segment(cells,4,int(group)*16)&&b->segment(cells,4,int(group)*16));
+            compare(*a,*b);snapshot(*b,counters);++segments;
         }
         for(unsigned i=0;i<12;++i){
             const auto h=a->terrain.handle((i*7)%a->terrain.size());
@@ -147,7 +183,8 @@ int main(){
             assert(a->terrain.markDestroyed(h)&&b->terrain.markDestroyed(h));compare(*a,*b);
             assert(a->terrain.retire(h)&&b->terrain.retire(h));retired.push_back(h);
             compare(*a,*b);
-            b->supported=true;assert(a->segment(cells,1,512)&&b->segment(cells,1,512));compare(*a,*b);
+            b->support(true);assert(a->segment(cells,1,512)&&b->segment(cells,1,512));compare(*a,*b);
+            snapshot(*b,counters);++segments;
         }
         for(unsigned i=0;i<a->terrain.size();i+=3){const auto h=a->terrain.handle(i);
             assert(a->terrain.markDestroyed(h)&&b->terrain.markDestroyed(h));
@@ -162,16 +199,36 @@ int main(){
         assert(b->terrain.sourcePublicationCount()==count);compare(*a,*b);
         for(const auto h:retired)assert(!a->terrain.contains(h)&&!b->terrain.contains(h));
     }
-    assert(b->sourceBirths&&b->scalarBirths&&b->sourceBirths+b->scalarBirths==a->scalarBirths);
+    assert(b->sourceBirths&&b->scalarBirths);
+    if(lend)assert(b->sourceSpans<segments/2&&b->sourceBirths+b->scalarBirths<a->scalarBirths);
+    else assert(b->sourceBirths+b->scalarBirths==a->scalarBirths);
+    return counters;
+}
+int main(){
+    assert(mixed(false)==mixed(true));
     // An unsupported birth uses the same scalar failure boundary, after a
     // previous source-owned segment. The successfully born prefix survives.
-    for(unsigned prefix=0;prefix<4;++prefix){
-        auto x=std::make_unique<Fixture<false>>();auto y=std::make_unique<Fixture<true>>();
+    for(unsigned prefix=0;prefix<8;++prefix){
+        auto x=std::make_unique<Fixture<false>>();auto y=std::make_unique<Fixture<true>>();y->lend=prefix>=4;
         assert(x->segment(cells,4,0)&&y->segment(cells,4,0));
-        x->failBirth=x->scalarBirths+prefix+1;y->failBirth=y->scalarBirths+prefix+1;y->supported=false;
+        x->failBirth=x->scalarBirths+prefix%4+1;y->failBirth=y->scalarBirths+prefix%4+1;y->support(false);
         assert(!x->segment(cells,4,16)&&!y->segment(cells,4,16));
-        assert(!x->terrain.valid()&&!y->terrain.valid()&&x->terrain.size()==4+prefix&&y->terrain.size()==4+prefix);
+        assert(!x->terrain.valid()&&!y->terrain.valid()&&x->terrain.size()==4+prefix%4&&y->terrain.size()==4+prefix%4);
         assert(x->terrain.lastLifetime()==y->terrain.lastLifetime());
     }
-    std::puts("Native source-record lifetimes: mixed constructors, mutations, reuse, teardown and failed prefixes match retained oracle");
+    // Owner failure, borrowed callback failure, topology and population
+    // capacity each return the next segment to the source span.
+    for(unsigned condition=0;condition<4;++condition){
+        auto y=std::make_unique<Fixture<true>>();y->lend=true;
+        assert(y->segment(cells,4,0)&&y->segment(cells,4,16)&&y->sourceSpans==1);
+        bool borrowed=false;std::unique_ptr<CallbackFailureSignal> signal;
+        std::unique_ptr<CallbackFailureSignal::Borrow> borrow;
+        if(condition==0)y->good=false;
+        if(condition==1){signal=std::make_unique<CallbackFailureSignal>();signal->observe(borrowed,y->scopes);
+            borrow=std::make_unique<CallbackFailureSignal::Borrow>(*signal);*signal=false;}
+        if(condition==2)++y->topology;
+        if(condition==3)y->logical=4093;
+        assert(y->segment(cells,4,32)&&y->sourceSpans==2);
+    }
+    std::puts("Native source-record lifetimes: mixed constructors, mutations, reuse, teardown, failed prefixes and leased segments match retained oracle");
 }

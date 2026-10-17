@@ -129,6 +129,10 @@ public:
         static_assert(SourceRecords,"Only the source-record owner borrows a publication basis");
         return this->sourceClock_.basis();
     }
+    const TerrainPublicationClock& sourcePublicationClock()const{
+        static_assert(SourceRecords,"Only the source-record owner borrows a publication clock");
+        return this->sourceClock_;
+    }
     // Population admission remains synchronous. The source owner publishes
     // its cumulative count and immutable birth facts immediately afterwards;
     // this boundary has no per-cell callbacks or retained-state construction.

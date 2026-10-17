@@ -8,6 +8,7 @@
 #include "RunnerPreparedDrawList.h"
 #include "RunnerLogicalLayerOrder.h"
 #include "TerrainBirthRecords.h"
+#include "TerrainSourceLease.h"
 namespace downwell {
 template<unsigned I,class Terrain> struct GameplayLayerStorage {
     using Type=RunnerLogicalLayerOrder<64,I+256,Terrain>;
@@ -313,6 +314,21 @@ public:
         live_+=count;
         if(created){changedDraw();projectionValid_[layer]=false;--count;}
         drawRevision_=drawRevision_>0xffffffffu-count?0xffffffffu:drawRevision_+count;
+        return true;
+    }
+    // The counters publishSourceTerrainSpan updates for an existing layer at
+    // this depth. Creating a layer stays in that publication.
+    bool lendSourceTerrain(std::int32_t integer,TerrainSourceLease& lease){
+        if(!enabled()||!valid()||!prepared_)return false;
+        const unsigned layer=layers_.findDynamic(integer);
+        NativeFamilyBirth::Population population;
+        if(layer==Layers::End||layers_.topologyRevision()==0xffffffffu||
+           !layers_.borrowRetainedPopulation(layer,population))return false;
+        lease.layer=layer;lease.layerId=layers_.get(layer)->id;
+        lease.retained=population.retained;lease.logical=population.logical;lease.capacity=population.capacity;
+        lease.live=&live_;lease.drawRevision=&drawRevision_;
+        lease.layerClock=&layers_.sourcePublicationClock();
+        lease.topology=&layers_.topologyRevision();lease.topologyRevision=layers_.topologyRevision();
         return true;
     }
     bool birthInheritedTerrain(InstanceHandle h,TerrainRunBirth& run){

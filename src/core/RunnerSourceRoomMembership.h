@@ -59,6 +59,7 @@ public:
     using AnimationProjection=typename Base::AnimationProjection;
     bool bindTerrain(Terrain& terrain){if(terrain_)return false;terrain_=&terrain;return true;}
     RunnerRegistrationOrder sourcePublicationBasis()const{return clock_.basis();}
+    const TerrainPublicationClock& sourcePublicationClock()const{return clock_;}
     bool contains(unsigned slot)const{State value;return source(slot,value)?value.list>=0:Base::contains(slot);}
     bool active(unsigned slot)const{State value;return source(slot,value)?value.list==0:Base::active(slot);}
     bool marked(unsigned slot)const{State value;return source(slot,value)?value.list>=0&&value.marked:Base::marked(slot);}

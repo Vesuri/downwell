@@ -138,14 +138,18 @@ after each item.
   pace alone.
 - **Current candidate:** `REFERENCE_TERRAIN_RECORDS=0` (default 1) selects
   one source-segment record per prepared row segment, written in place, with
-  the per-kind constructor facts proved once per tile. It is
+  the per-kind constructor facts proved once per tile and the consumers'
+  counters lent to the record owner after one proven span
+  (`TerrainSourceLease`). It is
   [measured here](amiga-frame-cost.md#source-record-candidate-for-section-0-a):
-  updates 99/122/136 cost 23.3/41.6/75.3 ms against the gates below, and
-  `createPrepared` still costs about 11,200 cycles per segment. The largest
-  remainder is the source span's separate layer, table, room and
-  thin-window publications (about 4,300 cycles), then record
-  reserve/commit (1,700), occupancy (1,500) and glue. Do not promote it until
-  the gates pass on a complete three-capture fall.
+  updates 99/122/136 cost 23.1/38.5/70.3 ms against the gates below, and
+  `createPrepared` costs about 8,600 cycles per segment. No duplicated owner
+  remains on that path; the rest is per-call admission, validation and
+  address arithmetic (glue 2,200, lease 1,800, occupancy 1,600, record
+  1,400). At 99 all of A's work is about 14,000 cycles against the 2,600
+  the gate allows, so that gate also needs builder position (3,100) and
+  raster invalidation (2,800). Do not promote it until the gates pass on a
+  complete three-capture fall.
 - **Gate:**
   - the quiet row update (99 type) at or under 21.5 ms. All of A's work at
     99 is 3.4 ms of 24.6 (records 2.42, builder position 0.52, invalidation

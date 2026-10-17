@@ -64,6 +64,9 @@ public:
         layers_[free].encodedDepth.assignInteger(depth);
         linkAfter(free,previous);slot=free;return true;
     }
+    // Advances with every topology or depth change (saturating). A borrower
+    // holding a layer slot must observe it: slots are reused after erasure.
+    const std::uint32_t& topologyRevision()const{return topology_;}
     unsigned elementOwner(unsigned element)const{return elements_.owner(element);}
     unsigned firstFreeElement(unsigned start=0)const{
         if constexpr(Retained)if(this->logical==Elements)return Elements;
@@ -239,7 +242,11 @@ private:
     // on every topology change. Slot numbers are private storage, not IDs.
     struct Lookup {std::int32_t key=0;unsigned slot=End;bool valid=false;};
     mutable Lookup idLookup_,depthLookup_;
-    void invalidateLookups(){idLookup_.valid=depthLookup_.valid=false;}
+    void invalidateLookups(){
+        idLookup_.valid=depthLookup_.valid=false;
+        if(topology_!=0xffffffffu)++topology_;
+    }
+    std::uint32_t topology_=0;
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){
         invalidateLookups();

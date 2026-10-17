@@ -4,6 +4,7 @@
 #include "RunnerObjectMembership.h"
 #include "NativeFamilyBirth.h"
 #include "TerrainReadCensus.h"
+#include "TerrainSourceLease.h"
 #include <cstdint>
 namespace downwell {
 // The ordering half of the runner instance registry, for owners whose
@@ -78,6 +79,16 @@ public:
         if(captureDirty_&&((captureFirst_<captureLast_&&first<captureLast_&&end>captureFirst_)||
                           (captureSecond_<captureEnd_&&first<captureEnd_&&end>captureSecond_)))
             *captureDirty_=true;
+        return true;
+    }
+    // Chronology and revisions for a callback-free source owner whose slots
+    // [first,end) lie outside both watched ranges: externalBirthSpan and
+    // externalRegistrationPublications then only advance these counters.
+    bool lendSourceBirths(unsigned first,unsigned end,TerrainSourceLease& lease){
+        if(!externalOrder_||first>=end||end>Capacity||
+           (captureFirst_<captureLast_&&first<captureLast_&&end>captureFirst_)||
+           (captureSecond_<captureEnd_&&first<captureEnd_&&end>captureSecond_))return false;
+        lease.nextOrder=&nextOrder_;lease.bindingRevision=&bindingRevision_;lease.captureRevision=&captureRevision_;
         return true;
     }
     bool canExternalBirth(unsigned count)const{

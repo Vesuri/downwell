@@ -7,6 +7,7 @@
 #include "WallFootprint.h"
 #include "RunnerLogicalLayerOrder.h"
 #include "NativeTerrainSourceRuns.h"
+#include "TerrainSourceLease.h"
 namespace downwell {
 // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
 // raster cache. Generated source IDs remain unknown until the shared global
@@ -20,6 +21,7 @@ template<unsigned Capacity,bool SourceRecords=false> class NativeTerrainLifetime
     };
     using Runs=typename NativeTerrainRunsStorage<Capacity,Order,SourceRecords>::Type;
     using ChangedCell=NativeTerrainChangedCell<Order>;
+    TerrainSourceLease sourceLease_;
     Runs runs_;
     unsigned next_=1,freeHint_=0;
     NativeTerrainField<Capacity,Runs,Order,unsigned char,&ChangedCell::flags,SourceRecords> flags_{runs_};
@@ -109,7 +111,9 @@ public:
         // Unsupported leaves all consumers unchanged. On success it has
         // admitted the complete segment; installing it cannot fail.
         // The owner has already written cells, slot, generation, y and tile.
-        SpanResult (*constructSourceSpan)(void*,InstanceHandle,const PreparedCells&,int,TerrainBirthFacts&)=nullptr;
+        // After success it may lend its counters for later segments of the
+        // same tile (TerrainSourceLease); unsupported must not lend.
+        SpanResult (*constructSourceSpan)(void*,InstanceHandle,const PreparedCells&,int,TerrainBirthFacts&,TerrainSourceLease&)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         DW_TERRAIN_READ(terrainFlagsRead);
@@ -119,6 +123,7 @@ public:
         return true;
     }
     bool bind(Binding binding){
+        sourceLease_=TerrainSourceLease{};
         if(!good_)return false;
         if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan||binding.constructSourceSpan))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
@@ -400,7 +405,11 @@ public:
                     // The immutable coordinates and identity are supplied
                     // by this owner, not trusted to a consumer callback.
                     facts->cells=cells.bytes;facts->y=cells.y;facts->tile=tile;facts->registration=0;
-                    const auto result=binding_.constructSourceSpan(binding_.context,first,cells,tile,*facts);
+                    // A lease publishes the same span without entering its owners.
+                    const bool leased=sourceLease_.admits(tile,cells.count);
+                    if(leased)sourceLease_.publish(cells.count,*facts);
+                    const auto result=leased?SpanResult::success:
+                        binding_.constructSourceSpan(binding_.context,first,cells,tile,*facts,sourceLease_);
                     if(result!=SpanResult::success)runs_.sources().abandon();
                     if(result==SpanResult::failure)return good_=false;
                     if(result==SpanResult::success){
@@ -514,7 +523,7 @@ private:
 public:
     bool canAppend(unsigned count)const{
         return good_&&count<=available()&&next_&&(!count||count-1<=0xffffffffu-next_)&&
-            (!binding_.admit||binding_.admit(binding_.context,count));
+            (!binding_.admit||sourceLease_.admitsBirths(count)||binding_.admit(binding_.context,count));
     }
     bool markDestroyed(InstanceHandle h){
         if(!good_||!runs_.contains(h))return good_=false;
