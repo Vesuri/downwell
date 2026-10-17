@@ -403,6 +403,42 @@ digest failure is unchanged (same digest as `a9dd0478`). The normal stripped Hun
 `d2493cfc7d6c3d2adf7e6ddc105472431360e29e7622f0b593335bca25b102d2`) passes
 512 KiB Chip startup.
 
+## Fixed frame work candidate — section 0 D, 2026-10-18
+
+Not accepted as the default; D's gates remain unmet. These measurements use
+`REFERENCE_FRAME_WORK=0 REFERENCE_ROW_PAINTING=1`: counted destruction results,
+empty-alarm admission, streak-dependent weapon selection and grouped display
+row debts, with the original row painter. No expanded asset bank is involved.
+The comparison is against the complete `07313c0e` fall above, not a mixed
+row-painting candidate. The three-capture method and 512 KiB Chip configuration
+are unchanged.
+
+| Window | Baseline mean/worst ms | Candidate mean/worst ms | Candidate over 20 ms | Candidate excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance 2–55 | 16.5 / 20.6 | 15.0 / 18.2 | 0 | 0 |
+| Quiet generation 56–121 | 18.8 / 24.5 | 17.3 / 22.5 | 12 | 7 |
+| First burst 122–135 | 20.2 / 35.0 | 18.6 / 33.6 | 5 | 16 |
+| Enemies 136–162 | 24.3 / 64.1 | 23.3 / 62.5 | 14 | 125 |
+| Landing 163–164 | 65.7 / 100.2 | 63.4 / 98.7 | 2 | 87 |
+| Whole fall 2–164 | 19.6 / 100.2 | 18.2 / 98.7 | 33 | 235 |
+
+Update 98 remains 14.3 ms (baseline 15.8), above D's 11.5 ms gate;
+the entrance mean remains above its 12 ms gate. Full behavior acceptance and
+the separate cadence run must precede any default change. All 165 native
+`quiet-state` observations match with `REFERENCE_FRAME_WORK=0` and `=1`,
+including tick 164, y 262144, health 4, ammo 8, three enemies and 1371 RNG
+draws (`tmp/d-state-{0,1}-gdb.log`). These are selected state observations,
+not full-state or pixel equivalence. Counted-result and
+alarm host tests pass in both arms; the row-sync test passes 10,000
+wrap/damage/pipeline cases with exact copied rows and untouched margins.
+
+Reports: `tmp/d-whole-{1,60,120}-report.txt`; traces:
+`tmp/trace/d-whole-{1,60,120}`. Trace ELF SHA-256 by start mark:
+
+- 1: `16cea0ae63824177063bb15fc1116188adf2a1f2d44cea9dea51652c6b5ffa68`
+- 60: `43a9ab06803e006b119edc3d33db717fc3cfa3ad8b73d1e853f57d04d5b3bc0d`
+- 120: `51474f861372e977aca77ba474e8e0834d73b0d922f2e84950642affd48f2be0`
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
@@ -2537,6 +2573,7 @@ named holds the numbers. Do not retry a row without removing the reason in its l
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Initial-fall §0 C, deadline-only paint-ahead | Move optional Chip transfers after required rendering, reduce transfers to eight rows, and admit both transfer and plan units only below 17 ms of measured work | Against the direct-row-reference candidate, updates 137–162 mean **20.1 → 20.2 ms**, worst **24.6 → 25.6**, excess **16 → 32 ms**, nine over-budget updates in both. Update 145 now performs **8.3 ms** of required row painting. ELF `d458c4541fc22c971589383c9fab40109b1606a9ef5f255cfd8d4ebb68a592b0`; report `tmp/c-budgeted-120-report.txt`. | The stricter deadline leaves cold rows until exposure: it defers work rather than removing it. Scene/raster/pixel tests pass, but the affected window regresses. Reverted; do not sweep deadline or strip-size variants without first reducing preparation/transfer work. | This row's introducing commit; scheduling experiment reverted |
 | Initial-fall §0 D, camera projection | Retain rounded camera coordinates keyed by the exact position-plus-shake input | Against the counted-frame candidate: update 98 **14.3 → 14.2 ms**; updates 98–121 mean **17.0 → 16.9**, worst **20.3 → 20.2**, one update over 20 ms in both. Reference/candidate ELF SHA-256: `48e1bcac4daab89c2159058ef186fd27858e8e7037ebb4f6b9a857a4b8b5921c` / `f6aff38aaa22800b9afe0011015d5397e1b2a4d42e50d6dbdffcadad3c84b830`. | Within 0.5-ms noise; does not justify retained state. Host runtime output matches the reference; mutation, copy, shake, reset and sanitizer tests pass. No cache/helper variants. | This row's introducing commit; [`retained-camera-projection.patch`](rejected/retained-camera-projection.patch) |
 | Initial-fall §0 A, unified segment records | One record owns identity, common flags/sprite/wall state, room state and retained layer state; mutations split records. Actor-only room nodes, thin registration derived from segment kind bits, range admission instead of per-cell admission. | Three 100-field captures cover 2–164 without gaps. Candidate window mean/worst/over-20/excess: entrance **16.2/20.2/1/0**, quiet **20.3/35.8/32/119**, burst **22.3/51.8/8/51**, enemies **32.5/92.7/27/338**, landing **94.7/136.6/2/149** (ms where applicable). Whole fall **22.0/136.6/70/658**, versus baseline **21.8/136.0/70/626**. Update 99 is **24.5 ms**; 122 **51.8**, 136 **92.7**, 163 **136.6**. Update 56 independently repeats at **254,320 cycles / 35.79 ms**, versus baseline 27.7 ms. `appendPreparedCells` alone still costs **17.39 ms for eight segments at 122 / 15,443 cycles per segment**, before builder-position publication (2.05 ms) and invalidation. | Consolidating state does not remove the generic publication work that creates that state. It misses the 2,500-cycle/segment and 4-ms/burst limits, the quiet-row/excess limits and both burst gates; the scalar fallback regresses by 8.1 ms. Rejected on work, not field-count redistribution or the small landing variation. The cadence run gives **198 fields / 164 updates**, worst gap seven at update 1; the landing witness passes (tick 164, y 262,144, health 4, ammo 8, three enemies, 1,371 RNG draws). The 18,000-frame replay and sanitizer fixtures for holes, reuse, mutation, failed prefixes and pending-birth room publication pass; these are not performance wins. Removed as a whole, not a basis for descriptor-packing, accessor or copy-helper tuning. Trace ELF SHA-256s for starts 1/60/120: `8f4fe073aca5b984aac2a008238b74ae772ed3c3ffa9eea67ac3299a090de362`, `76386a7725d71149dbea4398338d8b8890c3d83c12a22fe3d1cd033b6c20d39c`, `9d1ca7076e97be9be1697e811147c4a7794c449b298e493b7df7711c8343227b`; short recheck `d0d02dd6b62ff00c4ab3d99147a207da111e12f3fb44078542c3a887dc99d212`. | This row's introducing commit, [`terrain-segment-owner.patch`](rejected/terrain-segment-owner.patch) |
 | Initial-fall multi-row identity owner, global lookup | Host-generated two-byte column/row geometry; one native descriptor and owner transaction per event-free group | 122 54.923 → 51.106 ms (363,110 cycles, repeated); 136 94.5 → 96.950 ms; 163 135.9 → 141.214 ms; fall 191 → 192 fields | Per-row identity construction is actually removed, but repeated global group lookup costs 5.28/6.29 ms at 136/163. Adds 21,540 ordinary asset bytes. Superseded by the source-ordered traversal attempt below, not shipped. ELF `504de9758532b988de36826cf3487d9dc967609ac6e9be54678e2ca0bd318cd0`; reports `tmp/trace/pattern-owner-candidate-{122,136,stall}/report.txt` | This row's introducing commit; final experiment in [`terrain-pattern-owner.patch`](rejected/terrain-pattern-owner.patch) |
