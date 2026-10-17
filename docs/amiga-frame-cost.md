@@ -439,6 +439,60 @@ Reports: `tmp/d-whole-{1,60,120}-report.txt`; traces:
 - 60: `43a9ab06803e006b119edc3d33db717fc3cfa3ad8b73d1e853f57d04d5b3bc0d`
 - 120: `51474f861372e977aca77ba474e8e0834d73b0d922f2e84950642affd48f2be0`
 
+## Combined row-painting candidate — section 0 C/D, 2026-10-18
+
+**Not accepted as the default.** Three 100-field captures with
+`REFERENCE_FRAME_WORK=0 REFERENCE_ROW_PAINTING=0` cover all updates 2–164.
+The ordinary-memory terrain bank remains **330,024 bytes**; no expanded
+wall-and-tile bank was used. This candidate includes exact decoration-bound
+admission and run-based native composition of the retained row references.
+The short-span CPU display-copy experiment is reverted.
+
+| Window | Baseline mean/worst ms | Candidate mean/worst ms | Candidate over 20 ms | Candidate excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance 2–55 | 16.5 / 20.6 | 15.1 / 19.7 | 0 | 0 |
+| Quiet generation 56–121 | 18.8 / 24.5 | 17.8 / 24.3 | 1 | 4 |
+| First burst 122–135 | 20.2 / 35.0 | 18.5 / 33.8 | 2 | 14 |
+| Enemies 136–162 | 24.3 / 64.1 | 21.5 / 61.4 | 11 | 53 |
+| Landing 163–164 | 65.7 / 100.2 | 59.3 / 88.0 | 2 | 79 |
+| Whole fall 2–164 | 19.6 / 100.2 | 18.1 / 88.0 | 16 | 150 |
+
+This does not pass C or D. Excluding the generation burst at 136,
+137–162 has mean **20.0 ms**, worst **23.2 at 162**, ten over-budget
+updates and 11 ms excess. Against the isolated D candidate above, quiet
+generation is worse (17.3/22.5 → 17.8/24.3 ms), despite fewer over-budget
+updates. Do not accept on the overall reduction alone.
+
+Update **70 independently repeats at 172,720 cycles / 24.3 ms** in both
+the start-1 and start-60 captures. It spends 9.7 ms in Step and **7.64 ms
+in `drawMainWorldSpan`**, including 5.25 ms in `preparePatternCache` and
+3.71 ms in its scalar `paintCached` fallback. It is a cold visible-row
+miss, not fixed dispatch overhead. Update 98 now carries preparation and
+transfer work: **19.1 ms work**, including 1.4 ms preparation and 1.4 ms
+transfer. It is not an isolated remeasurement of D's 14.3-ms quiet update.
+The native composition change reduces update 162's transfer from 3.9 to
+2.3 ms versus the decoration-only candidate, but does not finish the row
+window.
+
+Evidence: `tmp/c-compose-{1,60,120}-report.txt`,
+`tmp/c-compose-70-recheck.txt`, `tmp/c-compose-98-report.txt`.
+ELF SHA-256 by trace start:
+
+- 1: `63b1a6259b873eb6637aafd5485c43ad5851d676062bb922d4dcd16abe9330c0`
+- 60: `2bdf58386116b07bf01e66e5de45897aa646b21397a7601ef1bce79e676f6229`
+- 120: `06538fcfaa975c049a330a6270759aa3c16e91b478117d8841c9760ff38529cf`
+
+Separate instrumented native evidence (`tmp/c-compose-pixels-gdb.log`):
+80 native composed rows match the portable pixel oracle, zero failures;
+all 165 selected fall samples match `tmp/d-state-0-gdb.log`, and the landing
+marker passes. This is not full-state or whole-frame pixel equivalence.
+Host evidence: 18,000-frame terrain ownership replay; 10,000 display-row
+debt cases; 10,000 composed-row comparisons; 4,800 raster transfer cases;
+416 decoration-edge cases; 12,360 pattern/seam/mutation rows; and the
+20,000-update backing/staging fixtures pass. Remaining acceptance gates
+and default selection are unchanged. The normal build is restored after
+both new captures and passes the 68000 instruction/helper audits.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
