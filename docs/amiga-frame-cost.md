@@ -537,6 +537,26 @@ Reports: `tmp/c-fallback-live-{1,60,120}-report.txt`,
 - 120: `b2b937c0b8f1419c92d1bd5585aa6faf3238d5c0d62bfa4e8ea4fef2fba0567c`
 - 135 recheck: `da5bde711c88b05251b20d1abdf0a6b1f7f0ad79c3da60f24c6acad757ef339b`
 
+### Prepared-band admission cost, update 141
+
+An eight-field capture starting at 140 independently measures update 141 at
+21.33 ms including 0.57 ms publication wait. `preparePatternPiece` costs
+**4.65 ms in two calls**. Both calls finish borrowed bands: one wall-only
+band and one wall/tile composition. There is no materialized-piece call in
+this update, so changing global-revision invalidation cannot remove this
+particular stall.
+
+The two calls expand the bands into 32 per-line descriptors. Inclusive
+`borrowPatternRow` costs 0.82 ms and source-row address lookup costs 0.71 ms;
+admission's own body costs 1.35 ms, including descriptor construction and
+publication loops. These figures do not establish that all 2.88 ms can be
+removed. A band-level descriptor is a structural candidate; changing copy
+helpers or adding another plan-validity cache is not justified by this trace.
+The bank remains 330,024 bytes. Report and folded stacks:
+`tmp/c-plan-cost-141-report.txt`, `tmp/c-plan-cost-141.folded`.
+Trace ELF SHA-256:
+`b8d26c7d1cfb7aa610d57f7517406927421b5f17f7f9ac3e9ebf03082cc5eefa`.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
