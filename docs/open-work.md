@@ -13,7 +13,7 @@ on PAL; do not add 60 Hz catch-up.
 ## Priority and scope
 
 Immediate priority: section 0, every update of the A500 initial fall within
-20 ms, worked in its B–E order. Do not add further section 1 functionality
+20 ms, worked in its C–E order. Do not add further section 1 functionality
 while this regression is unresolved.
 After that, finish live skeleton encounters (section 1), following its numbered
 integration tasks: production ownership, generation/query/dispatch, time-stop
@@ -37,25 +37,26 @@ earlier target of matching the historical 181 fields; reaching that is a
 milestone on the way, not completion.
 
 The current state is the complete trace of the
-[source-record terrain owner](amiga-frame-cost.md#source-record-terrain-owner-section-0-a),
-which replaced the duplicated per-span terrain records (formerly item A). It
-runs 186 fields for 164 updates, with a worst update of 104 ms. "Work"
-excludes the publication wait. The per-owner costs quoted in B–E come from
-the earlier
+[native enemy updates](amiga-frame-cost.md#native-enemy-updates-section-0-b)
+(formerly item B), on top of the
+[source-record terrain owner](amiga-frame-cost.md#source-record-terrain-owner-section-0-a)
+(formerly item A). It runs 176 fields for 164 updates, with a worst update of
+100 ms. "Work" excludes the publication wait. The per-owner costs quoted in
+C–E come from the earlier
 [`45e96a9c` trace](amiga-frame-cost.md#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12)
-(192 fields, worst 136 ms); item A did not change those owners, but
-re-measure before relying on a number.
+(192 fields, worst 136 ms); re-measure before relying on a number.
 
 | Window | Work mean ms | Worst ms (update) | Updates over 20 ms | Excess ms |
 | --- | ---: | ---: | ---: | ---: |
-| Authored entrance, 2–55 | 16.4 | 20.5 (19) | 1 | 0 |
-| Quiet generation, 56–121 | 18.7 | 24.5 (71) | 22 | 29 |
-| First burst, 122–135 | 21.2 | 34.9 (122) | 8 | 35 |
-| Enemies, 136–162 | 30.6 | 64.4 (136) | 27 | 288 |
-| Landing, 163–164 | 77.8 | 104.3 (163) | 2 | 116 |
+| Authored entrance, 2–55 | 16.5 | 20.6 (19) | 1 | 1 |
+| Quiet generation, 56–121 | 18.8 | 24.5 (71) | 22 | 31 |
+| First burst, 122–135 | 20.2 | 35.0 (122) | 8 | 27 |
+| Enemies, 136–162 | 24.3 | 64.1 (136) | 14 | 135 |
+| Landing, 163–164 | 65.7 | 100.2 (163) | 2 | 91 |
 
-Four owners account for the remaining excess. The items below remove them in
-order of how much over-budget work each one removes. Each item names:
+Three owners account for the remaining excess. Every update over 20 ms in
+137–162 paints a row (C). The items below remove them in order of how much
+over-budget work each one removes. Each item names:
 
 - the measured work it removes;
 - its target;
@@ -96,34 +97,6 @@ after each item.
 - **Clean up after each item:** delete your own traces once their numbers are
   in a commit. Stop every owned emulator before handoff.
 
-### B. Native enemy updates for the fall's families
-
-- **Removes about 8.3 ms per update per crawler.** Step is 17.1 ms in
-  137–162 against 8.8 ms on a quiet update:
-  - alarm dispatch 3.0–4.5 ms for one enemy alarm (the crawler's own alarm
-    body is 2.45, `updateCrawler` and `meetsTiles`);
-  - room effect, the enemy Step, 3.05 ms;
-  - native enemy animations 1.36 ms;
-  - contacts 0.25 ms.
-
-  At landing (164) the new crawlers, snails and frogs cost 15.4 ms in room
-  effects and 8.3 ms in alarms.
-- **Target:** at most 2.5 ms per update per crawler; 137–162 Step mean at or
-  under 11 ms.
-- **Approach:**
-  - **Family arrays:** the crawler, snail and frog keep their state and
-    countdown alarms in per-family arrays. They step in source order with
-    direct tile queries.
-  - **Generic machinery only when needed:** the captured-alarm projection,
-    dispatcher and record publication run only when a non-native owner
-    participates, or when a consumer reads the record. Section 5 E (quiet
-    frames and alarms) is the same work for later scenes; do the fall's
-    families here.
-- **Gate:**
-  - 137–162 has no update over 20 ms, given C;
-  - 164 Step at or under 20 ms;
-  - enemy-state fixtures, including alarm-time births and deaths.
-
 ### C. Row painting and the two-update row period
 
 - **Removes:**
@@ -148,7 +121,7 @@ after each item.
     only at segment seams, autotile neighbours and breakables. The live
     painter remains the oracle and the fallback.
 - **Gate:**
-  - no row update over 20 ms in 122–135 or 137–162 with B;
+  - no row update over 20 ms in 122–135 or 137–162;
   - scalar pixel comparison across all pattern rows and seams.
 
 ### D. Fixed per-update cost
@@ -192,8 +165,8 @@ after each item.
 
 ### E. Stage generation bursts ahead of their trigger
 
-- **What remains:** with the source-record owner the bursts at 122, 136 and
-  163 still cost 34.9, 64.4 and 104.3 ms of work, mostly builder and
+- **What remains:** with items A and B the bursts at 122, 136 and 163 still
+  cost 35.0, 64.1 and 100.2 ms of work, mostly builder and
   event-cell work (event cells about 6 and 22 ms at 122 and 136). At
   `45e96a9c` event cells at 163 were 43.3 ms:
   - breakables 16.1 ms for 21, 5,458 cycles each;
@@ -204,8 +177,10 @@ after each item.
 - **Approach:**
   1. **Cheaper event cells:** breakables publish as records with the
      source-record segment method (`TerrainBirthRecords` and a lent-counter
-     lease, as terrain does), and enemy adoption binds through B's family
-     arrays.
+     lease, as terrain does), and enemy adoption joins the roster and
+     record-owned appearance of the
+     [native enemy updates](amiga-frame-cost.md#native-enemy-updates-section-0-b)
+     instead of the generic runner birth and binding.
   2. **Stage the builder's next pattern** in slack time on earlier updates,
      once its trigger row is known: pattern choice, consumed RNG values, cell
      bytes and breakable outputs. Key the staged result on:
@@ -219,7 +194,7 @@ after each item.
   4. **On a key mismatch** (another RNG consumer or birth intervened),
      discard the staged result and run the normal path, which stays the
      oracle.
-- **Depends on B–D,** which provide the slack. Do E last.
+- **Depends on C and D,** which provide the slack. Do E last.
 - **Gate:**
   - the three bursts at or under 20 ms;
   - a fixture that forces a key mismatch;
@@ -315,7 +290,7 @@ reintroduce per-span terrain structures on the generated path.
   scenes fit. Continue removing unrelated resident resources and code without
   moving the same always-resident bytes into startup allocations.
 - Close this section only with every initial-fall update within 20 ms (items
-  B–E), a normally runnable build, explained/resolved recent regressions and
+  C–E), a normally runnable build, explained/resolved recent regressions and
   meaningful startup failure codes. Retain any 20 ms shortfall outside the
   initial fall explicitly in section 5; do not claim 50 FPS or stock total-memory fit without evidence. Restore a normal
   non-profile build and stop every owned emulator run before handoff.

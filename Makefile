@@ -53,6 +53,9 @@ endif
 ifeq ($(REFERENCE_ENEMY_ALARM_ROSTER),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
 endif
+ifeq ($(REFERENCE_ENEMY_UPDATES),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
+endif
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -1446,8 +1449,12 @@ verify-logical-layer-order: build/runner-logical-layer-order-test
 
 test: verify-logical-layer-order
 
-verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test
+verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test build/gameplay-collision-owner-audit-test build/gameplay-collision-owner-reference-enemies-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-runs.txt ./build/gameplay-collision-owner-test
+	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-audit.txt ./build/gameplay-collision-owner-audit-test
+	cmp build/ownership-runs.txt build/ownership-audit.txt
+	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-reference-enemies.txt ./build/gameplay-collision-owner-reference-enemies-test
+	cmp build/ownership-runs.txt build/ownership-reference-enemies.txt
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-scalar.txt ./build/gameplay-collision-owner-scalar-test
 	cmp build/ownership-runs.txt build/ownership-scalar.txt
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-snapshots.txt ./build/gameplay-collision-owner-snapshot-test
@@ -1456,6 +1463,17 @@ verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gamep
 build/live-collision-lifecycle-test build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test: tests/core/RegisteredSkeletonThrowChecks.h
 
 build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp tests/core/ScheduledBoxEffectsCheck.h tests/core/GeneratedSourceBirthChecks.h src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+# Native enemy updates cross-checked against the walks they replace, and
+# the reference enemy updates they replace.
+build/gameplay-collision-owner-reference-enemies-test: CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
+build/gameplay-collision-owner-reference-enemies-test: tests/core/GameplayCollisionOwnerTest.cpp tests/core/ScheduledBoxEffectsCheck.h tests/core/GeneratedSourceBirthChecks.h tests/core/RegisteredSkeletonThrowChecks.h src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+build/gameplay-collision-owner-audit-test: CXXFLAGS += -DDOWNWELL_AUDIT_ENEMY_UPDATES
+build/gameplay-collision-owner-audit-test: tests/core/GameplayCollisionOwnerTest.cpp tests/core/ScheduledBoxEffectsCheck.h tests/core/GeneratedSourceBirthChecks.h tests/core/RegisteredSkeletonThrowChecks.h src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
@@ -1928,6 +1946,7 @@ test: build/standard-bullet-test
 test: build/crawler-motion-test
 test: build/snail-motion-test
 test: build/walking-enemy-test
+test: build/enemy-motion-math-test
 
 test: test-gameplay-capture-comparison
 .PHONY: test-gameplay-capture-comparison
@@ -1945,6 +1964,10 @@ build/snail-motion-test: tests/core/SnailMotionTest.cpp src/core/SnailMotion.h s
 build/crawler-motion-test: tests/core/CrawlerMotionTest.cpp src/core/CrawlerMotion.h src/core/SolidCollision.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CrawlerMotionTest.cpp
+
+build/enemy-motion-math-test: tests/core/EnemyMotionMathTest.cpp src/core/PixelCollisionMath.h src/core/CrawlerMotion.h src/core/SnailMotion.h src/core/WalkingEnemyMotion.h src/core/SolidCollision.h src/core/EnemyContact.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/EnemyMotionMathTest.cpp
 
 build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
@@ -2551,6 +2574,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/crawler-motion-test
 	./build/snail-motion-test
 	./build/walking-enemy-test
+	./build/enemy-motion-math-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)

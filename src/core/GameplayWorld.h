@@ -83,6 +83,8 @@
 #include "core/SnailMotion.h"
 #include "core/SnailHitState.h"
 #include "core/WalkingEnemyMotion.h"
+#include "core/PixelCollisionMath.h"
+#include "core/SolidCellGrid.h"
 #include "core/BatHitState.h"
 #include "core/BatBehavior.h"
 #include "core/InstanceHandle.h"
@@ -182,6 +184,13 @@ public:
         bool hitIgnore=false;
     };
     using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
+    // How the crawler, snail and walker records hold their coordinates. The
+    // reference build keeps the source scripts' single fifths-of-Q8 long.
+#ifdef DOWNWELL_REFERENCE_ENEMY_UPDATES
+    using EnemyMotionMath=downwell::FixedCollisionMath;
+#else
+    using EnemyMotionMath=downwell::PixelCollisionMath;
+#endif
     struct EnemyState {
         // Family-local lifetime key; never a recovered Windows instance ID.
         std::uint32_t lifetimeId = 0;
@@ -205,13 +214,13 @@ public:
         downwell::FrogHorizontalMotion frogHorizontal;
         downwell::FrogHitState frogHit;
         downwell::FrogPresentation frogPresentation;
-        downwell::CrawlerMotion crawler;
-        downwell::SnailMotion snail;
+        downwell::BasicCrawlerMotion<EnemyMotionMath> crawler;
+        downwell::BasicSnailMotion<EnemyMotionMath> snail;
         downwell::SnailHitState snailHit;
         downwell::BatHitState batHit;
         unsigned short batDirectionFraction;
         downwell::BatActivity batActivity;
-        downwell::WalkingEnemyMotion walker;
+        downwell::BasicWalkingEnemyMotion<EnemyMotionMath> walker;
         int motionState;
         int auxiliaryState;
         int alarm0;
@@ -1545,6 +1554,29 @@ public:
     }
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
+    // The event part of advanceEnemyRoomAlarm, for a resolved record and an
+    // alarm index below AlarmBank::count.
+    bool advanceEnemyAlarm(EnemyState& enemy,unsigned alarm);
+    // advanceEnemyRoomAlarm for each roster entry with the alarm's event, in
+    // order, for Alarm 0 or 1. Each record resolves once; one whose counter
+    // is negative, or that is inactive or marked, changes nothing and is
+    // skipped. Eligible(shared) is the caller's capture filter; Valid() runs
+    // after each dispatched event, as the captured walk checks its owner.
+    template<class Entry,class Eligible,class Valid>
+    bool advanceRosterEnemyAlarm(const Entry* entries,unsigned count,unsigned alarm,unsigned base,
+                                 Eligible eligible,Valid valid){
+        const unsigned bit=1u<<alarm;
+        for(unsigned e=0;e<count;++e){
+            const auto& entry=entries[e];
+            if(!(entry.alarms&bit)||!eligible(entry.handle))continue;
+            const downwell::InstanceHandle local{entry.handle.slot-base,entry.handle.generation};
+            auto* record=const_cast<EnemyState*>(resolveEnemyLifetime(local));
+            if(!run_.effectsSucceeded||!record)return run_.effectsSucceeded=false;
+            if((alarm?record->alarm1:record->alarm0)<0||!record->active||record->destroyRequested)continue;
+            if(!advanceEnemyAlarm(*record,alarm)||!valid())return false;
+        }
+        return true;
+    }
     bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     void configureRoomAlarms(bool (*callback)(void*),void* context){roomAlarms_=callback;roomAlarmsContext_=context;}
     using ResultAlarmEmit=bool (*)(void*,downwell::LevelClearSelection::Effect,unsigned);
@@ -1578,6 +1610,17 @@ public:
             if(enemy->imagePhase>0x7fffffffu)return run_.effectsSucceeded=false;
         }while(cursor.within(first,last));
         return true;
+    }
+    // The same advance for every enemy whose local slot is room-active, in
+    // record order, for an animation population of native enemies alone.
+    template<class Active> bool advanceActiveEnemyAnimations(Active active){
+        for(unsigned i=0;i<enemyCount_;++i){
+            auto& enemy=enemies_[i];
+            if(enemy.identitySlot>=enemyCapacity||!active(enemy.identitySlot))continue;
+            downwell::advanceEnemyImageQ8(enemy.imagePhase,enemy.imageRemainder,enemy.imageSpeed);
+            if(enemy.imagePhase>0x7fffffffu)return run_.effectsSucceeded=false;
+        }
+        return run_.effectsSucceeded;
     }
     template<class Cursor,class Identity>
     bool advanceNativeBulletAnimations(Cursor& cursor,Identity identity,unsigned first,unsigned last){
@@ -1816,7 +1859,7 @@ public:
     }
     bool publishBoxHealth(downwell::InstanceHandle h,downwell::MotionBinary64 health){
         if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
-        breakables_[h.slot].state.wallHp=health;return true;
+        breakables_[h.slot].state.wallHp=health;observeBoxHealth(breakables_[h.slot]);return true;
     }
     template<class Controls,class Position,class Allocate,class Queries>
     auto boxCurrencyOperations(const downwell::ObjectPack& objects,downwell::InstanceHandle box,
@@ -1951,16 +1994,22 @@ public:
     BoxAlarmPrefix captureBoxAlarms()const{return {breakableCount_,nextBreakableLifetimeId_-1};}
     bool advanceBoxAlarmPrefix(BoxAlarmPrefix phase){
         if(!run_.effectsSucceeded)return false;
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+        if(!boxAlarmsArmed_)return true; // Every counter is still -1.
+#endif
         const unsigned end=phase.end<breakableCount_?phase.end:breakableCount_;
         for(unsigned i=0;i<end;++i){
             auto& box=breakables_[i];
-            if(!box.lifetimeId||box.lifetimeId>phase.lastLifetime||!box.active||box.destroyRequested)continue;
-            if(downwell::AlarmBank::advanceValue(box.alarm0))box.state.alarmZero();
+            // A negative counter is untouched whatever the box's state, and
+            // native boxes rarely arm Alarm 0: test it first.
+            if(box.alarm0<0||!box.lifetimeId||box.lifetimeId>phase.lastLifetime||!box.active||box.destroyRequested)continue;
+            if(downwell::AlarmBank::advanceValue(box.alarm0)){box.state.alarmZero();observeBoxHealth(box);}
         }
         return true;
     }
     bool publishBoxAlarm0(downwell::InstanceHandle h,std::int32_t value){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        if(value>=0)boxAlarmsArmed_=true;
         breakables_[h.slot].alarm0=value;return true;
     }
     template<class Query> bool stopBoxAlarm0(downwell::InstanceHandle h,Query timeBound){
@@ -2037,6 +2086,7 @@ public:
                                 SolidResolver mask = nullptr,WallContactResolver walls = nullptr,
                                 PlatformContactResolver platforms = nullptr,
                                 downwell::SolidCornerQuery::Corners corners = nullptr) {
+        if(resolver!=solidResolver_||context!=solidResolverContext_)solidCells_={};
         solidResolver_ = resolver;
         solidCorners_=corners;
         segmentResolver_ = segment;
@@ -2058,6 +2108,10 @@ public:
                 runtime.run_.shops.playerSolidAt(x+243, y+183);
         } : static_cast<SolidResolver>(nullptr));
     }
+    // The cells behind the configured solid resolver, which must answer
+    // exactly as SolidCells does for every sample, boxes included. Native
+    // enemy motion reads them directly; a different resolver drops them.
+    void configureSolidCells(const downwell::SolidCellGrid& cells){solidCells_=cells;}
     bool configureEnemy(unsigned index, int objectId, int spriteId,
                         int x, int y, int speedX, int speedY,
                         int health, int reward,
@@ -2713,8 +2767,19 @@ private:
     void prepareBreakableSlotsForReuse();
     std::uint32_t nextBreakableLifetimeId_ = 1;
     bool publishEnemyActivation(const EnemyState& enemy, bool active);
-    bool publishEnemyImage(const EnemyState& enemy,unsigned phase);
-    bool publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value);
+    bool publishEnemySprite(EnemyState& enemy,int sprite);
+    // With a record-owned appearance these setters are no-ops, bar the
+    // image's range check: take them here, without a call per Step.
+    bool publishEnemyImage(const EnemyState& enemy,unsigned phase){
+        if(!enemyLifecycle_.recordOwnsAppearance())return publishOwnedEnemyImage(enemy,phase);
+        if(phase<=0x7fffffffu)return true;
+        return run_.effectsSucceeded=false;
+    }
+    bool publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value){
+        return enemyLifecycle_.recordOwnsAppearance()||publishOwnedEnemyTransform(enemy,field,value);
+    }
+    bool publishOwnedEnemyImage(const EnemyState& enemy,unsigned phase);
+    bool publishOwnedEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value);
     bool retireEnemyOwnership(EnemyState& enemy);
     bool clearEnemyOwnership();
     bool retireBulletOwnership(BulletState& bullet);
@@ -2763,6 +2828,14 @@ private:
     // never traversal order. Update moved records during stable compaction.
     static_assert(enemyCapacity<=65535,"enemy index must fit its slot directory");
     unsigned short enemySlotIndex_[enemyCapacity]{};
+    // Only publishBoxAlarm0 arms a box's Alarm 0 (time stop extends a positive
+    // one). Never cleared, so the box prefix walk resumes for the rest of the
+    // world's life once any box has been armed.
+    bool boxAlarmsArmed_=false;
+    // Every write of a box's health reports here; also never cleared. While
+    // no box has been exhausted, the unbound box Step has nothing to destroy.
+    bool boxesMayBeExhausted_=false;
+    void observeBoxHealth(const Breakable& box){if(box.state.exhausted())boxesMayBeExhausted_=true;}
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
     downwell::GameMakerRandom::Lookahead randomLookahead_;
@@ -2779,6 +2852,20 @@ private:
     Currency* currencyInstances_=nullptr;
     SolidResolver solidResolver_;
     downwell::SolidCornerQuery::Corners solidCorners_=nullptr;
+    downwell::SolidCellGrid solidCells_{};
+    // An aligned box answers at its centre, the cell's top-left plus 8.
+    struct LiveBoxCell {
+        const GameplayWorld* world;
+        bool operator()(int left,int top)const{return world->breakableActiveAt(left+8,top+8);}
+    };
+    downwell::SolidCells<LiveBoxCell> solidCells()const{return {&solidCells_,{this}};}
+    bool nativeSolidCells()const{
+#ifdef DOWNWELL_REFERENCE_ENEMY_UPDATES
+        return false;
+#else
+        return solidCells_.valid();
+#endif
+    }
     SegmentResolver segmentResolver_ = nullptr;
     SolidResolver maskResolver_ = nullptr;
     WallContactResolver wallContactResolver_ = nullptr;

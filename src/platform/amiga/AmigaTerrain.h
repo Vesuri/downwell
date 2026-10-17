@@ -6,6 +6,7 @@
 #include "core/GameMakerRandom.h"
 #include "core/RoomPack.h"
 #include "core/TerrainWallContacts.h"
+#include "core/SolidCellGrid.h"
 #include "AmigaLandingIndex.h"
 
 class GameplayWorld;
@@ -246,6 +247,9 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
                                int minimumOffsetY);
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainCorners(void*,int left,int top,int right,int bottom);
+// The index cells amigaResolveTerrainSolid and amigaResolveTerrainCorners
+// read, for the runtime whose boxes they consult; empty without an index.
+downwell::SolidCellGrid amigaTerrainSolidCells(const AmigaTerrainCollisionContext& context);
 bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path);
 bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count);

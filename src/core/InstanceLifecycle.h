@@ -84,6 +84,16 @@ public:
         };
         return true;
     }
+    // Further, nothing observes the record's image index or transforms
+    // through this owner, its record-owned position needs no check per
+    // setter, and the owner holds the record's sprite. Those three setters
+    // become no-ops (the image keeps its range check); a caller may skip
+    // publishing an unchanged sprite.
+    template<class Owner> bool useRecordAppearance(Owner& owner){
+        if(context_!=&owner||!integerPositionCheck_)return false;
+        appearanceUnobserved_=true;return true;
+    }
+    bool recordOwnsAppearance()const{return appearanceUnobserved_;}
     template<class Owner> static RecordLifecycleBinding bindPositionedLifetime(Owner& owner){
         auto b=bind(owner);
         b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
@@ -120,7 +130,7 @@ public:
     }
     bool integerTransform(InstanceHandle h,const Record& r,RunnerTransformField field,int value,
                           RunnerImageValue alpha,std::uint32_t blend)const {
-        if(!transform_)return true;
+        if(!transform_||appearanceUnobserved_)return true;
         RunnerImageValue narrowed;
         return narrowed.assignInteger(value)&&
                transform_(context_,h,r,field,narrowed,alpha,blend);
@@ -244,9 +254,10 @@ public:
     bool mask(InstanceHandle h,const Record& r,int next)const{return !mask_||mask_(context_,h,r,next);}
     bool transform(InstanceHandle h,const Record& r,RunnerTransformField field,RunnerImageValue value,
                    RunnerImageValue alpha,std::uint32_t blend)const {
-        return !transform_||transform_(context_,h,r,field,value,alpha,blend);
+        return !transform_||appearanceUnobserved_||transform_(context_,h,r,field,value,alpha,blend);
     }
     bool phaseIndex(InstanceHandle h,const Record& r,unsigned phase)const {
+        if(appearanceUnobserved_)return phase<=0x7fffffffu;
         if(!imageIndex_)return true;
         if(phase>0x7fffffffu)return false;
         RunnerImageValue value;
@@ -257,11 +268,12 @@ public:
         return imageIndex(h,r,value);
     }
     bool imageIndex(InstanceHandle h,const Record& r,RunnerImageValue value)const {
-        return !imageIndex_||imageIndex_(context_,h,r,value);
+        return !imageIndex_||appearanceUnobserved_||imageIndex_(context_,h,r,value);
     }
     // For explicit rounded x/y assignments in the supported enemy scripts,
     // not xx/yy motion accumulators or a query-time synchronization pass.
     bool integerPosition(InstanceHandle h,const Record& r,std::int32_t x,std::int32_t y)const {
+        if(appearanceUnobserved_)return true;
         if(integerPositionCheck_)return integerPositionCheck_(context_,h,r);
         if(!move_)return true;
         RunnerImageValue px,py;
@@ -315,6 +327,7 @@ private:
     bool (*instancePlace_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,InstancePlaceResult&)=nullptr;
     bool (*imageIndex_)(void*,InstanceHandle,const Record&,RunnerImageValue)=nullptr;
     bool (*transform_)(void*,InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t)=nullptr;
+    bool appearanceUnobserved_=false;
 };
 using InstanceLifecycleBinding = RecordLifecycleBinding<InstanceRecord>;
 

@@ -292,6 +292,117 @@ erasure does not advance the topology. No route reads the builder between
 rows, so the landing before each scalar Create is conservative. The normal
 stripped Hunk (SHA-256 `2b78ec67bbdad16030dfcd982dba62138a3d1bc99935708657e87e8e00caccea`) passes 512 KiB Chip startup.
 
+### Native enemy updates (section 0 B)
+
+The default Amiga build now uses them; `REFERENCE_ENEMY_UPDATES=1` keeps the
+generic alarm walk, room animation walk, per-setter publication and
+fifths-of-Q8 motion as the oracle. At `a9dd0478` one crawler cost 8.7 ms of
+Step per update in 137–162 and the three enemies born at 163 cost 23.6 ms of
+room effects and alarms at 164. Almost all of it was generic machinery around
+a few terrain tests. The change removes it at each owner:
+
+- **Alarm phase.** When the combat capture holds only the player, the
+  captured walk becomes a direct pass per alarm index: the player's damage
+  alarm, the native box prefix and the enemy roster, in that resource order.
+  The roster pass resolves each enemy once and skips counters that cannot
+  change; events above Alarm 1 have no stored counter (the hit states count
+  them down) and are not dispatched. The box prefix runs only once some box
+  has armed Alarm 0, which only `publishBoxAlarm0` does. Enemy births no
+  longer invalidate the capture, whose first watched range now holds the
+  player alone.
+- **Room animation.** With only native enemies in the animation population,
+  each room-active enemy advances its image directly instead of the room walk
+  visiting every member; the advance takes one divide.
+- **Motion.** The crawler, snail and walker scripts are templates over their
+  coordinate math. `FixedCollisionMath` (one fifths-of-Q8 long) stays the
+  oracle; the native records hold a pixel and its 1280ths
+  (`PixelCollisionMath`), so rounding, the pixels a solid test needs and the
+  Q8 record fields take no division. Solid tests read the terrain index's
+  aligned cells (`SolidCellGrid`, from `amigaTerrainSolidCells`), each
+  distinct cell once, instead of calling the resolver per corner.
+- **Publication.** With no collision consumer admitted, nothing reads an
+  enemy's mirrored image index or transforms, so the record owns them and
+  its position (`useRecordAppearance`): those setters and the sprite
+  mirror's bookkeeping are no-ops, an unchanged sprite is not published, and
+  a change between two sprites keeps its prepared draw action (every enemy
+  flag write republishes it).
+- **Step order** comes from the alarm roster instead of a registered-range
+  walk, and an already ordered snapshot is not sorted again.
+- **Boxes.** The unbound box Step only destroys exhausted boxes; it runs once
+  some box has been exhausted. Every health write reports to the world.
+
+Tried and reverted, both slower on the 68000: taking the walker's and snail's
+mask box once per Step (it moved `contactWorldBounds` out of line, +3.2k
+cycles in the contacts at 164), and keeping the player's contact box across
+the enemy loop (+0.9k at 164).
+
+**Complete fall** (three 100-field captures from updates 1, 60 and 120),
+against the [source-record owner](#source-record-terrain-owner-section-0-a):
+
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms | `a9dd0478` mean / worst / over / excess |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Authored entrance, 2–55 | 16.5 | 20.6 (19) | 1 | 1 | 16.4 / 20.5 / 1 / 0 |
+| Quiet generation, 56–121 | 18.8 | 24.5 (71) | 22 | 31 | 18.7 / 24.5 / 22 / 29 |
+| First burst, 122–135 | 20.2 | 35.0 (122) | 8 | 27 | 21.2 / 34.9 / 8 / 35 |
+| Enemies, 136–162 | 24.3 | 64.1 (136) | 14 | 135 | 30.6 / 64.4 / 27 / 288 |
+| Landing, 163–164 | 65.7 | 100.2 (163) | 2 | 91 | 77.8 / 104.3 / 2 / 116 |
+| Whole fall, 2–164 | 19.6 | 100.2 (163) | 47 | 285 | 20.8 / 104.3 / 60 / 468 |
+
+Updates 2–121 have no enemy and are unchanged: their work moves by +0.1 ms
+on average and at most +0.4 ms (101); update 98's Step is 476 cycles longer
+(Step's own code and the roster-built Step order with no enemies) and its
+whole update 20 cycles. 123–135 gain 1.1–1.3 ms each: the box Step and the
+box alarm prefix no longer visit the first burst's boxes (about 9k cycles at
+`a9dd0478`'s 149). Capture ELF SHA-256:
+`a15c3d2001f1cee132372dc5d8213db0aa8d6b04030a0e2f08a141231e3e1b03` (from 1),
+`8fa991aba60ed8c9830038c0f5ea33712bd3a38add1240244c24322ed9314702` (60),
+`2034afd8e67eff56e334b51e500bf3ba36fe1be3d9609af26f6866cef9e82617` (120).
+
+**Per update**, Step ms (cycles):
+
+| Update | `a9dd0478` | Now | Gate |
+| ---: | ---: | ---: | ---: |
+| 150, falling crawler | 18.5 (131,114) | 10.8 (76,800) | – |
+| The crawler's own work at 150 | 8.7 (61,908) | 2.2 (15,424) | 2.5 |
+| 137–162 mean | 17.3 | 10.8 (at most 11.5) | 11 |
+| 164, landing with three enemies | 39.9 (283,746) | 19.6 (139,254) | 20 |
+
+The crawler's own work is measured against update 98, a quiet update at
+`a9dd0478` (Step 62,902 cycles): at 150 its Step is 8.4k cycles (5.5k of it
+motion), the alarm phase 4.8k above an empty one, contacts 1.4k and its
+animation 0.7k. Every update over 20 ms in 137–162 paints a row (5.2–17.9
+ms, item C); the others take 17.7–19.4 ms of work. At 164 the three enemies'
+Step is 38.0k cycles (109.5k), of which the turtle's terrain tests are 12.7k
+and the snail's 10.8k; alarms 16.8k (57.7k), half of it the crawler's motion;
+room animation 2.2k (16.3k). The player's 25.9k is unchanged.
+
+Behaviour on this tree: `bash amiga/profile.sh quiet-fall` gives **176
+fields** with native enemy updates (10 misses, worst gap 5 at 163) and **186**
+with the reference updates (18 misses, as at `a9dd0478`); both give the exact
+landing witness. The enemy witness
+(`amiga/profile_quiet_enemies.gdb`, every enemy's record fields for 400
+updates, 738 rows: a crawler falling and wall-following, a snail and a turtle)
+is identical in the native arm, the reference arm and at `a9dd0478`. All 165
+landing state samples match in both arms. On the host, the pixel math matches
+`FixedCollisionMath` over ±40 pixels exhaustively and two million random
+pairs, and the three scripts match their oracle instantiations on random cell
+terrain; the cell grid matches `amigaResolveTerrainSolid` and
+`amigaResolveTerrainCorners` on random indexes and live or destroyed boxes;
+the live simulation moves every enemy alike through the grid and the
+resolver; the collision-owner suite gives the same ownership witness in the
+native, audited (the roster's Step order against the walk, every capture)
+and reference arms, including a death and two armed births between alarm
+phases; the cross-target replay passes. Each check fails when its piece is
+broken: the math test on a lost tie rule, carry or fifth; the audit when the
+roster drops an entry from the Step order; the death-and-birth fixture when
+the roster ignores a birth. A new contact fixture covers a stomp that moves
+the player before the next enemy. `amiga-scene-runtime-test` still stops at
+its unrelated frame-0 builder checkpoint check, as it did at `2331458e`, so
+its cross-adapter enemy comparison does not run; `replay-test`'s schema-49
+digest failure is unchanged (same digest as `a9dd0478`). The normal stripped Hunk (SHA-256
+`d2493cfc7d6c3d2adf7e6ddc105472431360e29e7622f0b593335bca25b102d2`) passes
+512 KiB Chip startup.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval

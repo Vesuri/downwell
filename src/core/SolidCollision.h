@@ -42,21 +42,22 @@ template<class Math, class Query>
 bool resolveVerticalSolidCollisionChecked(typename Math::Number x,
     typename Math::Number& y, typename Math::Number vy, Query meeting,int& result) {
     using N = typename Math::Number;
-    const int sign = (vy > 0) - (vy < 0);
+    const N zero{};
+    const int sign = (vy > zero) - (vy < zero);
     const N delta = sign * Math::unit();
-    const N magnitude = vy < 0 ? -vy : vy;
+    const N magnitude = vy < zero ? -vy : vy;
     const N probe = Math::round(y) + sign * Math::ceilAbs(vy);
     bool hit=false;
     if(!meeting(x,probe,hit))return false;
     if(!hit){result=0;return true;}
     y = Math::round(y);
-    N move = 0;
+    N move{};
     for(;;){
         if(!meeting(x,y+move+delta,hit))return false;
         if(hit)break;
         move += delta;
-        if ((move < 0 ? -move : move) >= magnitude) {
-            move = 0;
+        if ((move < zero ? -move : move) >= magnitude) {
+            move = zero;
             break;
         }
     }
@@ -84,22 +85,23 @@ SolidCollisionResult resolveSolidCollision(
     typename Math::Number& x, typename Math::Number& y,
     typename Math::Number vx, typename Math::Number vy, Query meeting) {
     using N = typename Math::Number;
-    const int sx = (vx > 0) - (vx < 0);
-    const int sy = (vy > 0) - (vy < 0);
+    const N zero{};
+    const int sx = (vx > zero) - (vx < zero);
+    const int sy = (vy > zero) - (vy < zero);
     const N dx = sx * Math::unit();
     const N dy = sy * Math::unit();
-    const N ax = vx < 0 ? -vx : vx;
-    const N ay = vy < 0 ? -vy : vy;
+    const N ax = vx < zero ? -vx : vx;
+    const N ay = vy < zero ? -vy : vy;
     const N probeX = Math::round(x) + sx * Math::ceilAbs(vx);
     const N probeY = Math::round(y) + sy * Math::ceilAbs(vy);
     SolidCollisionResult result = {0, 0};
     if (meeting(probeX, y)) {
         x = Math::round(x);
-        N move = 0;
+        N move{};
         while (!meeting(x + move + dx, y)) {
             move += dx;
-            if ((move < 0 ? -move : move) >= ax) {
-                move = 0;
+            if ((move < zero ? -move : move) >= ax) {
+                move = zero;
                 break;
             }
         }
@@ -110,15 +112,15 @@ SolidCollisionResult resolveSolidCollision(
     if (result.x == 0 && result.y == 0 && meeting(probeX, probeY)) {
         x = Math::round(x);
         y = Math::round(y);
-        N moveX = 0;
-        N moveY = 0;
+        N moveX{};
+        N moveY{};
         for (;;) {
             if (meeting(x + moveX + dx, y + moveY)) break;
             moveX += dx;
             if (meeting(x + moveX, y + moveY + dy)) break;
             moveY += dy;
-            if ((moveY < 0 ? -moveY : moveY) >= ay) {
-                moveX = moveY = 0;
+            if ((moveY < zero ? -moveY : moveY) >= ay) {
+                moveX = moveY = zero;
                 break;
             }
         }
@@ -154,6 +156,17 @@ struct FixedCollisionMath {
         if (value < 0) value = -value;
         return ((value + unit() - 1) / unit()) * unit();
     }
+    // The enemy motion records' conversions, shared with PixelCollisionMath.
+    static Number pixels(int count) { return count * unit(); }
+    static Number fixed(long value) { return value; }
+    static long fixedValue(Number value) { return value; }
+    static int roundPixel(Number value) { return static_cast<int>(round(value) / unit()); }
+    static int floorPixel(Number value) {
+        return static_cast<int>(value / unit() - (value % unit() < 0));
+    }
+    static long truncatedQ8(Number value) { return value / 5; }
+    static long floorQ8(Number value) { return value / 5 - (value % 5 < 0 ? 1 : 0); }
+    static int floorQ8Remainder(Number value) { return static_cast<int>(value - floorQ8(value) * 5); }
 };
 
 } // namespace downwell

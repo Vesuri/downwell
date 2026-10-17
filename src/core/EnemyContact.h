@@ -73,6 +73,23 @@ inline ContactBounds contactWorldBounds(const ContactActor& actor) {
     return bounds;
 }
 
+// contactWorldBounds for an actor at whole pixels (Q8 x*256, y*256), which
+// round to themselves: the motion scripts' solid tests.
+inline ContactBounds contactPixelBounds(int x, int y, int scaleX, int scaleY, int mask) {
+    ContactBounds bounds = contactSpriteBounds(mask);
+    if (scaleX < 0) {
+        const int left = bounds.left;
+        bounds.left = -bounds.right; bounds.right = -left;
+    }
+    if (scaleY < 0) {
+        const int top = bounds.top;
+        bounds.top = -bounds.bottom; bounds.bottom = -top;
+    }
+    bounds.left += x; bounds.right += x;
+    bounds.top += y; bounds.bottom += y;
+    return bounds;
+}
+
 enum class EnemyContact { none, stomp, damage };
 inline EnemyContact classifyEnemyContact(const ContactActor& player,
     const ContactActor& enemy, int object, long playerStartY) {

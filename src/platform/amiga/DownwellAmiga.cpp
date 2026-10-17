@@ -2221,6 +2221,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts,amigaResolveTerrainPlatformContact,amigaResolveTerrainCorners);
+        port.configureSolidCells(amigaTerrainSolidCells(terrainCollision));
         enemyRandom=port.randomState();
 #if defined(DOWNWELL_NATURAL_VERIFY) || defined(DOWNWELL_PROFILE_SHOP)
         AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
@@ -3055,6 +3056,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision,
                             amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts,amigaResolveTerrainPlatformContact,amigaResolveTerrainCorners);
+                        port.configureSolidCells(amigaTerrainSolidCells(terrainCollision));
                         terrainRaster.ready = false;
                         wallDamage.clear();
                         terrainCopyTarget = nullptr;

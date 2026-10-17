@@ -84,6 +84,9 @@ REFERENCE_HUD_BORDER_EXTENT ?= 0
 REFERENCE_CONTACT_MOTION ?= 0
 REFERENCE_CONTACT_COORDINATES ?= 0
 REFERENCE_ENEMY_ALARM_ROSTER ?= 0
+# 1 selects the generic enemy alarm walk, room animation walk, per-setter
+# publication and fifths-of-Q8 motion: the oracle for native enemy updates.
+REFERENCE_ENEMY_UPDATES ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
 AMMO_DAMAGE_RANGE ?= 1
@@ -411,6 +414,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_CONTACT_COORDINATES
 endif
 ifeq ($(REFERENCE_ENEMY_ALARM_ROSTER),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+endif
+ifeq ($(REFERENCE_ENEMY_UPDATES),1)
+CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
 endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
 CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
@@ -769,6 +775,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENEMY_ALARM_ROSTER)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_ENEMY_UPDATES)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp

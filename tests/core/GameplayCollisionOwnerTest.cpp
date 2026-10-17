@@ -7263,8 +7263,7 @@ int main(){
                 ++slot;
             }
             assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
-            auto* box=const_cast<GameplayWorld::Breakable*>(world->findBreakable({0,1}));
-            assert(box);box->alarm0=initial;
+            assert(world->findBreakable({0,1})&&world->publishBoxAlarm0({0,1},initial));
         }
         RunnerStepSnapshot<32> snapshot;
         auto unfiltered=[&](){
@@ -7282,7 +7281,18 @@ int main(){
                 // A reused capture must observe counters rearmed between ticks.
                 auto& enemy=const_cast<GameplayWorld::EnemyState&>(world->enemyAt(0));
                 enemy.alarm1=1;
-                const_cast<GameplayWorld::Breakable*>(world->findBreakable({0,1}))->alarm0=0;
+                // Boxes arm Alarm 0 only through their published setter.
+                assert(world->publishBoxAlarm0({0,1},0));
+            }
+            if(tick==12)for(auto* world:{a.get(),b.get()}){
+                // A death and two armed births between alarm phases: the
+                // native roster dispatches exactly the captured walk's set,
+                // although enemy births leave its capture reusable.
+                assert(world->markEnemyDestroyed(world->enemyHandle(world->enemyAt(0).lifetimeId)));
+                PackedObject crawler,frog;assert(objects.findObject(119,crawler)&&objects.findObject(113,frog));
+                const unsigned count=world->enemyCount();
+                assert(world->configureEnemy(count,119,crawler.spriteId,48,128,0,0,5,14,0,1,1,-1,0,0,true,true,true)&&
+                    world->configureEnemy(count+1,113,frog.spriteId,64,128,0,0,5,14,0,1,-1,1,0,0,true,true,true));
             }
             a->step(0);b->step(0);
             assert(a->effectsSucceeded()&&b->effectsSucceeded()&&optimized->valid()&&reference->valid());

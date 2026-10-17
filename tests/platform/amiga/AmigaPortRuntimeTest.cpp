@@ -92,7 +92,8 @@ struct NativeEnemyLifecycleAudit {
         if(e.objectId==119)require(moves>0&&lastX==e.x+240&&lastY==e.y+176&&e.alarm0==2,
                 "crawler angle follows Step position publication, not Alarm 0");
         if(checkWalkingOrder)require(sprites==1&&moves==0&&field==downwell::RunnerTransformField::scaleX&&
-                e.spriteId==(e.objectId==111?164:187)&&e.walker.x==40*1280&&e.walker.y==0,
+                e.spriteId==(e.objectId==111?164:187)&&GameplayWorld::EnemyMotionMath::fixedValue(e.walker.x)==40*1280&&
+                GameplayWorld::EnemyMotionMath::fixedValue(e.walker.y)==0,
                 "walker scale follows its sprite setter but precedes motion integration");
         if(checkFrogOrder)require(moves==0&&sprites==0&&!e.frogLanded&&e.alarm1==-1&&
                 e.frogHorizontal.position==40*65536&&field==downwell::RunnerTransformField::scaleX,
@@ -197,8 +198,9 @@ void testNativeEnemyLifecycle(){
         require(walking.effectsSucceeded()==(fail==0)&&checked.sprites==(fail==6?0u:1u)&&
                 checked.transforms==(fail?0u:1u)&&checked.moves==(fail?0u:1u),
                 "walker callbacks run once in sprite-scale-position order and stop on rejection");
-        if(fail)require(walking.enemyAt(0).walker.x==40*1280&&walking.enemyAt(0).walker.y==0&&
-                       walking.enemyAt(0).walker.vy==256,
+        using Math=GameplayWorld::EnemyMotionMath;
+        if(fail)require(Math::fixedValue(walking.enemyAt(0).walker.x)==40*1280&&
+                       Math::fixedValue(walking.enemyAt(0).walker.y)==0&&Math::fixedValue(walking.enemyAt(0).walker.vy)==256,
                 "failed walker presentation retains earlier gravity without integrating motion");
     }
     for(unsigned fail:{0u,8u,10u}){
@@ -1330,7 +1332,7 @@ int main() {
             "descending wall snail selects offline vertically flipped artwork");
     auto stationarySnail = snail.enemyAt(0);
     stationarySnail.speedY = 0;
-    stationarySnail.snail.vy = 0;
+    stationarySnail.snail.vy = {};
     require(stationarySnail.drawFrame() == stationarySnail.imageFrame + 256,
             "zero velocity must not discard the stored snail image orientation");
     const auto stationarySnailBounds = downwell::contactWorldBounds({0, 0, 1,

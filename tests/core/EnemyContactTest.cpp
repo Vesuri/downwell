@@ -246,6 +246,29 @@ int main() {
                 "failed reward cannot retire, bounce, publish or reach a later contact");
         require(rewards==oldRewards+1&&combo.kills==oldCombo+1,
                 "already executed reward callback and combo changes are not rolled back");
+        {
+            // A contact that moves the player must refresh its contact box
+            // before the next enemy is tested.
+            struct Moving {
+                long y = 0; unsigned bounces = 0;
+                long offsetXFixed() const { return 0; }
+                long offsetYFixed() const { return y; }
+                long frameStartYFixed() const { return 0; }
+                int facing() const { return 1; }
+                void stompBounce() { y -= 64 * 256; ++bounces; }
+                void contactKnockback(int, int) {}
+            } moving;
+            Enemy pair[2];
+            pair[0].y = pair[1].y = 3 * 256;
+            int life = 4; unsigned guard = 0, kills = 0;
+            Combo pairCombo;
+            require(stepEnemyContacts(2, moving, life, guard, kills, pairCombo, false,
+                [&](unsigned i) -> Enemy& { return pair[i]; },
+                [&](const Enemy& e) { return EnemyContactLocation{{128, e.y, 1, 1, 153}, 7, 9}; },
+                [](Enemy&) { return true; }, [](EnemyContact) {}, [](int, int) { return true; }) &&
+                    moving.bounces == 1 && pair[1].active && kills == 1,
+                    "a stomp that lifts the player clears the next enemy at its old box");
+        }
         // Use a fresh count baseline after the deliberately failed reward.
         rewards=defeated;combo.kills=defeated;
         rewardWorks=true;retirementWorks=false;

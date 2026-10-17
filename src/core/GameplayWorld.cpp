@@ -371,6 +371,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     generationStep_ = nullptr; generationContext_ = nullptr;
     generationSucceeded_ = true;
     solidResolver_ = nullptr; solidCorners_=nullptr; solidResolverContext_ = nullptr; wallContactResolver_ = nullptr; platformContactResolver_ = nullptr;
+    solidCells_ = {};
     segmentResolver_ = nullptr;
     maskResolver_ = nullptr;
     landingResolver_ = nullptr; landingResolverContext_ = nullptr;
@@ -572,13 +573,22 @@ GameplayWorld::gemAt(unsigned index) const
     return gems_[index < gemCapacity ? index : 0];
 }
 
-bool GameplayWorld::publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value) {
+bool GameplayWorld::publishOwnedEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value) {
     if(enemyLifecycle_.integerTransform({enemy.identitySlot,enemy.lifetimeId},enemy,field,value,
                                         {0x3f800000u},0xffffffu))return true;
     run_.effectsSucceeded=false;return false;
 }
 
-bool GameplayWorld::publishEnemyImage(const EnemyState& enemy,unsigned phase) {
+bool GameplayWorld::publishEnemySprite(EnemyState& enemy,int sprite) {
+    // The owner then holds the record's sprite: an unchanged one plans no change.
+    if(enemyLifecycle_.recordOwnsAppearance()&&sprite==enemy.spriteId)return true;
+    if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,sprite)){
+        run_.effectsSucceeded=false;return false;
+    }
+    enemy.spriteId=sprite;return true;
+}
+
+bool GameplayWorld::publishOwnedEnemyImage(const EnemyState& enemy,unsigned phase) {
     if(enemyLifecycle_.phaseIndex({enemy.identitySlot,enemy.lifetimeId},enemy,phase))return true;
     run_.effectsSucceeded=false;return false;
 }
@@ -921,6 +931,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         auto& record=breakables_[index];
         record.x=x[source];record.y=y[source];record.active=true;
         if(creation)record.state=creation[source];
+        observeBoxHealth(record);
         record.lifetimeId=nextBreakableLifetimeId_++;
         auto* allocation=breakableLifecycle_.nativeAllocation();
         if(!(allocation?allocation->publish(record.nativeRegistration,index):
@@ -931,6 +942,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         breakables_[index].active = true;
         breakables_[index].destroyRequested = false;
         breakables_[index].state=creation?creation[source]:downwell::BreakableState{};
+        observeBoxHealth(breakables_[index]);
         breakables_[index].alarm0=-1;
         breakables_[index].myFx={};
         breakables_[index].sound={};
@@ -1077,14 +1089,17 @@ bool GameplayWorld::advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned al
         return run_.effectsSucceeded=false;
     auto& box=breakables_[key.slot];
     if(!box.active||box.destroyRequested||alarm!=0)return true;
-    if(downwell::AlarmBank::advanceValue(box.alarm0))box.state.alarmZero();
+    if(downwell::AlarmBank::advanceValue(box.alarm0)){box.state.alarmZero();observeBoxHealth(box);}
     return true;
 }
 
 bool GameplayWorld::advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
         auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(key));
         if(!run_.effectsSucceeded||!live||alarm>=downwell::AlarmBank::count)return run_.effectsSucceeded=false;
-        EnemyState& enemy = *live;
+        return advanceEnemyAlarm(*live,alarm);
+}
+
+bool GameplayWorld::advanceEnemyAlarm(EnemyState& enemy,unsigned alarm){
         if (!enemy.active||enemy.destroyRequested) return true;
         const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
         const bool alarm0Fired = alarm == 0 && downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
@@ -1115,22 +1130,28 @@ bool GameplayWorld::advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned 
 
 void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm, int cameraX, long cameraYQ8)
 {
-    const long cx = cameraX * 4096L;
-    const long cy = cameraYQ8 * 16;
-    const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
-        cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
-        alarm ? 0 : 64);
-    const auto meeting = [this](long x, long y) {
-        return downwell::CrawlerMotion::meetsTiles(x, y, [this](int px, int py) {
-            return solidResolver_ && solidResolver_(solidResolverContext_, px, py);
-        });
+    // Only a latched alarm and an unlatched Step read the view.
+    bool visible = false;
+    if (alarm == enemy.crawler.latched) {
+        const long cx = cameraX * 4096L;
+        const long cy = cameraYQ8 * 16;
+        visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
+            cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
+            alarm ? 0 : 64);
+    }
+    using Math=EnemyMotionMath;
+    using Crawler=decltype(enemy.crawler);
+    const auto move = [&](auto solid) {
+        const auto meeting = [&solid](Math::Number x, Math::Number y) { return Crawler::meetsTiles(x, y, solid); };
+        if (alarm) enemy.crawler.alarm(enemy.motionState > 0, visible, meeting);
+        else enemy.crawler.step(enemy.motionState > 0, visible, meeting);
     };
-    if (alarm) enemy.crawler.alarm(enemy.motionState > 0, visible, meeting);
-    else enemy.crawler.step(enemy.motionState > 0, visible, meeting);
-    enemy.preciseX = enemy.crawler.x / 5;
-    enemy.preciseY = enemy.crawler.y / 5;
-    enemy.speedX = enemy.crawler.vx / 5;
-    enemy.speedY = enemy.crawler.vy / 5;
+    if (nativeSolidCells()) move(solidCells());
+    else move([this](int px, int py) { return solidResolver_ && solidResolver_(solidResolverContext_, px, py); });
+    enemy.preciseX = Math::truncatedQ8(enemy.crawler.x);
+    enemy.preciseY = Math::truncatedQ8(enemy.crawler.y);
+    enemy.speedX = Math::truncatedQ8(enemy.crawler.vx);
+    enemy.speedY = Math::truncatedQ8(enemy.crawler.vy);
     enemy.grounded = enemy.crawler.latched;
 }
 
@@ -1192,28 +1213,30 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
             cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
             turtle ? 64 : 32);
-        if(!enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
-            [this, &enemy, turtle](long x, long y) {
-                return enemy.walker.meetsTiles(x, y, turtle,
-                    downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_});
-            },[this,&enemy](int sprite,int scale){
-                enemy.grounded=enemy.walker.grounded;
-                if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,sprite)){
-                    run_.effectsSucceeded=false;return false;
-                }
-                enemy.spriteId=sprite;
-                if(scale){
-                    if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
-                    enemy.facing=scale;
-                }
-                return true;
-            }))return false;
-        enemy.preciseX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.x, 5);
-        enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.y, 5);
-        enemy.speedX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vx, 5);
-        enemy.speedY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vy, 5);
-        enemy.gravityPositionRemainder = enemy.walker.y - enemy.preciseY * 5;
-        enemy.gravityRemainder = enemy.walker.vy - enemy.speedY * 5;
+        const auto presentation=[this,&enemy](int sprite,int scale){
+            enemy.grounded=enemy.walker.grounded;
+            if(!publishEnemySprite(enemy,sprite))return false;
+            if(scale){
+                if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                enemy.facing=scale;
+            }
+            return true;
+        };
+        const auto walk=[&](auto solid){
+            return enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
+                [&](EnemyMotionMath::Number x, EnemyMotionMath::Number y) {
+                    return enemy.walker.meetsTiles(x, y, turtle, solid);
+                },presentation);
+        };
+        if(!(nativeSolidCells() ? walk(solidCells()) :
+             walk(downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_})))return false;
+        using Math=EnemyMotionMath;
+        enemy.preciseX = Math::floorQ8(enemy.walker.x);
+        enemy.preciseY = Math::floorQ8(enemy.walker.y);
+        enemy.speedX = Math::floorQ8(enemy.walker.vx);
+        enemy.speedY = Math::floorQ8(enemy.walker.vy);
+        enemy.gravityPositionRemainder = static_cast<unsigned char>(Math::floorQ8Remainder(enemy.walker.y));
+        enemy.gravityRemainder = static_cast<unsigned char>(Math::floorQ8Remainder(enemy.walker.vy));
         enemy.grounded = enemy.walker.grounded;
     } else if (enemy.objectId == 116) {
         downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
@@ -1285,17 +1308,19 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
             enemy.imagePhase = 0; enemy.imageRemainder = 0;
             enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
         }
-        const bool alive = enemy.snail.step([this](int x, int y) {
-            return solidResolver_(solidResolverContext_, x, y);
-        },false,[this,&enemy](downwell::RunnerTransformField field,int value){return publishEnemyTransform(enemy,field,value);});
+        const auto transform=[this,&enemy](downwell::RunnerTransformField field,int value){return publishEnemyTransform(enemy,field,value);};
+        const bool alive = nativeSolidCells() ? enemy.snail.step(solidCells(),false,transform) :
+            enemy.snail.step([this](int x, int y) {
+                return solidResolver_(solidResolverContext_, x, y);
+            },false,transform);
         if(!run_.effectsSucceeded)return false;
         if (!alive && !publishEnemyActivation(enemy,false)) return false;
         enemy.active = alive;
         if (!enemy.active)
             return true;
-        enemy.preciseX = enemy.snail.x / 5;
-        enemy.preciseY = enemy.snail.y / 5;
-        enemy.speedY = enemy.snail.vy / 5;
+        enemy.preciseX = EnemyMotionMath::truncatedQ8(enemy.snail.x);
+        enemy.preciseY = EnemyMotionMath::truncatedQ8(enemy.snail.y);
+        enemy.speedY = EnemyMotionMath::truncatedQ8(enemy.snail.vy);
         enemy.motionState = enemy.facing = enemy.snail.facing;
     } else if (enemy.objectId == 119) {
         DW_PROFILE_SCOPE(profileEnemyCrawler);
@@ -1304,8 +1329,16 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
     DW_PROFILE_SCOPE(profileEnemyFinalize);
     // World origins (240,176) are even integers, so ties-to-even is
     // unchanged by storing these positions relative to the origin.
-    int publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);
-    int publishedY = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+    int publishedX, publishedY;
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+    // Only the bat publishes its rounded Q8 position; the others replace it.
+    if (enemy.objectId == 113 || enemy.objectId == 111 || enemy.objectId == 112 ||
+        enemy.objectId == 119 || enemy.objectId == 117) publishedX = publishedY = 0; else
+#endif
+    {
+        publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);
+        publishedY = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+    }
     if (enemy.objectId == 113) {
         publishedX = (int)downwell::frogPublishedPixel(enemy.frogHorizontal.position,65536);
         publishedY = (int)downwell::frogPublishedPixel(
@@ -1320,11 +1353,12 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         publishedY = enemy.crawler.pixelY();
     }
     if (enemy.objectId == 117) {
-        publishedX = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
-        publishedY = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
+        publishedX = EnemyMotionMath::roundPixel(enemy.snail.x);
+        publishedY = EnemyMotionMath::roundPixel(enemy.snail.y);
     }
     { DW_PROFILE_SCOPE(profileEnemyPositionPublish);
-    if(!enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,
+    if(!enemyLifecycle_.recordOwnsAppearance()&&
+       !enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,
                                        publishedX+240,publishedY+176)) {
         run_.effectsSucceeded=false;return false;
     }
@@ -1340,10 +1374,7 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         enemy.frogPresentation, enemy.batActivity, enemy.batHit,
         enemy.imagePhase, enemy.imageRemainder);
     { DW_PROFILE_SCOPE(profileEnemyPresentationPublish);
-    if(enemy.objectId!=111 && enemy.objectId!=112 &&
-       !enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
-        run_.effectsSucceeded=false;return false;
-    }
+    if(enemy.objectId!=111 && enemy.objectId!=112 && !publishEnemySprite(enemy,nextSprite))return false;
     enemy.spriteId=nextSprite;
     if(enemy.objectId==116 && !downwell::finishBatFields(enemy.batActivity,nextSprite,
         [this,&enemy](int mask){
@@ -1437,6 +1468,7 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
                         downwell::machineGunProfile(bullet.gemHigh).damage),applied)){
                         run_.effectsSucceeded=false;return true;
                     }
+                    observeBoxHealth(block);
                     return applied;
                 }
             }
@@ -1595,6 +1627,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if(!downwell::PlayerBoxContact::testPrepared(bounds,box.x+240,box.y+176,hit))return false;
             if (hit) {
                 box.state.wallHp={}; // scrWallCol leaves destruction to Step.
+                runtime.observeBoxHealth(box);
                 found=true;
                 return true;
             }
@@ -1763,7 +1796,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Step (261). A bound source adapter also runs healthy boxes' alarmStop.
     // The unbound path retains the old destruction boundary until all effect,
     // audio and time-stop owners can be supplied by the gameplay scene.
-    for(unsigned i=0;i<boxStepEnd&&i<breakableCount_;++i){
+    unsigned boxStepLimit=boxStepEnd;
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+    // Unbound, the Step only destroys exhausted boxes; none has been yet.
+    if(!boxStepDispatch_.bound()&&!boxesMayBeExhausted_)boxStepLimit=0;
+#endif
+    for(unsigned i=0;i<boxStepLimit&&i<breakableCount_;++i){
         auto& box=breakables_[i];
         if(!box.lifetimeId||box.lifetimeId>boxStepLastLifetime||!box.active||box.destroyRequested)continue;
         if(boxStepDispatch_.bound()){

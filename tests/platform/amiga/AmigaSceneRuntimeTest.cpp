@@ -349,8 +349,9 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.active && native.active) {
             const auto& a = native.walker;
             const auto& b = enemy.walker;
-            require(a.x == b.x - 240L * 1280 && a.y == b.y - 176L * 1280 &&
-                    a.vx == b.vx && a.vy == b.vy && a.facing == b.facing &&
+            using Math = GameplayWorld::EnemyMotionMath;
+            require(Math::fixedValue(a.x) == b.x - 240L * 1280 && Math::fixedValue(a.y) == b.y - 176L * 1280 &&
+                    Math::fixedValue(a.vx) == b.vx && Math::fixedValue(a.vy) == b.vy && a.facing == b.facing &&
                     a.grounded == b.grounded && a.publishedX == b.publishedX - 240 &&
                     a.publishedY == b.publishedY - 176,
                     "shared walking-enemy state matches exactly across adapters");
@@ -358,8 +359,9 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (enemy.objectId == 117 && enemy.active && native.active) {
             const auto& a = native.snail;
             const auto& b = enemy.snail;
-            require(a.x == b.x - 240L * 1280 && a.y == b.y - 176L * 1280 &&
-                    a.vy == b.vy && a.facing == b.facing && a.verticalFlip == b.verticalFlip &&
+            using Math = GameplayWorld::EnemyMotionMath;
+            require(Math::fixedValue(a.x) == b.x - 240L * 1280 && Math::fixedValue(a.y) == b.y - 176L * 1280 &&
+                    Math::fixedValue(a.vy) == b.vy && a.facing == b.facing && a.verticalFlip == b.verticalFlip &&
                     a.attached == b.attached,
                     "shared snail motion and orientation match exactly across adapters");
             require(native.drawFrame() / 256 == (enemy.scaleY < 0 ? 1u : 0u),
@@ -375,8 +377,9 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (enemy.objectId == 119 && enemy.active && native.active) {
             const auto& a = native.crawler;
             const auto& b = enemy.crawler;
-            require(a.x == b.x - 240L * 1280 && a.y == b.y - 176L * 1280 &&
-                    a.vx == b.vx && a.vy == b.vy && a.direction == b.direction &&
+            using Math = GameplayWorld::EnemyMotionMath;
+            require(Math::fixedValue(a.x) == b.x - 240L * 1280 && Math::fixedValue(a.y) == b.y - 176L * 1280 &&
+                    Math::fixedValue(a.vx) == b.vx && Math::fixedValue(a.vy) == b.vy && a.direction == b.direction &&
                     a.latched == b.latched && native.alarm0 == enemy.alarms.get(0),
                     "shared crawler state and alarm match exactly across adapters");
             require(a.imageDirection == b.imageDirection &&

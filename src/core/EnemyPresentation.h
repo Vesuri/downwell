@@ -1,6 +1,8 @@
 #ifndef DOWNWELL_CORE_ENEMY_PRESENTATION_H
 #define DOWNWELL_CORE_ENEMY_PRESENTATION_H
 
+#include "SmallUnsignedDivision.h"
+
 namespace downwell {
 
 // Ground turtle Create/Alarm 1 alternate walking between +1 and -1.
@@ -12,9 +14,10 @@ inline bool groundTurtleWalking(int walking) { return walking > 0; }
 // so existing state snapshots, frame resets and rate changes keep their units.
 inline void advanceEnemyImageFortiethsQ8(unsigned& phase, unsigned char& remainder,
                                         unsigned fortieths) {
-    const unsigned numerator = fortieths * 32u + remainder;
-    phase += numerator / 5u;
-    remainder = static_cast<unsigned char>(numerator % 5u);
+    // One quotient and remainder: a 68000 32-bit divide would be two calls.
+    const auto divided = SmallUnsignedDivision::full(fortieths * 32u + remainder, 5u);
+    phase += divided.quotient;
+    remainder = static_cast<unsigned char>(divided.remainder);
 }
 
 // Existing actors and snapshots retain twentieth-frame rates. Do not silently

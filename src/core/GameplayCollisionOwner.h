@@ -1,5 +1,8 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #define DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
+#ifdef DOWNWELL_AUDIT_ENEMY_UPDATES
+#include <cstdlib>
+#endif
 #include "GameplayCollisionView.h"
 #include "BlastSkeletonContact.h"
 #include "BlastWallContact.h"
@@ -255,7 +258,8 @@ private:
         // The other implemented alarm families are 73, 92, 211, 266 and
         // 370. Unsupported objects retain the complete registered capture.
         if(object<=92||object>=211||!alarmMetadata_.mask(object,alarms)){
-            enemyAlarmRosterEligible_=false;combatAlarmCaptureValid_=false;return true;
+            enemyAlarmRosterEligible_=false;combatAlarmCaptureValid_=false;
+            return check(watchCombatAlarmCapture());
         }
         return check(enemyAlarmRoster_.put({h,object,table_.registrationOrder(h),alarms}));
     }
@@ -1338,6 +1342,7 @@ private:
             }
             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
             if constexpr(nativeAnimationParticipant(Kind))++parent.nativeAnimationPopulation_;
+            if constexpr(Kind==View::Kind::enemy)++parent.nativeEnemyAnimationPopulation_;
             if(!parent.nativeBirthQueues(h.slot,object(r)))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
@@ -1407,6 +1412,10 @@ private:
             if constexpr(nativeAnimationParticipant(Kind))if(parent.native_){
                 if(!parent.check(parent.nativeAnimationPopulation_!=0))return false;
                 --parent.nativeAnimationPopulation_;
+                if constexpr(Kind==View::Kind::enemy){
+                    if(!parent.check(parent.nativeEnemyAnimationPopulation_!=0))return false;
+                    --parent.nativeEnemyAnimationPopulation_;
+                }
             }
             if(parent.native_&&!parent.nativeRetireQueues(h.slot))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
@@ -1509,14 +1518,29 @@ private:
             if(parent.native_){
                 auto* state=parent.nativePosition(h.slot);if(!state)return parent.check(false);
                 if(state->sprite.spriteId==sprite)return true;
-                std::uint32_t frames=0;if(sprite>=0)parent.sprites_.frameCount(unsigned(sprite),frames);
-                RunnerSpriteChange::Result change;
-                if(!parent.check(RunnerSpriteChange::plan(state->sprite.spriteId,sprite,state->sprite.imageIndex,frames,change)))return false;
-                state->sprite.spriteId=sprite;state->cachedFrame={0xbf800000u};state->appearanceFlags|=8u;
-                if(change.resetIndex)state->sprite.imageIndex={};
-                if(change.resetTimeline)state->timeline={};
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+                // An enemy record owns its appearance (see enemyBinding):
+                // nothing reads this mirror's index, timeline or frame.
+                const bool mirrored=Kind!=View::Kind::enemy||parent.collisionConsumersAdmitted_;
+#else
+                const bool mirrored=true;
+#endif
+                if(mirrored){
+                    std::uint32_t frames=0;if(sprite>=0)parent.sprites_.frameCount(unsigned(sprite),frames);
+                    RunnerSpriteChange::Result change;
+                    if(!parent.check(RunnerSpriteChange::plan(state->sprite.spriteId,sprite,state->sprite.imageIndex,frames,change)))return false;
+                    state->cachedFrame={0xbf800000u};state->appearanceFlags|=8u;
+                    if(change.resetIndex)state->sprite.imageIndex={};
+                    if(change.resetTimeline)state->timeline={};
+                }
+                state->sprite.spriteId=sprite;
+                const bool drew=parent.table_.sprite(h.slot)>=0;
                 bool changed;if(!parent.check(parent.table_.setSprite(h,sprite,changed)))return false;
                 if(changed){
+                    // A prepared action reads only whether a sprite exists and
+                    // flags whose every enemy write republishes it: between two
+                    // sprites it stands, and an unadmitted owner queues nothing.
+                    if(!mirrored&&drew&&sprite>=0&&parent.preparedDrawEnabled())return true;
                     std::uint32_t flags;
                     if(!parent.eligibilityFlags(h,flags)||!parent.nativeDirty(h.slot,object(r),flags))return parent.check(false);
                     if(parent.preparedDrawEnabled())return parent.publishPreparedDraw(h);
@@ -1681,6 +1705,7 @@ private:
     bool unregisteredTerrainCleanup_=false;
     NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
     unsigned nativeAnimationPopulation_=0; // Includes inactive and marked lifetimes until retirement.
+    unsigned nativeEnemyAnimationPopulation_=0; // The enemy part of nativeAnimationPopulation_.
     std::uint32_t nativeBoxFlags_=0;
     std::uint32_t nativeFieldFlags_=0;
     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
@@ -2021,12 +2046,21 @@ public:
         }));
     }
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
+    // Mutations in the ranges the combat alarm capture visits invalidate it.
+    // The roster dispatches every enemy, so with the native box prefix the
+    // capture's first range holds the player alone: enemy births keep it.
+    bool watchCombatAlarmCapture(){
+        if(!native_)return owner_.watchCaptureRanges(0,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_);
+        unsigned last=nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase;
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+        if(nativeEnemyAlarms()&&last==View::breakableBase)last=View::enemyBase;
+#endif
+        return table_.watchCaptureRanges(0,last,View::debrisBase,View::capacity,combatAlarmCaptureDirty_);
+    }
     bool attach(GameplayWorld& world){
         boxRetirementWindow_.invalidate();
         combatAlarmCaptureValid_=false;
-        if(!(native_?table_.watchCaptureRanges(0,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
-            owner_.watchCaptureRanges(0,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
-            return check(false);
+        if(!watchCombatAlarmCapture())return check(false);
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (world.awaitingPlayerBirth()?initialPlayer_!=nullptr:
              (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_))))return false;
@@ -2424,6 +2458,14 @@ public:
             if(!self.valid())return false;
 #if !defined(DOWNWELL_REFERENCE_ANIMATION) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
             if(self.native_&&!self.nativeAnimationPopulation_)return true;
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+            // Native enemies alone: each advances only its own image state and
+            // no other member has a handler, so room order is unobservable.
+            // Visit the same room-active members without walking the room.
+            if(self.native_&&self.nativeAnimationPopulation_==self.nativeEnemyAnimationPopulation_)
+                return self.check(self.world_->advanceActiveEnemyAnimations(
+                    [&](unsigned slot){return self.room_.active(View::enemyBase+slot);}));
+#endif
 #endif
             auto visitOne=[&](unsigned slot){
                 const auto shared=self.handleAt(slot);
@@ -2519,6 +2561,39 @@ public:
         world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+            if(self.nativeEnemyAlarms()){
+                // The alarm roster holds these registrations in the walk's
+                // (object, registration) order, without visiting the range.
+                EnemyAlarmRoster::Phase roster;
+                if(!self.check(self.enemyAlarmRoster_.begin(roster)))return false;
+                bool ok=true;
+                for(unsigned i=0;ok&&i<roster.count;++i){
+                    const auto& entry=roster.entries[i];std::uint32_t flags;
+                    if(!self.table_.flags(entry.handle,flags)||(flags&0x100003u)||!self.table_.registered(entry.handle))continue;
+                    const InstanceHandle local{entry.handle.slot-View::enemyBase,entry.handle.generation};
+                    ok=self.world_->resolveEnemyLifetime(local)&&snapshot.append(local.slot,local.generation,entry.object);
+                }
+                self.enemyAlarmRoster_.end();
+#ifdef DOWNWELL_AUDIT_ENEMY_UPDATES
+                // The registered walk below must give the same sorted order.
+                static GameplayWorld::EnemyStepOrder walked;walked.clear();
+                ok=ok&&self.visitRegistered(View::enemyBase,View::breakableBase,
+                    [&](InstanceHandle shared,int object,std::uint32_t flags){
+                    View::Kind kind;InstanceHandle local;
+                    if(!View::decode(shared,kind,local))return false;
+                    if(kind!=View::Kind::enemy||(flags&0x100003u))return true;
+                    return self.world_->resolveEnemyLifetime(local)&&walked.append(local.slot,local.generation,object);
+                });
+                walked.sort();
+                ok=ok&&walked.size()==snapshot.size();
+                for(unsigned i=0;ok&&i<walked.size();++i)ok=walked.handle(i).slot==snapshot.handle(i).slot&&
+                    walked.handle(i).generation==snapshot.handle(i).generation&&walked.object(i)==snapshot.object(i);
+                if(!ok)std::abort();
+#endif
+                return self.check(ok);
+            }
+#endif
             return self.check(self.visitRegistered(View::enemyBase,View::breakableBase,
                 [&](InstanceHandle shared,int object,std::uint32_t flags){
                 View::Kind kind;InstanceHandle local;
@@ -2642,7 +2717,16 @@ private:
     }
 public:
     auto playerBinding(){return scenePositionBinding(GameplayWorld::PlayerLifecycleBinding::bindMasks(player_),player_);}
-    auto enemyBinding(){return scenePositionBinding(GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_),enemies_);}
+    auto enemyBinding(){
+        auto binding=scenePositionBinding(GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_),enemies_);
+#ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
+        // Without collision consumers nothing reads an enemy's mirrored image
+        // index or transforms: nativePublishedSprite rejects enemies, bounds
+        // are never refreshed and both sprite draw actions draw the record.
+        if(!collisionConsumersAdmitted_)check(binding.useRecordAppearance(enemies_));
+#endif
+        return binding;
+    }
     auto breakableBinding(){
         auto binding=GameplayWorld::BreakableLifecycleBinding::bindDestruction(boxes_);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
@@ -3939,6 +4023,9 @@ private:
             if(!check(world_->playerDamageAlarmPending(combatAlarmPlayer_,1,pending)))return false;
             if(!pending)return true;
         }
+#if !defined(DOWNWELL_REFERENCE_ENEMY_UPDATES) && !defined(DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER)
+        if(projected&&combatAlarmPlayerOnly_)return dispatchNativeAlarms(capturedAlarms,boxes,enemies);
+#endif
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
           bool boxesPending=alarm==0&&boxes.end;
 #ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
@@ -4035,6 +4122,39 @@ private:
         }
         return true;
     }
+#if !defined(DOWNWELL_REFERENCE_ENEMY_UPDATES) && !defined(DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER)
+    // The captured walk above when only the player can dispatch from the
+    // capture: per alarm index, the player (35), the native box prefix (92)
+    // and the enemy roster, in that resource order. Births during the phase
+    // join none of them; a retired member fails its flag check, as above.
+    // Enemy events above Alarm 1 have no stored counter (their hit states
+    // count them down), so those calls only resolved the record.
+    bool dispatchNativeAlarms(unsigned capturedAlarms,GameplayWorld::BoxAlarmPrefix boxes,EnemyAlarmRoster::Phase enemies){
+        const auto player=combatAlarmPlayer_;
+        const unsigned columns=capturedAlarms|(enemies.alarms&3u)|(boxes.end?1u:0u);
+        for(unsigned alarm=0;alarm<AlarmBank::count&&(columns>>alarm);++alarm){
+            const unsigned bit=1u<<alarm;
+            std::uint32_t flags;bool pending=true;
+            // An unarmed damage alarm dispatches nothing, eligible or not.
+            if(player.generation&&(capturedAlarms&bit)&&
+               !(world_->playerDamageAlarmPending(player,alarm,pending)&&!pending)&&
+               eligibilityFlags(player,flags)&&!(flags&0x100003u)){
+                PackedObjectEvent event;View::Kind kind;InstanceHandle local;
+                if(!check(combatAlarmPending(player,alarm,pending)))return false;
+                if(pending&&alarmMetadata_.findEvent(objectOf(player),alarm,event)){
+                    if(!check(View::decode(player,kind,local)&&kind==View::Kind::player&&
+                        world_->advancePlayerDamageAlarm(local,alarm))||!valid())return false;
+                }
+            }
+            if(alarm==0&&boxes.end&&!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
+            if(alarm>1||!(enemies.alarms&bit))continue;
+            if(!check(world_->advanceRosterEnemyAlarm(enemies.entries,enemies.count,alarm,View::enemyBase,
+                [&](InstanceHandle h){return table_.flags(h,flags)&&!(flags&0x100003u);},
+                [&]{return valid();})))return false;
+        }
+        return true;
+    }
+#endif
 public:
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     GameplayDebrisInstances& debris(){return debris_;}

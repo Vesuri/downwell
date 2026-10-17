@@ -811,6 +811,21 @@ bool amigaResolveTerrainCorners(void* opaque,int left,int top,int right,int bott
     return false;
 }
 
+downwell::SolidCellGrid amigaTerrainSolidCells(const AmigaTerrainCollisionContext& context) {
+    static_assert(AmigaTerrainIndex::columns == 1 << 7, "grid rows are shifted");
+    downwell::SolidCellGrid grid;
+    if (!context.index || !context.runtime) return grid;
+    grid.cells = context.index->cells;
+    grid.originX = 240 + 8 - AmigaTerrainIndex::minX;
+    grid.originY = 176 + 8;
+    grid.columnShift = 7;
+    grid.width = AmigaTerrainIndex::columns * 16;
+    grid.height = AmigaTerrainIndex::rows * 16;
+    grid.solid = solidCell;
+    grid.breakable = breakableCell;
+    return grid;
+}
+
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
     DW_PROFILE_SCOPE(profileTerrainCollision);
     const AmigaTerrainCollisionContext& context =

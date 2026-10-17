@@ -5,6 +5,7 @@
 #include "core/CurrencyCollisionBounds.h"
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <vector>
@@ -38,6 +39,14 @@ void verifyTerrainCorners(){
             amigaResolveTerrainSolid(&context,right,bottom);
         require(amigaResolveTerrainCorners(&context,left,top,right,bottom)==reference,
                 "native corner samples match ordered point oracle");
+        const auto grid=amigaTerrainSolidCells(context);
+        require(grid.valid()==(context.runtime&&context.index),"solid cells need an index and the runtime that owns its boxes");
+        if(!grid.valid())return;
+        const downwell::SolidCells<std::function<bool(int,int)>> cells{&grid,
+            [&](int cellLeft,int cellTop){return runtime.breakableActiveAt(cellLeft+8,cellTop+8);}};
+        require(downwell::solidCorners(cells,left,top,right,bottom)==reference,"solid cell corners match the point oracle");
+        for(int px:{left,right})for(int py:{top,bottom})
+            require(cells(px,py)==amigaResolveTerrainSolid(&context,px,py),"solid cell points match the point oracle");
     };
     for(unsigned mode=0;mode<2;++mode){
         context.runtime=mode?&runtime:nullptr;
@@ -54,8 +63,14 @@ void verifyTerrainCorners(){
     const int x=0,y=0;
     require(runtime.appendBreakables(&x,&y,1)&&amigaAddTerrainObject(index,92,240,176),"corner live box");
     require(amigaResolveTerrainCorners(&context,0,0,0,0),"corner sees live box");
+    const auto grid=amigaTerrainSolidCells(context);
+    const downwell::SolidCells<std::function<bool(int,int)>> cells{&grid,
+        [&](int cellLeft,int cellTop){return runtime.breakableActiveAt(cellLeft+8,cellTop+8);}};
+    require(cells(-8,-8)&&cells(7,7)&&!cells(8,0)&&downwell::solidCorners(cells,-20,-20,-8,-8),
+            "solid cells see the live box across its whole cell");
     require(runtime.markBreakableDestroyed({0,runtime.breakableSlot(0).lifetimeId}),"corner destroy box");
     require(!amigaResolveTerrainCorners(&context,0,0,0,0),"corner immediately sees destruction");
+    require(!cells(0,0)&&!downwell::solidCorners(cells,-8,-8,7,7),"solid cells immediately see destruction");
     require(amigaAddTerrainObject(index,60,240,176),"corner new wall");
     require(amigaResolveTerrainCorners(&context,0,0,0,0),"corner immediately sees generation");
     context.index=nullptr;compare(0,0,15,15);
@@ -413,6 +428,7 @@ struct LiveSimulation {
         port.configureSolidResolver(amigaResolveTerrainSolid, &collision,
                                     amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,
                                     nullptr,nullptr,amigaResolveTerrainCorners);
+        port.configureSolidCells(amigaTerrainSolidCells(collision));
     }
 };
 void compareRandom(const downwell::GameMakerRandom& a,
@@ -684,6 +700,8 @@ int main(int argc, char** argv) {
         AmigaPortRuntime fast(300, false, 4096-176, true), reference(300, false, 4096-176, true);
         indexed.bind(fast); pixels.bind(reference);
         reference.configureSolidResolver(amigaResolveTerrainSolid, &pixels.collision);
+        reference.configureSolidCells({});
+        unsigned enemyUpdates = 0;
         for (unsigned tick = 0; tick < 600; ++tick) {
             downwell::Input input;
             input.fire = tick % 23 < 17;
@@ -696,8 +714,21 @@ int main(int argc, char** argv) {
                     fast.blocksDestroyed() == reference.blocksDestroyed(),
                     "indexed segment/corner terrain preserves live simulation checkpoints");
             compareRandom(fast.randomState(), reference.randomState());
+            require(fast.enemyCount() == reference.enemyCount(), "indexed/pixel enemy populations match");
+            for (unsigned i = 0; i < fast.enemyCount(); ++i) {
+                const auto& a = fast.enemyAt(i);
+                const auto& b = reference.enemyAt(i);
+                require(a.objectId == b.objectId && a.x == b.x && a.y == b.y && a.preciseX == b.preciseX &&
+                        a.preciseY == b.preciseY && a.speedX == b.speedX && a.speedY == b.speedY &&
+                        a.facing == b.facing && a.alarm0 == b.alarm0 && a.alarm1 == b.alarm1 &&
+                        a.spriteId == b.spriteId && a.imagePhase == b.imagePhase && a.grounded == b.grounded &&
+                        a.active == b.active && a.awake == b.awake,
+                        "grid cells and the point resolver move every enemy alike");
+                enemyUpdates += a.active && a.awake;
+            }
         }
         require(fast.player().shots() > 0, "indexed/pixel live comparison exercises firing");
+        require(enemyUpdates > 0, "indexed/pixel live comparison moves awake enemies");
     }
     LiveCollision boundary;
     {

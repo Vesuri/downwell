@@ -35,6 +35,11 @@ public:
         entries_[count_]={{slot,generation},object,count_};++count_;return true;
     }
     void sort(){
+        // Keys are unique (order is the append index), so input already in
+        // order, as an ordered roster capture is, is the sorted result.
+        unsigned ordered=1;
+        while(ordered<count_&&less(entries_[ordered-1],entries_[ordered]))++ordered;
+        if(ordered>=count_)return;
         for(unsigned i=count_/2;i;--i)sift(i-1,count_);
         for(unsigned i=count_;i>1;--i){swap(0,i-1);sift(0,i-1);}
     }
