@@ -31,7 +31,7 @@ public:
     void observeFailure(bool& owner){failed_.observe(owner);}
     bool discardUninitialized(){
         if(failed_)return false;
-        invalidateLookups();
+        changeTopology();
         for(auto& layer:layers_)layer=Layer{};
         elements_.clear();head_=tail_=End;
         if constexpr(Retained){for(auto& count:this->retained)count=0;this->logical=0;}
@@ -64,8 +64,11 @@ public:
         layers_[free].encodedDepth.assignInteger(depth);
         linkAfter(free,previous);slot=free;return true;
     }
-    // Advances with every topology or depth change (saturating). A borrower
-    // holding a layer slot must observe it: slots are reused after erasure.
+    // Advances (saturating) whenever an existing layer is erased, relinked or
+    // changes depth. A borrower holding a layer slot must observe it: slots
+    // are reused after erasure. Inserting a new layer after its equal-depth
+    // peers leaves every existing layer's find/findDynamic result and slot
+    // unchanged, so it does not advance.
     const std::uint32_t& topologyRevision()const{return topology_;}
     unsigned elementOwner(unsigned element)const{return elements_.owner(element);}
     unsigned firstFreeElement(unsigned start=0)const{
@@ -180,7 +183,7 @@ public:
         if(failed_||!get(slot))return false;
         auto& layer=layers_[slot];const auto old=layer.depth;
         if(depth==old)return true;
-        invalidateLookups();
+        changeTopology();
         layer.depth=depth;
         layer.encodedDepth.assignInteger(depth);
         if(depth<old){
@@ -242,14 +245,15 @@ private:
     // on every topology change. Slot numbers are private storage, not IDs.
     struct Lookup {std::int32_t key=0;unsigned slot=End;bool valid=false;};
     mutable Lookup idLookup_,depthLookup_;
-    void invalidateLookups(){
-        idLookup_.valid=depthLookup_.valid=false;
+    void invalidateLookups(){idLookup_.valid=depthLookup_.valid=false;}
+    void changeTopology(){
+        invalidateLookups();
         if(topology_!=0xffffffffu)++topology_;
     }
     std::uint32_t topology_=0;
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){
-        invalidateLookups();
+        changeTopology();
         const auto& l=layers_[slot];
         if(l.previous==End)head_=l.next;else layers_[l.previous].next=l.next;
         if(l.next==End)tail_=l.previous;else layers_[l.next].previous=l.previous;

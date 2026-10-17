@@ -15,12 +15,17 @@ class GameMakerRandom {
 public:
     // Runtime-owned Fast/host storage; temporary RNG snapshots stay small.
     // Sixteen consumed entries remain behind the cursor for stateWord().
+    // A draw moves only the read cursor (and drawCount_): the prepared count
+    // is write - read, and the consumer's history and state index derive
+    // from the draws since the ring started.
     struct Lookahead {
         static constexpr unsigned capacity = 512, aheadCapacity = capacity - 16;
         struct Entry { std::uint32_t output, mixed; } entries[capacity]{};
         std::array<std::uint32_t, 16> producer{};
         std::size_t producerIndex = 0;
-        unsigned read = 0, available = 0, history = 0;
+        unsigned read = 0, write = 0;
+        std::uint64_t startDraw = 0;
+        std::size_t startIndex = 0;
 #ifdef DOWNWELL_AUDIT_RANDOM
         std::array<std::uint32_t, 16> oracle{};
         std::size_t oracleIndex = 0;
@@ -36,7 +41,7 @@ public:
     void refill(unsigned steps = 4);
     // Producer-only bounded idle work. No consumer state or draw is advanced.
     bool prepareIdleWord() {
-        if(!lookahead_||lookahead_->available==Lookahead::aheadCapacity)return false;
+        if(!lookahead_||prepared()==Lookahead::aheadCapacity)return false;
         refill(1);return true;
     }
     void prepareLookahead(Lookahead& storage) {
@@ -54,13 +59,35 @@ public:
 
     void setSeed(std::uint32_t seed);
     std::uint32_t seed() const { return seed_; }
-    std::uint32_t nextU32();
+    // A prepared word is a ring read and a cursor step; only an empty ring
+    // (or the audit oracle) takes the out-of-line path.
+    std::uint32_t nextU32() {
+#ifndef DOWNWELL_AUDIT_RANDOM
+        if (lookahead_ && lookahead_->read != lookahead_->write) {
+            auto& ring = *lookahead_;
+            const auto value = ring.entries[ring.read].output;
+            ring.read = (ring.read + 1) & (Lookahead::capacity - 1);
+            ++drawCount_;
+            return value;
+        }
+#endif
+        return nextU32Unprepared();
+    }
     // One callback-free source operation may consume a consecutive prefix.
     // Values and final state equal count nextU32 calls; no caller can observe
     // intermediate consumer states inside this operation.
     void nextWords(std::uint32_t* output, unsigned count);
     // Discard draws whose values no caller reads; same stream and count.
-    void advance(unsigned draws);
+    void advance(unsigned draws) {
+#ifndef DOWNWELL_AUDIT_RANDOM
+        if (lookahead_ && draws <= prepared()) {
+            lookahead_->read = (lookahead_->read + draws) & (Lookahead::capacity - 1);
+            drawCount_ += draws;
+            return;
+        }
+#endif
+        advanceUnprepared(draws);
+    }
     double random(double upperExclusive = 1.0);
     std::uint64_t irandom(std::uint64_t upperInclusive);
     // Windows choose builtin: one unsigned WELL word modulo argument count,
@@ -87,7 +114,10 @@ public:
     // avoiding both floating point and a 64-bit multiply on a 68000.
     std::uint32_t randomIntegerSmall(std::uint32_t upperExclusive);
 
-    std::size_t stateIndex() const { return stateIndex_; }
+    std::size_t stateIndex() const {
+        if (!lookahead_) return stateIndex_;
+        return (lookahead_->startIndex - std::size_t(drawCount_ - lookahead_->startDraw)) & 15u;
+    }
     std::uint32_t stateWord(std::size_t index) const;
     std::uint64_t drawCount() const { return drawCount_; }
 #ifdef DOWNWELL_AUDIT_RANDOM
@@ -103,7 +133,15 @@ private:
     std::uint64_t drawCount_ = 0;
     Lookahead* lookahead_ = nullptr;
     void resetLookahead();
+    // Consumes draws <= prepared() and counts them.
     void consumeLookahead(unsigned draws);
+    unsigned prepared() const { return (lookahead_->write - lookahead_->read) & (Lookahead::capacity - 1); }
+    unsigned history() const {
+        const auto consumed = drawCount_ - lookahead_->startDraw;
+        return consumed >= 16 ? 16u : unsigned(consumed);
+    }
+    std::uint32_t nextU32Unprepared();
+    void advanceUnprepared(unsigned draws);
 };
 
 } // namespace downwell

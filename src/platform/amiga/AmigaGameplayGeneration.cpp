@@ -71,50 +71,63 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
     // have no occupancy, lifetime, layer or Create publication to perform.
     // Use the scalar RNG-only executor; never enter an empty terrain session.
     if(self.sourceCreate_||!count)return batch.executeReference(create,opaque);
-    if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch)||
-        (self.lifetimes_&&!self.lifetimes_->canAppend(count)))
+    if(!self.runtime_->terrainCreatesBackendOnly()||!amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch))
         return batch.executeReference(create,opaque);
-    if(!batch.beginPublication())return false;
-    if(y-24<self.dirtyFirst)self.dirtyFirst=y-24;
-    if(y+24>self.dirtyEnd)self.dirtyEnd=y+24;
-    // Occupancy and landing candidates are one publication, in the source
-    // segment's order relative to event Creates. No later segment is exposed.
-    const unsigned row=unsigned(y)>>4;
-    auto* destination=self.index_.cells+row*AmigaTerrainIndex::columns;
-    auto* landing=self.index_.nextLanding.publicationRow(row);
-    const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
-    const auto* word=batch.words();
-    for(unsigned i=0;i<words;++i,word+=4){
-        auto* target=destination+word[0];
-        if(!(target[0]|target[1])){
-            target[0]=word[2];target[1]=word[3];
-        }else for(unsigned half=0;half<2;++half){
-            const unsigned old=target[half],prepared=word[2+half];
-            unsigned walls=(old>>6)+(prepared>>6);
-            while(walls>3){
-                if(!self.index_.extraContacts.append(60,(int(word[0]+half)-32)*16,y))return false;
-                --walls;
+    // Occupancy, landing candidates and tiles are one publication, in the
+    // source segment's order relative to event Creates. No later segment is
+    // exposed. Callback-free: deferred builder rows stay pending.
+    const auto publish=[&]{
+        if(!batch.beginPublication())return false;
+        if(y-24<self.dirtyFirst)self.dirtyFirst=y-24;
+        if(y+24>self.dirtyEnd)self.dirtyEnd=y+24;
+        const unsigned row=unsigned(y)>>4;
+        auto* destination=self.index_.cells+row*AmigaTerrainIndex::columns;
+        auto* landing=self.index_.nextLanding.publicationRow(row);
+        const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
+        const auto* word=batch.words();
+        for(unsigned i=0;i<words;++i,word+=4){
+            auto* target=destination+word[0];
+            if(!(target[0]|target[1])){
+                target[0]=word[2];target[1]=word[3];
+            }else for(unsigned half=0;half<2;++half){
+                const unsigned old=target[half],prepared=word[2+half];
+                unsigned walls=(old>>6)+(prepared>>6);
+                while(walls>3){
+                    if(!self.index_.extraContacts.append(60,(int(word[0]+half)-32)*16,y))return false;
+                    --walls;
+                }
+                target[half]=((old|prepared)&63)|(walls<<6);
             }
-            target[half]=((old|prepared)&63)|(walls<<6);
+            auto* candidate=landing+unsigned(word[0])*32;
+            if(word[1]&1)*candidate|=bit;
+            if(word[1]&2)candidate[32]|=bit;
         }
-        auto* candidate=landing+unsigned(word[0])*32;
-        if(word[1]&1)*candidate|=bit;
-        if(word[1]&2)candidate[32]|=bit;
+        return self.tiles_.appendPrepared(batch);
+    };
+    // The builder pack outlives the world's terrain. Clear lifetimes
+    // before unloading/replacing that pack at a scene handoff.
+    const bool native=self.lifetimes_&&self.runtime_->nativeTerrainInstances()==self.lifetimes_;
+    const GameplayWorld::NativeTerrain::PreparedCells cells{batch.creates(),count,y,true,int(batch.platforms())};
+    if(native){
+        // A leased segment is admitted once, around this publication.
+        const int tile=self.runtime_->nativeTerrainTile();
+        if(self.lifetimes_->reserveLeased(tile,cells)){
+            if(!publish()){self.lifetimes_->abandonLeased();return false;}
+            if(!self.lifetimes_->publishLeased(tile,cells))return false;
+            batch.completePublication();return true;
+        }
     }
-    if(!self.tiles_.appendPrepared(batch))return false;
-    if(self.lifetimes_){
-        const auto produce=[&](auto birth){
+    if(self.lifetimes_&&!self.lifetimes_->canAppend(count))return batch.executeReference(create,opaque);
+    if(!publish())return false;
+    if(native){
+        if(!self.runtime_->constructNativeTerrainPrepared(cells))return false;
+    }else if(self.lifetimes_){
+        self.runtime_->publishPendingBuilderPosition();
+        if(!self.lifetimes_->publishRun([&]{
             const auto* source=batch.creates();
-            for(unsigned i=0;i<batch.count();++i,source+=2)
-                if(!birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,batch.y))return false;
+            for(unsigned i=0;i<count;++i,source+=2)
+                if(!self.birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,y))return false;
             return true;
-        };
-        if(self.runtime_->nativeTerrainInstances()==self.lifetimes_){
-            // The builder pack outlives the world's terrain. Clear lifetimes
-            // before unloading/replacing that pack at a scene handoff.
-            if(!self.runtime_->constructNativeTerrainPrepared({batch.creates(),count,y,true,int(batch.platforms())}))return false;
-        }else if(!self.lifetimes_->publishRun([&]{
-            return produce([&](int object,int x,int y){return self.birth(object,x,y);});
         }))return false;
     }
     batch.completePublication();
@@ -123,6 +136,7 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
 
 bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuilder::TerrainRun& run){
     auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
+    if(self.runtime_)self.runtime_->publishPendingBuilderPosition();
     if(self.sourceCreate_)return run.execute(create,opaque);
     AmigaTerrainRunIndex index(self.index_,run.objectId,run.x,run.y,run.stepX,run.count);
     // Unsupported geometry retains scalar partial publication/failure timing.
@@ -187,6 +201,8 @@ bool AmigaGameplayGeneration::create(void* opaque,
     const downwell::DeferredCreateInstance& command) {
     DW_PROFILE_SCOPE(profileGeneratedRegistration);
     auto& self = *static_cast<AmigaGameplayGeneration*>(opaque);
+    // Every scalar Create may read the builder (including reference terrain).
+    if(self.runtime_)self.runtime_->publishPendingBuilderPosition();
     if(self.sourceCreate_)return self.sourceCreate_(self.sourceContext_,command);
     // Border, pillar and isolated wall/platform Creates: the same backend
     // publication createGeneratedTerrain would make, without the world hop.

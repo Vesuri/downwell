@@ -18,7 +18,7 @@ GameMakerRandom::GameMakerRandom(const GameMakerRandom& other) {
 GameMakerRandom& GameMakerRandom::operator=(const GameMakerRandom& other) {
     if (this == &other) return *this;
     for (unsigned i = 0; i < 16; ++i) state_[i] = other.stateWord(i);
-    stateIndex_ = other.stateIndex_;
+    stateIndex_ = other.stateIndex();
     seed_ = other.seed_;
     drawCount_ = other.drawCount_;
     // Assignment preserves the destination's own storage, never the source's.
@@ -30,7 +30,9 @@ void GameMakerRandom::resetLookahead() {
     if (!lookahead_) return;
     lookahead_->producer = state_;
     lookahead_->producerIndex = stateIndex_;
-    lookahead_->read = lookahead_->available = lookahead_->history = 0;
+    lookahead_->read = lookahead_->write = 0;
+    lookahead_->startDraw = drawCount_;
+    lookahead_->startIndex = stateIndex_;
 #ifdef DOWNWELL_AUDIT_RANDOM
     lookahead_->oracle = state_;
     lookahead_->oracleIndex = stateIndex_;
@@ -40,6 +42,7 @@ void GameMakerRandom::resetLookahead() {
 void GameMakerRandom::bindLookahead(Lookahead& storage) {
     if (lookahead_ == &storage) return;
     for (unsigned i = 0; i < 16; ++i) state_[i] = stateWord(i);
+    stateIndex_ = stateIndex();
     lookahead_ = &storage;
     resetLookahead();
 }
@@ -47,23 +50,23 @@ void GameMakerRandom::bindLookahead(Lookahead& storage) {
 void GameMakerRandom::refill(unsigned steps) {
     if (!lookahead_) return;
     auto& ring = *lookahead_;
-    const unsigned room = Lookahead::aheadCapacity - ring.available;
+    const unsigned room = Lookahead::aheadCapacity - prepared();
     if (steps > room) steps = room;
     while (steps--) {
-        auto& entry = ring.entries[(ring.read + ring.available) & (Lookahead::capacity - 1)];
+        auto& entry = ring.entries[ring.write];
         const auto oldIndex = ring.producerIndex;
         entry.output = Well512::step(&ring.producer[0], ring.producerIndex);
         entry.mixed = ring.producer[oldIndex];
-        ++ring.available;
+        ring.write = (ring.write + 1) & (Lookahead::capacity - 1);
     }
 }
 
 std::uint32_t GameMakerRandom::stateWord(std::size_t index) const {
-    if (!lookahead_ || !lookahead_->history) return state_[index];
+    if (!lookahead_ || !history()) return state_[index];
     const auto& ring = *lookahead_;
-    const unsigned age = (index - stateIndex_) & 15u;
+    const unsigned age = (index - stateIndex()) & 15u;
     if (!age) return ring.entries[(ring.read - 1) & (Lookahead::capacity - 1)].output;
-    if (age <= ring.history)
+    if (age <= history())
         return ring.entries[(ring.read - age) & (Lookahead::capacity - 1)].mixed;
     return state_[index]; // Seed/snapshot words not yet overwritten by a draw.
 }
@@ -75,21 +78,16 @@ void GameMakerRandom::consumeLookahead(unsigned draws) {
     // No shadow state or verification work exists in production builds.
     while (draws--) {
         const auto output = Well512::reference(&ring.oracle[0], ring.oracleIndex);
-        assert(output == ring.entries[ring.read].output);
+        assert(prepared() && output == ring.entries[ring.read].output);
         ring.read = (ring.read + 1) & (Lookahead::capacity - 1);
-        --ring.available;
-        if (ring.history < 16) ++ring.history;
-        stateIndex_ = (stateIndex_ - 1) & 15u;
-        assert(stateIndex_ == ring.oracleIndex);
+        ++drawCount_;
+        assert(stateIndex() == ring.oracleIndex);
         for (unsigned i = 0; i < 16; ++i) assert(stateWord(i) == ring.oracle[i]);
         ++auditedDraws;
     }
 #else
     ring.read = (ring.read + draws) & (Lookahead::capacity - 1);
-    ring.available -= draws;
-    ring.history += draws;
-    if (ring.history > 16) ring.history = 16;
-    stateIndex_ = (stateIndex_ - draws) & 15u;
+    drawCount_ += draws;
 #endif
 }
 
@@ -107,28 +105,29 @@ void GameMakerRandom::setSeed(std::uint32_t seed) {
     resetLookahead();
 }
 
-std::uint32_t GameMakerRandom::nextU32() {
-    ++drawCount_;
+std::uint32_t GameMakerRandom::nextU32Unprepared() {
     if (lookahead_) {
-        if (!lookahead_->available) refill(1);
+        if (!prepared()) refill(1);
         const auto value = lookahead_->entries[lookahead_->read].output;
         consumeLookahead(1);
         return value;
     }
+    ++drawCount_;
     return Well512::step(&state_[0],stateIndex_);
 }
 
-void GameMakerRandom::advance(unsigned draws) {
-    drawCount_ += draws;
+void GameMakerRandom::advanceUnprepared(unsigned draws) {
     if (lookahead_) {
         while (draws) {
-            if (!lookahead_->available) refill(draws);
-            const unsigned count = draws < lookahead_->available ? draws : lookahead_->available;
+            if (!prepared()) refill(draws);
+            const unsigned available = prepared();
+            const unsigned count = draws < available ? draws : available;
             consumeLookahead(count);
             draws -= count;
         }
         return;
     }
+    drawCount_ += draws;
     while (draws--) Well512::step(&state_[0],stateIndex_);
 }
 
@@ -137,10 +136,10 @@ void GameMakerRandom::nextWords(std::uint32_t* output, unsigned count) {
         while (count--) *output++ = nextU32();
         return;
     }
-    drawCount_ += count;
     while (count) {
-        if (!lookahead_->available) refill(count);
-        const unsigned take = count < lookahead_->available ? count : lookahead_->available;
+        if (!prepared()) refill(count);
+        const unsigned available = prepared();
+        const unsigned take = count < available ? count : available;
         const unsigned first = lookahead_->read;
         for (unsigned i = 0; i < take; ++i)
             *output++ = lookahead_->entries[(first + i) & (Lookahead::capacity - 1)].output;

@@ -256,6 +256,27 @@ void lookupMutations(){
     },inactive),"failed merge preserves observable partial lookup state");
     lookup(failed,1,10);
 }
+// A borrower holding a slot observes erasure, relinking and depth changes.
+// Inserting a new layer after its equal-depth peers changes no existing
+// layer's lookup, so it leaves the revision (but not the caches) alone.
+void topologyRevision(){
+    Owner owner;
+    lookup(owner,3,10);
+    const auto a=add(owner,1,10),b=add(owner,2,20);
+    auto revision=owner.topologyRevision();
+    const auto c=add(owner,3,10),d=add(owner,4,5);
+    require(owner.topologyRevision()==revision&&owner.findDynamic(10)==a&&owner.find(2)==b&&
+            owner.find(3)==c&&owner.findDynamic(5)==d,"insertion leaves existing lookups and the revision");
+    lookup(owner,3,10);lookup(owner,4,5);
+    require(owner.move(b,15,false,publish,inactive)&&owner.topologyRevision()!=revision,"depth change advances");
+    revision=owner.topologyRevision();
+    require(owner.attach(d,0,true,true,inactive)&&owner.detach(0)&&!owner.get(d)&&
+            owner.topologyRevision()!=revision,"erasure advances");
+    revision=owner.topologyRevision();
+    require(owner.move(c,0,false,publish,inactive)&&owner.topologyRevision()!=revision,"relinking advances");
+    revision=owner.topologyRevision();
+    require(owner.discardUninitialized()&&owner.topologyRevision()!=revision,"discard advances");
+}
 void retainedPopulation(){
     using Retained=downwell::RunnerLayers<4,8,true>;
     for(unsigned failure=0;failure<3;++failure){
@@ -306,5 +327,5 @@ void retainedPopulation(){
         guarded.retainedCount(source)==2&&guarded.get(source)->depth==10,
         "physical-only merge cannot silently omit retained publication");
 }
-int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();lookupMutations();retainedPopulation();std::cout<<"Layer identities, logical retained population, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}
+int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();lookupMutations();topologyRevision();retainedPopulation();std::cout<<"Layer identities, topology revision, logical retained population, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}
 #endif

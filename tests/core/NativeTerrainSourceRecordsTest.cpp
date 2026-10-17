@@ -22,6 +22,8 @@ template<bool Source> struct Fixture {
     StationaryRetirementWindow thin;
     CallbackFailureScopes scopes;
     bool good=true,lend=false;
+    // Fused: try the backend's one-admission leased entries first.
+    bool fused=false,failPublish=false;unsigned published=0;
     typename Terrain::Binding binding;
     void support(bool value){if(value!=supported)++topology;supported=value;}
     Fixture(){
@@ -76,6 +78,11 @@ template<bool Source> struct Fixture {
         },[](unsigned,bool){return true;});
     }
     bool segment(const unsigned char* cells,unsigned count,int y){
+        if constexpr(Source)if(fused&&terrain.reserveLeased(51,{cells,count,y,true})){
+            ++published;
+            if(failPublish){terrain.abandonLeased();return false;}
+            return terrain.publishLeased(51,{cells,count,y,true});
+        }
         bool effects=true;return terrain.constructPrepared(51,effects,{cells,count,y,true})&&effects;
     }
 };
@@ -145,8 +152,8 @@ static void snapshot(const Fixture<true>& x,std::vector<std::uint32_t>& out){
     for(long top:{-4096L*4000,0L,4096L*100,4096L*600})for(std::uint32_t cutoff:{0u,x.terrain.lastLifetime()})
         out.push_back(x.thin.contains(top,cutoff));
 }
-static std::vector<std::uint32_t> mixed(bool lend){
-    auto a=std::make_unique<Fixture<false>>();auto b=std::make_unique<Fixture<true>>();b->lend=lend;
+static std::vector<std::uint32_t> mixed(bool lend,bool fused=false){
+    auto a=std::make_unique<Fixture<false>>();auto b=std::make_unique<Fixture<true>>();b->lend=lend;b->fused=fused;
     std::vector<InstanceHandle> retired;std::vector<std::uint32_t> counters;unsigned segments=0;
     for(unsigned round=0;round<20;++round){
         for(unsigned group=0;group<8;++group){
@@ -202,10 +209,24 @@ static std::vector<std::uint32_t> mixed(bool lend){
     assert(b->sourceBirths&&b->scalarBirths);
     if(lend)assert(b->sourceSpans<segments/2&&b->sourceBirths+b->scalarBirths<a->scalarBirths);
     else assert(b->sourceBirths+b->scalarBirths==a->scalarBirths);
+    assert(fused==(b->published!=0)&&b->published+b->sourceSpans<=segments);
     return counters;
 }
 int main(){
-    assert(mixed(false)==mixed(true));
+    const auto reference=mixed(false);
+    assert(reference==mixed(true)&&reference==mixed(true,true));
+    // A failed backend publication between the fused entries leaves the record,
+    // identity and lent counters untouched; the lifetimes stay valid.
+    {
+        auto y=std::make_unique<Fixture<true>>();y->lend=y->fused=true;
+        assert(y->segment(cells,4,0)&&y->segment(cells,4,16)&&y->published==1&&y->sourceSpans==1);
+        std::vector<std::uint32_t> before,after;snapshot(*y,before);
+        const auto size=y->terrain.size(),count=y->terrain.sourcePublicationCount();
+        y->failPublish=true;assert(!y->segment(cells,4,32)&&y->published==2);
+        snapshot(*y,after);
+        assert(before==after&&y->terrain.valid()&&y->terrain.size()==size&&y->terrain.sourcePublicationCount()==count);
+        y->failPublish=false;assert(y->segment(cells,4,32)&&y->terrain.size()==size+4&&y->published==3);
+    }
     // An unsupported birth uses the same scalar failure boundary, after a
     // previous source-owned segment. The successfully born prefix survives.
     for(unsigned prefix=0;prefix<8;++prefix){
@@ -218,17 +239,18 @@ int main(){
     }
     // Owner failure, borrowed callback failure, topology and population
     // capacity each return the next segment to the source span.
-    for(unsigned condition=0;condition<4;++condition){
-        auto y=std::make_unique<Fixture<true>>();y->lend=true;
+    for(unsigned condition=0;condition<8;++condition){
+        auto y=std::make_unique<Fixture<true>>();y->lend=true;y->fused=condition>=4;
         assert(y->segment(cells,4,0)&&y->segment(cells,4,16)&&y->sourceSpans==1);
         bool borrowed=false;std::unique_ptr<CallbackFailureSignal> signal;
         std::unique_ptr<CallbackFailureSignal::Borrow> borrow;
-        if(condition==0)y->good=false;
-        if(condition==1){signal=std::make_unique<CallbackFailureSignal>();signal->observe(borrowed,y->scopes);
+        if(condition%4==0)y->good=false;
+        if(condition%4==1){signal=std::make_unique<CallbackFailureSignal>();signal->observe(borrowed,y->scopes);
             borrow=std::make_unique<CallbackFailureSignal::Borrow>(*signal);*signal=false;}
-        if(condition==2)++y->topology;
-        if(condition==3)y->logical=4093;
-        assert(y->segment(cells,4,32)&&y->sourceSpans==2);
+        if(condition%4==2)++y->topology;
+        if(condition%4==3)y->logical=4093;
+        const unsigned published=y->published;
+        assert(y->segment(cells,4,32)&&y->sourceSpans==2&&y->published==published);
     }
-    std::puts("Native source-record lifetimes: mixed constructors, mutations, reuse, teardown, failed prefixes and leased segments match retained oracle");
+    std::puts("Native source-record lifetimes: mixed constructors, mutations, reuse, teardown, failed prefixes and leased (including fused) segments match retained oracle");
 }

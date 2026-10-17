@@ -13,7 +13,7 @@ on PAL; do not add 60 Hz catch-up.
 ## Priority and scope
 
 Immediate priority: section 0, every update of the A500 initial fall within
-20 ms, worked in its A–E order. Do not add further section 1 functionality
+20 ms, worked in its B–E order. Do not add further section 1 functionality
 while this regression is unresolved.
 After that, finish live skeleton encounters (section 1), following its numbered
 integration tasks: production ownership, generation/query/dispatch, time-stop
@@ -36,21 +36,26 @@ PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
 earlier target of matching the historical 181 fields; reaching that is a
 milestone on the way, not completion.
 
-The current baseline is the complete trace in
-[the frame-cost audit](amiga-frame-cost.md#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12),
-taken at `45e96a9c`. It runs 192 fields for 164 updates, with a worst update
-of 136 ms. "Work" excludes the publication wait.
+The current state is the complete trace of the
+[source-record terrain owner](amiga-frame-cost.md#source-record-terrain-owner-section-0-a),
+which replaced the duplicated per-span terrain records (formerly item A). It
+runs 186 fields for 164 updates, with a worst update of 104 ms. "Work"
+excludes the publication wait. The per-owner costs quoted in B–E come from
+the earlier
+[`45e96a9c` trace](amiga-frame-cost.md#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12)
+(192 fields, worst 136 ms); item A did not change those owners, but
+re-measure before relying on a number.
 
 | Window | Work mean ms | Worst ms (update) | Updates over 20 ms | Excess ms |
 | --- | ---: | ---: | ---: | ---: |
-| Authored entrance, 2–55 | 16.2 | 20.5 (19) | 1 | 0 |
-| Quiet generation, 56–121 | 20.2 | 27.7 (56) | 32 | 115 |
-| First burst, 122–135 | 22.5 | 55.0 (122) | 8 | 54 |
-| Enemies, 136–162 | 31.4 | 94.3 (136) | 27 | 308 |
-| Landing, 163–164 | 93.7 | 136.0 (163) | 2 | 147 |
+| Authored entrance, 2–55 | 16.4 | 20.5 (19) | 1 | 0 |
+| Quiet generation, 56–121 | 18.7 | 24.5 (71) | 22 | 29 |
+| First burst, 122–135 | 21.2 | 34.9 (122) | 8 | 35 |
+| Enemies, 136–162 | 30.6 | 64.4 (136) | 27 | 288 |
+| Landing, 163–164 | 77.8 | 104.3 (163) | 2 | 116 |
 
-Five owners account for the excess. The items below remove them in order of
-how much over-budget work each one removes. Each item names:
+Four owners account for the remaining excess. The items below remove them in
+order of how much over-budget work each one removes. Each item names:
 
 - the measured work it removes;
 - its target;
@@ -91,82 +96,6 @@ after each item.
 - **Clean up after each item:** delete your own traces once their numbers are
   in a commit. Stop every owned emulator before handoff.
 
-### A. One owner for generated terrain records
-
-- **Removes:**
-  - about 16,000 cycles (2.2–2.3 ms) per prepared row segment, at a
-    border-only row and in every burst alike;
-  - 2.42 ms on every quiet row update;
-  - 21.9, 32.3 and 32.6 ms in the bursts at 122, 136 and 163;
-  - the 7.35 ms scalar fallback at 56.
-- **Where that cost goes:** about ten structures each record the same span:
-  - identity table admission and birth;
-  - room membership (`bindTerrainSpan`);
-  - logical layer admission and order;
-  - retained cells (`reserveRetainedCells`, `commitRetainedCells`);
-  - the thin-platform retirement window and external registration;
-  - per-cell flags and sprites.
-
-  This is the duplicated per-block terrain ownership that AGENTS.md says to
-  replace first.
-- **Target:** at most 6,500 cycles per segment for terrain records,
-  including occupancy, and at most 1,500 cycles per row for builder
-  position publication (0.43 ms per row, 1.5–2.8 ms per burst). The
-  original 2,500 cycles for all of this was a budget share, not a measured
-  floor: one record, the lent consumer counters and the occupancy words
-  already take about 4,500 cycles of necessary stores and checks. Raster
-  invalidation (0.39 ms per row) marks per-pixel-row dirty bytes for row
-  painting and belongs with C.
-- **Approach:**
-  1. **Use the [terrain-read census](amiga-frame-cost.md#terrain-api-read-census-for-section-0-a):**
-     preserve the observed animation-skip, cutoff and retirement-proof
-     consumers while removing construction-only duplicate records. The
-     unobserved mutation/lifecycle queries must still be derivable from the
-     segment owner; zero reads in this route do not remove their semantics.
-  2. **One table:** make the prepared segment the one authoritative record:
-     first identity, row and cell bytes, appended once to a segment table
-     owned by `NativeTerrainLifetimes`. Each consumer reads that table:
-     - identity resolution by slot range;
-     - room activity by row range;
-     - cleanup chronology by segment order;
-     - inactive-layer Draw cutoffs by segment index;
-     - thin-platform End Step by its kind bits.
-  3. **Per-cell state:** materialise per-cell runner state only for cells
-     that change (destroy, activation, appearance, wall event), at that
-     change.
-  4. **Remove the old structures** for native terrain slots.
-- **How this differs from the closed attempts** (listed below): those
-  replaced one structure (room membership alone, a registration encoding,
-  multi-row identity groups) and kept the others. This item removes them
-  together, and is judged on per-segment cycles and the window table, not on
-  pace alone.
-- **Current candidate:** `REFERENCE_TERRAIN_RECORDS=0` (default 1) selects
-  one source-segment record per prepared row segment, written in place, with
-  the per-kind constructor facts proved once per tile and the consumers'
-  counters lent to the record owner after one proven span
-  (`TerrainSourceLease`). It is
-  [measured here](amiga-frame-cost.md#source-record-candidate-for-section-0-a),
-  including a complete three-capture fall: whole-fall excess 507 ms (was
-  626), quiet window 58 (115), first burst 37 (54), enemies 290 (308),
-  landing 121 (147); updates 99/122/136 cost 23.1/37.4/68.5 ms. No
-  duplicated owner remains on that path, and `createPrepared` costs about
-  7,200–7,800 cycles per segment. Remaining levers, estimated: fuse the
-  leased record path's repeated admission and validation (400–800 cycles
-  per segment); builder position's integer conversion and per-update
-  publication acquire (about 1,500 cycles per row and 1,160 per update).
-  Together they would leave 122 at about 35.5 and 136 at about 66 ms; the
-  rest of those bursts is event cells (B, E). Do not promote it until the
-  gates pass on a complete three-capture fall.
-- **Gate:**
-  - the quiet row update (99 type) at or under 22.8 ms: the targets above
-    remove about 2,300 more cycles there. Even with no record, position or
-    invalidation work 99 would cost about 21.3 ms; its other excess is row
-    painting (C) and the fixed update cost (D);
-  - quiet generation window excess at or under 30 ms;
-  - 122 at or under 35 ms, 136 at or under 65 ms;
-  - the behaviour gates plus destroy, activation and failure-prefix fixtures
-    on generated terrain.
-
 ### B. Native enemy updates for the fall's families
 
 - **Removes about 8.3 ms per update per crawler.** Step is 17.1 ms in
@@ -203,7 +132,7 @@ after each item.
     5.17), with 16.6 and 17.9 ms at 141 and 143;
   - breakables drawn through the generic masked asset path (2.5 ms at 141);
   - raster invalidation of each new row's band, per-pixel-row dirty bytes
-    for the painter (0.39 ms per row; moved here from A).
+    for the painter (0.39 ms per row).
 
   In the quiet window, generation and painting land in the same update of
   each two-update row period (15.6 versus 24.6 ms).
@@ -219,7 +148,7 @@ after each item.
     only at segment seams, autotile neighbours and breakables. The live
     painter remains the oracle and the fallback.
 - **Gate:**
-  - no row update over 20 ms in 122–135 or 137–162 with A and B;
+  - no row update over 20 ms in 122–135 or 137–162 with B;
   - scalar pixel comparison across all pattern rows and seams.
 
 ### D. Fixed per-update cost
@@ -240,7 +169,9 @@ after each item.
   - weapon level recomputed every update 0.20 ms;
   - camera 0.50 ms;
   - DitherAbove 0.66–1.09 ms;
-  - RNG refill 0.44 ms.
+  - RNG refill 0.44 ms;
+  - the builder's position publication, re-acquired every generation update
+    although it is unchanged for the builder's lifetime, 0.18 ms.
 - **Target:** a quiet update at or under 11 ms. This leaves room for a row's
   work and for one enemy.
 - **Approach:** do work only when its inputs change. Not instruction tuning:
@@ -261,17 +192,20 @@ after each item.
 
 ### E. Stage generation bursts ahead of their trigger
 
-- **What remains:** even with A, the bursts keep about 20, 45 and 65 ms of
-  builder and event-cell work at 122, 136 and 163. Event cells at 163 are
-  43.3 ms:
+- **What remains:** with the source-record owner the bursts at 122, 136 and
+  163 still cost 34.9, 64.4 and 104.3 ms of work, mostly builder and
+  event-cell work (event cells about 6 and 22 ms at 122 and 136). At
+  `45e96a9c` event cells at 163 were 43.3 ms:
   - breakables 16.1 ms for 21, 5,458 cycles each;
   - enemy adoption 11.4 ms, of which runner birth and binding is 8.5;
   - breakable random evaluation 5.1 ms;
   - enemy choice 3.8 ms.
 - **Target:** 122, 136 and 163 each at or under 20 ms.
 - **Approach:**
-  1. **Cheaper event cells:** breakables publish as records with A's
-     segment method, and enemy adoption binds through B's family arrays.
+  1. **Cheaper event cells:** breakables publish as records with the
+     source-record segment method (`TerrainBirthRecords` and a lent-counter
+     lease, as terrain does), and enemy adoption binds through B's family
+     arrays.
   2. **Stage the builder's next pattern** in slack time on earlier updates,
      once its trigger row is known: pattern choice, consumed RNG values, cell
      bytes and breakable outputs. Key the staged result on:
@@ -285,7 +219,7 @@ after each item.
   4. **On a key mismatch** (another RNG consumer or birth intervened),
      discard the staged result and run the normal path, which stays the
      oracle.
-- **Depends on A–D,** which provide the slack. Do E last.
+- **Depends on B–D,** which provide the slack. Do E last.
 - **Gate:**
   - the three bursts at or under 20 ms;
   - a fixture that forces a key mismatch;
@@ -308,9 +242,9 @@ is in the audit and the git log.
 - Fresh-cell default preinitialisation and copy-loop variants.
 - Immutable-row and copy-on-write spatial encodings.
 
-Item A is not a variant of these: it removes all the per-span structures
-together, behind one owner. Its census must show that each removed structure
-is either unread in the fall or derivable from the segment table.
+The source-record owner that completed the former item A replaced all the
+per-span structures together, behind one record per segment; do not
+reintroduce per-span terrain structures on the generated path.
 
 ### Other regression work (after the fall)
 
@@ -381,7 +315,7 @@ is either unread in the fall or derivable from the segment table.
   scenes fit. Continue removing unrelated resident resources and code without
   moving the same always-resident bytes into startup allocations.
 - Close this section only with every initial-fall update within 20 ms (items
-  A–E), a normally runnable build, explained/resolved recent regressions and
+  B–E), a normally runnable build, explained/resolved recent regressions and
   meaningful startup failure codes. Retain any 20 ms shortfall outside the
   initial fall explicitly in section 5; do not claim 50 FPS or stock total-memory fit without evidence. Restore a normal
   non-profile build and stop every owned emulator run before handoff.

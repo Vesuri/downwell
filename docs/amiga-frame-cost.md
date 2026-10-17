@@ -2,9 +2,10 @@
 
 ## Complete initial fall against the 20 ms budget — `45e96a9c`, 2026-10-12
 
-This is the current baseline for open-work section 0. The sections after it
-are earlier measurements, kept for their evidence; do not quote their numbers
-as the current state.
+This was the open-work section 0 baseline before item A; the current state
+is the [source-record terrain owner](#source-record-terrain-owner-section-0-a).
+The sections after it are earlier measurements, kept for their evidence; do
+not quote their numbers as the current state.
 
 **Pace:** `bash amiga/profile.sh quiet-fall` gives **192 PAL fields for 164
 updates (42.7 FPS)**, with a worst gap of 7 fields at update 163. 18 updates
@@ -178,97 +179,118 @@ skip its terrain; that does not justify copying fragmented lifetime topology
 into animation. This census does not change the timing baseline above or close
 item A.
 
-### Source-record candidate for section 0 A
+### Source-record terrain owner (section 0 A)
 
-`REFERENCE_TERRAIN_RECORDS=0` selects the candidate; the default (1) keeps the
-retained owner. Each prepared row segment becomes one `TerrainBirthRecords`
-record supplying identity, room and layer chronology and initial state;
-changed cells materialize separately. The record is reserved and written in
-place (no facts or identity temporaries, one admission check), and
-`GameplayCollisionOwner` proves the per-kind flags, Create plan and integer
-depth once per tile. After one successful source span, the collision owner
-lends the record owner the counters that span updates (`TerrainSourceLease`):
-identity chronology and capture revisions, the terrain layer's retained
-population, the layer and room clocks and the thin-platform retirement
-proof. Later segments of the same tile publish through the lease without
-entering the layer, table, room or window owners. The lease observes owner
-health, borrowed callback status, layer topology and the bounded counters;
-rebinding revokes it. Segments carry the pack's validated thin-platform
-count, and the record and lifetime owners keep their counters ahead of their
-arrays. Both arms invalidate the raster band with longword writes and
-convert only a changed builder coordinate.
+The default Amiga build now uses it; `REFERENCE_TERRAIN_RECORDS=1` keeps the
+retained per-span owners as the oracle. Each prepared row segment becomes one
+`TerrainBirthRecords` record supplying identity, room and layer chronology
+and initial state; changed cells materialize separately. The record is
+reserved and written in place, and `GameplayCollisionOwner` proves the
+per-kind flags, Create plan and integer depth once per tile. After one
+successful source span, the collision owner lends the record owner the
+counters that span updates (`TerrainSourceLease`): identity chronology and
+capture revisions, the terrain layer's retained population, the layer and
+room clocks and the thin-platform retirement proof. Later segments of the
+same tile are admitted once (`reserveLeased`), the backend publishes their
+occupancy, landing candidates and tiles, and `publishLeased` installs the
+record; no layer, table, room or window owner is entered. The lease observes
+owner health, borrowed callback status, layer topology and the bounded
+counters; rebinding revokes it.
 
-**Complete fall, candidate arm** (three 100-field captures from updates 1,
-60 and 120, `tools/amiga-fall-budget.py`), against the
+The last step to the gates removed more unobserved or repeated work:
+
+- **Corridor rows** discard `choose(2)` and 19 cell draws; they now advance
+  the stream by 20 in one step (update 99's builder step 22,744 → 10,890
+  cycles).
+- **Layer topology** advances only when an existing layer is erased,
+  relinked or changes depth. A breakable birth inserting its scenery layer
+  after equal-depth peers no longer revokes the terrain lease, so the
+  bursts no longer re-prove a source span each update (7,290 cycles at 122
+  and at 136).
+- **Builder newline rows** under a lent publication cannot fail and have no
+  spatial consumer; they land at the next scalar Create (or the phase end)
+  instead of every row (builder position at 122: 13,136 → 8,672 cycles; at
+  136: 24,668 → 13,400).
+- **Leased segments are admitted once,** around the backend's own
+  publication, instead of by the lifetimes, the lease and the record in
+  turn.
+- **A prepared RNG word** is a ring read and a cursor step: the prepared
+  count, history and consumer state index derive from the draw count, read
+  only by `stateWord()` and `stateIndex()`. With the single admission this
+  took 122 from 35.8 to 34.9 ms and 136 from 66.0 to 64.5.
+
+**Complete fall** (three 100-field captures from updates 1, 60 and 120,
+`tools/amiga-fall-budget.py`), against the
 [baseline](#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12):
 
 | Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms | Baseline mean / worst / over / excess |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Authored entrance, 2–55 | 16.3 | 20.4 (19) | 1 | 0 | 16.2 / 20.5 / 1 / 0 |
-| Quiet generation, 56–121 | 19.3 | 24.4 (71) | 22 | 58 | 20.2 / 27.7 / 32 / 115 |
-| First burst, 122–135 | 21.4 | 37.4 (122) | 8 | 37 | 22.5 / 55.0 / 8 / 54 |
-| Enemies, 136–162 | 30.7 | 68.5 (136) | 27 | 290 | 31.4 / 94.3 / 27 / 308 |
-| Landing, 163–164 | 80.7 | 110.2 (163) | 2 | 121 | 93.7 / 136.0 / 2 / 147 |
-| Whole fall, 2–164 | 21.1 | 110.2 (163) | 60 | 507 | 21.8 / 136.0 / 70 / 626 |
+| Authored entrance, 2–55 | 16.4 | 20.5 (19) | 1 | 0 | 16.2 / 20.5 / 1 / 0 |
+| Quiet generation, 56–121 | 18.7 | 24.5 (71) | 22 | 29 | 20.2 / 27.7 / 32 / 115 |
+| First burst, 122–135 | 21.2 | 34.9 (122) | 8 | 35 | 22.5 / 55.0 / 8 / 54 |
+| Enemies, 136–162 | 30.6 | 64.4 (136) | 27 | 288 | 31.4 / 94.3 / 27 / 308 |
+| Landing, 163–164 | 77.8 | 104.3 (163) | 2 | 116 | 93.7 / 136.0 / 2 / 147 |
+| Whole fall, 2–164 | 20.8 | 104.3 (163) | 60 | 468 | 21.8 / 136.0 / 70 / 626 |
 
-Update 56 no longer takes the scalar fallback (22.7 ms, was 27.7). The quiet
-window's worst update is now 71, whose excess is row painting
-(`drawMainWorldSpan` 6.0, `syncGameRows` 3.8 ms), not records. Capture ELF
-SHA-256: `1eaf9f1f27a26c4bf357e2e86c4a5561cbf67e9a33a2a6d017dea7577cb46552`
-(from 1), `46fe22819e407dd3c0b1f32d39f1924624800371f25c8113bd0735ce5d54297b`
-(60), `0e2ff98a0cc150bc02dee383ce69adcfaa301ea11b6d06672aa0fb062f9365d7`
-(120).
+16 of the quiet window's 22 updates over 20 ms both generate and paint a row
+(20.6–21.7 ms). Three generate without painting (20.2–21.4 ms): 72 and 118
+with a 3.8 ms display row sync, 56 with a 13.5 ms Step and 2.7 ms draw-list
+collection. Their excess is C's row work and the fixed update cost (D). The other
+three paint without generating; the worst, 69 and 71, paint the most
+(`drawMainWorldSpan` 7.5 and 6.1 ms). Capture ELF SHA-256:
+`796ee3bb60228069148c8b435a44a0f4c68068ee6bb88d92ab7888d6a4cf3490` (from 1),
+`dd438086da39db36fcf1c5fe96e052a2067b2d1f5a8c80a20a1f280c4432542c` (60),
+`c73099a1fdc5fe4b16a9db10597de75b4715e2f90c1db284a376459eb4efeced` (120).
 
-**Per update**, ms of work, with the steps that reached it:
+**Per update**, ms of work against the item's gates:
 
-| Update | Baseline `45e96a9c` | Checkpoint `8fe3b60f` | Per-tile facts `0d9a8f28` | Lease `635da95d` | Now | Item A gate |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 99, one quiet row | 24.6 | 24.2 | 23.3 | 23.1 | 23.1 | 21.5 |
-| 122, first burst | 55.0 | 48.8 | 41.6 | 38.5 | 37.4 | 35 |
-| 136, enemy burst | 94.3 | 87.2 | 75.3 | 70.3 | 68.5 | 65 |
+| Update | Baseline `45e96a9c` | `a3bce28b` | Now | Gate |
+| ---: | ---: | ---: | ---: | ---: |
+| 99, one quiet row | 24.6 | 22.6 | 21.1 | 22.8 |
+| 122, first burst | 55.0 | 37.4 | 34.9 | 35 |
+| 136, enemy burst | 94.3 | 68.5 | 64.4 | 65 |
+| 163, landing | 136.0 | 110.2 | 104.3 | – |
 
-- **`createPrepared` per call:** 16,984 → 7,222 cycles at 99; 16,186 →
-  7,785 at 122 (nine calls); 12,422 → 6,025 at 136 (19 calls, some empty).
-  The lease removed 2,500–3,300 cycles per segment; the last step
-  (validated thin count, a static tile table that was rebuilt on the stack
-  per call, hoisted builder reads, layout) removed about 850 more.
-- **Row publication at 99:** builder position 0.52 → 0.43 ms (3,090
-  cycles: a 500–700-cycle integer conversion per row, a 1,160-cycle
-  publication acquire per update, and stores into the collision owner);
-  raster invalidation 0.50 → 0.39 ms (per-pixel-row dirty bytes).
-- **Remaining per segment at 122 (cycles):**
+Earlier revisions of this table gave 99 as 23.1 ms at `a3bce28b`: that was
+the marker-to-marker time, including 0.5 ms of publication wait. The 22.8 ms
+gate was derived from it, so it is 0.5 ms looser than intended; 99's work is
+under the stricter 22.3 ms too.
 
-  | Part | Cycles |
-  | --- | ---: |
-  | Occupancy and landing publication (`createPrepared` own) | 1,700 |
-  | Lease admission and publication | 1,300 |
-  | Other glue (tile lookup and append, backend admission, builder begin/complete, contacts, empty segments) | 1,270 |
-  | Record reserve/commit | 1,240 |
-  | The update's one re-proven source span, after a layer topology change | 810 |
-  | `constructPrepared` own | 660 |
-  | RNG advance of the segment's draws | 550 |
-  | Pre-publication `canAppend` admission | 270 |
+**Per segment the target is not met.** A non-empty leased segment costs
+about 7,300 cycles at 122 and 7,100 for a two-cell corridor segment at 99,
+against the 6,500 the item aimed for; the update gates pass because of the
+removals above. Remaining per segment at 122 (cycles):
 
-  No duplicated owner remains on this path. Each part is admission,
-  validation, stores and address arithmetic that its owner needs; fusing
-  them further is estimated at 400–800 cycles per segment.
-- **At 99 records cannot reach the gate.** All item A work there is about
-  13,100 cycles (records 7,220, builder position 3,090, raster invalidation
-  2,770); the 21.5 ms gate needs about 2,600. Removing all of it would leave
-  99 at about 21.3 ms: its other excess is row painting (2.9 ms) and the
-  fixed update cost.
+| Part | Cycles |
+| --- | ---: |
+| Backend occupancy, landing candidates, tiles and the segment's RNG advance | 2,140 |
+| Lease publication (lent counters and record facts) | 1,140 |
+| Backend admission, tile lookup, completion and header reads | 1,150 |
+| Record commit | 1,030 |
+| Lease and record admission | 940 |
+| `reserveLeased` and `publishLeased` own | 800 |
 
-Behaviour on this tree: `bash amiga/profile.sh quiet-fall` gives **187
-fields** for the candidate (17 misses, worst gap 5 at 163) and **190** for the
-default (17 misses, worst gap 6 at 163), versus the baseline's 192; both give
-the exact landing witness. All 165 `profile_quiet_landing.gdb` state samples
-match in both arms. The 18,000-frame ownership replay (both arms) passes and
-fails when the lease's chronology or a segment's thin-platform count is
-sabotaged; source-record (including leased and unleased runs with identical
-counters after every segment), raster-band, read-census and collision-owner
-fixtures pass. The normal stripped Hunk (SHA-256
-`3c9056f15121325bfffff2e32c125cce4da051e06281156f3ba1a036f4a3dc8f`) passes
-512 KiB Chip startup.
+Builder position costs about 1,450 cycles per row at 122 and 1,100 at 136
+(target 1,500), including one 1,250-cycle publication acquire per update. A
+single-row update pays 3,650 (99), so the target is not met there; the
+per-update acquire of an unchanged publication is listed under D.
+
+Behaviour on this tree: `bash amiga/profile.sh quiet-fall` gives **186
+fields** with the source-record owner (18 misses, worst gap 5 at 163) and
+**190** with the retained oracle (17 misses, worst gap 6 at 163), versus the
+baseline's 192; both give the exact landing witness. All 165 `profile_quiet_landing.gdb` state
+samples match in both arms. The 18,000-frame ownership replays pass in both
+arms, as do the source-record (leased, fused and unleased runs with
+identical counters after every segment), RNG lookahead (against the direct
+WELL stream after every operation), layer topology, lent builder publication,
+raster-band, read-census, builder and collision-owner fixtures. Each check
+fails when its piece is broken: the replays when deferred builder rows never
+land (frame 136) or a fused segment drops its thin-platform count (frame
+1113); the builder corpus and RNG replay when a corridor row draws 19; the
+RNG test when the derived history or state index is off; the layer test when
+erasure does not advance the topology. No route reads the builder between
+rows, so the landing before each scalar Create is conservative. The normal
+stripped Hunk (SHA-256 `2b78ec67bbdad16030dfcd982dba62138a3d1bc99935708657e87e8e00caccea`) passes 512 KiB Chip startup.
 
 ## No-input initial-fall comparison
 

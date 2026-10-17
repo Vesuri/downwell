@@ -334,6 +334,8 @@ public:
         return nativeTerrainInstances_&&nativeTerrainInstances_->constructPrepared(
             downwell::terrainTileForArea(run_.stage.area),run_.effectsSucceeded,cells);
     }
+    // The tile NativeTerrainLifetimes::reserveLeased/publishLeased take.
+    int nativeTerrainTile()const{return downwell::terrainTileForArea(run_.stage.area);}
     bool publishNativeTerrainIndexed(downwell::InstanceHandle h){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->publishIndexed(h);
@@ -757,6 +759,9 @@ public:
         // Unindexed generator fixtures have no room/controller ownership.
         return run_.effectsSucceeded=!builderController_||builderController_->position(x,y);
     }
+    // Before any generated Create except callback-free terrain publication:
+    // lands newline rows the builder controller deferred.
+    void publishPendingBuilderPosition(){if(builderController_)builderController_->publishPosition();}
     void configureDitherAboveEnvironment(bool lowSpec,bool ending){ditherLowSpec_=lowSpec;ditherEnding_=ending;}
     bool adoptDitherAbove(const downwell::GameplayDitherAbove::Snapshot& snapshot){
         if(!run_.effectsSucceeded||!ditherAbove_||!ditherAbove_->adopt(snapshot))return run_.effectsSucceeded=false;

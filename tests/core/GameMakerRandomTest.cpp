@@ -274,6 +274,9 @@ void testLookahead() {
             require(actual.stateWord(i) == oracle.stateWord(i), "lookahead preserves every consumer state word");
     };
     constexpr unsigned skips[] = {0, 1, 15, 16, 17, 495, 496, 497, 1000};
+    const auto prepared = [](const Random::Lookahead& ring) {
+        return (ring.write - ring.read) & (Random::Lookahead::capacity - 1);
+    };
     for (unsigned seed = 0; seed < 32; ++seed) {
         Random::Lookahead storage, replacement;
         Random actual(seed), oracle(seed);
@@ -281,7 +284,7 @@ void testLookahead() {
         actual.bindLookahead(storage);
         auto* activeStorage=&storage;
         actual.refill(Random::Lookahead::aheadCapacity);
-        require(storage.available == Random::Lookahead::aheadCapacity, "test exercises populated ring, not fallback");
+        require(prepared(storage) == Random::Lookahead::aheadCapacity, "test exercises populated ring, not fallback");
         equal(actual, oracle);
         require(!actual.prepareIdleWord(),"full ring stops idle work");
         for (unsigned tick = 0; tick < 1800; ++tick) {
@@ -293,18 +296,26 @@ void testLookahead() {
                 for (unsigned i = 0; i < count; ++i) oracle.nextU32();
                 equal(actual, oracle);
             }
+            if (tick % 53 == 0) {
+                std::uint32_t words[40];
+                const unsigned count = 1 + tick % 40;
+                actual.nextWords(words, count);
+                for (unsigned i = 0; i < count; ++i)
+                    require(words[i] == oracle.nextU32(), "buffered word prefix matches direct WELL output");
+                equal(actual, oracle);
+            }
             for(unsigned idle=0;idle<tick%17;++idle){
-                const auto before=activeStorage->available;
+                const auto before=prepared(*activeStorage);
                 const bool didWork=actual.prepareIdleWord();
                 require(didWork==(before<Random::Lookahead::aheadCapacity)&&
-                    activeStorage->available==before+unsigned(didWork),"idle work prepares at most one word");
+                    prepared(*activeStorage)==before+unsigned(didWork),"idle work prepares at most one word");
                 equal(actual,oracle);
             }
             const unsigned budget=tick%3?0u:4u;
-            const unsigned beforeFrame=activeStorage->available;
+            const unsigned beforeFrame=prepared(*activeStorage);
             if(budget){Random::FrameRefill frame{actual};}
             const unsigned expectedRoom=Random::Lookahead::aheadCapacity-beforeFrame;
-            require(activeStorage->available==beforeFrame+(budget<expectedRoom?budget:expectedRoom),
+            require(prepared(*activeStorage)==beforeFrame+(budget<expectedRoom?budget:expectedRoom),
                 "idle-only simulation skips frame preparation; ordinary frames retain their budget");
             equal(actual, oracle); // Producer progress is not a consumed draw.
             if (tick % 211 == 0) {

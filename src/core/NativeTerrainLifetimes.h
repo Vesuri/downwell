@@ -441,6 +441,41 @@ public:
             return appendPreparedCells(cells,tile,effectsSucceeded);
         });
     }
+    // A segment the source lease admits, on a dense live prefix: one
+    // admission of the record, identity and lent counters. The caller then
+    // makes its own callback-free publication of the same segment and calls
+    // publishLeased(), or abandonLeased() if that publication failed.
+    // Nothing is observable until publishLeased(). False leaves every owner
+    // untouched; the caller then takes the general canAppend/constructPrepared
+    // path. Separate calls keep the caller's publication out of this frame.
+    bool reserveLeased(int tile,PreparedCells cells){
+        if constexpr(SourceRecords){
+            const unsigned count=cells.count,slot=freeHint_;
+            if(!good_||publicationRun_||pendingPublication_||!cells.retained||!cells.bytes||!count||
+               slot!=runs_.size()||count>Capacity-slot||!sourceLease_.admits(tile,count))return false;
+            return runs_.sources().reserve({slot,next_},count)!=nullptr;
+        }else{
+            (void)tile;(void)cells;return false;
+        }
+    }
+    void abandonLeased(){if constexpr(SourceRecords)runs_.sources().abandon();}
+    // Only after a successful reserveLeased(), with the same tile and cells.
+    bool publishLeased(int tile,PreparedCells cells){
+        if constexpr(SourceRecords){
+            DW_TERRAIN_CONSTRUCTION_SCOPE;
+            DW_TERRAIN_READ(terrainPreparedSegments);
+            DW_TERRAIN_READ_ADD(terrainPreparedCells,cells.count);
+            auto& facts=*runs_.sources().pendingFacts();
+            facts.cells=cells.bytes;facts.y=cells.y;facts.tile=tile;
+            sourceLease_.publish(cells.count,cells.thin(),facts);
+            if(!runs_.sources().commit())return good_=false;
+            next_+=cells.count;freeHint_+=cells.count;
+            if(wallRadius(tile)<0||wallRadius(tile)>16)unboundedWallArt_=true;
+            return true;
+        }else{
+            (void)tile;(void)cells;return good_=false;
+        }
+    }
 private:
     bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded,
                              bool direct=false,bool* admitted=nullptr){

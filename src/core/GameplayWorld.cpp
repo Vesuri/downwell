@@ -981,6 +981,9 @@ bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::Generat
         return true;
     }
 #endif
+    // The retained family's bindings may read the builder; the native
+    // allocation above runs no observer.
+    publishPendingBuilderPosition();
     downwell::BreakableState state;
     state.breakSound=static_cast<unsigned short>(creation.sound);
     state.haveGem=static_cast<unsigned char>(creation.gems);

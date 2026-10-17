@@ -64,8 +64,9 @@ REFERENCE_GENERATED_BOXES ?= 0
 REFERENCE_INITIAL_RASTER ?= 0
 REFERENCE_INITIAL_RASTER_STORAGE ?= 0
 REFERENCE_ROOM_PREPARE ?= 0
-# Keep the retained oracle as default until section 0 A passes its gates.
-REFERENCE_TERRAIN_RECORDS ?= 1
+# 1 selects the retained per-span terrain owners, the oracle for the
+# source-record owner (see "Source-record terrain owner" in the audit).
+REFERENCE_TERRAIN_RECORDS ?= 0
 REFERENCE_FIELD_BANK ?= 0
 REFERENCE_FIELD_ADMISSION ?= 0
 REFERENCE_ENTRY_ASSETS ?= 0

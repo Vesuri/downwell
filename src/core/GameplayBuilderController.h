@@ -26,10 +26,12 @@ public:
     using AcquirePublication=bool (*)(void*,const Record&,Publication&);
     explicit GameplayBuilderController(Binding binding={},void* context=nullptr,
         AcquirePublication acquire=nullptr):binding_(binding),publicationContext_(context),acquire_(acquire){}
+    // Deferred rows land when the phase ends, including after a failure:
+    // each was a completed setter.
     template<class Generate> bool withGeneration(Generate generate){
         if(phase_)return fail();
         Phase phase;phase_=&phase;
-        struct Reset {GameplayBuilderController& owner;~Reset(){owner.phase_=nullptr;}} reset{*this};
+        struct Reset {GameplayBuilderController& owner;~Reset(){owner.publishPosition();owner.phase_=nullptr;}} reset{*this};
         return generate()&&good_;
     }
     bool valid()const{return good_;}
@@ -46,11 +48,7 @@ public:
         integerX_=x;integerY_=y;return true;
     }
     bool position(int x,int y){
-        // record_ holds the exact conversion of integerX_/integerY_; rows
-        // usually keep x, so convert only a changed coordinate.
-        RunnerImageValue px=record_.x,py=record_.y;
-        if(!good_||!record_.lifetimeId||(x!=integerX_&&!px.assignInteger(x))||
-           (y!=integerY_&&!py.assignInteger(y)))return fail();
+        if(!good_||!record_.lifetimeId)return fail();
         if(phase_&&!phase_->acquired){
             if(acquire_&&!acquire_(publicationContext_,record_,phase_->publication))return fail();
             const auto& p=phase_->publication;
@@ -58,12 +56,38 @@ public:
             phase_->acquired=true;
         }
         if(phase_&&phase_->publication.x){
+            // A lent position cannot fail and no spatial queue consumes it.
+            // Newline rows (same x, exactly representable increasing y) land
+            // together at the next reader: publishPosition() precedes every
+            // Create but callback-free terrain, and the end of the phase.
+            auto& phase=*phase_;
+            const int last=phase.pending?phase.y:integerY_;
+            if(x==integerX_&&y>last&&y<=0x1000000&&y>=-0x1000000){phase.y=y;++phase.pending;return true;}
+            publishPosition();
+        }
+        // record_ holds the exact conversion of integerX_/integerY_; rows
+        // usually keep x, so convert only a changed coordinate.
+        RunnerImageValue px=record_.x,py=record_.y;
+        if((x!=integerX_&&!px.assignInteger(x))||(y!=integerY_&&!py.assignInteger(y)))return fail();
+        if(phase_&&phase_->publication.x){
             const auto& p=phase_->publication;
             if(!RunnerSpatialSplit::equal(*p.x,px)||!RunnerSpatialSplit::equal(*p.y,py)){
                 *p.x=px;*p.y=py;*p.appearance|=8u;
             }
         }else if(binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,px,py))return fail();
         record_.x=px;record_.y=py;integerX_=x;integerY_=y;return true;
+    }
+    // Lands deferred newline rows; cannot fail. The same comparisons as one
+    // setter per row: exact increasing y values all differ, so more than one
+    // row always changes the lent value.
+    void publishPosition(){
+        if(!phase_||!phase_->pending)return;
+        auto& phase=*phase_;const auto& p=phase.publication;
+        RunnerImageValue py;py.assignInteger(phase.y);
+        if(phase.pending>1||!RunnerSpatialSplit::equal(*p.x,record_.x)||!RunnerSpatialSplit::equal(*p.y,py)){
+            *p.x=record_.x;*p.y=py;*p.appearance|=8u;
+        }
+        record_.y=py;integerY_=phase.y;phase.pending=0;
     }
     bool clear(){
         if(!good_||(phase_&&phase_->publication.x)||
@@ -75,7 +99,7 @@ private:
     Record record_{};
     int integerX_=0,integerY_=0;
     Binding binding_{};
-    struct Phase {Publication publication{};bool acquired=false;};
+    struct Phase {Publication publication{};bool acquired=false;unsigned pending=0;int y=0;};
     void* publicationContext_=nullptr;
     AcquirePublication acquire_=nullptr;
     Phase* phase_=nullptr;

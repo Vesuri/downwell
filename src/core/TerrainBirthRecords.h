@@ -91,6 +91,8 @@ public:
         return &birth;
     }
     void abandon(){pendingCount_=0;}
+    // The reserved, unpublished record; null when none is pending.
+    TerrainBirthFacts* pendingFacts(){return pendingCount_?&pendingRecord_->birth:nullptr;}
     bool commit(){
         const unsigned count=pendingCount_,n=pending_;pendingCount_=0;
         if(!count)return false;

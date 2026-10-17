@@ -1486,16 +1486,32 @@ int main(){
             assert(leased.withGeneration([]{return true;})&&!mirror.acquisitions);
             // A failed nested birth retains each completed row, including
             // through a Record pointer captured before entering generation.
+            // Newline rows land at the next reader or when the phase ends.
             assert(!leased.withGeneration([&]{
                 for(int y=720;y<=800;y+=16){
-                    assert(leased.position(-16,y));RunnerImageValue expected;
+                    assert(leased.position(-16,y));
+                    if(y!=752)continue;
+                    leased.publishPosition();RunnerImageValue expected;
                     assert(expected.assignInteger(y)&&retained->y.bits==expected.bits&&
-                           mirror.y.bits==expected.bits&&mirror.x.bits==retained->x.bits);
+                           mirror.y.bits==expected.bits&&mirror.x.bits==retained->x.bits&&(mirror.flags&8u));
+                    mirror.flags=0;
                 }
                 return false;
             }));
+            RunnerImageValue landed;
+            assert(landed.assignInteger(800)&&retained->y.bits==landed.bits&&mirror.y.bits==landed.bits);
             assert(leased.valid()&&mirror.acquisitions==1&&(mirror.flags&8u));
-            assert(leased.withGeneration([&]{return leased.position(-16,816);})&&mirror.acquisitions==2);
+            // One row that leaves the lent value unchanged marks nothing.
+            mirror.flags=0;assert(mirror.y.assignInteger(816));
+            assert(leased.withGeneration([&]{return leased.position(-16,816);})&&mirror.acquisitions==2&&
+                   !(mirror.flags&8u)&&retained->y.bits==mirror.y.bits);
+            // A setter that is not a newline lands deferred rows, then publishes.
+            assert(leased.withGeneration([&]{
+                RunnerImageValue x,y;
+                return leased.position(-16,848)&&leased.position(0,848)&&x.assignInteger(0)&&
+                    y.assignInteger(848)&&mirror.x.bits==x.bits&&mirror.y.bits==y.bits&&
+                    retained->x.bits==x.bits&&retained->y.bits==y.bits&&(mirror.flags&8u);
+            })&&mirror.acquisitions==3);
             const auto last=retained->y.bits;mirror.reject=true;
             assert(!leased.withGeneration([&]{return leased.position(-16,832);})&&
                 !leased.valid()&&retained->y.bits==last&&mirror.y.bits==last);

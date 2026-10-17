@@ -427,9 +427,8 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
     if (endReached_)
         return true;
     if (generationCount_ < -1) {
-        random.chooseIndexSmall(2);
-        for (int cell = 0; cell < 19; ++cell)
-            random.nextU32();
+        // choose(2) and the 19 cell draws: no caller reads their values.
+        random.advance(20);
         if(preparedTerrainEmitter_){
             // The source has already consumed this row's RNG. Both wall
             // Creates precede advanceRow and have no intervening event.
