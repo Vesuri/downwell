@@ -103,7 +103,8 @@ void Game::applyStartupShortcut() {
 
 void Game::update(const Input& input, std::uint32_t restartSeed) {
     const auto failed=[&] {
-        if(simulationSucceeded_ && startup_.effectsSucceeded())return false;
+        if(simulationSucceeded_ && startup_.effectsSucceeded() &&
+           startup_.roomLoadSucceeded() && startup_.deferredCommandsSucceeded())return false;
         simulationSucceeded_=false;finished_=true;return true;
     };
     if(failed())return;
@@ -115,10 +116,10 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
         if(failed())return;
         if (startup_.nextLevelRequested()) {
             startup_.loadNextAreaOneLevel(input);
-            if (!startup_.roomLoadSucceeded()) finished_ = true;
+            if (!startup_.roomLoadSucceeded()) simulationSucceeded_ = false;
         }
     } else {
-        if(collisionPass_)startup_.stepWithCollisionPass(input,input.fire&&!fire_,
+        if(collisionPass_)simulationSucceeded_=startup_.stepWithCollisionPass(input,input.fire&&!fire_,
             [&]{return collisionPass_(collisionContext_,startup_);});
         else startup_.step(input, input.fire && !fire_);
         if(failed())return;
@@ -128,7 +129,8 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
     if(failed())return;
     const auto action = startup_.deathResults().inputEffects.action;
     if (action != DeathMenuSequence::Action::None &&
-        !startup_.restartFromResults(action, restartSeed)) finished_ = true;
+        !startup_.restartFromResults(action, restartSeed)) simulationSucceeded_ = false;
+    if(failed())return;
     fire_ = input.fire;
     left_ = input.left; right_ = input.right;
     ++tick_;
@@ -179,6 +181,14 @@ void Game::renderLevelClear(Renderer& renderer) const {
 }
 
 void Game::render(Renderer& renderer) const {
+    // Do not draw after a failed simulation. Within this Draw, stop after a
+    // failed event instead of publishing a HUD over a partial room. Component
+    // fixtures may retry Draw after fixing a binding; production exits on its
+    // first failed Draw.
+    if(!simulationSucceeded_ || !startup_.effectsSucceeded()) {
+        renderingSucceeded_=false;
+        return;
+    }
     // GameMaker renders the 160x284 room surface into the centre of the
     // 380x284 PC application surface.  Everything outside it is the HUD
     // layer, whose untouched pen is true black.
@@ -223,6 +233,10 @@ void Game::render(Renderer& renderer) const {
     }
     if (!clipReleased)
         renderer.clearClipRect();
+    if(!renderingSucceeded_ || !startup_.effectsSucceeded()) {
+        renderingSucceeded_=false;
+        return;
+    }
     if (startup_.inMainRoom() && !startup_.levelClearActive())
         renderLandscapeHud(renderer);
     if (startup_.inMainRoom() && !startup_.levelClearActive() && startup_.exitDither().active) {

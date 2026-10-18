@@ -1060,6 +1060,8 @@ int main() {
             require(counters==1,"registered counter is drawn by its event");
             RecordingRenderer unboundParent;effectGame.render(unboundParent);
             require(!effectGame.renderingSucceeded(),"parent Draw binding does not escape its scope");
+            require(std::find(unboundParent.spriteOrder.begin(),unboundParent.spriteOrder.end(),415)==
+                unboundParent.spriteOrder.end(),"failed parent Draw stops before the health HUD");
             require(shop.clear(),"retire parent Draw fixture");
         }
         {
@@ -1170,9 +1172,29 @@ int main() {
         failedGame.update({});
         require(failedGame.finished()&&!failedGame.simulationSucceeded(),"host reports simulation failure separately from ordinary quit");
         require(failedRuntime.randomDrawCount()==draws&&failedGame.tick()==tick,"failed update does not continue simulation");
+        RecordingRenderer stoppedDraw;
+        failedGame.render(stoppedDraw);
+        require(!failedGame.renderingSucceeded()&&!stoppedDraw.clearCount&&stoppedDraw.spriteOrder.empty(),
+            "failed simulation issues no subsequent framebuffer operations");
         failedRuntime.reset(downwell::PlatformProfile::desktop);
         failedGame.update({});
         require(!failedGame.simulationSucceeded()&&failedGame.tick()==tick,"Game failure is terminal even if inner runtime is reset");
+    }
+    {
+        auto game=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
+        auto& runtime=const_cast<downwell::StartupRuntime&>(game->startup());
+        runtime.skipToGameForTesting();
+        unsigned calls=0;
+        game->configureCollisionPass([](void* context,downwell::StartupRuntime&){
+            ++*static_cast<unsigned*>(context);return false;
+        },&calls);
+        game->update({});
+        require(calls==1&&game->finished()&&!game->simulationSucceeded()&&game->tick()==0,
+            "production update reports a failing callback without completing the frame");
+        const auto draws=runtime.randomDrawCount();
+        game->update({});
+        require(calls==1&&runtime.randomDrawCount()==draws,
+            "terminal callback failure cannot execute again");
     }
     {
         auto flashStorage = std::make_unique<downwell::Game>(&rooms,&objects,&builders);

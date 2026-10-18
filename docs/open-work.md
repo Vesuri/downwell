@@ -12,12 +12,12 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Immediate priority: section 0, every update of the A500 initial fall within
-20 ms. Item C is deferred at the user's request. D remains the next fixed-cost
-item; E still depends on C and D. Do not resume C without user direction.
-Do not add further section 1 functionality
-while this regression is unresolved.
-After that, finish live skeleton encounters (section 1), following its numbered
+Immediate priority, at the user's request: finish **1.01**, the production
+encounter session. Section 0's initial-fall budget remains unresolved; its
+item C is deferred and must not resume without user direction. D remains its
+next fixed-cost item; E still depends on C and D. Keep new session bindings
+scene-local so they do not reintroduce unrelated per-frame work.
+Then finish live skeleton encounters (section 1), following its numbered
 integration tasks: production ownership, generation/query/dispatch, time-stop
 and damage chains, then natural encounter verification. The A500 frame-budget work in
 section 5 remains open; use its measured architectural approach rather than
