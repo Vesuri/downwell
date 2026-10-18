@@ -1,5 +1,44 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: typed terrain cleanup at Draw entry
+
+Against `93fe0234`, production Draw cleanup retires marked native terrain
+through its typed owner without reconstructing a generic actor record and
+redispatching it to that same owner. The ordered marked-room traversal, native
+retirement binding, spatial/layer removal and post-retirement lifetime checks
+remain. Public custom cleanup callbacks retain their generic route;
+`DOWNWELL_REFERENCE_TYPED_TERRAIN_CLEANUP` retains that route for production
+Draw as well. No owner storage or asset bank is added.
+
+Same deterministic scene-collision fall, 512 KiB Chip / 8 MiB Fast:
+
+| Measurement | Baseline | Typed cleanup |
+| --- | ---: | ---: |
+| 164 updates, PAL fields | 1,060 | 1,033 |
+| First update, PAL fields | 213 | 213 |
+| Updates 57–61 mean, ms | 98.5 | 93.8 |
+| Draw entry at 58/60, ms | 44.5/44.4 | 32.5/32.6 |
+| Updates 57/58/59/60/61, ms | 49.6/171.0/41.9/129.3/100.5 | 49.7/159.2/41.9/117.3/100.8 |
+| Updates 137–141 mean, ms | 103.1 | 101.1 |
+| Updates 137/138/139/140/141, ms | 129.8/98.5/71.7/98.2/117.3 | 129.6/93.5/71.8/93.1/117.5 |
+
+Independent update-58 capture: **1,131,070 cycles / 159.2 ms**. All 165 native
+state samples match the parent. Generic/typed host collision-owner witnesses
+agree; the 18,000-update terrain replay and mixed source/retained collision
+fixtures pass. These are not completion of the production performance gate:
+the scene-collision backend remains diagnostic.
+
+Candidate ELF SHA-256
+`528e8cd3d39cd6d9300dfdffe8f1663a3237d9391d4ed03dc5862548f07b2c4f`.
+Reports: `tmp/typed-cleanup-{cost,late,recheck}/report.txt`; baseline reports:
+`tmp/collision-visual-{cost,late}/report.txt`. State/cadence witnesses:
+`tmp/typed-cleanup-candidate/`; host witnesses:
+`tmp/typed-cleanup-{owner,reference}.txt`. Raw traces are removed after commit.
+The shipping external-backend smoke run completes in **179 PAL fields** with
+the exact landing witness (`tmp/typed-cleanup-shipping-candidate/cadence-gdb.log`).
+This is a smoke measurement, not a controlled speed claim against the earlier
+178-field shipping build, and does not close section 0's budget.
+
 ## Encounter candidate: one terrain read per collision visual
 
 Against the unchanged `d9a7b95c` runtime (subsequent commits only add tests and

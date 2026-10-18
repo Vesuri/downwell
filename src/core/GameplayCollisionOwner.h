@@ -5393,12 +5393,23 @@ public:
     // Source room cleanup visits active entries before inactive entries.
     // Retire may remove only the supplied lifetime, never create/rebind; it
     // must dispatch to the corresponding typed store before this call returns.
-    template<class Retire> bool cleanupDestroyed(Retire retire){
+    template<bool TypedTerrain=false,class Retire> bool cleanupDestroyed(Retire retire){
         if(!valid()||!world_)return check(false);
         if(!destructionPending_)return true;
         DW_PROFILE_SCOPE(profileDrawCleanup);
         auto cleanup=[&](unsigned slot){
             const auto h=handleAt(slot);std::uint32_t flags;
+            if constexpr(TypedTerrain){
+                if(native_&&slot>=View::terrainBase&&slot<View::timeFieldBase&&world_->nativeTerrainInstances()){
+                    const InstanceHandle local{slot-View::terrainBase,h.generation};
+                    // The terrain owner validates the live generation and
+                    // destruction mark before invoking the SAME retirement
+                    // binding. No generic actor record or family switch is
+                    // needed. Keep the post-retirement lifetime checks.
+                    return world_->retireNativeTerrain(local)&&valid()&&!table_.contains(h)&&
+                        !world_->nativeTerrainInstances()->contains(local);
+                }
+            }
             if(!eligibilityFlags(h,flags)||!(flags&1u))return false;
             View::Record record;
             if(!View(*world_).resolve(h,record))return false;
@@ -5461,7 +5472,11 @@ private:
             }
             unregisteredTerrainCleanup_=false;
         }
+#ifdef DOWNWELL_REFERENCE_TYPED_TERRAIN_CLEANUP
         return cleanupDestroyed([&](InstanceHandle shared,const View::Record& record){
+#else
+        return cleanupDestroyed<true>([&](InstanceHandle shared,const View::Record& record){
+#endif
             View::Kind kind;InstanceHandle local;
             if(!View::decode(shared,kind,local))return false;
             switch(kind){
