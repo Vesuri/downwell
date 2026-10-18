@@ -62,6 +62,26 @@ the derived cell payload under ignored `generated/`.
 
 ## Shared Amiga DMA planes
 
+`make test-amiga-wind-bank` prepares and checks the admitted wind audio bank.
+`generate-amiga-wind-bank.py` reads hash-verified extracted resources 349–355
+and converts them offline with FFmpeg to signed 8-bit mono PCM at 22,030 Hz,
+without normalisation or baked gain. It records extraction/conversion versions,
+input hashes and the output hash in `generated/amiga-wind.json`. The `.bin`
+source bank has a reviewed 2 MiB **Fast RAM** ceiling; it must not be linked
+into the executable or loaded wholesale into Chip RAM. It is not yet installed
+by the normal build: playback and scene residency are still §1.01 work.
+
+`WindBank` borrows validated bytes and rejects missing/duplicate resource IDs,
+noncontiguous or out-of-range samples, unreviewed rates, and invalid padding.
+The `DWWA` format is big-endian: 20-byte header (`magic[4]`, `u16 version=1`,
+`u16 count=7`, `u32 rate=22030`, `u32 PAL period=161`, `u32 fileBytes`), then
+seven 12-byte entries (`u32 resource`, `u32 offset`, `u32 sampleBytes`) in resource
+order, then contiguous PCM. An odd-length sample has one zero alignment byte,
+excluded from its sample count. No pointers or copyrighted payloads are committed.
+Period 161 plays at 22,030.4037 Hz on PAL (0.00184% above the offline rate).
+The currently admitted source event permits only one concurrent wind voice;
+this bank does not claim admission of the game's other sounds or music.
+
 `amiga_scene_contract.py` is the explicit native art admission boundary used by
 the production exporters. Adding art to `SELECTIONS` does not assign it to the
 gameplay bank: every encoded resource and prepared variant needs a declared

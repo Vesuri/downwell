@@ -2261,6 +2261,18 @@ build/gameplay-encounter-session-test: tests/core/GameplayEncounterSessionTest.c
 test: test-gameplay-encounter-session
 test-gameplay-encounter-session: build/gameplay-encounter-session-test
 	./build/gameplay-encounter-session-test
+
+generated/amiga-wind.bin: tools/generate-amiga-wind-bank.py extracted/audio/manifest.json data/data.win $(wildcard extracted/audio/sound-effects/349_sfxMagicWind*.ogg extracted/audio/sound-effects/35[0-5]_sfxMagicWind*.ogg)
+	python3 tools/generate-amiga-wind-bank.py
+
+build/amiga-wind-bank-test: tests/platform/amiga/WindBankTest.cpp src/platform/amiga/WindBank.h
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc tests/platform/amiga/WindBankTest.cpp -o $@
+
+.PHONY: test-amiga-wind-bank
+test-amiga-wind-bank: generated/amiga-wind.bin build/amiga-wind-bank-test
+	python3 tests/amiga-wind-bank-test.py
+	./build/amiga-wind-bank-test generated/amiga-wind.bin
 build/stored-shop-child-test: tests/core/StoredShopChildTest.cpp src/core/ObjectPack.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
