@@ -95,8 +95,15 @@ int main(){
         auto& world=const_cast<StartupRuntime&>(game->startup());
         world.registerLevelExit(int(world.mainPlayerY()));
         Input heldCancel;heldCancel.cancel=true;
-        for(unsigned i=0;i<160;++i)assert(session->update(heldCancel)&&session->draw(sink));
+        for(unsigned i=0;i<240&&!world.levelClearActive();++i)
+            assert(session->update(heldCancel)&&session->draw(sink));
+        assert(world.levelClearActive());
+        Input earlyConfirm=heldCancel;earlyConfirm.fire=true;
+        for(unsigned i=0;i<160;++i)assert(session->update(earlyConfirm)&&session->draw(sink));
         assert(world.levelClearActive()&&world.levelClear().selection.visible);
+        assert(!world.shops().inputState().confirm);
+        // Release and press again: a held entrance press cannot auto-select.
+        assert(session->update(heldCancel)&&session->draw(sink));
         Input confirm;confirm.fire=true;confirm.cancel=true;
         for(unsigned i=0;i<240&&world.runStage().level!=2;++i)
             assert(session->update(confirm)&&session->draw(sink));

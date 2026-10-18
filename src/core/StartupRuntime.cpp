@@ -424,7 +424,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         resultsInput.left = left;
         resultsInput.right = right;
         resultsInput.fire = fire;
-        run_.results.beginStep(resultsInput);
+        run_.results.beginStep(resultsInput,encounterInputEdges());
     }
 
     for (std::size_t i = 0; i < instances_.size(); ++i) {

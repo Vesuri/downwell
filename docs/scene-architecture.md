@@ -62,6 +62,16 @@ including level-clear updates; shortcut steps sample their virtual inputs.
 Native frames sample before scene dispatch, and gameplay Draw rejects a missing
 or duplicate sample. Session retirement unbinds the borrowed publication.
 Cancel is a separate held input/replay bit, never an alias for Pause.
+Level-clear updates borrow and consume that same mutable Confirm edge. The VM
+assembly for `scrControlInput` assigns `global.dUp` from pressed inputs and
+`global.dUpHeld` separately; `scrResult` reads/clears the former. Holding Fire
+through the upgrade entrance therefore cannot select when the 30-tick wait
+expires. Both worlds' `stepLevelClear` boundaries choose the session publication
+when bound; explicit input arguments remain for standalone controller fixtures.
+DeathMenu Begin Step likewise reads the session's current Confirm/navigation
+publication rather than deriving another edge from its own room-local history.
+Unlike `scrResult`, its assembly does not clear `global.dUp`, so this borrow is
+read-only. Standalone `DeathResults` fixtures retain local-history input.
 The SDL controller backend supplies face 2 (B), including device hotplug and
 removal. Native scene dispatch uses the same session edges; standalone scene and
 Shop fixtures retain their local-history reference paths. This does not add the

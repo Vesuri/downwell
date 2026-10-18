@@ -10,6 +10,18 @@ static std::vector<std::uint8_t> read(const char* path){
     std::ifstream in(path,std::ios::binary);return {std::istreambuf_iterator<char>(in),{}};
 }
 int main(){
+    {
+        DeathResults results;results.active=true;
+        results.menu.visible[5]=true;results.menu.sequenceOver=true;
+        Input held;held.fire=true;
+        ShopInteraction::Input edges;
+        results.beginStep(held,&edges);
+        assert(results.inputEffects.action==DeathMenuSequence::Action::None);
+        edges.confirm=true;results.beginStep(held,&edges);
+        assert(results.inputEffects.action==DeathMenuSequence::Action::Retry);
+        // DeathMenu reads dUp but unlike scrResult does not clear it.
+        assert(edges.confirm);
+    }
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
         rb=read("generated/downwell-rooms.dwrm");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
@@ -29,6 +41,36 @@ int main(){
             world->step(update<2?16:0);
             assert(world->shops().inputState().cancel==(update==0));
             assert(frame.beginDraw(true)&&frame.publishable()&&frame.finish());
+        }
+        {
+            bool heartGoal=false;
+            assert(world->registerLevelExit(176+world->player().offsetY()));
+            for(unsigned update=0;update<240&&!world->levelResultRequested();++update){
+                GameplayEncounterSession::Frame frame(session);assert(frame.sampleInput({}));
+                world->step(0);assert(frame.beginDraw(true)&&frame.finish());
+            }
+            assert(world->levelResultRequested());
+            assert(world->enterLevelClear(0,heartGoal));
+            for(unsigned update=0;update<160;++update){
+                GameplayEncounterSession::Frame frame(session);Input held;held.fire=true;
+                assert(frame.sampleInput(held));
+                bool legacyHeld=true;
+                assert(world->stepLevelClear(legacyHeld,false,false,heartGoal,
+                    [](LevelClearSelection::Effect,unsigned){}));
+                assert(frame.beginDraw(true)&&frame.finish());
+            }
+            assert(world->levelClear().selection.visible&&!world->nextLevelRequested());
+            assert(!world->shops().inputState().confirm);
+            for(unsigned update=0;update<2;++update){
+                GameplayEncounterSession::Frame frame(session);Input held;held.fire=update!=0;
+                assert(frame.sampleInput(held));
+                bool legacyHeld=held.fire;
+                assert(world->stepLevelClear(legacyHeld,false,false,heartGoal,
+                    [](LevelClearSelection::Effect,unsigned){}));
+                assert(!world->shops().inputState().confirm); // shared consumption, not a local copy
+                assert(frame.beginDraw(true)&&frame.finish());
+            }
+            assert(!world->levelClear().selection.visible);
         }
         {
             GameplayEncounterSession::Frame handoff(session);assert(handoff.valid());

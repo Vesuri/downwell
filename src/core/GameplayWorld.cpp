@@ -1600,7 +1600,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.selectWeaponLevel(currencyAccount_);
     run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
     downwell::Input input = downwell::unpackReplayInput(packedInput);
-    run_.results.beginStep(input);
+    run_.results.beginStep(input,encounterInput_?&encounterInput_->publication():nullptr);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     const auto activation = downwell::advanceMainRoomActivationChecked(activationY_,

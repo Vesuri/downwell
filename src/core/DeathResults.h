@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_DEATH_RESULTS_H
 #include "DeathMenuProgress.h"
 #include "Input.h"
+#include "ShopInteraction.h"
 namespace downwell {
 // Shared results controller. Begin/alarms precede world updates; opening can
 // occur during player processing; the presentation phase follows world updates.
@@ -16,12 +17,13 @@ struct DeathResults {
     DeathMenuProgress::Frame frame;
     unsigned alarmSounds = 0;
 
-    void beginStep(const Input& input) {
+    void beginStep(const Input& input,const ShopInteraction::Input* edges=nullptr) {
         inputEffects = {};
         alarmSounds = 0;
         if (active) {
-            inputEffects = menu.beginStep(input.fire && !previous.fire,
-                input.left && !previous.left, input.right && !previous.right);
+            inputEffects = menu.beginStep(edges?edges->confirm:input.fire && !previous.fire,
+                edges?edges->left:input.left && !previous.left,
+                edges?edges->right:input.right && !previous.right);
             progress.acknowledge(inputEffects);
             alarmSounds = menu.advanceAlarms();
         }

@@ -3031,8 +3031,12 @@ public:
     template<class Emit>
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
+        // The source result script reads and clears the shared pressed edge.
+        auto* edges=encounterInput_?&encounterInput_->publication():nullptr;
+        bool& publishedConfirm=edges?edges->confirm:confirm;
+        if(edges){leftPressed=edges->left;rightPressed=edges->right;}
         ++tick_;
-        const bool ok = run_.stepLevelClearPositioned(confirm, leftPressed, rightPressed, heartGoal,
+        const bool ok = run_.stepLevelClearPositioned(publishedConfirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, mainPlayerMotion_, mainPlayerHealth_, random_, emit,
             [this](int x,int y){return createResultDither(x,y);},
             [this](auto event){return this->advanceResultRoomAlarms(event);},

@@ -2602,8 +2602,13 @@ public:
     template<class Emit>
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
+        // scrResult consumes global.dUp, not dUpHeld. Keep the explicit
+        // publication for isolated callers, but production borrows the session.
+        auto* edges=encounterInput_?&encounterInput_->publication():nullptr;
+        bool& publishedConfirm=edges?edges->confirm:confirm;
+        if(edges){leftPressed=edges->left;rightPressed=edges->right;}
         ++tick_;
-        return run_.stepLevelClearPositioned(confirm, leftPressed, rightPressed, heartGoal,
+        return run_.stepLevelClearPositioned(publishedConfirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, player_, health_, enemyRandom_, emit,[](int,int){return true;},
             [this](auto event){
                 if(!resultRoomAlarms_){
