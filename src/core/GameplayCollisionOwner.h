@@ -14,6 +14,7 @@
 #include "RunnerSpatialInstances.h"
 #include "RunnerSpatialTreeLease.h"
 #include "RunnerSpatialCapacity.h"
+#include "PreparedCollisionEvents.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
@@ -93,6 +94,7 @@ public:
         PackedSpriteCollision descriptors[741];
         PreparedSpriteGeometry<741> sprites;
         PreparedTerrainBirthBounds terrain;
+        PreparedCollisionEvents<386,512> events;
     };
     struct SkeletonEncounterStorage {
         GameplayWorld::Bones::Storage bones;
@@ -125,6 +127,7 @@ public:
         auto& geometry=storage.geometry;
         if(!check(sprites_.prepare(geometry.descriptors,741)&&geometry.sprites.prepare(sprites_)&&
             geometry.terrain.prepare(objectDefaults_,sprites_)))return false;
+        geometry.events.prepare(objects_);
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         if(!check(owner_.bindTerrainGeometry(geometry.terrain)))return false;
 #endif
@@ -319,6 +322,13 @@ private:
 #endif
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
+    bool collisionEvent(int self,int other,bool& found,PackedObjectEvent& event)const{
+        return geometry_&&geometry_->events.ready()?geometry_->events.collisionEvent(self,other,found,event):
+            objects_.collisionEvent(self,other,found,event);
+    }
+    bool collisionEventExists(int self,int other,bool& found)const{
+        PackedObjectEvent event;return collisionEvent(self,other,found,event);
+    }
     GameplayWorld* world_=nullptr;
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
@@ -1896,6 +1906,10 @@ public:
         if(!native_&&!terrain_.bindStorage(reference->terrain)){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
         geometry_=native_?(nativeCollision?&nativeCollision->geometry:nullptr):&reference->geometry;
+        // Scene collision storage owns this optional acceleration. External
+        // backends neither allocate it nor decode bindings during the intro.
+        // Larger metadata retains the complete pack lookup path.
+        if(geometry_)geometry_->events.prepare(objects_);
         good_=(!encounter||(bones_.bindStorage(&encounter->bones)&&skeletons_.bindStorage(&encounter->skeletons)))&&
             (!geometry_||sprites_.prepare(geometry_->descriptors,741))&&objectDefaults_.prepare(objects,sprites_)&&
             (!geometry_||(geometry_->sprites.prepare(sprites_)&&
@@ -2005,7 +2019,7 @@ public:
             [&](InstanceHandle h,bool publish){return refresh(h,publish);},
             [&](InstanceHandle self,InstanceHandle other,bool& found){
                 const int a=objectOf(self),b=objectOf(other);
-                return a>=0&&b>=0&&objects_.collisionEventExists(a,b,found);
+                return a>=0&&b>=0&&collisionEventExists(a,b,found);
             },[&](InstanceHandle h,unsigned& frames){
                 const auto p=properties_.read(h.slot);if(!p)return false;
                 PackedSpriteCollision resource;
@@ -2028,7 +2042,7 @@ public:
             [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});},
             [&](InstanceHandle self,InstanceHandle other,bool& found){
                 const int a=objectOf(self),b=objectOf(other);
-                return a>=0&&b>=0&&objects_.collisionEventExists(a,b,found);
+                return a>=0&&b>=0&&collisionEventExists(a,b,found);
             },
             [&](InstanceHandle h,unsigned& frames){
                 int sprite,mask;
@@ -2098,7 +2112,7 @@ public:
             [&](InstanceHandle a,InstanceHandle b,int& subtype,bool& found,PackedObjectEvent& event){
                 if(!resolves(a)||!resolves(b))return false;
                 const int object=objectOf(a);subtype=objectOf(b);
-                return object>=0&&subtype>=0&&objects_.collisionEvent(object,subtype,found,event);
+                return object>=0&&subtype>=0&&collisionEvent(object,subtype,found,event);
             },execute));
     }
     // Execute an already sealed, mixed-family pass; never filter it into
@@ -3299,7 +3313,7 @@ public:
             !View::decode(event.other,otherKind,other)||otherKind!=View::Kind::terrain||
             !resolves(event.self)||!resolves(event.other)||objectOf(event.other)!=60||
             event.type!=4||event.subtype!=60||event.owner!=61||event.code!=991||
-            !objects_.collisionEvent(61,60,found,binding)||!found||
+            !collisionEvent(61,60,found,binding)||!found||
             binding.ownerObjectId!=61||binding.codeId!=991||objects_.findEvent(60,1,0,destroy))return check(false);
         return check(native_?world_->destroyNativeTerrain(other):terrain_.requestDestroy(other));
     }
@@ -3321,7 +3335,7 @@ private:
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
            !View::decode(event.self,kind,local)||kind!=View::Kind::goalField||
            event.type!=4||event.subtype!=objectOf(event.other)||
-           !objects_.collisionEvent(objectOf(event.self),event.subtype,found,binding)||!found||
+           !collisionEvent(objectOf(event.self),event.subtype,found,binding)||!found||
            binding.ownerObjectId!=255||event.owner!=binding.ownerObjectId||event.code!=binding.codeId)
             return check(false);
         return check(contact(local));

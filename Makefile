@@ -328,6 +328,13 @@ build/runner-collision-dispatch-test: tests/core/RunnerCollisionDispatchTest.cpp
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 
 .PHONY: verify-runner-collision-pairs
+test: test-prepared-collision-events
+.PHONY: test-prepared-collision-events
+test-prepared-collision-events: build/prepared-collision-events-test
+	./build/prepared-collision-events-test
+build/prepared-collision-events-test: tests/core/PreparedCollisionEventsTest.cpp src/core/ObjectPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 verify-runner-collision-pairs: build/runner-collision-pairs-test
 	./build/runner-collision-pairs-test
 
