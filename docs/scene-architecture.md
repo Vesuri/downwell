@@ -65,9 +65,22 @@ Cancel is a separate held input/replay bit, never an alias for Pause.
 The SDL controller backend supplies face 2 (B), including device hotplug and
 removal. Native scene dispatch uses the same session edges; standalone scene and
 Shop fixtures retain their local-history reference paths. This does not add the
-remaining gamepad axis/direction semantics or native physical Cancel binding.
+remaining gamepad axis/direction semantics.
 Isolated event fixtures may continue to provide explicit input/currency through
 the reference overloads.
+
+Native Cancel is the second button on a two-button joystick in port 2 (pin 9,
+POTGOR bit 14, active low); fire remains CIA-A PRA bit 7. `AmigaInput` leases
+that pin through `potgo.resource` before takeover and drives OUTRY/DATRY high
+for the button pull-up prescribed by RKM chapter 8, "Digital I/O On The
+Controller Port". Resource writes mask only those two bits, preserving the
+other port and pins. Missing resource/allocation returns 20 before takeover.
+Retirement returns the pin to input mode and frees the allocation; the resource
+has no CloseResource operation. No per-update resource calls are needed.
+`make test-amiga-input` compiles the real acquisition/cleanup implementation
+against an instrumented resource and checks all 16 input combinations, unrelated
+pins, replay transport and held Cancel across reset. This is not electrical
+testing of a physical joystick or support for CD32 serial-pad decoding.
 
 `make test-encounter-session` exercises full startup and `SKIP_TO_GAME`, then
 level completion and Retry through the session. Exit placement and lethal

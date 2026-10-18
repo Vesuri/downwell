@@ -371,9 +371,7 @@ boundaries rather than assembling them only in tests. Reuse the shared core
 APIs; platform code supplies devices, assets and presentation only. Wire settings,
 shared input consumption, language/font state, tile/view reads and real audio
 interfaces. Audit each admitted consumer's mutation/consumption of the shared
-input publication against its source event. The shared Cancel input is carried through replays
-and supplied by SDL's controller face 2; bind the native physical control as
-well. SDL currently
+input publication against its source event. SDL currently
 loads only wind sounds 349–355; load the actual
 resources required by each admitted event before enabling it. Define equivalent
 Amiga audio/resource bindings, not dummy successful callbacks. Bind

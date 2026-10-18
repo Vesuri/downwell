@@ -1,22 +1,37 @@
 #include "AmigaInput.h"
 
 #include <exec/types.h>
+#include <proto/exec.h>
+#define __NOLIBBASE__
+#include <proto/potgo.h>
+#undef __NOLIBBASE__
 
 namespace {
 volatile UWORD* const joy1dat = (volatile UWORD*)0xdff00c;
 volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
+volatile UWORD* const potgor = (volatile UWORD*)0xdff016;
 }
 
-downwell::Input AmigaInput::sample()
+AmigaInput::AmigaInput()
 {
-    const UWORD value = *joy1dat;
-    const UWORD y1 = (value >> 9) & 1u;
-    const UWORD x1 = (value >> 1) & 1u;
-    downwell::Input input;
+    resource_=(Library*)OpenResource((CONST_STRPTR)"potgo.resource");
+    if(!resource_)return;
+    Library* const PotgoBase=resource_;
+    // Lease only port 2 pin 9. Output-high provides the RKM button pull-up;
+    // never infer a previous output latch from the button's readback value.
+    allocated_=AllocPotBits(0xc000u);
+    if(ready())WritePotgo(0xc000u,0xc000u);
+}
 
-    /* JOY1DAT is a quadrature pair; these are its left/right switch levels. */
-    input.left = y1 != 0;
-    input.right = x1 != 0;
-    input.fire = (*ciaaPra & 0x80u) == 0;
-    return input;
+AmigaInput::~AmigaInput()
+{
+    if(!ready())return;
+    Library* const PotgoBase=resource_;
+    WritePotgo(0,0xc000u);
+    FreePotBits(allocated_);
+}
+
+downwell::Input AmigaInput::sample()const
+{
+    return decode(*joy1dat,*ciaaPra,*potgor);
 }

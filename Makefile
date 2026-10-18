@@ -2108,6 +2108,14 @@ test: test-sdl-input
 test-sdl-input: build/sdl-input-test
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build/sdl-input-test
 
+build/amiga-input-test: tests/platform/amiga/AmigaInputTest.cpp src/platform/amiga/AmigaInput.cpp src/core/Replay.cpp $(wildcard tests/platform/amiga/input-compat/*/*.h) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/input-compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+.PHONY: test-amiga-input
+test: test-amiga-input
+test-amiga-input: build/amiga-input-test
+	./build/amiga-input-test
+
 build/sdl-flash-raster-test: tests/platform/SDLFlashRasterTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
