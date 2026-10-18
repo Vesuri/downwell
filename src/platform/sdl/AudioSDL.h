@@ -2,6 +2,7 @@
 #define DOWNWELL_AUDIO_SDL_H
 #include "core/MotionBinary64.h"
 #include "core/RunnerAudioGain.h"
+#include "core/AudioMasterGain.h"
 #include <SDL.h>
 #include <array>
 #include <vector>
@@ -29,6 +30,7 @@ public:
     bool getGain(int id,MotionBinary64& gain);
     bool setGain(int id,MotionBinary64 gain,int milliseconds);
     bool setPitch(int id,MotionBinary64 pitch);
+    bool setMasterGain(MotionBinary64 gain);
     void update();
 private:
     friend struct AudioSDLTestAccess;
@@ -45,6 +47,7 @@ private:
     SDL_AudioDeviceID device_=0;
     int nextVoice_=1000000;
     int rate_=48000;
+    AudioMasterGain master_;
 };
 }
 #endif

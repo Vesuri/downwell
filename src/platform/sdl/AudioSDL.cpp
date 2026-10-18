@@ -96,6 +96,9 @@ bool AudioSDL::setPitch(int id,MotionBinary64 pitch){
     if(!pitch.valid()||real(pitch)<=0||real(pitch)>256)return false;
     Lock lock(device_);auto* v=find(id);if(!v)return false;v->pitch=real(pitch);return true;
 }
+bool AudioSDL::setMasterGain(MotionBinary64 gain){
+    Lock lock(device_);return device_&&master_.set(gain);
+}
 void AudioSDL::callback(void* self,Uint8* bytes,int count){
     std::memset(bytes,0,count);
     static_cast<AudioSDL*>(self)->mix(reinterpret_cast<float*>(bytes),unsigned(count)/(2*sizeof(float)));
@@ -115,6 +118,7 @@ void AudioSDL::mix(float* output,unsigned frames){
             if(v.cursor>=length){if(v.loop)v.cursor=std::fmod(v.cursor,double(length));else v.active=false;}
         }
     }
-    for(unsigned i=0;i<frames*2;++i)output[i]=std::clamp(output[i],-1.0f,1.0f);
+    const float master=RunnerAudioGain::value(master_.value);
+    for(unsigned i=0;i<frames*2;++i)output[i]=std::clamp(output[i]*master,-1.0f,1.0f);
 }
 }

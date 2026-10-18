@@ -1,20 +1,12 @@
 #ifndef DOWNWELL_CORE_STORED_ENCOUNTER_SESSION_H
 #define DOWNWELL_CORE_STORED_ENCOUNTER_SESSION_H
 #include "EncounterBoundary.h"
+#include "EncounterSettings.h"
 #include "Game.h"
 #include "StoredDitherCollisionPass.h"
 #include "TimeFieldWind.h"
 
 namespace downwell {
-// Source globals used by the currently admitted event environment. These are
-// live session values, not constants captured separately by collision/Draw.
-// scrGlobalStuff: gameVolume=1, ending=0. Windows scrLoadSave forces lowSpec=-1
-// (false under the runner's >0.5 condition). Saved settings admission is separate.
-struct EncounterSettings {
-    MotionBinary64 gameVolume=MotionBinary64::fromInteger(1);
-    bool lowSpec=false,ending=false;
-};
-
 // Production owner for the stored-world frontend's admitted event bindings.
 // Devices and decoded assets outlive this object; no SDL calls or game rules
 // belong here. New event families must install their real scopes here before
@@ -62,7 +54,7 @@ private:
         return collision_.valid()&&world.effectsSucceeded()&&world.roomLoadSucceeded()&&world.deferredCommandsSucceeded();
     }
     template<class Body> bool withUpdateEnvironment(Body body){
-        if(!settings_.gameVolume.valid())return false;
+        if(!settings_.gameVolume.valid()||!audio_.setMasterGain(settings_.masterGain))return false;
         return game_.withCollisionPass([&](StartupRuntime& world){
             return contacts_.run(world,settings_.gameVolume,audio_);
         },[&]{

@@ -30,6 +30,16 @@ constant in the collision callback. Adding a family requires its concrete
 update/Draw scopes and resource dependencies; having a registered record alone
 does not authorize skipping its unbound events.
 
+`EncounterSettings` keeps `gameVolume` separate from device master gain.
+`scrLoadSave` assembly loads the INI `option/masterGain` default 0.6 and calls
+`audio_master_gain`; it does not overwrite the per-sound gain. The stored session
+publishes that setting before running an update, including startup shortcuts.
+The admitted master range is 0–1; unsupported settings fail rather than silently
+clamp. SDL applies it to the mixed output before clipping. The native wind
+device combines it with voice gain when computing Paula volume (floor to 0–64),
+while `getGain` continues to report the independent source control. This is a
+device-resolution adaptation, not a claim of identical Windows DSP output.
+
 The shared player phase publishes Shop edges once into `ShopWorld::input`;
 compact parents consume that same publication. Registered parent scopes borrow
 it and the world's currency account through the state-owning overloads, rather

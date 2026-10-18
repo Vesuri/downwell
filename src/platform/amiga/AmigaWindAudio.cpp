@@ -1,4 +1,5 @@
 #include "AmigaWindAudio.h"
+#include "core/MultiplyBinary32.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaPlatform.h"
 #include "amiga-wind.h"
@@ -92,7 +93,7 @@ bool AmigaWindAudio::play(int resource,int /*priority*/,bool loop,int& voice){
     if(playing_){Enable();return false;} // Source wind guard allows one voice.
     // A previous stop may not yet have reached VBI: do not touch DMA buffers.
     sample_=sample;resource_=resource;voice_=nextVoice_++;voice=voice_;
-    gain_.current.assignInteger(1);volume_=64;
+    gain_.current.assignInteger(1);updateVolume();
     playing_=true;command_=1;Enable();return true;
 }
 bool AmigaWindAudio::isPlaying(int id,bool& playing){
@@ -110,16 +111,28 @@ bool AmigaWindAudio::getGain(int id,MotionBinary64& value){
 }
 bool AmigaWindAudio::setGain(int id,MotionBinary64 value,int milliseconds){
     if(!ready()||id!=voice_||id<1000000||milliseconds||!gain_.set(value,0,0))return false;
+    updateVolume();return true;
+}
+bool AmigaWindAudio::setMasterGain(MotionBinary64 value){
+    if(!master_.set(value))return false;
+    updateVolume();return true;
+}
+void AmigaWindAudio::updateVolume(){
     // Map the source's float gain to Paula's linear 0..64 volume. Keep the
     // source value unchanged for getGain; clipping is a device limitation.
-    const auto bits=gain_.current.bits;
+    RunnerImageValue effective;
+    // Both controls are finite and nonnegative, master <= 1. The retained
+    // normal-only product can fail only on underflow, inaudible at Paula's
+    // 1/64 resolution. It must not pull a floating-point runtime into the IRQ.
+    if(!multiplyBinary32(gain_.current,master_.value,effective))effective.bits=0;
+    const auto bits=effective.bits&0x7fffffffu; // -0 is silence, not saturation.
     unsigned volume=0;
     if(bits>=0x3f800000u)volume=64;
     else if(bits>=0x3c000000u){
         const unsigned exponent=(bits>>23)&255,shift=144-exponent;
         volume=((bits&0x7fffffu)|0x800000u)>>shift;
     }
-    Disable();volume_=volume;Enable();return true;
+    volume_=volume; // Only the low word varies; VBI alone writes AUDxVOL.
 }
 bool AmigaWindAudio::setPitch(int id,MotionBinary64 value){
     return ready()&&id==voice_&&id>=1000000&&value.high==0x3ff00000u&&!value.low;

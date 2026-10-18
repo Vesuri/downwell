@@ -67,6 +67,14 @@ int main(){
         assert(audio.getGain(voice,gain)&&gain.high==one.high); // Resource gain never overwrites voice gain.
         assert(audio.setGain(voice,half,0));assert(audio.getGain(voice,gain)&&gain.high==half.high);
         assert(AudioSDLTestAccess::sample(audio)==0.0625f); // .25 PCM * .5 resource * .5 voice.
+        assert(audio.setMasterGain(half)&&AudioSDLTestAccess::sample(audio)==0.03125f);
+        assert(audio.getGain(voice,gain)&&gain.high==half.high&&audio.getGain(349,gain)&&gain.high==half.high);
+        assert(!audio.setMasterGain(MotionBinary64::fromInteger(2))&&
+               !audio.setMasterGain(MotionBinary64::fromInteger(-1))&&
+               !audio.setMasterGain({0x7ff00000u,0}));
+        assert(AudioSDLTestAccess::sample(audio)==0.03125f); // Rejection preserves the control.
+        assert(audio.setMasterGain({0x80000000u,0})&&AudioSDLTestAccess::sample(audio)==0);
+        assert(audio.setMasterGain(one));
         const MotionBinary64 sevenTenths{0x3fe66666u,0x66666666u};
         assert(audio.setGain(349,sevenTenths,0)&&audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
         assert(audio.getGain(voice,gain)&&gain.high==half.high);

@@ -7,6 +7,11 @@
 #include <memory>
 #include <vector>
 using namespace downwell;
+namespace downwell {
+struct AudioSDLTestAccess {
+    static std::uint32_t master(AudioSDL& audio){AudioSDL::Lock lock(audio.device_);return audio.master_.value.bits;}
+};
+}
 static std::vector<std::uint8_t> read(const char* path){
     std::ifstream in(path,std::ios::binary);return {std::istreambuf_iterator<char>(in),{}};
 }
@@ -60,6 +65,9 @@ int main(){
         assert(owner->attach(game->startup()));
         auto session=std::make_unique<Session>(*game,*owner,audio);
         assert(session->start()&&game->startupShortcutApplied());
+        assert(AudioSDLTestAccess::master(audio)==0x3f19999au);
+        session->settings().masterGain={0x3fe00000u,0};
+        assert(session->update({})&&AudioSDLTestAccess::master(audio)==0x3f000000u);
         Sink sink;
         for(unsigned frame=0;frame<4096&&!game->startup().inMainRoom();++frame){
             Input input;

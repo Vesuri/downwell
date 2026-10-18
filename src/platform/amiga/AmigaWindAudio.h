@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_WIND_AUDIO_H
 #include "WindBank.h"
 #include "core/RunnerAudioGain.h"
+#include "core/AudioMasterGain.h"
 #include <exec/execbase.h>
 class AmigaPlatform;
 
@@ -27,6 +28,7 @@ public:
     bool getGain(int id,MotionBinary64& value);
     bool setGain(int id,MotionBinary64 value,int milliseconds);
     bool setPitch(int id,MotionBinary64 value);
+    bool setMasterGain(MotionBinary64 value);
     void update(){} // Device-clock completion comes from Paula, not game ticks.
 private:
     friend struct AmigaWindAudioProbe;
@@ -36,6 +38,7 @@ private:
     void queue(unsigned bank,unsigned bytes);
     unsigned fill(unsigned bank);
     void halt();
+    void updateVolume();
     bool matches(int id)const{return id==voice_||id==resource_;}
     static AmigaWindAudio* current_;
     AmigaPlatform* platform_=nullptr;
@@ -53,6 +56,7 @@ private:
     volatile unsigned command_=0; // 0 none, 1 stop/start, 2 start next VBI, 3 stop
     int voice_=-1,resource_=-1,nextVoice_=1000000;
     RunnerAudioGain gain_{};
+    AudioMasterGain master_;
     volatile unsigned volume_=64;
     unsigned bankIndex_=0;
     std::uint32_t offset_=0;

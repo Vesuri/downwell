@@ -39,6 +39,7 @@ extern "C" void downwellWindQueued(unsigned bank,const unsigned char* pcm,unsign
 }
 namespace downwell {
 struct AmigaWindAudioProbe {
+    static unsigned volume(const AmigaWindAudio& audio){return audio.volume_;}
     static bool sample(AmigaWindAudio& audio,int id,WindBank::Sample& s){return audio.bank_.sample(id,s);}
     static bool check(AmigaWindAudio& audio,unsigned row){
         const unsigned bank=gWindProbeTrace[row][3],at=gWindProbeTrace[row][4];
@@ -80,6 +81,14 @@ int main(){
         downwell::MotionBinary64 gain;
         if(!audio.getGain(voice,gain)||gain.high!=0x3fe00000u||gain.low||
            !wind.contact(random,sound,channel,one,audio)||random.calls!=1||wind.voice!=voice)return 20;
+        if(!audio.setMasterGain({0x3fe33333u,0x33333333u})||
+           downwell::AmigaWindAudioProbe::volume(audio)!=19||
+           !audio.getGain(voice,gain)||gain.high!=0x3fe00000u||gain.low||
+           audio.setMasterGain(downwell::MotionBinary64::fromInteger(2))||
+           downwell::AmigaWindAudioProbe::volume(audio)!=19||
+           !audio.setMasterGain(one)||downwell::AmigaWindAudioProbe::volume(audio)!=32)return 20;
+        if(!audio.setGain(voice,{0x80000000u,0},0)||downwell::AmigaWindAudioProbe::volume(audio)||
+           !audio.setGain(voice,{0x3fe00000u,0},0)||downwell::AmigaWindAudioProbe::volume(audio)!=32)return 20;
         int rejected=-1;
         if(audio.play(resource,90,false,rejected)||rejected!=-1||
            audio.setPitch(voice,{0x3fe00000u,0})||audio.setGain(voice,one,100))return 20;

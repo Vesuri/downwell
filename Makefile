@@ -2066,7 +2066,7 @@ build/bat-motion-test: tests/core/BatMotionTest.cpp src/core/BatMotion.h src/cor
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/BatMotionTest.cpp
 
-build/sdl-audio-test: tests/platform/SDLAudioTest.cpp src/platform/sdl/AudioSDL.cpp src/platform/sdl/AudioSDL.h src/core/RunnerAudioGain.h
+build/sdl-audio-test: tests/platform/SDLAudioTest.cpp src/platform/sdl/AudioSDL.cpp src/platform/sdl/AudioSDL.h src/core/RunnerAudioGain.h src/core/AudioMasterGain.h
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(LDFLAGS)
 .PHONY: verify-sdl-audio
