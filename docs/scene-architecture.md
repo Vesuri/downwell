@@ -161,6 +161,18 @@ The target enables the candidate through `encounter_collision_verify.mk` only
 for this test and restores the normal build on exit. It does not enable that
 backend for shipping or prove its remaining performance and transition gates.
 
+`make verify-amiga-encounter-reentry` runs the native collision candidate through
+the existing results fixture: Retry, style select, garden and subsequent
+gameplay. It retains the rendering/residency assertions and additionally
+requires one run-history lease, three encounter scene loads, two releases and
+a live audio device on final reentry. Results readiness is injected; reset,
+input confirmation, resource retirement and reentry use the frontend paths.
+It is not a natural-death or level-completion witness. The results fixture does
+not execute the reference terrain-mask query probe, so it must not link that
+probe's full sprite-mask pack; the candidate loads its scene encounter bank.
+An early executable return fails the verifier immediately. The make target
+restores the normal build whether verification succeeds or fails.
+
 ## Scene owners
 
 The Amiga scene translation units are `AmigaPublisherScene`,

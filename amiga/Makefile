@@ -593,8 +593,10 @@ ifeq ($(EXIT_WIPE_VERIFY),1)
 ASFLAGS += --defsym DOWNWELL_EXIT_WIPE_VERIFY=1
 endif
 ifneq ($(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS)),)
+ifeq ($(findstring -DDOWNWELL_RESULTS_RESTART_VERIFY,$(CFLAGS)),)
 ASFLAGS += --defsym DOWNWELL_REFERENCE_COLLISION_MASKS=1
 REFERENCE_COLLISION_MASK_INPUT := $(REPO)/generated/downwell-sprite-masks.dwsm
+endif
 endif
 # Pixel verifiers retain linked source bytes as an independent load oracle.
 # Shipping/profiling executables must never link these transient scene banks.
@@ -1251,8 +1253,8 @@ audit: $(OUT).elf
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_game_pack'; then \
 		echo "*** gameplay CPU art must be scene-loaded, not linked"; exit 1; \
 	else echo "Gameplay CPU art linkage audit: clean"; fi
-	@if [ -z '$(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_collision_masks'; then \
-		echo "*** reference-only collision masks linked into shipping executable"; exit 1; \
+	@if [ -z '$(REFERENCE_COLLISION_MASK_INPUT)' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_collision_masks'; then \
+		echo "*** reference collision masks linked without an admitted query probe"; exit 1; \
 	else echo "Collision-mask ownership linkage audit: clean"; fi
 	@if [ -z '$(findstring DOWNWELL_REFERENCE_SCENE_BANKS,$(CPPFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_(results|shop|clear)_pack'; then \
 		echo "*** transient scene art linked into shipping executable"; exit 1; \

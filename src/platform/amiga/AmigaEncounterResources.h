@@ -8,6 +8,12 @@
 #include "../../../generated/amiga-encounter-masks.h"
 #include <exec/memory.h>
 #include <proto/exec.h>
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+extern "C" {
+volatile unsigned gDownwellEncounterSceneLoads=0,gDownwellEncounterSceneReleases=0;
+volatile unsigned gDownwellEncounterRunLoads=0;
+}
+#endif
 
 // Run-owned collision history is acquired before rmMain's first birth. The
 // immutable masks/audio and update environment are gameplay scene resources.
@@ -36,6 +42,9 @@ public:
             if(!allocation)return false;
             collision_=new(allocation) Owner::NativeCollisionStorage;
             if(!owner_.bindNativeCollisionStorage(*collision_))return false;
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+            ++gDownwellEncounterRunLoads;
+#endif
         }
         masks_=static_cast<UBYTE*>(AllocMem(DOWNWELL_ENCOUNTER_MASK_BYTES,MEMF_FAST));
         if(!masks_||platform.loadFile("PROGDIR:Downwell.encountermasks",masks_,
@@ -45,12 +54,18 @@ public:
         auto* allocation=AllocMem(sizeof(Environment),MEMF_FAST);
         if(!allocation){releaseScene();return false;}
         environment_=new(allocation) Environment(world_,owner_,maskView_,audio_,Room{&world_});
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+        ++gDownwellEncounterSceneLoads;
+#endif
         return audio_.stopAll();
     }
     bool bind(downwell::GameplayEncounterSession::Frame& frame){
         return ready()&&(world_.boundEncounterUpdate(environment_)||frame.bindUpdateEnvironment(*environment_));
     }
     void releaseScene(){
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+        if(environment_)++gDownwellEncounterSceneReleases;
+#endif
         if(environment_){environment_->~Environment();FreeMem(environment_,sizeof(Environment));environment_=nullptr;}
         audio_.release();
         maskView_=downwell::SpriteMaskPack(nullptr,0);

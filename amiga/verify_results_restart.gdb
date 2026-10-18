@@ -1,7 +1,19 @@
 set pagination off
 set confirm off
-target remote 127.0.0.1:2345
+if $_isvoid($encounter_backend)
+    set $encounter_backend = 0
+    target remote 127.0.0.1:2345
+end
 source chip_memory_watch.gdb
+break *main
+continue
+set $results_return_pc = *(unsigned long*)$sp
+tbreak *$results_return_pc
+commands
+    silent
+    printf "Executable returned %lu before completing results reentry\n", $d0
+    quit 1
+end
 break downwellStartupFailed
 commands
     silent
@@ -21,7 +33,7 @@ if gDownwellSceneAdmissionFailure != 0
     quit 1
 end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
-if $owner->collisionConsumersAdmitted_ || !$owner->native_ || !$owner->sceneryLayers_
+if $owner->collisionConsumersAdmitted_ != $encounter_backend || !$owner->native_ || !$owner->sceneryLayers_
     printf "Results re-entry is not exercising shipping native scene admission\n"
     quit 1
 end
@@ -29,6 +41,21 @@ if $owner->owner_.control_.bank_ != 0 || $owner->terrain_.records_ != 0
     printf "Reference control/terrain backing resident after native re-entry\n"
     quit 1
 end
+if $encounter_backend
+    if !$owner->geometry_ || !$owner->nativeCollisionStorage_ || !$owner->owner_.index_.tree_.tree_
+        printf "Admitted collision backing missing after reentry\n"
+        quit 1
+    end
+    if gDownwellEncounterRunLoads != 1 || gDownwellEncounterSceneLoads != 3 || gDownwellEncounterSceneReleases != 2
+        printf "Encounter leases did not retain Retry and reload for style/surface\n"
+        quit 1
+    end
+    if !downwell::AmigaWindAudio::current_
+        printf "Production audio device missing on gameplay reentry\n"
+        quit 1
+    end
+    printf "Native encounter: one run history, three scene leases, two retirements\n"
+else
 if $owner->geometry_ != 0 || $owner->nativeCollisionStorage_ != 0
     printf "Unadmitted collision backing resident after native re-entry\n"
     quit 1
@@ -38,6 +65,7 @@ if $owner->owner_.index_.tree_.tree_ != 0 || $owner->owner_.index_.operations_.b
     quit 1
 end
 printf "Native re-entry: external backend retained; no reference control, terrain, geometry, queue, tree or journal allocation\n"
+end
 printf "Initial Chip allocation: free=%lu largest=%lu remaining=%lu\n", gDownwellStartupChipFree, gDownwellStartupChipLargest, gDownwellStartupChipRemaining
 if gDownwellResultsRestartCount != 3 || gDownwellResultsRestartMask != 7
     printf "Not all results destinations executed\n"

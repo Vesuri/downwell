@@ -1919,7 +1919,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         (unsigned long)(amiga_object_pack_end-amiga_object_pack));
     const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
         (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
-#ifdef DOWNWELL_SCENE_VERIFY
+#if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)
     const downwell::SpriteMaskPack collisionMasks(amiga_collision_masks,
         (unsigned long)(amiga_collision_masks_end-amiga_collision_masks));
     if(!collisionMasks.valid())return 20;
