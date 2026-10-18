@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_WORLD_H
 
 #include "PlayerMotion.h"
+#include "RunAudioBinding.h"
 #include "GameplayFrame.h"
 #include "PreparedRoomTerrain.h"
 #include "ScriptEffectRuntimeBinding.h"
@@ -1537,6 +1538,12 @@ public:
         const bool ok=tick();collisionPass_=nullptr;collisionPassContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Audio,class Body> bool withRunAudio(Audio& audio,Body body){
+        if(runAudio_.stopAll)return false;
+        runAudio_=downwell::RunAudioBinding::bind(audio);
+        struct Leave {downwell::RunAudioBinding& binding;~Leave(){binding={};}} leave{runAudio_};
+        return body();
+    }
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     // The event part of advanceEnemyRoomAlarm, for a resolved record and an
@@ -2674,6 +2681,7 @@ private:
     void* registeredActorEndStepContext_=nullptr;
     bool (*collisionPass_)(void*)=nullptr;
     void* collisionPassContext_=nullptr;
+    downwell::RunAudioBinding runAudio_;
     bool collisionPassExecuting_=false;
     RoomActorDraw roomActorDraw_=nullptr;
     RoomActorDraw roomActorReadOnlyDraw_=nullptr;

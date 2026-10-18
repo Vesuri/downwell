@@ -28,6 +28,7 @@ public:
             // complete dependency before enabling that collision event.
             for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount;++id)
                 if(!audio_.hasResource(id))return false;
+            if(!audio_.stopAll())return false;
             return withUpdateEnvironment([&]{
                 game_.applyStartupShortcut();return worldSucceeded();
             });
@@ -47,7 +48,7 @@ public:
             game_.render(renderer);return game_.renderingSucceeded()&&worldSucceeded();
         });
     }
-    bool retire(){return boundary_.retire();}
+    bool retire(){if(!audio_.stopAll())boundary_.fail();return boundary_.retire();}
 private:
     bool worldSucceeded()const{
         const auto& world=game_.startup();
@@ -55,14 +56,14 @@ private:
     }
     template<class Body> bool withUpdateEnvironment(Body body){
         if(!settings_.gameVolume.valid()||!audio_.setMasterGain(settings_.masterGain))return false;
-        return game_.withCollisionPass([&](StartupRuntime& world){
+        return game_.withRunAudio(audio_,[&]{return game_.withCollisionPass([&](StartupRuntime& world){
             return contacts_.run(world,settings_.gameVolume,audio_);
         },[&]{
             // The mutable runtime is supplied at the core-owned binding seam;
             // backend adapters do not reach through const inspection APIs.
             game_.configureDitherAboveEnvironment(settings_.lowSpec,settings_.ending);
             return body();
-        });
+        });});
     }
     Game& game_;
     StoredWorldCollision& collision_;

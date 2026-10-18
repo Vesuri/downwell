@@ -224,6 +224,7 @@ void StartupRuntime::resetSceneState() {
 
 bool StartupRuntime::restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed) {
     if (resultsDestination(action) == ResultsDestination::none) return false;
+    if(!runAudio_.reset())return run_.effectsSucceeded=false;
     if(!ownedEntryRegistration_.clear())return false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;

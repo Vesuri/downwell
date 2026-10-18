@@ -25,6 +25,7 @@ public:
     bool play(int resource,int priority,bool loop,int& voice);
     bool isPlaying(int id,bool& playing);
     bool stop(int id);
+    bool stopAll();
     bool getGain(int id,MotionBinary64& value);
     bool setGain(int id,MotionBinary64 value,int milliseconds);
     bool setPitch(int id,MotionBinary64 value);

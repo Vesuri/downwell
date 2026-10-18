@@ -40,6 +40,17 @@ device combines it with voice gain when computing Paula volume (floor to 0–64)
 while `getGain` continues to report the independent source control. This is a
 device-resolution adaptation, not a claim of identical Windows DSP output.
 
+The session also binds run-audio reset around startup shortcuts and updates.
+`ResetPlayer`/`scrInitialize` stop all voices; the shared restart entry points
+invoke that binding before clearing `global.voidWind` and the overlap channels.
+A failed device reset aborts the restart and marks the world failed. Native
+world reconstruction preserves the lexical binding, not an audio device or
+resource bank. SDL startup and retirement stop its owned voices as well.
+This binding covers the admitted winds, not the still-unbound reset sound 321
+or the later music/resource-group events. `AmigaWindAudio::stopAll` publishes a
+VBlank stop command; a same-update play replaces it with a stop/start command,
+and pending reload IRQs cannot consume the new sample before that boundary.
+
 The shared player phase publishes Shop edges once into `ShopWorld::input`;
 compact parents consume that same publication. Registered parent scopes borrow
 it and the world's currency account through the state-owning overloads, rather

@@ -131,6 +131,23 @@ int main(){
        !audio.play(349,90,false,voice))return 20;
     platform.waitVblank();platform.waitVblank();platform.waitVblank();
     if(!(AmigaHardware::enabledDMAChannels()&DMAF_AUD0)||!audio.isPlaying(voice,playing)||!playing)return 20;
+    if(!audio.stopAll()||!audio.isPlaying(voice,playing)||playing)return 20;
+    platform.waitVblank();
+    if(AmigaHardware::enabledDMAChannels()&(DMAF_AUD0|DMAF_AUD1))return 20;
+    // A new run can play after stop-all without reloading the bank.
+    offset=silence=0;
+    if(!audio.play(349,90,false,voice))return 20;
+    platform.waitVblank();platform.waitVblank();platform.waitVblank();
+    if(!(AmigaHardware::enabledDMAChannels()&DMAF_AUD0))return 20;
+    // Reset followed by a different sound in the same update. A pending old
+    // reload IRQ must not consume the new sample until VBI has retired DMA.
+    if(!audio.stopAll())return 20;
+    resource=355;offset=silence=0;
+    if(!downwell::AmigaWindAudioProbe::sample(audio,resource,reference)||
+       !audio.play(resource,90,false,voice))return 20;
+    platform.waitVblank();platform.waitVblank();platform.waitVblank();
+    if(!audio.isPlaying(voice,playing)||!playing||gWindProbeFailed||
+       !downwell::AmigaWindAudioProbe::check(audio,gWindProbeRows-1))return 20;
     platform.restore();
     if(audio.ready()||SysBase->IntVects[INTB_AUD0].iv_Code!=savedAudio.iv_Code)return 20;
     FreeMem(words,8);

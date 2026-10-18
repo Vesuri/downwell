@@ -103,6 +103,10 @@ bool AmigaWindAudio::stop(int id){
     if(!ready())return false;
     Disable();if(matches(id)){playing_=false;command_=3;}Enable();return true;
 }
+bool AmigaWindAudio::stopAll(){
+    if(!ready())return false;
+    Disable();playing_=false;command_=3;Enable();return true;
+}
 bool AmigaWindAudio::getGain(int id,MotionBinary64& value){
     if(!ready())return false;
     if(hasResource(id)){value=MotionBinary64::fromInteger(1);return true;}

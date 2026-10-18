@@ -26,6 +26,10 @@ struct Sink final:Renderer {
     void drawSpriteTransformed(std::int32_t,std::uint32_t,float,float,float,float,float)override{++calls;}
     void drawText(std::int32_t,const char*,float,float,Color,TextAlign)override{++calls;}
 };
+struct SessionAudio:AudioSDL {
+    unsigned stops=0;
+    bool stopAll(){++stops;return AudioSDL::stopAll();}
+};
 int main(){
     assert(SDL_Init(SDL_INIT_AUDIO)==0);
     const auto r=read("generated/downwell-rooms.dwrm"),o=read("generated/downwell-objects.dwob"),
@@ -35,9 +39,9 @@ int main(){
     BuilderPatternPack builders(b.data(),b.size());SpriteCollisionPack sprites(c.data(),c.size());
     SpriteMaskPack masks(m.data(),m.size());
     assert(rooms.valid()&&objects.valid()&&builders.valid()&&sprites.valid()&&masks.valid());
-    using Session=StoredEncounterSession<AudioSDL>;
+    using Session=StoredEncounterSession<SessionAudio>;
     {
-        AudioSDL missing;assert(missing.ready()&&!missing.hasResource(349));
+        SessionAudio missing;assert(missing.ready()&&!missing.hasResource(349));
         for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount-1;++id){
             char path[128];std::snprintf(path,sizeof(path),"extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
             assert(missing.load(id,path,MotionBinary64::fromInteger(1)));
@@ -54,7 +58,7 @@ int main(){
         Sink sink;assert(!session->draw(sink)&&!sink.calls);
     }
     {
-        AudioSDL audio;assert(audio.ready());
+        SessionAudio audio;assert(audio.ready());
         for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount;++id){
             char path[128];std::snprintf(path,sizeof(path),"extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
             assert(audio.load(id,path,MotionBinary64::fromInteger(1))&&audio.hasResource(id));
@@ -65,6 +69,7 @@ int main(){
         assert(owner->attach(game->startup()));
         auto session=std::make_unique<Session>(*game,*owner,audio);
         assert(session->start()&&game->startupShortcutApplied());
+        assert(audio.stops==1);
         assert(AudioSDLTestAccess::master(audio)==0x3f19999au);
         session->settings().masterGain={0x3fe00000u,0};
         assert(session->update({})&&AudioSDLTestAccess::master(audio)==0x3f000000u);
@@ -92,6 +97,14 @@ int main(){
             assert(session->update(confirm)&&session->draw(sink));
         assert(world.inMainRoom()&&world.runStage().level==2&&!world.levelClearActive());
         assert(session->update({})&&session->draw(sink));
+        // A looping device voice cannot expire while the CPU fast-forwards
+        // the death menu. Only the production ResetPlayer binding can stop it.
+        int oldVoice=-1;bool oldPlaying=false;
+        // Keep the witness outside the admitted wind family so its ordinary
+        // overlap-channel stop cannot accidentally satisfy this assertion.
+        assert(audio.load(348,"extracted/audio/sound-effects/348_sfxPickup_Cat.wav",MotionBinary64::fromInteger(1)));
+        assert(audio.play(348,90,true,oldVoice)&&audio.isPlaying(oldVoice,oldPlaying)&&oldPlaying);
+        const auto stopsBeforeRetry=audio.stops;
         assert(world.subtractPlayerHealth(MotionBinary64::fromInteger(world.mainPlayerHealth())));
         bool retried=false;
         for(unsigned i=0;i<900&&!retried;++i){
@@ -106,6 +119,7 @@ int main(){
             retried=results&&!world.deathResults().active;
         }
         assert(retried&&world.inMainRoom()&&world.mainPlayerHealth()==4&&world.randomSeed()==42);
+        assert(audio.stops==stopsBeforeRetry+1&&audio.isPlaying(oldVoice,oldPlaying)&&!oldPlaying);
         assert(owner->valid()&&session->succeeded());
         std::puts("Session retained across level completion, death and Retry");
         // There must be no callback borrowing this owner outside the update.

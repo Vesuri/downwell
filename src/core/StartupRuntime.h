@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STARTUP_RUNTIME_H
 
 #include "AreaOneBuilder.h"
+#include "RunAudioBinding.h"
 #include "RunnerDirectionValue.h"
 #include "RunnerAlarmValue.h"
 #include "BlastWallContact.h"
@@ -147,6 +148,12 @@ public:
     // Call at a room-transition boundary, after consuming the results action.
     // Seed is explicit so randomize can be recorded/replayed by the platform.
     bool restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed);
+    template<class Audio,class Body> bool withRunAudio(Audio& audio,Body body){
+        if(runAudio_.stopAll)return false;
+        runAudio_=RunAudioBinding::bind(audio);
+        struct Leave {RunAudioBinding& binding;~Leave(){binding={};}} leave{runAudio_};
+        return body();
+    }
     template<unsigned Capacity,unsigned Registered> bool restartFromResultsWithScriptEffects(
         DeathMenuSequence::Action action,std::uint32_t seed,
         StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,ScriptSpawnEffects<Capacity>& effects){
@@ -3196,6 +3203,7 @@ private:
         })&&roomLayers_.serviceDepths()&&healthy();
     }
     void resetSceneState();
+    RunAudioBinding runAudio_;
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;
 

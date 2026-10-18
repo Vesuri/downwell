@@ -27,6 +27,7 @@ public:
     bool pause(int id);
     bool resume(int id);
     bool stop(int id);
+    bool stopAll();
     bool getGain(int id,MotionBinary64& gain);
     bool setGain(int id,MotionBinary64 gain,int milliseconds);
     bool setPitch(int id,MotionBinary64 pitch);

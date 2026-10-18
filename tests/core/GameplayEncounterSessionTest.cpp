@@ -14,7 +14,7 @@ int main(){
         rb=read("generated/downwell-rooms.dwrm");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     RoomPack rooms(rb.data(),rb.size());assert(objects.valid()&&sprites.valid()&&rooms.valid());
-    for(unsigned failure=0;failure<3;++failure){
+    for(unsigned failure=0;failure<4;++failure){
         auto owner=makeCollisionOwner(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},
             &rooms,GameplayCollisionOwner::Ownership::native);
@@ -30,13 +30,27 @@ int main(){
         }
         {
             GameplayEncounterSession::Frame handoff(session);assert(handoff.valid());
-            assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+            struct Audio {unsigned stops=0;bool stopAll(){++stops;return true;}} audio;
+            assert(world->withRunAudio(audio,[&]{
+                assert(!world->withRunAudio(audio,[]{return true;}));
+                for(unsigned retry=0;retry<2;++retry)
+                    assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+                return true;
+            })&&audio.stops==2); // Binding survives the in-place world reconstruction.
+            assert(world->withRunAudio(audio,[]{return true;})); // Lexical teardown.
             assert(handoff.finish());
         }
         unsigned publications=0;
         {
             GameplayEncounterSession::Frame frame(session);assert(frame.valid());
-            if(failure==1){
+            if(failure==3){
+                struct RejectAudio {bool stopAll(){return false;}} audio;
+                assert(world->withRunAudio(audio,[&]{
+                    assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::none);
+                    return true; // Ignoring the callback failure cannot permit publication.
+                }));
+                assert(!world->effectsSucceeded()&&!frame.beginDraw(true));
+            }else if(failure==1){
                 // Real failed world callback, before Draw: no presentation.
                 assert(!world->withShopStepState([](auto&,auto&){return false;}));
                 assert(!frame.beginDraw(true));

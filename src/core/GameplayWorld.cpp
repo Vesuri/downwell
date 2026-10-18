@@ -34,6 +34,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if(!runAudio_.reset()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    const auto runAudio=runAudio_;
     if(levelNumbers_&&!levelNumbers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(limboShards_&&!limboShards_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredFlash_&&!registeredFlash_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -150,6 +152,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms,playerBirthTiming);
+    runAudio_=runAudio;
     run_.backgroundMusicId=backgroundMusic;
     nativeTerrainInstances_=nativeTerrainInstances;
     nativeTerrainBinding_=nativeTerrainBinding;

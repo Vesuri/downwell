@@ -41,6 +41,9 @@ public:
     void configureDitherAboveEnvironment(bool lowSpec,bool ending){
         startup_.configureDitherAboveEnvironment(lowSpec,ending);
     }
+    template<class Audio,class Body> bool withRunAudio(Audio& audio,Body body){
+        return startup_.withRunAudio(audio,body);
+    }
 
     // Platform entropy for ResetPlayer/randomize; fixed default for replays.
     void update(const Input& input, std::uint32_t restartSeed = 2);

@@ -72,6 +72,9 @@ bool AudioSDL::resume(int id){
     return device_!=0;
 }
 bool AudioSDL::stop(int id){Lock lock(device_);for(auto& v:voices_)if(v.id==id||v.resource==id){v.active=false;v.paused=false;}return device_!=0;}
+bool AudioSDL::stopAll(){
+    Lock lock(device_);for(auto& v:voices_){v.active=false;v.paused=false;}return device_!=0;
+}
 bool AudioSDL::getGain(int id,MotionBinary64& gain){
     Lock lock(device_);
     if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty()){gain=samples_[id].gain.current.promoted();return true;}
