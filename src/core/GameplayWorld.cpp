@@ -36,6 +36,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (destination == downwell::ResultsDestination::none) return destination;
     if(!runAudio_.reset()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto runAudio=runAudio_;
+    const auto encounterUpdateOwner=encounterUpdateOwner_;
+    const auto encounterCollision=collisionPass_;
+    auto* const encounterCollisionContext=collisionPassContext_;
     auto* const encounterInput=encounterInput_;
     if(encounterInput)encounterInput->resetPublication();
     if(levelNumbers_&&!levelNumbers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -155,6 +158,12 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms,playerBirthTiming);
     runAudio_=runAudio;
+    // The split frame's borrowed environment survives in-place Retry, just
+    // like its input publication. No device/resource is copied into the world.
+    if(encounterUpdateOwner){
+        encounterUpdateOwner_=encounterUpdateOwner;
+        collisionPass_=encounterCollision;collisionPassContext_=encounterCollisionContext;
+    }
     bindEncounterInput(encounterInput);
     run_.backgroundMusicId=backgroundMusic;
     nativeTerrainInstances_=nativeTerrainInstances;

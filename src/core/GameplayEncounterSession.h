@@ -31,6 +31,14 @@ public:
         explicit Frame(GameplayEncounterSession& session):session_(session),frame_(session.boundary_){
             if(!session_.healthy())frame_.fail();
         }
+        ~Frame(){leaveEnvironment();}
+        template<class Environment> bool bindUpdateEnvironment(Environment& environment){
+            if(!valid()||!sampled_||frame_.drawing()||environment_)return frame_.fail();
+            if(!environment.enterUpdate())return frame_.fail();
+            environment_=&environment;
+            leave_=[](void* p){return static_cast<Environment*>(p)->leaveUpdate();};
+            return true;
+        }
         bool valid()const{return frame_.valid()&&session_.healthy();}
         bool sampleInput(const Input& input){
             if(!valid()||sampled_||frame_.drawing())return frame_.fail();
@@ -38,6 +46,7 @@ public:
         }
         bool beginDraw(bool gameplay=false){
             if(gameplay&&!sampled_)return frame_.fail();
+            if(!leaveEnvironment())return frame_.fail();
             if(!valid()||!frame_.beginDraw())return frame_.fail();
             // Source deferred destruction is swept at gameplay Draw entry,
             // before collecting render commands, not at publication time.
@@ -49,12 +58,21 @@ public:
             return true;
         }
         bool finish(){
+            if(!leaveEnvironment())frame_.fail();
             if(!session_.healthy())frame_.fail();
             return frame_.finish();
         }
     private:
+        bool leaveEnvironment(){
+            if(!environment_)return true;
+            auto* context=environment_;environment_=nullptr;
+            const bool okay=leave_(context);leave_=nullptr;
+            return okay||frame_.fail();
+        }
         GameplayEncounterSession& session_;
         EncounterBoundary::Frame frame_;
+        void* environment_=nullptr;
+        bool (*leave_)(void*)=nullptr;
         bool sampled_=false;
     };
 private:

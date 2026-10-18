@@ -1545,6 +1545,25 @@ public:
         struct Leave {downwell::RunAudioBinding& binding;~Leave(){binding={};}} leave{runAudio_};
         return body();
     }
+    // Split-loop session scope: the caller owns these callbacks until Draw
+    // entry or frame completion. Never coexist with a reference lexical pass.
+    bool bindEncounterUpdate(const void* owner,downwell::RunAudioBinding audio,
+        void* collisionContext,bool (*collision)(void*)){
+        if(!run_.effectsSucceeded||!owner||!audio.stopAll||!collision||
+           encounterUpdateOwner_||runAudio_.stopAll||collisionPass_)
+            return run_.effectsSucceeded=false;
+        encounterUpdateOwner_=owner;runAudio_=audio;
+        collisionPassContext_=collisionContext;collisionPass_=collision;
+        return true;
+    }
+    bool unbindEncounterUpdate(const void* owner){
+        if(!owner||encounterUpdateOwner_!=owner||collisionPassExecuting_)
+            return run_.effectsSucceeded=false;
+        encounterUpdateOwner_=nullptr;runAudio_={};
+        collisionPassContext_=nullptr;collisionPass_=nullptr;
+        return true;
+    }
+    bool boundEncounterUpdate(const void* owner)const{return owner&&encounterUpdateOwner_==owner;}
     bool bindEncounterInput(downwell::EncounterInput* input){
         if(input&&encounterInput_&&input!=encounterInput_)return false;
         encounterInput_=input;run_.shops.borrowedInput=input?&input->publication():nullptr;
@@ -2696,6 +2715,7 @@ private:
     bool (*collisionPass_)(void*)=nullptr;
     void* collisionPassContext_=nullptr;
     downwell::RunAudioBinding runAudio_;
+    const void* encounterUpdateOwner_=nullptr;
     downwell::EncounterInput* encounterInput_=nullptr;
     bool collisionPassExecuting_=false;
     RoomActorDraw roomActorDraw_=nullptr;

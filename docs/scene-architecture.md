@@ -42,6 +42,17 @@ checks the selected field's sound/RNG against the reference owner, and exercises
 the real world collision-phase hook and Draw-time retirement. This fixture is
 not evidence that the Amiga frontend has acquired those production leases.
 
+`GameplayEncounterEnvironment` borrows that pass, audio device and settings
+for a split native frame. `Frame::bindUpdateEnvironment` requires the session's
+input sample first and rejects rebinding or installation after Draw. Dependency
+checks run once per environment lifetime (the immutable scene resources must
+outlive it); device readiness and settings are checked at update entry.
+Draw entry, explicit frame completion and abandoned-frame cleanup all remove
+the world's borrowed callbacks. A failed callback cannot become a publishable
+frame. In-place Retry preserves both callback identities until the owning
+frame releases them; it does not copy or reconstruct a device/resource lease.
+Reference lexical scopes remain available and cannot coexist with this binding.
+
 `EncounterSettings` keeps `gameVolume` separate from device master gain.
 `scrLoadSave` assembly loads the INI `option/masterGain` default 0.6 and calls
 `audio_master_gain`; it does not overwrite the per-sound gain. The stored session

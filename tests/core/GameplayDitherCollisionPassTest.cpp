@@ -1,4 +1,6 @@
 #include "core/GameplayDitherCollisionPass.h"
+#include "core/GameplayEncounterEnvironment.h"
+#include "core/GameplayEncounterSession.h"
 #include "CollisionOwnerFixture.h"
 #include <cassert>
 #include <fstream>
@@ -10,6 +12,12 @@ static std::vector<std::uint8_t> read(const char* path){
 }
 struct Audio {
     bool playing=false,fail=false;std::vector<int> calls;
+    unsigned stops=0,updates=0;int missing=-1;bool masterOkay=true;
+    bool ready()const{return true;}
+    bool hasResource(int id)const{return id!=missing;}
+    bool stopAll(){++stops;playing=false;return !fail;}
+    void update(){++updates;}
+    bool setMasterGain(MotionBinary64 gain){return masterOkay&&gain.high==0x3fe33333u&&gain.low==0x33333333u;}
     bool isPlaying(int id,bool& out){calls.push_back(id);out=id==900&&playing;return !fail;}
     bool stop(int id){calls.push_back(10000+id);return true;}
     bool play(int id,int priority,bool loop,int& voice){
@@ -19,9 +27,9 @@ struct Audio {
     bool setGain(int,MotionBinary64,int){return true;}
     bool setPitch(int,MotionBinary64){return true;}
 };
-int main(){
+int main(int argc,char** argv){
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
-        rb=read("generated/downwell-rooms.dwrm"),mb=read("generated/downwell-sprite-masks.dwsm");
+        rb=read("generated/downwell-rooms.dwrm"),mb=read(argc>1?argv[1]:"generated/downwell-sprite-masks.dwsm");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     RoomPack rooms(rb.data(),rb.size());SpriteMaskPack masks(mb.data(),mb.size());
     assert(objects.valid()&&sprites.valid()&&rooms.valid()&&masks.valid());
@@ -79,8 +87,64 @@ int main(){
                     MotionBinary64::fromInteger(1),audio,room);},[&]{world->step(0);return world->effectsSucceeded();}));
                 assert(passes==1&&audio.calls.size()>queries);
                 assert(owner->prepareDraw()); // Physical retirement only at Draw.
+                GameplayEncounterSession session(*world,*owner);assert(session.start());
+                using Environment=GameplayEncounterEnvironment<Audio,decltype(room),256>;
+                auto environment=std::make_unique<Environment>(*world,*owner,masks,audio,room);
+                {
+                    GameplayEncounterSession::Frame frame(session);
+                    assert(frame.sampleInput({})&&frame.bindUpdateEnvironment(*environment));
+                    assert(world->boundEncounterUpdate(environment.get()));
+                    world->step(0);assert(world->effectsSucceeded());
+                    assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+                    assert(audio.stops==1&&world->boundEncounterUpdate(environment.get()));
+                    assert(frame.beginDraw(true)&&!world->boundEncounterUpdate(environment.get()));
+                    assert(frame.publishable()&&frame.finish());
+                }
+                {
+                    GameplayEncounterSession::Frame frame(session);
+                    assert(frame.sampleInput({})&&frame.bindUpdateEnvironment(*environment));
+                    assert(frame.finish()&&!world->boundEncounterUpdate(environment.get()));
+                }
+                assert(audio.updates==2&&session.retire());
+                // An abandoned frame is terminal, but must still retire its
+                // borrowed callbacks before the environment/device disappears.
+                GameplayEncounterSession abandoned(*world,*owner);assert(abandoned.start());
+                {
+                    GameplayEncounterSession::Frame frame(abandoned);
+                    assert(frame.sampleInput({})&&frame.bindUpdateEnvironment(*environment));
+                }
+                assert(!abandoned.succeeded()&&!world->boundEncounterUpdate(environment.get()));
             }
         }
+    }
+    for(unsigned failure=0;failure<4;++failure){
+        auto owner=makeCollisionOwner(objects,sprites,{}, {},&rooms,GameplayCollisionOwner::Ownership::nativeScenery);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
+        assert(owner->attach(*world));
+        GameplayEncounterSession session(*world,*owner);assert(session.start());
+        Audio audio;
+        auto room=[]{return RunnerCollisionEventContext::RoomState{true,false};};
+        using Environment=GameplayEncounterEnvironment<Audio,decltype(room),256>;
+        auto environment=std::make_unique<Environment>(*world,*owner,masks,audio,room);
+        {
+            GameplayEncounterSession::Frame frame(session);assert(frame.sampleInput({}));
+            if(failure==0)audio.missing=355;
+            if(failure==1)audio.masterOkay=false;
+            if(failure<2){assert(!frame.bindUpdateEnvironment(*environment));}
+            else {
+                assert(frame.bindUpdateEnvironment(*environment));
+                if(failure==2)assert(!frame.bindUpdateEnvironment(*environment));
+                else {
+                    audio.fail=true;
+                    assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::none);
+                }
+            }
+            assert(!frame.beginDraw(true)&&!frame.publishable()&&!frame.finish());
+        }
+        assert(!session.succeeded()&&!world->boundEncounterUpdate(environment.get()));
+        // Even a failed owner releases the reference binding slots.
+        audio.fail=false;assert(world->withRunAudio(audio,[]{return true;}));
     }
     std::puts("Dither/wind admission: reference/native sealed order, room suppression and terminal audio failure passed");
 }
