@@ -53,7 +53,7 @@ int main() {
     def test_hud_is_packaged_as_scene_data(self):
         for script in ('run.sh', 'verify_startup.sh', 'verify_replay.sh'):
             text = (ROOT / 'amiga' / script).read_text()
-            self.assertIn('patterns exitmask selectionmask hud entrymask; do', text)
+            self.assertIn('patterns exitmask selectionmask hud entrymask terrain; do', text)
         makefile = (ROOT / 'amiga/Makefile').read_text()
         self.assertIn('$(OUT).hud: $(AMIGA_HUD)', makefile)
         self.assertIn('HUD source must be scene-loaded, not linked', makefile)
@@ -106,6 +106,7 @@ int main() {
         self.assertEqual(contract.BANKS['patterns'], 72 * 1024)
         self.assertEqual(contract.BANKS['hud'], 16 * 1024)
         self.assertEqual(contract.BANKS['entrymask'], 31104)
+        self.assertEqual(contract.BANKS['terrain'], 384 * 1024)
         with tempfile.TemporaryDirectory(prefix='downwell-pattern-budget-') as directory:
             root = Path(directory)
             # Synthetic payloads only: this tests the size/ownership boundary,

@@ -13,7 +13,9 @@ on PAL; do not add 60 Hz catch-up.
 ## Priority and scope
 
 Immediate priority: section 0, every update of the A500 initial fall within
-20 ms, worked in its C–E order. Do not add further section 1 functionality
+20 ms. Item C is deferred at the user's request. D remains the next fixed-cost
+item; E still depends on C and D. Do not resume C without user direction.
+Do not add further section 1 functionality
 while this regression is unresolved.
 After that, finish live skeleton encounters (section 1), following its numbered
 integration tasks: production ownership, generation/query/dispatch, time-stop
@@ -98,6 +100,17 @@ after each item.
   in a commit. Stop every owned emulator before handoff.
 
 ### C. Row painting and the two-update row period
+
+**Deferred; not accepted as the default.** The preserved C/D candidate is
+selected with `REFERENCE_ROW_PAINTING=0 REFERENCE_FRAME_WORK=0`; both remain
+`1` by default. It uses prepared pattern rows, ordinary-memory preparation,
+paint-ahead and reduced fixed-frame work, without the rejected larger asset
+bank. Behavior/pixel checks have passed, but the timing gate below has not.
+The existing late-fall capture still has four updates over 20 ms; exact
+fence-excluded accounting gives 18.9 ms mean and 20.6 ms worst (139).
+The full-fall, cadence and default-acceptance gates must be rerun on the final
+candidate before closing C. Measurements and test evidence are in
+[the audit](amiga-frame-cost.md#row-preparation-and-empty-family-dispatch--provisional).
 
 - **Removes:**
   - corridor row painting, 2.85 ms per row in the quiet window;

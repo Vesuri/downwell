@@ -178,6 +178,20 @@ int main() {
         for (int row=exposed.first;row<exposed.first+exposed.count;++row) {
             storedY[row%320]=row; storedRevision[row%320]=revisions[row];
         }
+        const int oldEnd=scene.backingEnd();
+        const auto ahead=scene.prepareBacking(y,284,320,16);
+        assert(scene.backingEnd()==oldEnd&&ahead.count>=0&&ahead.count<=16);
+        if(ahead.count){
+            assert(ahead.first>=y+284&&ahead.first+ahead.count<=y+308);
+            assert(!scene.preparedBacking({ahead.first+1,ahead.count},320));
+            // Failed paint is deliberately not committed or displayed.
+            if(tick%7){
+                for(int row=ahead.first;row<ahead.first+ahead.count;++row){
+                    storedY[row%320]=row;storedRevision[row%320]=revisions[row];
+                }
+                assert(scene.preparedBacking(ahead,320));
+            }
+        }
         const int damaged=y+int((random>>16)%360)-32;
         for (int row=damaged;row<damaged+16;++row) {
             ++revisions[row];

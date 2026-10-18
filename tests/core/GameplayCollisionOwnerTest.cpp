@@ -1032,12 +1032,17 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
     }
 }
 static void checkEmptyPlayerAlarmPhase(const ObjectPack& objects,const SpriteCollisionPack& sprites){
-    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        for(unsigned tick=0;tick<8;++tick){
+            world->step(0);
+            assert(world->effectsSucceeded()&&world->findPlayer(world->playerHandle())->damageAlarm<0);
+        }
         for(int value:{-2,-1,0,1,2,-1,2}){
             assert(world->setPlayerDamageAlarm(world->playerHandle(),value));
             world->step(0);
@@ -1084,6 +1089,12 @@ static void checkNativeAnimationPopulation(const ObjectPack& objects,const Sprit
     }
 }
 int main(){
+#ifdef DOWNWELL_FRAME_WORK_TEST
+    const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+    ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    checkEmptyPlayerAlarmPhase(objects,sprites);
+    std::puts("Idle room alarms: reference/native/scenery, armed player and new box passed");
+#else
     assert(downwell::RunnerBindingRevisionVerification::run());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
         const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
@@ -9276,5 +9287,6 @@ int main(){
     }
     std::printf("Gameplay collision owner bytes (host): %zu\n",sizeof(GameplayCollisionOwner));
     std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");
+#endif
 }
 #endif

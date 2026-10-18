@@ -32,6 +32,10 @@ public:
     // Requires height + 16 <= ringHeight (284 visible rows, 320 allocated).
     // Caller must paint the returned span before publishing the frame.
     StageSpan exposeBacking(int viewY, int height, int ringHeight);
+    // Predict pixels only. The range remains uncommitted until painting
+    // succeeds; never overwrite rows that still belong to the visible view.
+    StageSpan prepareBacking(int viewY,int height,int ringHeight,int budget)const;
+    bool preparedBacking(StageSpan span,int ringHeight);
     int backingFirst() const { return cachedFirst_; }
     int backingEnd() const { return cachedEnd_; }
     // Staging belongs to the scene, independently of the Copper slot lifetime.

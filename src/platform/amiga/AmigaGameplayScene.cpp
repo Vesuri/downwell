@@ -49,6 +49,22 @@ AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int vi
     return {first, count > 0 ? count : 0};
 }
 
+AmigaGameplayScene::StageSpan AmigaGameplayScene::prepareBacking(int viewY,int height,int ringHeight,int budget)const{
+    if(budget<16||height+24>ringHeight||cachedFirst_>viewY||cachedEnd_<viewY+height)return {0,0};
+    const int target=viewY+height+24;
+    int count=target-cachedEnd_;
+    if(count<16)return {0,0};
+    if(count>budget)count=budget;
+    return {cachedEnd_,count>0?count:0};
+}
+
+bool AmigaGameplayScene::preparedBacking(StageSpan span,int ringHeight){
+    if(span.count<=0||span.count>ringHeight||span.first!=cachedEnd_)return false;
+    cachedEnd_+=span.count;
+    if(cachedFirst_<cachedEnd_-ringHeight)cachedFirst_=cachedEnd_-ringHeight;
+    return true;
+}
+
 void AmigaGameplayScene::staged(StageSpan span, int ringHeight) {
     if (span.count <= 0) return;
     if (stagedFirst_ < stagedEnd_ &&

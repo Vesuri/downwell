@@ -11,6 +11,7 @@ struct Copy { unsigned x,y,w,h; };
 static std::vector<Copy> copies;
 static unsigned drains;
 static bool nasty;
+unsigned amigaRowSyncVisited;
 void AmigaHardware::setBlitterNasty(bool enabled) { nasty=enabled; }
 void AmigaHardware::blitterDrain() { assert(nasty); ++drains; }
 Bitmap::Bitmap(void* p,uint16_t w,uint16_t h,uint16_t planes,bool inter,bool own,uint16_t dma)
@@ -29,6 +30,18 @@ void Bitmap::copy(const Bitmap& source,uint16_t x,uint16_t y,uint16_t sx,uint16_
     }
 }
 int main() {
+    // Exhaust every word shape and search start against a scalar oracle.
+    // Run boundaries, not just final pixels, determine the DMA submissions.
+    for(unsigned bits=0;bits<65536;++bits){
+        AmigaRowDebt<16> debt;
+        for(unsigned row=0;row<16;++row)if(bits&(1u<<row))debt.assign(row,row+1,true);
+        for(unsigned first=0;first<=16;++first)for(bool owed:{false,true}){
+            unsigned expected=first;
+            while(expected<16&&bool(bits&(1u<<expected))!=owed)++expected;
+            assert(debt.next(first,16,owed)==expected);
+        }
+    }
+    std::puts("Row debt: all 65536 word shapes and every search start match scalar runs");
     constexpr unsigned rows=downwellGameRingHeight, bytes=downwellGameRingBytes;
     std::array<unsigned char,bytes> backing{}, pixels[2]{}, expected[2]{};
     bool owed[2][rows]{};
@@ -48,6 +61,17 @@ int main() {
             for(unsigned y=0;y<rows;++y) { owed[b][y]=false; assert(!tracker.dirty(y,b)); }
         }
     };
+    initialize();
+    tracker.damage(rows-8,0,16);
+    for(unsigned b=0;b<2;++b){
+        copies.clear();amigaRowSyncVisited=0;
+        tracker.sync(targets[b],source,b);
+        assert(copies.size()==2&&copies[0].y==0&&copies[0].h==8&&
+               copies[1].y==rows-8&&copies[1].h==8);
+#if defined(DOWNWELL_ROW_SYNC_AUDIT) && !defined(DOWNWELL_REFERENCE_FRAME_WORK)
+        assert(amigaRowSyncVisited<=48); // The clean middle is not visited.
+#endif
+    }
     initialize();
     unsigned random=17;
     auto next=[&] { random=random*1664525u+1013904223u; return random; };

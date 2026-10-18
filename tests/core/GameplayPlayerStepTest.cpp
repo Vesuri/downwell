@@ -25,6 +25,47 @@ struct Fixture {
 }
 
 int main() {
+    for(bool heldBeforeBirth:{false,true}){
+        Fixture f;downwell::Input right;right.right=true;
+        f.step(heldBeforeBirth?right:downwell::Input{});
+        require(f.run.shops.previous.right==heldBeforeBirth,
+            "empty shop family retains raw input history");
+        downwell::ShopWorld::Instance* born=nullptr;
+        downwell::stepGameplayPlayer(f.player,f.death,f.run,f.currency,f.health,f.random,right,
+            240,176,160,34,false,downwell::NoPlayerPositionPublication{},downwell::NoPlayerScalePublication{},
+            downwell::UnindexedPlayerGoalContact{},[&](const auto&,int x,int y){
+                born=f.run.shops.create(x+100,y,[](unsigned,unsigned hi){return hi;},[]{return 1u;},4,1);
+                require(born!=nullptr,"synchronous callback creates the first shop");
+                born->menu.active=born->menu.speaking=true;
+                born->menu.menuState=1;born->menu.cursor=1;
+                born->keeper.alarm2=3;
+                return true;
+            });
+        require(born&&born->menu.cursor==(heldBeforeBirth?1u:2u),
+            "first shop sees the true press edge in its birth update");
+        require(born->keeper.alarm2==2&&born->menu.cursorPhaseQuarters==1,
+            "first shop runs alarms and presentation in the callback update");
+        require(f.run.effectsSucceeded&&f.run.shops.previous.right,
+            "shop family dispatch preserves successful input publication");
+    }
+    {
+        Fixture f;
+        for(unsigned streak:{0u,0u,99u,100u,100u,101u,0u,0xffffffffu,99u}){
+            f.currency.streak=streak;
+            f.run.gemHigh=!(downwell::machineGunProfileForStreak(streak).level!=0);
+            f.run.selectWeaponLevel(f.currency);
+            require(f.run.gemHigh==(downwell::machineGunProfileForStreak(streak).level!=0),
+                "retained weapon selection matches reference at unchanged and changed inputs");
+            auto copy=f.run;
+            copy.selectWeaponLevel(f.currency);
+            require(copy.gemHigh==f.run.gemHigh,"copied session retains weapon selection");
+        }
+        f.currency.streak=99;f.run.selectWeaponLevel(f.currency);
+        f.currency.streak=100;
+        require(!f.run.gemHigh,"pickup does not select a profile before Begin Step");
+        f.run.selectWeaponLevel(f.currency);
+        require(f.run.gemHigh,"next Begin Step selects updated streak");
+    }
     for(bool accept:{false,true}){
         Fixture f;downwell::Input right;right.right=true;unsigned transitions=0;bool published=false;
         downwell::stepGameplayPlayer(f.player,f.death,f.run,f.currency,f.health,f.random,right,

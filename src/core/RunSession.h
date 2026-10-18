@@ -497,8 +497,21 @@ struct RunSession {
     }
     SideCameraLockers sideCameraLockers;
     bool gemHigh = false;
+    // Begin Step owns this selection; pickups later in the tick must not
+    // change it early. Retain the derived profile until its input changes.
+    unsigned weaponSelectionStreak = 0;
+    bool weaponSelectionValid = false, weaponSelectionHigh = false;
     void selectWeaponLevel(const CurrencyAccount& currency) {
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
         gemHigh = machineGunProfileForStreak(currency.streak).level != 0;
+#else
+        if(!weaponSelectionValid || weaponSelectionStreak != currency.streak){
+            weaponSelectionHigh = machineGunProfileForStreak(currency.streak).level != 0;
+            weaponSelectionStreak = currency.streak;
+            weaponSelectionValid = true;
+        }
+        gemHigh = weaponSelectionHigh;
+#endif
     }
     // Pickup-only upgrade effects: nonGemGainGem (combo rewards) does not
     // invoke scrRechargeGem. Ownership is sampled at collection, not birth.

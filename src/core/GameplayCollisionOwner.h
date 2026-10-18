@@ -2626,6 +2626,22 @@ public:
             DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid()||self.combatAlarmPhaseInUse_||self.actorEndStepExecuting_)return self.check(false);
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+            // A retained player-only projection proves that no other captured
+            // handler can arm an alarm. Test that admission before acquiring
+            // phase workspaces/roster leases. Birth/registration changes dirty
+            // the projection. Native enemies and boxes bypass that capture:
+            // their retained handler mask and never-armed proof independently
+            // guard this admission, including nonempty dormant populations.
+            if(self.nativeEnemyAlarms()&&self.combatAlarmCaptureValid_&&
+               !self.combatAlarmCaptureDirty_&&self.combatAlarmPlayerOnly_&&
+               self.combatAlarmPlayer_.generation&&self.nativeBoxAlarmPrefix_&&
+               self.enemyAlarmRoster_.noAlarmHandlers()&&self.world_->boxAlarmsNeverArmed()){
+                bool pending=true;
+                if(!self.check(self.world_->playerDamageAlarmPending(self.combatAlarmPlayer_,1,pending)))return false;
+                if(!pending)return true;
+            }
+#endif
             self.combatAlarmPhaseInUse_=true;
             struct ReleasePhase {bool& flag;~ReleasePhase(){flag=false;}} releasePhase{self.combatAlarmPhaseInUse_};
             auto& phase=self.combatAlarmPhase_;

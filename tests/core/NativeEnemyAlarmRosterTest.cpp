@@ -4,7 +4,13 @@
 int main(){
     using Roster=downwell::NativeEnemyAlarmRoster<4>;
     Roster roster;
+    assert(roster.noAlarmHandlers());
+    assert(roster.put({{3,1},121,1,0})&&roster.noAlarmHandlers());
+    Roster::Phase emptyHandlers;
+    assert(roster.begin(emptyHandlers)&&!roster.noAlarmHandlers());
+    roster.end();assert(roster.noAlarmHandlers());roster.clear();
     assert(roster.put({{2,1},116,3,1}));
+    assert(!roster.noAlarmHandlers());
     assert(roster.put({{0,1},112,1,2}));
     assert(roster.put({{1,1},112,2,2}));
     Roster::Phase phase;

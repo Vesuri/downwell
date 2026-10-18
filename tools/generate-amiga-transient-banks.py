@@ -5,17 +5,19 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'generate-amiga-transient-banks/v5'
+VERSION = 'generate-amiga-transient-banks/v6'
 # Budgets are deliberately not inferred from payload sizes. Growth must be
 # reviewed against scene peak residency, not silently enlarge an allocation.
 # Upgrade owns the living player's DMA poses (16 KiB allowance), allowing the
 # entire 221282-byte cavern CPU pack and 106574-byte DMA pack to retire.
 BANKS = {'results': 24576, 'shop': 16384, 'clear': 188416,
          'patterns': 72 * 1024, 'exitmask': 31104, 'selectionmask': 14256,
-         'hud': 16 * 1024, 'entrymask': 31104}
+         'hud': 16 * 1024, 'entrymask': 31104, 'terrain': 384 * 1024}
 
 
 def bank_path(name):
+    if name == 'terrain':
+        return 'generated/amiga-pattern-terrain.bin'
     if name == 'patterns':
         return 'generated/downwell-builder-patterns.dwbp'
     if name in ('exitmask', 'selectionmask', 'entrymask'):
@@ -37,7 +39,7 @@ def main():
         lines += [f'#define DOWNWELL_{name.upper()}_BANK_BYTES {len(payload)}u',
                   f'#define DOWNWELL_{name.upper()}_BANK_BUDGET {budget}u']
         banks[name] = {'bytes': len(payload), 'budget': budget,
-                       'owner': ('gameplay' if name == 'entrymask' else
+                       'owner': ('gameplay' if name in ('entrymask', 'terrain') else
                                  'terrain-lifetimes' if name == 'patterns' else
                                  'upgrade' if name in ('clear', 'selectionmask') else name),
                        'sha256': hashlib.sha256(payload).hexdigest()}

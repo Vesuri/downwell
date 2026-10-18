@@ -29,6 +29,9 @@ private:
         return a.object<b.object||(a.object==b.object&&a.order<b.order);
     }
 public:
+    // Read-only phase admission. A pinned bank still requires the ordinary
+    // begin() failure path; absence of handlers is stronger than zero actors.
+    bool noAlarmHandlers()const{return pinned_<0&&!banks_[current_].alarms;}
     bool begin(Phase& out){
         if(pinned_>=0)return false;
         pinned_=int(current_);const auto& bank=banks_[current_];

@@ -1578,9 +1578,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const unsigned oldGemStreak = currencyAccount_.streak;
     const unsigned oldShots = player_.shots();
     bool bulletChanged = false;
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
     unsigned destroyedBlockCount = 0;
     int destroyedBlockX[destroyedCapacity] = {0};
     int destroyedBlockY[destroyedCapacity] = {0};
+#else
+    GameplayFrame frame;
+    auto& destroyedBlockCount=frame.destroyedBlockCount;
+    auto& destroyedBlockX=frame.blockX;
+    auto& destroyedBlockY=frame.blockY;
+#endif
 
     ++tick_;
     currencyAccount_.beginStep();
@@ -2018,8 +2025,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     trajectory_.addU64(checkpoint_);
 #endif
 
-    run_.shops.endStep(34 + downwell::floorQ8Coordinate(generationCameraY));
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+    if(run_.shops.allocatedCount)
+#endif
+        run_.shops.endStep(34 + downwell::floorQ8Coordinate(generationCameraY));
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
     GameplayFrame frame = {};
+#endif
     run_.gameplayPresentationStep(enemyRandom_);
     if(!reconcilePhase(PhaseBoundary::endStep))return {};
     frame.playerMotion = motion;
@@ -2036,11 +2048,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     frame.scrollDelta = scrollDelta;
     frame.cameraXChanged = cameraXDelta != 0;
     frame.cameraXDelta = cameraXDelta;
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
     frame.destroyedBlockCount = destroyedBlockCount;
     for (unsigned index = 0; index < destroyedBlockCount; ++index) {
         frame.blockX[index] = destroyedBlockX[index];
         frame.blockY[index] = destroyedBlockY[index];
     }
+#endif
     DW_PROFILE_PHASE(profileSimulation);
     return frame;
 }

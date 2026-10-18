@@ -1466,6 +1466,24 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp t
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
+FRAME_WORK_TEST_SOURCES = tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp
+build/frame-work-test build/frame-work-reference-test: $(FRAME_WORK_TEST_SOURCES) $(wildcard src/core/*.h tests/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FRAME_WORK_TEST $(if $(findstring reference,$@),-DDOWNWELL_REFERENCE_FRAME_WORK) -o $@ $(FRAME_WORK_TEST_SOURCES)
+.PHONY: test-frame-work
+test-frame-work: build/frame-work-test build/frame-work-reference-test
+	./build/frame-work-test
+	./build/frame-work-reference-test
+
+build/gameplay-frame-test build/gameplay-frame-reference-test: tests/core/GameplayFrameTest.cpp src/core/GameplayFrame.h src/core/GameplayLimits.h src/core/PlayerMotion.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) $(if $(findstring reference,$@),-DDOWNWELL_REFERENCE_FRAME_WORK) -o $@ $<
+.PHONY: test-gameplay-frame
+test-gameplay-frame: build/gameplay-frame-test build/gameplay-frame-reference-test
+	./build/gameplay-frame-test
+	./build/gameplay-frame-reference-test
+test: test-gameplay-frame
+
 # Native enemy updates cross-checked against the walks they replace, and
 # the reference enemy updates they replace.
 build/gameplay-collision-owner-reference-enemies-test: CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
@@ -2524,6 +2542,23 @@ generate-initial-terrain: generate-amiga-game generate-room-pack build/prepare-i
 	python3 tools/generate-terrain-phase.py
 	python3 tools/generate-initial-terrain.py
 
+build/amiga-pattern-terrain-test: tests/platform/amiga/AmigaPatternTerrainTest.cpp src/platform/amiga/AmigaTerrainPainter.cpp src/platform/amiga/AmigaTerrainRaster.cpp src/platform/amiga/AmigaGameplayRows.cpp src/platform/amiga/AmigaRenderer.c $(filter-out tests/platform/amiga/AmigaLiveTerrainTest.cpp,$(AMIGA_LIVE_TERRAIN_TEST_SOURCES)) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_TERRAIN_BATCH -o $@ $(filter %.cpp %.c,$^)
+
+.PHONY: generate-pattern-terrain test-pattern-terrain
+build/amiga-pattern-row-test: tests/platform/amiga/AmigaPatternRowTest.cpp src/platform/amiga/AmigaPatternRow.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: test-amiga-pattern-row
+test-amiga-pattern-row: build/amiga-pattern-row-test
+	./build/amiga-pattern-row-test
+test: test-amiga-pattern-row
+generate-pattern-terrain: generate-amiga-game generate-builder-pattern-pack
+	python3 tools/generate-pattern-terrain.py
+test-pattern-terrain: generate-pattern-terrain build/amiga-pattern-terrain-test
+	./build/amiga-pattern-terrain-test generated/amiga-game.dwap generated/amiga-pattern-terrain.bin
+
 .PHONY: test-amiga-coverage-word
 test: test-amiga-coverage-word
 test-amiga-coverage-word: build/amiga-coverage-word-test
@@ -2846,6 +2881,7 @@ test-amiga-gameplay-effects: build/amiga-gameplay-effects-test
 	./build/amiga-gameplay-effects-test
 test: test-amiga-gameplay-effects
 
+build/amiga-gameplay-rows-test: CXXFLAGS += -DDOWNWELL_ROW_SYNC_AUDIT
 build/amiga-gameplay-rows-test: tests/platform/amiga/AmigaGameplayRowsTest.cpp src/platform/amiga/AmigaGameplayRows.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
@@ -2854,6 +2890,13 @@ test-amiga-gameplay-rows: build/amiga-gameplay-rows-test
 test: test-amiga-gameplay-rows
 
 .PHONY: test-amiga-gameplay-scene
+build/amiga-frame-budget-test: tests/platform/amiga/AmigaFrameBudgetTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: test-amiga-frame-budget
+test-amiga-frame-budget: build/amiga-frame-budget-test
+	./build/amiga-frame-budget-test
+test: test-amiga-frame-budget
 build/amiga-gameplay-scene-test: tests/platform/amiga/AmigaGameplaySceneTest.cpp src/platform/amiga/AmigaGameplayScene.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)

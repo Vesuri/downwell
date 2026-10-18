@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_TERRAIN_PAINTER_H
 #include "AmigaRenderer.h"
 #include "AmigaTerrain.h"
+class AmigaTerrainRaster;
 
 // Fresh terrain composition in the retained implementation's painter order. No cache ownership,
 // allocation, simulation, buffer publication or whole-frame redraw policy.
@@ -9,6 +10,15 @@ class AmigaTerrainPainter {
 public:
     static bool bindBatch(const UBYTE* pack, const UBYTE* end, UBYTE* scratch, unsigned bytes);
     static bool bindPrepared(const UBYTE* data,unsigned bytes);
+    static bool bindPatterns(const UBYTE* data,unsigned bytes);
+    static bool borrowPatternRows(AmigaTerrainRaster&,const AmigaTerrainIndex&,
+        const AmigaTerrainTiles&,const AmigaTerrainDecoration*,unsigned,const GameplayWorld*,
+        int viewX,int first,int height);
+    // Resolve a row's source-dependent commands once, then consume its pixels
+    // in bounded pieces. Any raster invalidation revokes the pending plan.
+    static bool preparePatternPiece(AmigaTerrainRaster&,const AmigaTerrainIndex&,
+        const AmigaTerrainTiles&,const AmigaTerrainDecoration*,unsigned,const GameplayWorld*,
+        int viewX,int first);
     static bool corridorRows(const AmigaTerrainIndex& index,const AmigaTerrainTiles& tiles,
                              int first,int end);
     // Transactional direct-cache attempt. False means the caller must repaint

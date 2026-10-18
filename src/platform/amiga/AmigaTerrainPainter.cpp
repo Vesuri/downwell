@@ -1,6 +1,7 @@
 #include "AmigaTerrainPainter.h"
 #include "AmigaWallBackground.h"
 #include "AmigaTerrainRunSurface.h"
+#include "AmigaTerrainRaster.h"
 #include "core/GameplayWorld.h"
 #include "core/Profile.h"
 #include "core/ShopFixtures.h"
@@ -23,8 +24,24 @@ __attribute__((noinline)) void downwellTerrainBatchMismatch(){
 namespace {
 AmigaTerrainBatch terrainBatch{};
 const UBYTE* preparedTerrain=nullptr;
+AmigaPatternTerrain patternTerrain;
+struct PatternRowPlan {
+    AmigaTerrainRaster* owner=nullptr;
+    unsigned revision=0,count=0;
+    int first=0;
+    const UBYTE* walls=nullptr;
+    const UBYTE* groups[3]{};
+    bool grouped=false;
+    struct Command {
+        unsigned frame;
+        int x,y;
+        bool overlay;
+        AmigaPatternTerrain::Overlay art;
+    } commands[32];
+} patternRowPlan;
 AmigaTerrainRunSurface* directSurface=nullptr;
 bool directFailed=false;
+bool directWallsPrepared=false;
 #ifdef DOWNWELL_TERRAIN_BATCH
 #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
 bool useTerrainBatch=true;
@@ -40,6 +57,7 @@ static ULONG wallRowBits(const AmigaTerrainIndex& index,int row,int column,unsig
     return bits;
 }
 static void paintIndexedBatch(const AmigaTerrainIndex& index,int viewX,int viewY){
+    if(directWallsPrepared)return;
     if(terrainBatch.left>=terrainBatch.right || terrainBatch.top>=terrainBatch.bottom)return;
     const int firstX=(viewX+terrainBatch.left-downwellPlayfieldX+8)&~15;
     const int lastX=(viewX+terrainBatch.right-downwellPlayfieldX+7)&~15;
@@ -59,6 +77,24 @@ static void paintIndexedBatch(const AmigaTerrainIndex& index,int viewX,int viewY
             downwellPlayfieldX+firstX-viewX,y-viewY,above,middle,below,columns);
         above=middle;middle=below;
     }
+}
+static bool paintPatternRows(UWORD* pixels,const AmigaTerrainIndex& index,
+                             int viewX,int first,int height){
+    if(!patternTerrain.ready()||viewX!=160||first<8||first+height>AmigaTerrainIndex::rows*16-8)return false;
+    int row=(first+8)/16;
+    unsigned above=wallRowBits(index,row-1,41,13);
+    unsigned middle=wallRowBits(index,row,41,13);
+    const int end=first+height;
+    while(first<end){
+        const unsigned below=wallRowBits(index,row+1,41,13);
+        const unsigned skip=first-(row*16-8);
+        const unsigned count=end-first<int(16-skip)?unsigned(end-first):16-skip;
+        const auto* reference=patternTerrain.find(middle,above,below);
+        if(!reference)return false;
+        patternTerrain.copy(reference,skip,count,pixels);
+        pixels+=count*22;first+=count;++row;above=middle;middle=below;
+    }
+    return true;
 }
 #endif
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -102,6 +138,137 @@ bool AmigaTerrainPainter::bindPrepared(const UBYTE* data,unsigned bytes){
     preparedTerrain=bytes==4992?data:nullptr;
     return preparedTerrain!=nullptr;
 }
+bool AmigaTerrainPainter::bindPatterns(const UBYTE* data,unsigned bytes){
+    patternRowPlan.owner=nullptr;
+    return patternTerrain.bind(data,bytes);
+}
+bool AmigaTerrainPainter::preparePatternPiece(AmigaTerrainRaster& raster,const AmigaTerrainIndex& index,
+    const AmigaTerrainTiles& tiles,const AmigaTerrainDecoration* decorations,unsigned decorationCount,
+    const GameplayWorld* runtime,int viewX,int first){
+#ifndef DOWNWELL_TERRAIN_BATCH
+    return false;
+#else
+    const int rowFirst=((first+8)&~15)-8;
+    if(!patternTerrain.ready()||viewX!=160||rowFirst<8||rowFirst+16>int(AmigaTerrainRaster::rows)-8)return false;
+    auto& plan=patternRowPlan;
+    if(plan.owner!=&raster||plan.revision!=raster.revision()||plan.first!=rowFirst){
+        plan.owner=nullptr;
+        if(borrowPatternRows(raster,index,tiles,decorations,decorationCount,runtime,viewX,rowFirst,16)){
+            for(int y=rowFirst;y<rowFirst+16;++y)raster.setDirty(1,y,false);
+            return true;
+        }
+        if(runtime&&(runtime->terrainInstances()||runtime->shops().allocatedCount||
+            (runtime->nativeTerrainInstances()&&runtime->nativeTerrainInstances()->hasWallPresentationState())))return false;
+        const int row=(rowFirst+8)/16;
+        const unsigned middle=wallRowBits(index,row,41,13);
+        plan.walls=patternTerrain.find(middle,
+            wallRowBits(index,row-1,41,13),wallRowBits(index,row+1,41,13));
+        if(!plan.walls)return false;
+        plan.count=0;
+        unsigned codes[3]={},occupied=0;
+        plan.grouped=true;
+        for(unsigned id=tiles.first(row*16);id;){
+            const auto& tile=tiles.at(id);id=tile.next;
+            if(tile.x+8<=160||tile.x-8>=320)continue;
+            if(tile.objectId==92&&runtime&&!runtime->breakableActiveAt(tile.x-240,row*16-176))continue;
+            if(tile.frame>=26||plan.count==32)return false;
+            plan.commands[plan.count++]={tile.frame,110+tile.x-160,8,false,{}};
+            const unsigned cell=unsigned(tile.x-160)/16,bit=1u<<(cell+1);
+            const unsigned digit=tile.frame==16?1:tile.frame==17?2:tile.frame==22?3:tile.frame==23?4:0;
+            if(!digit||(middle&bit)||(occupied&bit))plan.grouped=false;
+            occupied|=bit;
+            static const unsigned powers[]={1,5,25,125};
+            codes[cell/4]+=digit*powers[cell&3];
+        }
+        for(unsigned i=0;i<3;++i){
+            plan.groups[i]=patternTerrain.tileGroup(codes[i]);
+            if(!plan.groups[i])plan.grouped=false;
+        }
+        bool decorated=false;
+        for(unsigned d=0;d<decorationCount;++d){
+            const auto& deco=decorations[d];
+            if(deco.y+24<rowFirst||deco.y-24>=rowFirst+16)continue;
+            AmigaPatternTerrain::Overlay art;
+            if(!patternTerrain.overlay(deco.spriteId,deco.frame,deco.flipX,art))return false;
+            // The broad source admission covers neighbouring rows too. Only
+            // an actual bitmap intersection requires materializing this row;
+            // otherwise it can keep borrowing immutable wall/tile words.
+            const int top=deco.y-art.originY;
+            if(top>=rowFirst+16||top+int(art.height)<=rowFirst)continue;
+            if(plan.count==32)return false;
+            const int x=110+deco.x-160;
+            if((unsigned(x-art.originX-96)&15u)!=art.phase)return false;
+            plan.commands[plan.count++]={0,x,deco.y-rowFirst,true,art};
+            decorated=true;
+        }
+        plan.owner=&raster;plan.revision=raster.revision();plan.first=rowFirst;
+#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+        if(plan.grouped&&!decorated){
+            // Immutable source strips own these pixels. Publish references in
+            // the existing raster slots; compose only once, into Chip RAM.
+            const AmigaPatternRow source{patternTerrain.row(plan.walls,0),
+                {occupied?plan.groups[0]:nullptr,occupied?plan.groups[1]:nullptr,
+                 occupied?plan.groups[2]:nullptr}};
+            return raster.borrowPatternBand(rowFirst,source,true);
+        }
+#else
+        (void)decorated;
+#endif
+        return true; // Admission and pixel composition never share an update.
+    }
+    const unsigned offset=unsigned(first-rowFirst);
+    const unsigned count=offset+8>16?16-offset:8;
+    auto* pixels=raster.writeRows(1,first,count);
+    patternTerrain.copy(plan.walls,offset,count,pixels);
+    AmigaTerrainRunSurface surface(pixels,int(offset),int(count),110,160,terrainBatch.tiles,preparedTerrain);
+    if(plan.grouped)for(unsigned i=0;i<3;++i)if(plan.groups[i])surface.addTileGroup(plan.groups[i],i*4);
+    for(unsigned i=0;i<plan.count;++i){
+        const auto& command=plan.commands[i];
+        if(plan.grouped&&!command.overlay)continue;
+        const bool ok=command.overlay?surface.overlay(command.art,command.x,command.y):
+            surface.tile(command.frame,command.x,command.y);
+        if(!ok){plan.owner=nullptr;return false;}
+    }
+    for(unsigned y=0;y<count;++y)raster.setDirty(1,first+y,false);
+    return true;
+#endif
+}
+bool AmigaTerrainPainter::borrowPatternRows(AmigaTerrainRaster& raster,const AmigaTerrainIndex& index,
+    const AmigaTerrainTiles& tiles,const AmigaTerrainDecoration* decorations,unsigned decorationCount,
+    const GameplayWorld* runtime,int viewX,int first,int height){
+#if !defined(DOWNWELL_TERRAIN_BATCH) || defined(DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE)
+    return false;
+#else
+    const int end=first+height;
+    if(!patternTerrain.ready()||viewX!=160||first<8||end>AmigaTerrainIndex::rows*16-8||
+        (runtime&&(runtime->terrainInstances()||runtime->shops().allocatedCount||
+        (runtime->nativeTerrainInstances()&&runtime->nativeTerrainInstances()->hasWallPresentationState()))))return false;
+    int row=(first+8)/16;
+    for(int r=row;r<=(end+7)/16;++r)if(tiles.first(r*16))return false;
+    for(unsigned d=0;d<decorationCount;++d){
+        const auto& deco=decorations[d];
+        if(deco.y+24<first||deco.y-24>=end)continue;
+        AmigaPatternTerrain::Overlay art;
+        if(!patternTerrain.overlay(deco.spriteId,deco.frame,deco.flipX,art))return false;
+        const int top=deco.y-art.originY;
+        if(top<end&&top+int(art.height)>first)return false;
+    }
+    unsigned above=wallRowBits(index,row-1,41,13),middle=wallRowBits(index,row,41,13);
+    while(first<end){
+        const unsigned below=wallRowBits(index,row+1,41,13);
+        const auto* reference=patternTerrain.find(middle,above,below);
+        if(!reference)return false;
+        unsigned skip=first-(row*16-8);
+        if(!skip&&first+16<=end){
+            if(!raster.borrowPatternBand(first,{patternTerrain.row(reference,0),{nullptr,nullptr,nullptr}}))return false;
+            first+=16;skip=16;
+        }
+        while(skip<16&&first<end){raster.borrowPatternRow(1,first,patternTerrain.row(reference,skip));++first;++skip;}
+        ++row;above=middle;middle=below;
+    }
+    return true;
+#endif
+}
 
 bool AmigaTerrainPainter::corridorRows(const AmigaTerrainIndex& index,
     const AmigaTerrainTiles& tiles,int first,int end){
@@ -140,10 +307,13 @@ bool AmigaTerrainPainter::paintCached(UWORD* rows,AmigaRenderer* renderer,
         downwellPlayfieldWidth,terrainBatch.tiles,preparedTerrain);
     AmigaRenderer local=*renderer;
     directSurface=&surface;directFailed=false;
-    surface.clear();
+    directWallsPrepared=index&&(!runtime||(!runtime->terrainInstances()&&
+        (!runtime->nativeTerrainInstances()||!runtime->nativeTerrainInstances()->hasWallPresentationState())))&&
+        paintPatternRows(rows,*index,viewX,viewY+clipY,clipHeight);
+    if(!directWallsPrepared)surface.clear();
     const bool ok=paint(&local,rooms,room,index,tiles,decorations,decorationCount,
         runtime,pack,end,viewX,viewY,downwellPlayfieldX,clipY,downwellPlayfieldWidth,clipHeight);
-    directSurface=nullptr;
+    directSurface=nullptr;directWallsPrepared=false;
 #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
     if(ok&&!directFailed){
         alignas(UWORD) static UBYTE expected[downwellGameRingBytes];
@@ -193,6 +363,8 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
         DW_PROFILE_SCOPE(profileTerrainAsset);
         if(directSurface){
             if(sprite==51&&!flip&&directSurface->tile(frame,x,y))return;
+            AmigaPatternTerrain::Overlay overlay;
+            if(patternTerrain.overlay(sprite,frame,flip!=0,overlay)&&directSurface->overlay(overlay,x,y))return;
             // The normal renderer does nothing for missing or wholly clipped
             // art. Such a command must not abort a completed cache span.
             int left,top,width,height;

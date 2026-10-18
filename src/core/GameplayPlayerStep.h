@@ -91,6 +91,12 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     // observation. A failed synchronous transition must stop later work.
     if(!timeTransition(player,shopPlayerX,shopPlayerY)){run.effectsSucceeded=false;return motion;}
     int facing = player.facing();
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+    // A synchronous time-transition callback above may create the first shop.
+    // Read membership here, not at frame entry. Empty families still observe
+    // held input so a later birth cannot manufacture a new press edge.
+    if(run.shops.allocatedCount){
+#endif
     const auto shopRandom = [&random](unsigned lo, unsigned hi) {
         return lo + random.irandomSmall(hi - lo);
     };
@@ -102,6 +108,9 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     player.face(facing);
     run.shops.advanceKeepers(shopPlayerX, false, run.stage.area, shopRandom);
     run.shops.advancePresentation();
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+    }else run.shops.previous=input;
+#endif
     DW_PROFILE_PHASE(profilePlayer);
     run.advanceLevelExitAlarms(viewX, viewY);
     death.publishHealth(health);

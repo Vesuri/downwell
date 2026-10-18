@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_AMIGA_TERRAIN_RUN_SURFACE_H
 #define DOWNWELL_AMIGA_TERRAIN_RUN_SURFACE_H
 #include "AmigaRenderer.h"
+#include "AmigaPatternTerrain.h"
 
 // A dirty span of the retained Fast-RAM raster, not an intermediate bitmap.
 // Native words are row-interleaved: eleven PF1 words, then eleven PF2 words.
@@ -44,6 +45,43 @@ public:
          right_(left+width),tiles_(tiles),prepared_(prepared) {}
     void clear() {
         for(int i=0;i<height_*words*2;++i)pixels_[i]=0;
+    }
+    // Admitted non-overlapping tile cells: the immutable group can be ORed
+    // over the wall image without per-tile clipping or mask composition.
+    void addTileGroup(const UBYTE* source,unsigned column){
+        for(unsigned w=0;w<5&&column+w<unsigned(words);++w){
+            const unsigned dest=column+w;
+            const UWORD clip=dest==0?0x0003:dest==10?0xfffc:0xffff;
+            const auto* input=source+firstY_*20+w*2;
+            auto* out=pixels_+dest;
+            for(int y=0;y<height_;++y,input+=20,out+=words*2){
+                out[0]|=word(input)&clip;
+                out[words]|=word(input+10)&clip;
+            }
+        }
+    }
+    bool overlay(const AmigaPatternTerrain::Overlay& art,int anchorX,int anchorY){
+        const int left=anchorX-art.originX,top=anchorY-art.originY;
+        if((unsigned(left-x)&15u)!=art.phase)return false;
+        const int start=left-int(art.phase);
+        const int first=top>firstY_?top:firstY_;
+        const int end=top+int(art.height)<firstY_+height_?top+int(art.height):firstY_+height_;
+        if(first>=end)return true;
+        for(unsigned col=0;col<art.words;++col){
+            const int px=start+int(col)*16;
+            if(px+16<=left_||px>=right_||px<x||px>=x+words*16)continue;
+            const unsigned l=px<left_?unsigned(left_-px):0;
+            const unsigned r=px+16>right_?unsigned(px+16-right_):0;
+            const UWORD clip=UWORD((0xffffu>>l)&(0xffffu<<r));
+            const auto* source=art.pixels+((first-top)*art.words+col)*6;
+            auto* target=pixels_+(first-firstY_)*words*2+(px-x)/16;
+            for(int y=first;y<end;++y,source+=art.words*6,target+=words*2){
+                const UWORD mask=word(source)&clip;
+                target[0]=(target[0]&UWORD(~mask))|(word(source+2)&mask);
+                target[words]=(target[words]&UWORD(~mask))|(word(source+4)&mask);
+            }
+        }
+        return true;
     }
     // Resolve a whole occupancy row once. Its cells share vertical clipping,
     // source-row offset and alignment; do not rediscover these per wall.

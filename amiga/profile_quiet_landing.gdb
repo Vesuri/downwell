@@ -3,6 +3,8 @@
 set pagination off
 set confirm off
 set max-value-size unlimited
+set $sPatternVerification = 0
+set $sPatternPreparationVerification = 0
 target remote 127.0.0.1:2345
 break downwellTraceFrameMark
 set $sSamples=0
@@ -22,11 +24,23 @@ continue
 end
 end
 continue
-if $sWorld->player_.grounded_
-printf "DOWNWELL_QUIET_LANDED\n"
-else
+if !$sWorld->player_.grounded_
 printf "DOWNWELL_QUIET_NO_LANDING\n"
+quit 1
 end
+if $sPatternVerification
+printf "QUIET_PATTERN_ROWS checks=%lu failures=%lu\n",gDownwellPatternTransferChecks,gDownwellTerrainBatchFailures
+if gDownwellPatternTransferChecks == 0 || gDownwellTerrainBatchFailures != 0
+quit 1
+end
+if $sPatternPreparationVerification
+printf "QUIET_PATTERN_PREPARATION checks=%lu\n",gDownwellPatternPreparationChecks
+if gDownwellPatternPreparationChecks == 0
+quit 1
+end
+end
+end
+printf "DOWNWELL_QUIET_LANDED\n"
 shell touch .run/gdb-ready.marker
 detach
 quit

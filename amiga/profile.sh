@@ -25,6 +25,15 @@ case "$mode" in
       # Stops at every update: state equivalence only, never timing evidence.
       script=profile_quiet_landing.gdb
       ready_marker=DOWNWELL_QUIET_LANDED
+      if [[ ${TERRAIN_BATCH_VERIFY:-0} == 1 ]]; then
+        mkdir -p ../tmp
+        preparation_check=0
+        if [[ ${REFERENCE_ROW_PAINTING:-1} == 0 ]]; then preparation_check=1; fi
+        sed -e 's/^set $sPatternVerification = 0$/set $sPatternVerification = 1/' \
+          -e "s/^set \$sPatternPreparationVerification = 0\$/set \$sPatternPreparationVerification = $preparation_check/" \
+          profile_quiet_landing.gdb > ../tmp/profile-quiet-pattern-rows.gdb
+        script="$PWD/../tmp/profile-quiet-pattern-rows.gdb"
+      fi
     fi
     if [[ $mode == terrain-reads ]]; then
       flags+=(TERRAIN_READ_CENSUS=1)
@@ -141,6 +150,7 @@ fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
+  unset SCENE_VERIFY
   unset TERRAIN_READ_CENSUS
   unset PROBES FPSCOUNT
   unset PROFILE_ENTRY

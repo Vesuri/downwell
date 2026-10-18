@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_WORLD_H
 
 #include "PlayerMotion.h"
+#include "GameplayFrame.h"
 #include "PreparedRoomTerrain.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -100,22 +101,6 @@ enum {
     gameplayWorldDestroyedCapacity = gameplayWorldBulletCapacity + 1,
     gameplayWorldEnemyCapacity = 64,
     gameplayWorldGemCapacity = downwell::gameplayGemCapacity
-};
-
-struct GameplayFrame {
-    PlayerMotionDelta playerMotion;
-    bool ammoChanged;
-    bool healthChanged;
-    bool currencyChanged;
-    bool streakChanged;
-    bool bulletChanged;
-    bool scrolled;
-    int scrollDelta;
-    bool cameraXChanged;
-    int cameraXDelta;
-    unsigned destroyedBlockCount;
-    int blockX[gameplayWorldDestroyedCapacity];
-    int blockY[gameplayWorldDestroyedCapacity];
 };
 
 // Portable fixed-point world extracted from the native runtime. Terrain and
@@ -1987,6 +1972,9 @@ public:
             if(breakables_[i].lifetimeId&&breakables_[i].alarm0>=0)return true;
         return false;
     }
+    // Conservative lifetime proof already maintained by alarm publication.
+    // Once armed, keep the dispatcher even after the countdown expires.
+    bool boxAlarmsNeverArmed()const{return !boxAlarmsArmed_;}
     // Native boxes never re-register or compact. A prefix plus generation
     // ceiling captures the same lifetimes without copying their handles.
     // The ceiling also excludes replacement slots after a room/config reset.

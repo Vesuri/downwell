@@ -58,6 +58,7 @@ REFERENCE_CLEAR_HEADINGS ?= 0
 REFERENCE_CLEAR_MOTION ?= 0
 REFERENCE_ACTOR_PREFIX ?= 0
 REFERENCE_DRAW_LIST ?= 0
+REFERENCE_FRAME_WORK ?= 1
 REFERENCE_VALIDATION ?= 0
 REFERENCE_ANIMATION ?= 0
 REFERENCE_GENERATED_BOXES ?= 0
@@ -67,6 +68,7 @@ REFERENCE_ROOM_PREPARE ?= 0
 # 1 selects the retained per-span terrain owners, the oracle for the
 # source-record owner (see "Source-record terrain owner" in the audit).
 REFERENCE_TERRAIN_RECORDS ?= 0
+REFERENCE_ROW_PAINTING ?= 1
 REFERENCE_FIELD_BANK ?= 0
 REFERENCE_FIELD_ADMISSION ?= 0
 REFERENCE_ENTRY_ASSETS ?= 0
@@ -343,6 +345,9 @@ endif
 ifeq ($(REFERENCE_DRAW_LIST),1)
 CFLAGS += -DDOWNWELL_REFERENCE_DRAW_LIST
 endif
+ifeq ($(REFERENCE_FRAME_WORK),1)
+CFLAGS += -DDOWNWELL_REFERENCE_FRAME_WORK
+endif
 ifeq ($(REFERENCE_VALIDATION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_VALIDATION
 endif
@@ -417,6 +422,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
 endif
 ifeq ($(REFERENCE_ENEMY_UPDATES),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
+endif
+ifeq ($(REFERENCE_ROW_PAINTING),0)
+CFLAGS += -DDOWNWELL_PREPARED_PATTERN_ROWS
 endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
 CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
@@ -634,13 +642,14 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 ifeq ($(TERRAIN_DIRECT),1)
 OBJECTS += obj/AmigaTerrainPrepared.o
 endif
+OBJECTS += obj/AmigaPatternTransfer.o
 ifeq ($(PREPARED_FIELDS),1)
 OBJECTS += obj/AmigaFieldPrepared.o
 endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain
 
 $(OUT).entrymask: $(AMIGA_ENTRY_MASK)
 	@mkdir -p $(@D)
@@ -661,6 +670,12 @@ $(OUT).selectionmask: $(AMIGA_SELECTION_MASK)
 $(OUT).patterns: $(REPO)/generated/downwell-builder-patterns.dwbp
 	@mkdir -p $(@D)
 	cp $< $@
+
+$(OUT).terrain: $(REPO)/generated/amiga-pattern-terrain.bin
+	cp $< $@
+
+$(REPO)/generated/amiga-pattern-terrain.bin: $(AMIGA_GAME) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-pattern-terrain.py
+	python3 $(REPO)/tools/generate-pattern-terrain.py
 
 $(OUT).columns: $(REPO)/generated/amiga-field-columns.bin
 	@mkdir -p $(@D)
@@ -696,7 +711,7 @@ $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/generated/amiga-pattern-terrain.bin $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
@@ -737,6 +752,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DRAW_LIST)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_FRAME_WORK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_VALIDATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_GENERATED_BOXES)' >> $@.tmp
@@ -752,6 +768,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER_STORAGE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_PREPARE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_TERRAIN_RECORDS)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_ROW_PAINTING)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_ADMISSION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp
@@ -1142,6 +1159,10 @@ $(REPO)/generated/amiga-initial-terrain.bin: $(AMIGA_GAME) $(REPO)/generated/dow
 	$(MAKE) -C $(REPO) generate-initial-terrain
 
 obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/generated/amiga-initial-terrain.bin
+	@mkdir -p $(@D)
+	$(AS) $(ASFLAGS) -o $@ $<
+
+obj/AmigaPatternTransfer.o: $(AMIGA_SRC)/AmigaPatternTransfer.s
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 

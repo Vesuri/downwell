@@ -17,6 +17,8 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaFrameBudget.h"
+#include "AmigaShopArtSnapshot.h"
 #include "AmigaVerificationScratch.h"
 #include "AmigaGameplayAssetAdmission.h"
 #include "AmigaSceneAdmission.h"
@@ -1361,6 +1363,46 @@ static void syncGameRows(Bitmap& destination, const Bitmap& backing, unsigned bu
 
 
 static bool terrainPaintSucceeded=true;
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+static AmigaFrameBudget::Stamp frameWorkStamp(){
+    UWORD field,high,low,again;
+    do {
+        field=AmigaPlatform::vblankCount();
+        high=*vposrPointer;low=*vhposrPointer;again=*vposrPointer;
+    }while(field!=AmigaPlatform::vblankCount()||((high^again)&1));
+    return {field,(ULONG(high&1)<<16)|low};
+}
+// Prepare complete tile rows once, independent of the smaller strips exposed
+// by the camera. Live mutations invalidate this same raster before reuse.
+static bool preparePatternCache(AmigaRenderer* renderer,const downwell::RoomPack& rooms,
+    const downwell::PackedRoom& room,const AmigaTerrainDecoration* decorations,unsigned decorationCount,
+    const AmigaPortRuntime* runtime,int viewX,int first,int end){
+    if(!terrainCollision.index||viewX!=mainViewX||first<8||end>terrainRasterRows-8)return false;
+    for(int y=((first+8)&~15)-8;y<end;y+=16){
+        bool dirty=false;
+        for(int i=0;i<16&&!dirty;++i)dirty=terrainRaster.dirty(1,y+i);
+        if(!dirty)continue;
+        int start=y;
+        // Cold visible rows use the same admitted composition as paint-ahead:
+        // one admission and at most two eight-line pieces. Unsupported art
+        // still falls through to the portable painter without acknowledging it.
+        for(unsigned piece=0;piece<3;++piece){
+            while(start<y+16&&!terrainRaster.dirty(1,start))++start;
+            if(start==y+16)break;
+            if(!AmigaTerrainPainter::preparePatternPiece(terrainRaster,*terrainCollision.index,
+                    terrainTiles,decorations,decorationCount,runtime,viewX,start))break;
+        }
+        while(start<y+16&&!terrainRaster.dirty(1,start))++start;
+        if(start==y+16)continue;
+        int count=y+16-start;
+        if(!AmigaTerrainPainter::paintCached(terrainRaster.writeRows(1,start,count),renderer,
+                rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
+                runtime,activeGamePack,activeGamePackEnd,viewX,start,0,count))return false;
+        for(int i=0;i<count;++i)terrainRaster.setDirty(1,start+i,false);
+    }
+    return true;
+}
+#endif
 static void drawMainWorldSpan(
     AmigaRenderer* renderer,
     const downwell::RoomPack& rooms,
@@ -1385,6 +1427,13 @@ static void drawMainWorldSpan(
         finalWorldY <= terrainRasterRows;
     if (terrainRaster.ready && cacheable && !refresh) {
         const int column = (viewX - mainViewX + 160) / 160;
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+        if(column==1&&clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+           (terrainRaster.dirty(column,firstWorldY)||
+            terrainRaster.runEnd(column,firstWorldY,finalWorldY)<unsigned(finalWorldY)))
+            (void)preparePatternCache(renderer,rooms,room,decorations,decorationCount,
+                runtime,viewX,firstWorldY,finalWorldY);
+#endif
         // A dirty strip must not force reconstruction of clean retained rows.
         // Each recursive call is homogeneous, so splitting adds one stack
         // level only (the verification oracle may add its existing level).
@@ -1511,6 +1560,12 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
     if(pristine){
 #ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
         if(!terrainRaster.borrowInitial(initialTerrain)){terrainPaintSucceeded=false;return;}
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+        // Spend the dictionary expansion once before the level is presented,
+        // not once per exposed line during the initial fall. Side columns
+        // remain borrowed; no extra raster allocation or asset bank is needed.
+        if(!terrainRaster.materializeInitialColumn(1)){terrainPaintSucceeded=false;return;}
+#endif
 #endif
         for(unsigned column=0;column<3;++column){
 #ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
@@ -1836,7 +1891,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     unsigned front = 0;
     int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
-    unsigned oldShopArt[downwell::ShopWorld::capacity] = {};
+    AmigaShopArtSnapshot oldShopArt;
     const downwell::ObjectPack objects(amiga_object_pack,
         (unsigned long)(amiga_object_pack_end-amiga_object_pack));
     const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
@@ -2298,6 +2353,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         return true;
     };
     const auto releaseGameplayArt=[&](){
+        (void)AmigaTerrainPainter::bindPatterns(nullptr,0);
         amigaRendererReleaseHardwareSpriteCopies();
         if(gDownwellGameArtResidentBytes)++gDownwellGameArtReleases;
         if(gDownwellGamePlaneResidentBytes)++gDownwellGamePlaneReleases;
@@ -2355,7 +2411,14 @@ __attribute__((noinline)) static int runDownwell(void) {
         static_assert(DOWNWELL_ENTRYMASK_BANK_BYTES==AmigaEntryMask::bytes&&
             DOWNWELL_ENTRYMASK_BANK_BYTES<=DOWNWELL_ENTRYMASK_BANK_BUDGET,
             "Gameplay entry mask residency budget");
-        if(!memory.acquireGameCatalogue(cpuBytes+DOWNWELL_ENTRYMASK_BANK_BYTES))return false;
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+        static_assert(DOWNWELL_TERRAIN_BANK_BYTES<=DOWNWELL_TERRAIN_BANK_BUDGET,
+            "Prepared terrain artwork residency budget");
+        constexpr ULONG terrainArtBytes=DOWNWELL_TERRAIN_BANK_BYTES;
+#else
+        constexpr ULONG terrainArtBytes=0;
+#endif
+        if(!memory.acquireGameCatalogue(cpuBytes+DOWNWELL_ENTRYMASK_BANK_BYTES+terrainArtBytes))return false;
         activeGamePack=memory.gameCatalogue();activeGamePackEnd=activeGamePack+cpuBytes;
         UBYTE* entryMask=memory.gameCatalogue()+cpuBytes;
         if(platform.loadFile("PROGDIR:Downwell.entrymask",entryMask,
@@ -2365,6 +2428,13 @@ __attribute__((noinline)) static int runDownwell(void) {
         activeEntryMask=entryMask;
         gDownwellEntryMaskResidentBytes=DOWNWELL_ENTRYMASK_BANK_BYTES;
         ++gDownwellEntryMaskLoads;
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+        UBYTE* terrainArt=entryMask+DOWNWELL_ENTRYMASK_BANK_BYTES;
+        if(platform.loadFile("PROGDIR:Downwell.terrain",terrainArt,terrainArtBytes)!=LONG(terrainArtBytes)||
+           !AmigaTerrainPainter::bindPatterns(terrainArt,terrainArtBytes)){
+            releaseGameplayArt();return false;
+        }
+#endif
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
         for(unsigned i=0;i<AmigaEntryMask::bytes;++i)
             if(entryMask[i]!=amiga_entry_mask[i]){releaseGameplayArt();return false;}
@@ -2661,6 +2731,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             break;
         }
         DW_PROFILE_FRAME((unsigned)scenes.scene());
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+        AmigaFrameBudget frameBudget(frameWorkStamp());
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
         if(scenes.scene()==AmigaScene::gameplay)
             downwellProfileGameplay(port.tick(),176L*256+port.player().offsetYFixed(),
@@ -2671,8 +2744,14 @@ __attribute__((noinline)) static int runDownwell(void) {
         bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
         const unsigned oldWallTileCount=port.wallBackgroundTiles().size();
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
         int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
+#else
+        AmigaPortFrame gameplayResult;
+        const auto& destroyedBlockX=gameplayResult.blockX;
+        const auto& destroyedBlockY=gameplayResult.blockY;
+#endif
         DW_PROFILE_PHASE(profileWait);
         // The spatial tree is derived state. Only observing queries (or log
         // pressure) should materialize it; even idle-time service can overrun
@@ -2688,11 +2767,17 @@ __attribute__((noinline)) static int runDownwell(void) {
             displayFenced = true;
             if (overlapStep) {
                 DW_PROFILE_SCOPE(profileWait);
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+                const auto waitStart=frameWorkStamp();
+#endif
                 // Only prepare RNG output during an already-required wait.
                 // One word is bounded; stop well before the PAL VBlank edge.
                 fencedVblank = platform.waitPublished(fencedVblank,[](void* context){
                     return static_cast<AmigaPortRuntime*>(context)->prepareRandomIdleWord();
                 },&port,8);
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+                frameBudget.excludeWait(waitStart,frameWorkStamp());
+#endif
             }
             // The preceding detached list has crossed the publication boundary.
             // Only now may another overlay overwrite an entry cover's DMA bank.
@@ -3650,8 +3735,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 (gDownwellClearReentries == 1 && gDownwellClearGameplayUpdates == 60))
                 port.registerLevelExit(176 + port.player().offsetY());
 #endif
-            for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
-                oldShopArt[i] = port.shops().instances[i].artRevision;
+            oldShopArt.capture(port.shops());
 #ifdef DOWNWELL_CAMERA_VERIFY
             // Bind through the world: step() rebinds the player's callbacks.
             port.configureLandingResolver([](void*, int, int) { return 0; }, nullptr);
@@ -3679,7 +3763,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                     activeEntryMask!=nullptr, terrainRaster.hasStorage())){
                 gDownwellSceneAdmissionFailure=2;exitCode=20;break;
             }
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
             const AmigaPortFrame result = port.step(packedInput);
+#else
+            gameplayResult=port.step(packedInput);
+            const auto& result=gameplayResult;
+#endif
 #ifdef DOWNWELL_OVERFLOW_VERIFY
             {
                 std::uint64_t actual[5];amigaOverflowWitness(port,actual);
@@ -3754,8 +3843,11 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
             // Invalidate before selecting a precomposed side-room ring.
             invalidateShopRaster(port.shops());
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+            if(port.shops().allocatedCount)
+#endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
-                if (oldShopArt[i] != port.shops().instances[i].artRevision) gameplayScene.invalidateStage();
+                if (oldShopArt.changed(i,port.shops().instances[i])) gameplayScene.invalidateStage();
             const auto resultsAction = port.deathResults().inputEffects.action;
             if (resultsAction != downwell::DeathMenuSequence::Action::None) {
                 // An entropy boundary, separate from the gameplay RNG stream.
@@ -3788,10 +3880,12 @@ __attribute__((noinline)) static int runDownwell(void) {
             gDownwellProfileCameraChange = result.cameraXDelta;
 #endif
             destroyedBlockCount = result.destroyedBlockCount;
+#ifdef DOWNWELL_REFERENCE_FRAME_WORK
             for (unsigned block = 0; block < destroyedBlockCount; ++block) {
                 destroyedBlockX[block] = result.blockX[block];
                 destroyedBlockY[block] = result.blockY[block];
             }
+#endif
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset(), &port.ammoGauge(), port.ammoMeterOffset());
             if (result.healthChanged)
@@ -3820,6 +3914,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                 composeDeathFlash(&renderer, port.deathSequence().flashVisible());
             }
             const downwell::ShopWorld::Instance* activeShop = nullptr;
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+            if(port.shops().allocatedCount)
+#endif
             for (const auto& shop : port.shops().instances)
                 if (shop.present && shop.menu.active) { activeShop = &shop; break; }
             if (activeShop && !port.exitDither().active && !port.deathResults().active && !selectOverlayAssetBank(true)) {
@@ -4033,9 +4130,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                     top,bottom-top,downwellPlayfieldX,downwellPlayfieldWidth,true,1);
                 return terrainPaintSucceeded;
             }))terrainPaintSucceeded=false;
+#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+            if(port.shops().allocatedCount)
+#endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
                 const auto& shop = port.shops().instances[i];
-                if (!shop.allocated || shop.artRevision == oldShopArt[i]) continue;
+                if (!shop.allocated || !oldShopArt.changed(i,shop)) continue;
                 if (backingCopyPending) AmigaHardware::blitterDrain();
                 gameplayScene.invalidateStage();
                 const int first = shop.y - 21, end = shop.y + 12;
@@ -4082,6 +4182,35 @@ __attribute__((noinline)) static int runDownwell(void) {
                         &port, worldViewX, worldViewY, top, bottom - top, left, right - left, true, 3);
                 }
             }
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+            // Only presentation is advanced: geometry and RNG stay at their
+            // source trigger. The builder is 128 pixels ahead of the view.
+            // New generation owns its update; use the intervening update to
+            // fill the hidden ring margin, rather than waiting for exposure.
+            if(!cameraXChanged&&missingHeight==0&&destroyedBlockCount==0&&
+               liveGeneration.dirtyFirst>=liveGeneration.dirtyEnd&&terrainRaster.ready){
+                const auto ahead=gameplayScene.prepareBacking(worldViewY,
+                    downwellDisplayHeight,downwellGameRingHeight,16);
+                bool ready=ahead.count>0&&ahead.first>=0&&ahead.first+ahead.count<=terrainRasterRows;
+                for(int y=ahead.first;ready&&y<ahead.first+ahead.count;++y)
+                    ready=!terrainRaster.dirty(unsigned((worldViewX-mainViewX+160)/160),y);
+                if(ready){
+                    if(backingCopyPending)AmigaHardware::blitterDrain();
+                    int origin=int(port.ringOrigin())+ahead.first-worldViewY;
+                    while(origin<0)origin+=downwellGameRingHeight;
+                    amigaRendererSetGameOrigin(&renderer,origin%downwellGameRingHeight);
+#ifdef DOWNWELL_SCENE_VERIFY
+                    drawMainWorldSpan(&renderer,rooms,mainRoom,builders,fragments,liveBuilder.fragmentCount(),
+                        generatedDecorations,liveBuilder.decorationCount(),&port,worldViewX,ahead.first,0,ahead.count);
+#else
+                    dirtyGameRows(renderer.gameOrigin,0,ahead.count);
+                    transferTerrainRows(&renderer,worldViewX,ahead.first,0,ahead.count,false);
+#endif
+                    if(terrainPaintSucceeded&&!gameplayScene.preparedBacking(ahead,downwellGameRingHeight))
+                        terrainPaintSucceeded=false;
+                }
+            }
+#endif
             // Prepare a possible side-room view a small strip at a time in
             // retired garden memory. The actual camera jump then needs only
             // Chip-to-Chip DMA, not an entire Fast-to-Chip raster transfer.
@@ -4392,6 +4521,42 @@ __attribute__((noinline)) static int runDownwell(void) {
             ++gDownwellEntryWipeFrames;
 #endif
             /* AmigaPlatform makes the published list live at next VBlank. */
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+            // Required rendering is finished. Spend only this update's actual
+            // remaining work budget on future raster rows, before publication.
+            // No Chip/display writes, simulation or RNG advances occur here.
+            if(!cameraXChanged&&!destroyedBlockCount&&worldViewX==mainViewX&&
+               liveGeneration.dirtyFirst>=liveGeneration.dirtyEnd&&
+               terrainRaster.ready&&terrainCollision.index){
+                const int first=worldViewY+downwellDisplayHeight;
+                int end=first+128<terrainRasterRows-8?first+128:terrainRasterRows-8;
+                if(end>liveBuilder.frontierY()-24)end=liveBuilder.frontierY()-24;
+                for(unsigned piece=0;piece<4&&end>first&&frameBudget.canPrepare(frameWorkStamp());++piece){
+                    const unsigned y=terrainRaster.nextPreparation(first,end);
+                    if(y>=unsigned(end))break;
+                    if(terrainRaster.needsPatternMaterialization(y)){
+                        const unsigned budget=unsigned(end)-y<8?unsigned(end)-y:8;
+                        if(!terrainRaster.materializePatternRows(y,budget)){terrainPaintSucceeded=false;break;}
+                        continue;
+                    }
+                    if(terrainRaster.preparationFallback(y)){
+                        const int painted=terrainRaster.prepareFallback(y,end,
+                            [&](UWORD* pixels,unsigned top,unsigned height){
+                                return AmigaTerrainPainter::paintCached(pixels,&renderer,rooms,mainRoom,
+                                    terrainCollision.index,terrainTiles,generatedDecorations,
+                                    liveBuilder.decorationCount(),&port,activeGamePack,activeGamePackEnd,
+                                    worldViewX,top,0,height);
+                            });
+                        if(painted<=0){terrainRaster.skipPreparation(((y+8)&~15)+8);break;}
+                        continue;
+                    }
+                    if(!AmigaTerrainPainter::preparePatternPiece(terrainRaster,*terrainCollision.index,
+                        terrainTiles,generatedDecorations,liveBuilder.decorationCount(),&port,worldViewX,y)){
+                        terrainRaster.deferPreparationFallback(y);break;
+                    }
+                }
+            }
+#endif
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayScene.copper(back));
             overlapNextStep = true;
