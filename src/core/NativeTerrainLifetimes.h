@@ -87,6 +87,7 @@ public:
         std::uint32_t spatial=0;
         int sprite=-2,cachedSprite=-2,cacheX=0,cacheY=0;
         bool sourceOwned=false;
+        unsigned imageIndex=0;
     };
     bool readCollision(InstanceHandle h,CollisionRead& out)const{
         Identity id;if(!runs_.read(h,id))return false;
@@ -96,7 +97,8 @@ public:
         if(!source){flags=flags_.retained(h.slot);sprite=createSprite_.retained(h.slot);wall=walls_.retained(h.slot);}
         int dx,dy;if(!wall.cachedOffset(dx,dy))return false;
         out={id,(flags&3u)|((flags&4u)?8u:0u)|((flags&8u)?0x200u:0u)|((flags&16u)?0x8000u:0u),
-            sprite,(flags&64u)?sprite:-2,dx,dy,source};
+            sprite,(flags&64u)?sprite:-2,dx,dy,source,
+            !(flags&32u)?0u:id.object==93?23u:id.object==60?(wall.bits>>8)&15u:0u};
         return true;
     }
     enum class SpanResult { unsupported, success, failure };

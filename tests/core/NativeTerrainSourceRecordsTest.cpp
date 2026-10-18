@@ -99,7 +99,7 @@ template<class Terrain> static void collisionRead(const Terrain& terrain,Instanc
         read.identity.object==id.object&&read.identity.x==id.x&&read.identity.y==id.y&&
         read.identity.source==id.source&&read.identity.creationCode==id.creationCode);
     assert(read.spatial==flags&&read.sprite==sprite&&read.cachedSprite==cached&&read.cacheX==x&&read.cacheY==y&&
-        read.sourceOwned==terrain.sourceOwned(h));
+        read.sourceOwned==terrain.sourceOwned(h)&&read.imageIndex==image);
 }
 static void compare(const Fixture<false>& scalar,const Fixture<true>& source){
     const auto& a=scalar.terrain;const auto& b=source.terrain;

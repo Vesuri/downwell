@@ -1,5 +1,40 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: one terrain read per collision visual
+
+Against the unchanged `d9a7b95c` runtime (subsequent commits only add tests and
+documentation), the native terrain visual reader obtains identity, flags,
+cached/current sprite and image index from one checked source/retained read.
+It replaces repeated lifetime and field lookups, not tree publications or pair
+selection. There is no persistent cache, new allocation or asset bank. Actor
+and temporary wall-query scopes retain the old reader; the complete old route
+is selectable with `DOWNWELL_REFERENCE_COLLISION_VISUAL`.
+
+Same deterministic scene-collision initial fall, 512 KiB Chip / 8 MiB Fast:
+
+| Measurement | Baseline | Single read |
+| --- | ---: | ---: |
+| 164 updates, PAL fields | 1,071 | 1,060 |
+| First update, PAL fields | 211 | 213 |
+| Updates 57–61 mean, ms | 101.3 | 98.5 |
+| Collision visual reader, ms/update in 57–61 | 6.65 | 3.47 |
+| Updates 57/58/59/60/61, ms | 49.7/178.1/41.9/136.9/100.0 | 49.6/171.0/41.9/129.3/100.5 |
+| Updates 137–141 mean, ms | 104.6 | 103.1 |
+| Updates 137/138/139/140/141, ms | 129.7/102.2/71.7/102.0/117.2 | 129.8/98.5/71.7/98.2/117.3 |
+
+Independent update-58 capture: **1,215,090 cycles / 171.0 ms**. The recurring
+reader saving is **3.18 ms**; unchanged updates move by at most 0.5 ms in these
+windows. Initial transition cadence moves by two fields; this is not hidden
+as a universal improvement. The candidate still fails its production frame
+budget and is not the shipping backend.
+
+Candidate ELF SHA-256
+`787c47e24223604b6e969f501fb92856fd3fe60af714c219614b7b3996057005`.
+Reports: `tmp/collision-visual-{cost,late,recheck}/report.txt`; early baseline
+`tmp/located-spatial-control/report.txt`, late baseline
+`tmp/merged-source-late/report.txt`. State/cadence witnesses are in
+`tmp/collision-visual-candidate/`. Raw traces are removed after committing.
+
 ## Encounter candidate: indexed source records and cleanup merge
 
 Baseline `bd7ba71e` uses the unchanged `e9174008` candidate executable

@@ -871,6 +871,28 @@ private:
         return check(okay&&recorded);
     }
     bool nativeCollisionVisual(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
+#ifndef DOWNWELL_REFERENCE_COLLISION_VISUAL
+        if(native_&&h.slot>=View::terrainBase&&h.slot<View::timeFieldBase&&!wallQuery_){
+            DW_PROFILE_COUNT(counterCachedCollisionReads);
+            if(!check(collisionConsumersAdmitted_)||!world_||!world_->nativeTerrainInstances())return false;
+            GameplayWorld::NativeTerrain::CollisionRead read;
+            if(!world_->nativeTerrainInstances()->readCollision({h.slot-View::terrainBase,h.generation},read))return false;
+            const auto& id=read.identity;
+            const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
+            state.flags=(definition->initialFlags&~8u)|read.spatial|
+                (((collisionConsumersAdmitted_||id.object==93)&&!read.sourceOwned?
+                    table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);
+            bool found,precise;
+            // Match the retained visual reader's cached sprite and origin.
+            // Temporary wall-query geometry retains the separate live scope.
+            if(!nativeTerrainCachedBounds(id,state.x,state.y,state.bounds,found,precise,read.cachedSprite))return false;
+            sprite.spriteId=read.sprite==-2?definition->spriteId:read.sprite;sprite.maskId=definition->maskId;
+            return sprite.imageIndex.assignInteger(read.imageIndex);
+        }
+#endif
+        return nativeCollisionVisualReference(h,state,sprite);
+    }
+    bool nativeCollisionVisualReference(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
         DW_PROFILE_COUNT(counterCachedCollisionReads);
         if(!check(collisionConsumersAdmitted_))return false;
         if(wallQuery_&&wallQuery_->handle.slot==h.slot&&wallQuery_->handle.generation==h.generation){
