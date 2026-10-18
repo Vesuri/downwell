@@ -377,8 +377,8 @@ The candidate full-owner integration has not passed the bounded initial-fall
 gate; keep the external backend as the shipping default until that coupling
 is removed and the complete fall is measured. Preserve source spatial-history
 ordering rather than substituting a current-state-only tree.
-The collision-enabled candidate now completes the fall, but takes 3,942 PAL
-fields for 164 updates (2.08 FPS; update 1 takes 245 fields). Landing state is
+The collision-enabled candidate now completes the fall, but takes 3,545 PAL
+fields for 164 updates (2.31 FPS; update 1 takes 245 fields). Landing state is
 tick 164, x 0, y 262144, camera y 1024, grounded, health 4, ammo 8, three enemies,
 and 1371 RNG draws. Profile the admitted collision collection/tree work and
 remove the regression before shipping this backend; successful allocation and

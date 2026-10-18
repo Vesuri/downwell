@@ -43,7 +43,16 @@ class RunnerSourceRoomMembership:public RunnerRunRoomMembership<Capacity,First,L
         // The ordinary lists are already ordered. This rare mixed observer
         // does not change them; the animation skip cursor below uses them
         // directly and never enters this scan for terrain it excludes.
-        const_cast<Base&>(static_cast<const Base&>(*this)).visitCleanupChecked([&](unsigned slot){return consider(slot,state(slot));});
+        auto& ordinary=const_cast<Base&>(static_cast<const Base&>(*this));
+        if(onlyMarked){
+            // Cleanup observes only marks. Borrow the owning run's sparse
+            // mark traversal instead of rebuilding every live cell's state
+            // for every successor. The merge still rereads marks after each
+            // callback, retaining callback-created later marks and room order.
+            ordinary.visitMarkedCleanupOrdered([&](unsigned slot,RunnerImageValue depth,bool active){
+                return consider(slot,{ordinaryOrder_[slot],depth,static_cast<std::int8_t>(active?0:1),true});
+            });
+        }else ordinary.visitCleanupChecked([&](unsigned slot){return consider(slot,state(slot));});
         if(terrain_)terrain_->visitSourceRoomStates([&](unsigned local,const State& value){return consider(First+local,value);});
         return found;
     }

@@ -233,7 +233,29 @@ static std::vector<std::uint32_t> mixed(bool lend,bool fused=false){
     assert(fused==(b->published!=0)&&b->published+b->sourceSpans<=segments);
     return counters;
 }
+template<bool Source> static std::vector<unsigned> cleanupMarks(){
+    auto f=std::make_unique<Fixture<Source>>();
+    for(unsigned slot=0;slot<5;++slot)assert(f->room.bind(slot,{slot<2?0xbf800000u:0u}));
+    assert(f->segment(cells,4,64));
+    assert(f->room.reconcileChecked([](unsigned slot){return slot==4;},[](unsigned,bool){return true;}));
+    assert(f->room.mark(0)&&f->room.mark(4));
+    const auto terrain=f->terrain.handle(1);
+    assert(f->terrain.markDestroyed(terrain));
+    // A terminal callback must not consume its mark or visit a later entry.
+    unsigned failed=0;
+    assert(!f->room.visitMarkedCleanupChecked([&](unsigned slot){assert(slot==0);++failed;return false;}));
+    assert(failed==1&&f->room.marked(0));
+    std::vector<unsigned> visited;
+    assert(f->room.visitMarkedCleanupChecked([&](unsigned slot){
+        visited.push_back(slot);
+        if(slot==0){assert(f->room.mark(1)&&f->room.mark(3));}
+        return slot<32?f->room.remove(slot):f->terrain.retire(f->terrain.currentHandle(slot-32));
+    }));
+    assert(visited.size()==5&&visited.back()==4);
+    return visited;
+}
 int main(){
+    assert(cleanupMarks<false>()==cleanupMarks<true>());
     const auto reference=mixed(false);
     assert(reference==mixed(true)&&reference==mixed(true,true));
     // A failed backend publication between the fused entries leaves the record,
