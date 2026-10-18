@@ -2243,6 +2243,15 @@ build/shop-world-test: tests/core/ShopWorldTest.cpp src/core/PlayerMotion.cpp $(
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 test-shop-world: build/shop-world-test
 	./build/shop-world-test
+
+build/shop-input-binding-test: tests/core/ShopInputBindingTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+.PHONY: test-shop-input-binding
+test: test-shop-input-binding
+test-shop-input-binding: build/shop-input-binding-test
+	./build/shop-input-binding-test
 build/stored-shop-child-test: tests/core/StoredShopChildTest.cpp src/core/ObjectPack.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)

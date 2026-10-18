@@ -30,6 +30,8 @@ int main() {
         f.step(heldBeforeBirth?right:downwell::Input{});
         require(f.run.shops.previous.right==heldBeforeBirth,
             "empty shop family retains raw input history");
+        require(f.run.shops.input.right==heldBeforeBirth,
+            "empty family publishes edges for later registered callbacks");
         downwell::ShopWorld::Instance* born=nullptr;
         downwell::stepGameplayPlayer(f.player,f.death,f.run,f.currency,f.health,f.random,right,
             240,176,160,34,false,downwell::NoPlayerPositionPublication{},downwell::NoPlayerScalePublication{},

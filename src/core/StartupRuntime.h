@@ -2825,6 +2825,13 @@ public:
     // real queries/scripts to the selected parent, not the outer event caller.
     template<unsigned Capacity,class CreationAudio,class EnvironmentFor,class Tick>
     bool withShopParentSteps(StoredShopCreationOwner<instanceCapacity,Capacity,CreationAudio>& owner,
+        EnvironmentFor environmentFor,Tick tick){
+        return withShopParentSteps(owner,run_.shops.input,currencyAccount_,environmentFor,tick);
+    }
+    // Explicit state is retained for isolated source-event fixtures. Production
+    // scopes use the overload above, borrowing the world's live publication.
+    template<unsigned Capacity,class CreationAudio,class EnvironmentFor,class Tick>
+    bool withShopParentSteps(StoredShopCreationOwner<instanceCapacity,Capacity,CreationAudio>& owner,
         ShopInteraction::Input& input,CurrencyAccount& currency,EnvironmentFor environmentFor,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(shopParentStep_||!owner.belongsTo(instances_,objectPack_)||!owner.valid())return run_.effectsSucceeded=false;

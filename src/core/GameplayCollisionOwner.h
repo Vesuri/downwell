@@ -3107,6 +3107,13 @@ public:
         return check(tick())&&valid();
     }
     template<class EnvironmentFor>
+    bool stepRegisteredShopParent(InstanceHandle caller,EnvironmentFor environmentFor){
+        if(!valid()||!world_)return check(false);
+        return world_->withShopStepState([&](ShopInteraction::Input& input,CurrencyAccount& currency){
+            return stepRegisteredShopParent(caller,input,currency,environmentFor);
+        });
+    }
+    template<class EnvironmentFor>
     bool stepRegisteredShopParent(InstanceHandle caller,ShopInteraction::Input& input,
         CurrencyAccount& currency,EnvironmentFor environmentFor){
         if(!valid()||!world_||!resolves(caller)||objectOf(caller)!=277)return check(false);

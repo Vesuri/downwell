@@ -194,13 +194,13 @@ int main(){
             require(voice==987&&!world.instance(id)->destroyRequested,"radio stop precedes parent destruction");++stops;return true;
         }
     } parentRadio{live,parentId};
-    ShopInteraction::Input parentInput;CurrencyAccount parentCurrency;unsigned parentBodies=0;
+    CurrencyAccount parentCurrency;unsigned parentBodies=0;
     auto parentEnvironment=[&](const InstanceRecord& r,auto body){
         require(r.instanceId==parentId,"selected parent context");++parentBodies;
         ShopParentProbe env{parentOnly,parentCurrency,parentOnly.y};env.crime=true;env.meet=false;
         return body(env);
     };
-    require(live.withShopParentSteps(owner,parentInput,parentCurrency,parentEnvironment,[&]{
+    require(live.withShopParentSteps(owner,parentEnvironment,[&]{
         return live.withShopParentLifetimeEvents(owner,parentRadio,[&]{live.step(false);return live.effectsSucceeded();});
     })&&parentBodies==1,
         "parent lifetime handler joins stored End Step and deferred cleanup");

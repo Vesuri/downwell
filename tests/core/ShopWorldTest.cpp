@@ -11,6 +11,21 @@ static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    {
+        downwell::ShopWorld world;
+        downwell::Input held;held.fire=true;held.right=true;
+        world.publishInput(held);
+        auto& shared=world.input;
+        require(shared.confirm&&shared.right&&!shared.left&&!shared.cancel,"publish source Shop input edges");
+        shared.confirm=false;
+        require(!world.input.confirm&&world.previous.fire,"consumption does not change raw history");
+        world.publishInput(held);
+        require(!shared.confirm&&!shared.right,"held buttons do not recreate consumed edges");
+        world.publishInput({});world.publishInput(held);
+        require(shared.confirm&&shared.right,"a release and press publishes new edges");
+        world.reset();
+        require(!shared.confirm&&!shared.right&&!world.previous.fire,"room reset clears publication and history");
+    }
     for(unsigned area:{1u,3u})for(unsigned reject=0;reject<=3;++reject){
         struct Ops {
             unsigned currentArea,reject,calls=0;bool good=true;
@@ -423,6 +438,8 @@ int main() {
     tick(true);
     require(shop->menu.active && run.shops.noControl && player.grounded() &&
         money.currency == 1000 && greetings == 1, "opening consumes press without jumping or buying");
+    require(!run.shops.input.confirm&&run.shops.previous.fire,
+        "later registered parents borrow the compact parent's consumed confirmation");
     tick(true);
     require(money.currency == 1000, "held confirmation does not purchase");
     require(shop->feedback.soundCount == 0 && !shop->feedback.resetKeeperImage,

@@ -2415,6 +2415,10 @@ public:
         },[this]{return enemyRandom_.chooseIndexSmall(3);},health_,owner,lookup);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
+    template<class Body> bool withShopStepState(Body body){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=body(run_.shops.input,currencyAccount_)&&run_.effectsSucceeded;
+    }
     bool registerSideCameraLocker(int x, int y,unsigned sourceId=0) {
         return run_.effectsSucceeded=run_.effectsSucceeded&&run_.sideCameraLockers.create(x,y,sourceId);
     }

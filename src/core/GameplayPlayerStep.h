@@ -109,7 +109,7 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     run.shops.advanceKeepers(shopPlayerX, false, run.stage.area, shopRandom);
     run.shops.advancePresentation();
 #ifndef DOWNWELL_REFERENCE_FRAME_WORK
-    }else run.shops.previous=input;
+    }else run.shops.publishInput(input);
 #endif
     DW_PROFILE_PHASE(profilePlayer);
     run.advanceLevelExitAlarms(viewX, viewY);

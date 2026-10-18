@@ -30,6 +30,16 @@ constant in the collision callback. Adding a family requires its concrete
 update/Draw scopes and resource dependencies; having a registered record alone
 does not authorize skipping its unbound events.
 
+The shared player phase publishes Shop edges once into `ShopWorld::input`;
+compact parents consume that same publication. Registered parent scopes borrow
+it and the world's currency account through the state-owning overloads, rather
+than reconstructing input in a frontend or copying it for each nested visit.
+Raw held history remains separate from consumption, including when the Shop
+family is empty. Room reset clears both. This is the existing keyboard/fire
+subset; it does not map pause to the source's separate `padCancel`, or replace
+the still-separate startup/menu control state. Isolated event fixtures may
+continue to provide explicit input/currency through the reference overloads.
+
 `make test-encounter-session` exercises full startup and `SKIP_TO_GAME`, then
 level completion and Retry through the session. Exit placement and lethal
 health subtraction are explicit lifecycle fixtures, not natural-encounter

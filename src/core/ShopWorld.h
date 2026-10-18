@@ -44,6 +44,17 @@ struct ShopWorld {
     unsigned fixtureRevision = 0;
     bool noControl = false, interactable = false;
     Input previous;
+    // One mutable input publication for the whole Shop phase. A nested
+    // registered with(Shop) must see consumption by earlier parents, rather
+    // than reconstructing dUp from held input. Keep raw history separately:
+    // consuming dUp must not manufacture another press on the next update.
+    ShopInteraction::Input input;
+
+    void publishInput(const Input& held) {
+        input = {held.right && !previous.right, held.left && !previous.left,
+                 held.fire && !previous.fire, false};
+        previous = held;
+    }
 
     void reset() {
         // Do not materialize a whole eight-shop temporary on the A500's
@@ -52,6 +63,7 @@ struct ShopWorld {
         allocatedCount = fixtureRevision = 0;
         noControl = interactable = false;
         previous = {};
+        input = {};
     }
 
     // Stock uses irandom_range; scrShopAssignText then chooses one of three
@@ -225,15 +237,13 @@ public:
     void step(const Input& held, int x, int y, bool criminal, bool dead,
               int& facing, CurrencyAccount& currency, Choose choose,
               Grant grant, Emit emit) {
-        ShopInteraction::Input edges{held.right && !previous.right,
-            held.left && !previous.left, held.fire && !previous.fire, false};
-        previous = held; // Always track raw edges, including while locked.
+        publishInput(held); // Always track raw edges, including while locked.
         for (auto& shop : instances) if (shop.allocated && !shop.sourceId) {
             shop.feedback.beginStep();
             if (!shop.present) continue;
             const ShopInteraction::Context context{meets(shop, x, y),
                 interactable, x > shop.x, criminal, dead};
-            shop.menu.step(edges, context, noControl, facing, shop.stock,
+            shop.menu.step(input, context, noControl, facing, shop.stock,
                 currency, choose, grant, [&](ShopInteraction::Effect effect) {
                     if (effect == ShopInteraction::Effect::disableMask)
                         shop.maskEnabled = false;
