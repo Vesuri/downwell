@@ -5,7 +5,36 @@
 #include <array>
 #include <algorithm>
 using namespace downwell;
+static void repeatedPasses(){
+    RunnerCollisionPairs<64,4096> sparse;
+    RunnerCollisionPairs<64,4096,false> oracle;
+    unsigned seed=7;
+    auto random=[&](){seed=seed*1664525u+1013904223u;return seed;};
+    for(unsigned pass=0;pass<300;++pass){
+        assert(sparse.beginPass()&&oracle.beginPass());
+        std::vector<unsigned> actual,expected;
+        auto event=[&](auto& calls){return [&](InstanceHandle a,InstanceHandle b,bool& found){
+            calls.insert(calls.end(),{a.slot,a.generation,b.slot,b.generation});
+            found=((a.slot+b.slot+pass)%3)==0;return true;
+        };};
+        // Alternate empty, single-entry, repeated-slot and full-domain passes.
+        const unsigned n=pass%4==0?0:pass%4==1?1:pass%4==2?128:64;
+        for(unsigned i=0;i<n;++i){
+            const InstanceHandle a{pass%4==3?i:random()%64,1+random()%4};
+            for(unsigned j=0;j<8;++j){const InstanceHandle b{random()%64,1+random()%4};
+                assert(sparse.candidate(a,b,event(actual))&&oracle.candidate(a,b,event(expected)));
+            }
+            assert(sparse.finishInstance(a)&&oracle.finishInstance(a));
+        }
+        assert(actual==expected&&sparse.seal()&&oracle.seal()&&sparse.size()==oracle.size());
+        actual.clear();expected.clear();
+        assert(sparse.dispatch([&](auto a,auto b){actual.insert(actual.end(),{a.slot,a.generation,b.slot,b.generation});return true;}));
+        assert(oracle.dispatch([&](auto a,auto b){expected.insert(expected.end(),{a.slot,a.generation,b.slot,b.generation});return true;}));
+        assert(actual==expected);
+    }
+}
 int main(){
+    repeatedPasses();
     unsigned cases=0;
     for(unsigned events=0;events<512;++events){
         std::array<unsigned,3> order{{0,1,2}};

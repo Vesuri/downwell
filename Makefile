@@ -331,7 +331,7 @@ build/runner-collision-dispatch-test: tests/core/RunnerCollisionDispatchTest.cpp
 verify-runner-collision-pairs: build/runner-collision-pairs-test
 	./build/runner-collision-pairs-test
 
-build/runner-collision-pairs-test: tests/core/RunnerCollisionPairsTest.cpp src/core/RunnerCollisionPairs.h src/core/InstanceHandle.h
+build/runner-collision-pairs-test: tests/core/RunnerCollisionPairsTest.cpp src/core/RunnerCollisionPairs.h src/core/InstanceHandle.h src/core/SlotIndex.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 

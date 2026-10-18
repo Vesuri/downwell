@@ -1,12 +1,13 @@
 #ifndef DOWNWELL_CORE_RUNNER_COLLISION_PAIRS_H
 #define DOWNWELL_CORE_RUNNER_COLLISION_PAIRS_H
 #include "InstanceHandle.h"
+#include "SlotIndex.h"
 namespace downwell {
 // Candidate callback 0x503000 and append-order dispatch 0x5025b6. The owner
 // supplies ORIGINAL dirty-list/spatial traversal order and live handles. It
 // must not mutate lifetimes from event-lookup callbacks. Precise overlap and
 // destruction checks happen later, when processing the sealed pairs.
-template<unsigned Instances,unsigned Capacity> class RunnerCollisionPairs {
+template<unsigned Instances,unsigned Capacity,bool SparseReset=true> class RunnerCollisionPairs {
     static_assert(Instances>0&&Capacity>0,"Collision storage must be nonempty");
 public:
     struct Pair {InstanceHandle self,other;};
@@ -15,7 +16,10 @@ public:
     const Pair* at(unsigned index)const{return index<count_?&pairs_[index]:nullptr;}
     bool beginPass(){
         if(!good_||collecting_||executing_)return fail();
-        count_=0;for(auto& generation:processed_)generation=0;
+        count_=0;
+        if constexpr(SparseReset){
+            while(touchedCount_)processed_[touched_[--touchedCount_]]=0;
+        }else for(auto& generation:processed_)generation=0; // Retained oracle.
         collecting_=true;ready_=false;return true;
     }
     template<class HasEvent> bool candidate(InstanceHandle self,InstanceHandle other,HasEvent hasEvent){
@@ -33,6 +37,12 @@ public:
     bool finishInstance(InstanceHandle self){
         if(!good_)return false;
         if(!collecting_||!valid(self))return fail();
+        if constexpr(SparseReset){
+            // A slot may be stamped repeatedly, including with a replacement
+            // generation. Remember it once; candidate suppression still reads
+            // the exact generation rather than merely a per-slot visited bit.
+            if(!processed_[self.slot])touched_[touchedCount_++]=self.slot;
+        }
         processed_[self.slot]=self.generation;return true;
     }
     bool seal(){
@@ -57,6 +67,8 @@ private:
     bool valid(InstanceHandle h)const{return h.slot<Instances&&h.generation!=0;}
     bool fail(){good_=false;return false;}
     Pair pairs_[Capacity]{};std::uint32_t processed_[Instances]{};
+    typename SlotIndex<Instances>::Type touched_[SparseReset?Instances:1];
+    unsigned touchedCount_=0;
     unsigned count_=0;bool collecting_=false,ready_=false,executing_=false,good_=true;
 };
 }
