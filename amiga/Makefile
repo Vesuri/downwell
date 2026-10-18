@@ -626,7 +626,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 COLLISION_PACK := $(REPO)/generated/downwell-sprites.dwsc
 COLLISION_MASK_PACK := $(REPO)/generated/downwell-sprite-masks.dwsm
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaPlayer.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaWindAudio.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
@@ -649,7 +649,7 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).wind $(OUT).encountermasks
 
 $(OUT).entrymask: $(AMIGA_ENTRY_MASK)
 	@mkdir -p $(@D)
@@ -902,6 +902,17 @@ obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
 obj/AmigaKeyboard.o: $(AMIGA_SRC)/AmigaKeyboard.cpp $(AMIGA_SRC)/AmigaKeyboard.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaWindAudio.o: $(AMIGA_SRC)/AmigaWindAudio.cpp $(AMIGA_SRC)/AmigaWindAudio.h $(REPO)/generated/amiga-wind.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -I$(REPO)/generated -c -o $@ $<
+
+obj/DownwellAmiga.o: $(REPO)/generated/amiga-encounter-masks.h
+$(REPO)/generated/amiga-encounter-masks.h: $(REPO)/tools/generate-encounter-masks.py $(REPO)/generated/downwell-sprite-masks.dwsm
+	cd $(REPO) && python3 tools/generate-encounter-masks.py
+out/Downwell.encountermasks: $(REPO)/generated/amiga-encounter-masks.h
+	@mkdir -p $(@D)
+	cp $(REPO)/generated/downwell-encounter-masks.dwsm $@
 
 # Isolated real-Paula fixture; does not replace the normal game executable.
 .PHONY: wind-audio-probe

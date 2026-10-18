@@ -1051,6 +1051,14 @@ test-spatial-journal: build/runner-spatial-journal-test
 	./build/runner-spatial-journal-test
 test: test-spatial-journal
 
+.PHONY: test-spatial-capacity
+test: test-spatial-capacity
+test-spatial-capacity: build/runner-spatial-capacity-test
+	./build/runner-spatial-capacity-test
+build/runner-spatial-capacity-test: tests/core/RunnerSpatialCapacityTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
 build/terrain-row-selection-test: tests/core/TerrainRowSelectionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
@@ -1509,6 +1517,14 @@ build/gameplay-scene-collision-contract-test: tests/core/GameplayCollisionContra
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SCENE_COLLISION_BACKEND -o $@ $(filter %.cpp,$^)
 test: test-gameplay-collision-contract
+
+build/native-collision-source-span-test: tests/core/NativeCollisionSourceSpanTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(HOST_CHECK_HEADERS) tests/core/CollisionOwnerFixture.h
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TERRAIN_SOURCE_RECORDS -o $@ $(filter %.cpp,$^)
+.PHONY: test-native-collision-source-span
+test-native-collision-source-span: build/native-collision-source-span-test
+	./build/native-collision-source-span-test
+test: test-native-collision-source-span
 
 build/gameplay-room-views-reference-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build

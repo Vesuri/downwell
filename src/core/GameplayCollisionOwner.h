@@ -13,6 +13,7 @@
 #include "ProjectileViewInterior.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerSpatialTreeLease.h"
+#include "RunnerSpatialCapacity.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
@@ -52,12 +53,13 @@ extern volatile unsigned localDrawCaptureMode;
 class GameplayCollisionOwner {
 public:
     using View=GameplayCollisionView;
+    static constexpr unsigned spatialNodeCapacity=RunnerSpatialCapacity<View::capacity>::nodes;
     using ScalarStates=RunnerBorrowedSpatialStates<RunnerSpatialState,View::capacity>;
 #ifdef DOWNWELL_PLATFORM_AMIGA
-    using DerivedTree=RunnerSpatialTreeLease<View::capacity*2>;
+    using DerivedTree=RunnerSpatialTreeLease<spatialNodeCapacity>;
     template<class Operation,unsigned Count> using JournalStorage=RunnerSpatialJournalLease<Operation,Count>;
 #else
-    using DerivedTree=RunnerSpatialIndex<View::capacity*2>;
+    using DerivedTree=RunnerSpatialIndex<spatialNodeCapacity>;
     template<class Operation,unsigned Count> using JournalStorage=RunnerSpatialJournalInline<Operation,Count>;
 #endif
     // Verification builds keep the complete scalar membership pipeline alive,
@@ -562,14 +564,14 @@ private:
         const auto* terrain=world_?world_->nativeTerrainInstances():nullptr;
         if(terrain&&terrain->sourcePopulation()&&first<View::timeFieldBase&&last>View::terrainBase){
             unsigned after=0,order=0;InstanceHandle local;int object=0;
-            bool present=terrain->nextSourceRegistration(after,local,object,order);
+            bool present=terrain->nextSourceRegistration(after,local,object,order,collisionConsumersAdmitted_);
             auto before=[&](unsigned limit){
                 while(present&&(!limit||order<limit)){
                     const InstanceHandle h{View::terrainBase+local.slot,local.generation};
                     if(h.slot>=first&&h.slot<last){std::uint32_t flags;
                         if(!eligibilityFlags(h,flags)||!visit(h,object,flags))return false;
                     }
-                    after=order;present=terrain->nextSourceRegistration(after,local,object,order);
+                    after=order;present=terrain->nextSourceRegistration(after,local,object,order,collisionConsumersAdmitted_);
                 }return true;
             };
             return visitNativeOrdinaryRegistered(first,last,[&](InstanceHandle h,int child,std::uint32_t flags){
@@ -1018,10 +1020,11 @@ private:
         InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,
         int tile,TerrainBirthFacts& facts,TerrainSourceLease& lease){
         using Result=GameplayWorld::NativeTerrain::SpanResult;
-        if(!valid()||!native_||collisionConsumersAdmitted_||!world_||!nativeTerrainLayersBound_||
+        if(!valid()||!native_||!world_||!nativeTerrainLayersBound_||
            nativeTerrainLayerRunActive_||terrainRoomCount_||!cells.retained||!cells.count)return Result::unsupported;
         const auto& recipe=sourceTerrainRecipe(tile);
         if(!recipe.supported)return Result::unsupported;
+        if(collisionConsumersAdmitted_)return constructCollisionSourceSpan(first,cells,tile,facts,recipe);
         facts.flags[0]=recipe.flags[0];facts.flags[1]=recipe.flags[1];
         unsigned layer;
         if(!layers_.admitSourceTerrainSpan(cells.count,recipe.depth,layer))return Result::unsupported;
@@ -1037,6 +1040,73 @@ private:
         table_.externalRegistrationPublications(slot,thinCount);
         lendSourceTerrain(tile,recipe,lease);
         return Result::success;
+    }
+    GameplayWorld::NativeTerrain::SpanResult constructCollisionSourceSpan(
+        InstanceHandle first,const GameplayWorld::NativeTerrain::PreparedCells& cells,
+        int tile,TerrainBirthFacts& facts,const SourceTerrainRecipe& source){
+        using Result=GameplayWorld::NativeTerrain::SpanResult;
+        if(!geometry_||!nativeCollisionStorage_)return Result::unsupported;
+        const unsigned slot=View::terrainBase+first.slot;
+        unsigned layer;
+        if(!table_.canFreshExternalSpan(slot,cells.count)||
+           !layers_.admitSourceTerrainSpan(cells.count,source.depth,layer))return Result::unsupported;
+        struct Shape {
+            int low=0x7fffffff,high=(-2147483647-1);
+            PreparedTerrainBirthBounds::Key key;
+            bool spatial=false,collision=false;
+        } shapes[2];
+        unsigned present=0;
+        for(unsigned i=0;i<cells.count;++i){
+            auto& shape=shapes[cells.kind(i)];const int x=cells.x(i);
+            if(x<shape.low)shape.low=x;if(x>shape.high)shape.high=x;
+            present|=1u<<cells.kind(i);
+        }
+        RunnerSpatialSplit::PixelBox envelope{};bool haveEnvelope=false;
+        for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind)){
+            const int object=kind?93:60;
+            const auto* definition=objectDefaults_.get(object);
+            const auto* family=families_.flags(object);
+            const auto* create=nativeTerrainCreate_.get(object,tile);
+            auto& shape=shapes[kind];PreparedTerrainBirthBounds::Key lastKey;
+            RunnerSpatialSplit::PixelBox low,high;bool precise,lastPrecise;
+            if(!definition||!family||!create||(definition->initialFlags&3u)||
+               !geometry_->terrain.publication(object,shape.low,cells.y,shape.key,low,precise)||
+               !geometry_->terrain.publication(object,shape.high,cells.y,lastKey,high,lastPrecise))return Result::unsupported;
+            unsigned flags=(definition->initialFlags&~0x208u)|(precise?0x200u:0u);
+            if(!NativeDirtyQueue::shouldPublishBounds(*family,flags,false))return Result::unsupported;
+            facts.flags[kind]=32u|16u|(precise?8u:0u)|(create->changedSprite?4u:0u);
+            shape.spatial=NativeDirtyQueue::shouldQueue(true,*family,definition->initialFlags);
+            shape.collision=(*family&8u)!=0;
+            if(!haveEnvelope){envelope=low;haveEnvelope=true;}
+            if(low.left<envelope.left)envelope.left=low.left;
+            if(high.right>envelope.right)envelope.right=high.right;
+            if(low.top<envelope.top)envelope.top=low.top;
+            if(low.bottom>envelope.bottom)envelope.bottom=low.bottom;
+        }
+        bool admitted=false;unsigned completed=0;
+        // The journal admits storage/envelope before the first publication.
+        // A pressure boundary keeps the existing scalar constructor. No
+        // mutable terrain records or registry entries are installed here.
+        const bool okay=owner_.externalSpatialPublication([&](auto& index){
+            return index.insertGeometrySpan(slot,cells.count,envelope,completed,admitted,
+                [&](unsigned i,PreparedTerrainBirthBounds::Key& key){
+                    if(!i){
+                        if(!table_.externalBirthSpan(slot,cells.count,facts.registration))return false;
+                        const auto roomBasis=room_.sourcePublicationBasis();
+                        facts.roomLow=roomBasis.low;facts.roomHigh=roomBasis.high;facts.roomDepth=source.roomDepth;
+                        if(!layers_.publishSourceTerrainSpan(layer,source.depth,cells.count,facts))return false;
+                        table_.externalRegistrationPublications(slot,cells.count);
+                        thinRetirementWindow_.appendSpan(cells.y,cells.thin()!=0,first.generation+cells.count-1,cells.count);
+                    }
+                    const auto& shape=shapes[cells.kind(i)];
+                    if(shape.spatial)nativeCollisionStorage_->spatial.mark(slot+i);
+                    if(shape.collision)nativeCollisionStorage_->collision.mark(slot+i);
+                    key=shape.key;key.value+=unsigned(cells.x(i)-shape.low)/4;
+                    return true;
+                });
+        });
+        if(!okay){check(false);return Result::failure;}
+        return admitted?Result::success:Result::unsupported;
     }
     // Native, external collision, world, layer binding and the recipe are
     // fixed for this binding; runs and room spans exist only inside the
@@ -1129,7 +1199,7 @@ private:
         if(!terrain->read(h,id,active,destroyed)||!terrain->spatialFlags(h,flags))return check(false);
         if(id.object==93)thinRetirementWindow_.invalidate();
         const unsigned slot=View::terrainBase+local;
-        const bool sourceRegistered=terrain->sourceOwned(h)&&id.object==93&&room_.active(slot);
+        const bool sourceRegistered=terrain->sourceOwned(h)&&(collisionConsumersAdmitted_||id.object==93)&&room_.active(slot);
         if(flags&0x8000u){
             // Cached geometry may still be constructor state after Create.
             // Never remove using the current appearance before it is flushed.
@@ -5147,7 +5217,7 @@ public:
                 }
                 const int object=objectOf(h);
                 if(world_->nativeTerrainInstances()->sourceOwned({h.slot-View::terrainBase,h.generation})){
-                    if(object==93)table_.externalRegistrationPublications(slot,1);
+                    if(collisionConsumersAdmitted_||object==93)table_.externalRegistrationPublications(slot,1);
                     return layers_.reconcile(h)&&publishPreparedDraw(h);
                 }
                 return ((!collisionConsumersAdmitted_&&object!=93)||table_.registerExternalObject(h,object,registered))&&

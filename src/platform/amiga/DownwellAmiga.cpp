@@ -18,6 +18,9 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
 #include "AmigaKeyboard.h"
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+#include "AmigaEncounterResources.h"
+#endif
 #include "AmigaFrameBudget.h"
 #include "AmigaShopArtSnapshot.h"
 #include "AmigaVerificationScratch.h"
@@ -1940,7 +1943,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     alignas(ReferenceStorage) static UBYTE referenceMemory[sizeof(ReferenceStorage)];
     referenceStorage=new(referenceMemory) ReferenceStorage;
 #endif
-    AmigaSpatialTreeStorage<downwell::GameplayCollisionOwner::View::capacity*2> spatialTreeStorage;
+    AmigaSpatialTreeStorage<downwell::GameplayCollisionOwner::spatialNodeCapacity> spatialTreeStorage;
     AmigaSpatialJournalStorage<downwell::GameplayCollisionOwner::Owner::SpatialIndex::JournalStorage> spatialJournalStorage;
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
         downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
@@ -1948,8 +1951,10 @@ __attribute__((noinline)) static int runDownwell(void) {
         DOWNWELL_NATIVE_BOXES!=0,DOWNWELL_NATIVE_FIELDS!=0,referenceStorage);
     if(!collisionOwner.valid()||!collisionOwner.bindSpatialTree(spatialTreeStorage.provider())||
        !collisionOwner.bindSpatialJournal(spatialJournalStorage.provider()))return 20;
+#ifndef DOWNWELL_SCENE_COLLISION_BACKEND
     if(ownership!=downwell::GameplayCollisionOwner::Ownership::reference&&
        !collisionOwner.declareExternalCollisionBackend())return 20;
+#endif
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
@@ -1971,6 +1976,9 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+    AmigaEncounterResources encounterResources(port,collisionOwner);
+#endif
     downwell::GameplayEncounterSession encounterSession(port,collisionOwner);
     if(!encounterSession.start())return 20;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
@@ -2306,6 +2314,11 @@ __attribute__((noinline)) static int runDownwell(void) {
 #if (defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_SCENE_DESCENT_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
     // These explicit fixtures inspect the authored room before their scene
     // loop. The full-scene route exercises ordinary deferred room admission.
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+    if(!encounterResources.acquire(platform)){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
+#endif
     if(!prepareInitialGameplay()){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
@@ -2967,6 +2980,10 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             DW_PROFILE_PHASE(profileSimulation);
             if (!sceneResetRequested) scenes.step(liveInput,encounterSession.inputPublication());
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+            if(scenes.scene()!=AmigaScene::gameplay)encounterResources.releaseScene();
+            else if(encounterResources.ready()&&!encounterResources.bind(encounterFrame))break;
+#endif
             DW_PROFILE_PHASE(profileOther);
             {
                 const bool presentationChanged =
@@ -3106,6 +3123,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     DW_PROFILE_PHASE(profileEntryFields);
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+                    if(!encounterResources.acquire(platform)||!encounterResources.bind(encounterFrame)){exitCode=20;break;}
+#endif
                     if(!prepareInitialGameplay()){exitCode=20;break;}
                     if (!acquireGameplayPlanes()) { exitCode=20; break; }
 #ifdef DOWNWELL_PREPARED_FIELDS
@@ -5005,6 +5025,9 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
 
     if(!encounterSession.retire())exitCode=20;
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+    encounterResources.releaseScene();
+#endif
     keyboard.release();
     platform.restore();
     memory.release();

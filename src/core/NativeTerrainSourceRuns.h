@@ -44,14 +44,14 @@ public:
     unsigned sourcePublicationCount()const{return sources_.sourcePublicationCount();}
     bool sourceOwned(InstanceHandle h)const{SourceRead read;return sources_.read(h,read);}
     unsigned sourcePopulation()const{return sources_.size();}
-    bool nextSourceRegistration(unsigned after,InstanceHandle& handle,int& object,unsigned& order)const{
+    bool nextSourceRegistration(unsigned after,InstanceHandle& handle,int& object,unsigned& order,bool walls=false)const{
         bool found=false;
         sources_.visit([&](InstanceHandle h,const SourceRead& source){
-            if(source.object()!=93)return true;
+            if(!walls&&source.object()!=93)return true;
             const auto* changed=sources_.mutation(h);
             if(changed&&changed->room.list!=0)return true;
             const unsigned stamp=changed?changed->publication.stamp:source.registration();
-            if(stamp>after&&(!found||stamp<order)){found=true;handle=h;object=93;order=stamp;}
+            if(stamp>after&&(!found||stamp<order)){found=true;handle=h;object=source.object();order=stamp;}
             return true;
         });return found;
     }

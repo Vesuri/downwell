@@ -58,8 +58,8 @@ public:
         if constexpr(SourceRecords)return runs_.sourceOwned(h);
         return false;
     }
-    bool nextSourceRegistration(unsigned after,InstanceHandle& handle,int& object,unsigned& order)const{
-        if constexpr(SourceRecords)return runs_.nextSourceRegistration(after,handle,object,order);
+    bool nextSourceRegistration(unsigned after,InstanceHandle& handle,int& object,unsigned& order,bool walls=false)const{
+        if constexpr(SourceRecords)return runs_.nextSourceRegistration(after,handle,object,order,walls);
         return false;
     }
     unsigned sourcePublicationCount()const{
