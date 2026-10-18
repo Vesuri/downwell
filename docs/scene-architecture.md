@@ -92,6 +92,16 @@ against an instrumented resource and checks all 16 input combinations, unrelated
 pins, replay transport and held Cancel across reset. This is not electrical
 testing of a physical joystick or support for CD32 serial-pad decoding.
 
+X is the approved keyboard Cancel binding on SDL and Amiga; Escape quits,
+and Pause remains separate. Keyboard and controller Cancel are ORed before
+the shared session derives edges. SDL retains held X and short taps, clearing
+it on focus loss. Amiga takes the CIA-A serial vector immediately before the
+frame loop, using Revs' decode/handshake and displaced-vector ownership model;
+it restores the vector before platform restoration. Failed acquisition returns
+20 through normal cleanup. `make test-amiga-keyboard` checks resource failure,
+vector replacement/rollback/restoration and serial X/Escape decoding; the
+interrupt-masked poll acknowledges the short-tap latch without losing a press.
+
 `make test-encounter-session` exercises full startup and `SKIP_TO_GAME`, then
 level completion and Retry through the session. Exit placement and lethal
 health subtraction are explicit lifecycle fixtures, not natural-encounter

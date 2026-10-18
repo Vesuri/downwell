@@ -17,6 +17,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaKeyboard.h"
 #include "AmigaFrameBudget.h"
 #include "AmigaShopArtSnapshot.h"
 #include "AmigaVerificationScratch.h"
@@ -2735,13 +2736,16 @@ __attribute__((noinline)) static int runDownwell(void) {
     downwellStartupReady();
 #endif
     int exitCode = 20; // Internal loop breaks are failures, not normal quits.
+    AmigaKeyboard keyboard;
+    const bool keyboardReady=keyboard.acquire();
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
     // After a plain gameplay frame the next simulation step needs no display
     // memory, so it runs while that frame's list waits for its VBlank.
     bool overlapNextStep = false;
     UWORD fencedVblank = AmigaPlatform::vblankCount();
     for (;;) {
-        if ((*ciaaPra & 0x40u) == 0) {
+        if(!keyboardReady)break;
+        if ((*ciaaPra & 0x40u) == 0 || keyboard.quit()) {
             exitCode = 0;
             break;
         }
@@ -2896,6 +2900,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #else
             downwell::Input liveInput = controls.sample();
+            liveInput.cancel=keyboard.cancel()||liveInput.cancel;
 #ifdef DOWNWELL_PROFILE_AUTORUN
             static unsigned profileMenuFrames = 0;
             liveInput = downwell::Input();
@@ -5000,6 +5005,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
 
     if(!encounterSession.retire())exitCode=20;
+    keyboard.release();
     platform.restore();
     memory.release();
 #ifdef DOWNWELL_CLEAR_VERIFY

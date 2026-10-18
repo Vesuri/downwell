@@ -114,7 +114,9 @@ gate. With the Amiga toolchain and FS-UAE installed, run
 trajectory digest before the normal interactive Amiga executable is rebuilt.
 
 Use Left/Right or A/D to move, Space or Z to jump/fire and confirm selections,
-and Escape to quit. Use the startup shortcuts above for focused testing.
+X to cancel, and Escape to quit in SDL. On Amiga, use the joystick for movement
+and fire; X or the second joystick button cancels, and Escape quits.
+Cancel is separate from Pause. Use the startup shortcuts above for focused testing.
 
 Remaining behavior, rendering, performance and verification work is tracked only
 in [the work queue](docs/open-work.md). Implementation history and past test

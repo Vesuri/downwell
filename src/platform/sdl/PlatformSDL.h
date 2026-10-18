@@ -50,6 +50,7 @@ private:
     std::array<SDL_Texture*, 3> flashFrames_{};
     std::uint64_t nextTick_ = 0;
     bool screenshotRequested_ = false;
+    bool cancelKeyHeld_ = false;
 };
 
 } // namespace downwell

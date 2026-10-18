@@ -6,6 +6,21 @@
 int main(){
     downwell::PlatformSDL platform;assert(platform.ready());
     assert(!platform.pollInput().cancel);
+    auto key=[](Uint32 type,SDL_Keycode code){
+        SDL_Event e{};e.type=type;e.key.keysym.sym=code;
+        assert(SDL_PushEvent(&e)==1);
+    };
+    key(SDL_KEYDOWN,SDLK_x);
+    assert(platform.pollInput().cancel&&platform.pollInput().cancel);
+    key(SDL_KEYUP,SDLK_x);assert(!platform.pollInput().cancel);
+    key(SDL_KEYDOWN,SDLK_x);key(SDL_KEYUP,SDLK_x);
+    assert(platform.pollInput().cancel&&!platform.pollInput().cancel);
+    key(SDL_KEYDOWN,SDLK_ESCAPE);
+    auto escape=platform.pollInput();assert(escape.quit&&!escape.cancel);
+    key(SDL_KEYDOWN,SDLK_x);assert(platform.pollInput().cancel);
+    SDL_Event focus{};focus.type=SDL_WINDOWEVENT;
+    focus.window.event=SDL_WINDOWEVENT_FOCUS_LOST;
+    assert(SDL_PushEvent(&focus)==1);assert(!platform.pollInput().cancel);
     const int index=SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER,
         SDL_CONTROLLER_AXIS_MAX,SDL_CONTROLLER_BUTTON_MAX,0);
     assert(index>=0&&SDL_IsGameController(index));

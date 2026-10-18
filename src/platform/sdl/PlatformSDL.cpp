@@ -141,6 +141,16 @@ Input PlatformSDL::pollInput() {
     Input input;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) &&
+            event.key.keysym.sym == SDLK_x) {
+            cancelKeyHeld_ = event.type == SDL_KEYDOWN;
+            if (cancelKeyHeld_) input.cancel = true; // Retain a tap within this poll.
+        }
+        if (event.type == SDL_WINDOWEVENT &&
+            event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+            cancelKeyHeld_ = false;
+            input.cancel = false;
+        }
         if (event.type == SDL_KEYDOWN && !event.key.repeat &&
             event.key.keysym.sym == SDLK_F12)
             screenshotRequested_ = true;
@@ -162,7 +172,8 @@ Input PlatformSDL::pollInput() {
             if(controller_)break;
         }
     }
-    input.cancel=controller_&&SDL_GameControllerGetButton(controller_,SDL_CONTROLLER_BUTTON_B);
+    input.cancel=input.cancel||cancelKeyHeld_||
+        (controller_&&SDL_GameControllerGetButton(controller_,SDL_CONTROLLER_BUTTON_B));
     input.left = keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_A];
     input.right = keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D];
     input.fire = keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_Z];

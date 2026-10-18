@@ -1,0 +1,2 @@
+#define CIAICRB_SP 3
+#define CIACRAF_SPMODE 0x40

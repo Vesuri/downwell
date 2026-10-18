@@ -626,7 +626,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 COLLISION_PACK := $(REPO)/generated/downwell-sprites.dwsc
 COLLISION_MASK_PACK := $(REPO)/generated/downwell-sprite-masks.dwsm
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlayer.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
@@ -896,6 +896,10 @@ verify-health-link: $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/
 	python3 $(REPO)/tests/amiga-health-link-test.py --assembler "$$(command -v $(AS))" --linker "$$( $(CC) -print-prog-name=ld )"
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaKeyboard.o: $(AMIGA_SRC)/AmigaKeyboard.cpp $(AMIGA_SRC)/AmigaKeyboard.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

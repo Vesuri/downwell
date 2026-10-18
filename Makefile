@@ -2116,6 +2116,14 @@ test: test-amiga-input
 test-amiga-input: build/amiga-input-test
 	./build/amiga-input-test
 
+build/amiga-keyboard-test: tests/platform/amiga/AmigaKeyboardTest.cpp src/platform/amiga/AmigaKeyboard.cpp $(wildcard tests/platform/amiga/input-compat/*/*.h) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/input-compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+.PHONY: test-amiga-keyboard
+test: test-amiga-keyboard
+test-amiga-keyboard: build/amiga-keyboard-test
+	./build/amiga-keyboard-test
+
 build/sdl-flash-raster-test: tests/platform/SDLFlashRasterTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
