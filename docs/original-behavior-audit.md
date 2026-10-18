@@ -475,6 +475,16 @@ rounds Y before checking `global.ending` for self-destruction. This is not a
 catch-up loop. Its wall Collision event (991) enters `other` and destroys the
 contacted wall; Draw (992) is `draw_self`, not the entry wipe's effect surface.
 The assembly hashes and event metadata are pinned by the instance-ID verifier.
+The native prepared pair path validates code 991, the absent reverse 60/61
+collision, and absent wall Destroy handler against immutable resources. It
+admits only the typed dither/wall slots with non-solid live flags. Within this
+closed event, object identity and solidity cannot change: its only operation
+is the existing wall-destruction mark, with physical retirement deferred.
+Consequently it can omit redundant generic metadata/solid rereads while
+retaining exact overlap, OTHER's collision-queue publication and both ordered
+event-context calls with their room guards. Other pairs or unsupported state
+use the generic wrapper. Presentation observers report rendering changes and
+failure, not additional game events or object transformations.
 The stored dispatcher executes Begin Step through `DitherAboveStep`, publishing
 X, optional incremented Y, and rounded Y separately through the lifecycle
 owner. For this controller the precise coordinate fields mirror published

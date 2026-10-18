@@ -27,16 +27,23 @@ struct Audio {
     bool setGain(int,MotionBinary64,int){return true;}
     bool setPitch(int,MotionBinary64){return true;}
 };
-int main(int argc,char** argv){
+template<bool Prepared> static void exercise(int argc,char** argv){
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
         rb=read("generated/downwell-rooms.dwrm"),mb=read(argc>1?argv[1]:"generated/downwell-sprite-masks.dwsm");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     RoomPack rooms(rb.data(),rb.size());SpriteMaskPack masks(mb.data(),mb.size());
     assert(objects.valid()&&sprites.valid()&&rooms.valid()&&masks.valid());
-    std::vector<int> reference;
+    std::vector<int> reference,referenceDestroyed;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery}){
-        for(unsigned failure=0;failure<2;++failure){
-            auto owner=makeCollisionOwner(objects,sprites,{}, {},&rooms,mode);
+        for(unsigned failure=0;failure<3;++failure){
+            struct Presentation {
+                bool reject=false;std::vector<int> destroyed;
+                bool changed(int x,int y,int before,int after){
+                    if(before>=0&&after<0){destroyed.push_back(x);destroyed.push_back(y);return !reject;}
+                    return true;
+                }
+            } presentation;
+            auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation::bind(presentation), {},&rooms,mode);
             const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
             auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
                 owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
@@ -53,19 +60,25 @@ int main(int argc,char** argv){
             // Retained overlapping entry fields; normal first-level Create
             // destroys its entry field. This is an explicit ordering fixture.
             assert(fields.create(240,176,371)&&fields.create(240,176,371));
-            auto pass=std::make_unique<GameplayDitherCollisionPass<256>>(*owner,masks);
-            Audio audio;audio.fail=failure;
+            auto pass=std::make_unique<GameplayDitherCollisionPass<256,Prepared>>(*owner,masks);
+            Audio audio;audio.fail=failure==1;
             const auto before=world->randomDrawCount();
             bool pending=true;
             auto room=[&]{return RunnerCollisionEventContext::RoomState{true,pending};};
             assert(pass->run(*world,MotionBinary64::fromInteger(1),audio,room));
             assert(audio.calls.empty()&&world->randomDrawCount()==before);
             pending=false;
+            presentation.reject=failure==2;
             // Source dispatcher retains dirty collision entries for next pass.
             const bool okay=pass->run(*world,MotionBinary64::fromInteger(1),audio,room);
-            assert(okay==!failure&&!audio.calls.empty());
+            assert(okay==!failure);
+            if(failure!=2)assert(!audio.calls.empty());
+            else assert(presentation.destroyed.size()==2); // Stop at the first failed wall notification.
             if(failure){
-                assert(!owner->valid()&&!world->effectsSucceeded());
+                assert(!owner->valid());
+                // The scalar terrain observer latches its owner, whereas
+                // native destruction also passes through world.effects.
+                if(failure!=2||native)assert(!world->effectsSucceeded());
                 const auto count=audio.calls.size();
                 assert(!pass->run(*world,MotionBinary64::fromInteger(1),audio,room)&&audio.calls.size()==count);
             }else{
@@ -73,8 +86,8 @@ int main(int argc,char** argv){
                 // Which overlapping lifetime owns the RNG-selected sound is
                 // observable even though both contacts share the same voice.
                 for(unsigned i=0;i<2;++i)audio.calls.push_back(fields.find(fields.handle(i))->windSound);
-                if(mode==GameplayCollisionOwner::Ownership::reference)reference=audio.calls;
-                else assert(audio.calls==reference);
+                if(mode==GameplayCollisionOwner::Ownership::reference){reference=audio.calls;referenceDestroyed=presentation.destroyed;}
+                else assert(audio.calls==reference&&presentation.destroyed==referenceDestroyed);
                 unsigned destroyed=0;
                 for(unsigned i=0;i<8;++i){
                     if(native){GameplayWorld::NativeTerrain::Identity id;bool active,dead;
@@ -148,3 +161,4 @@ int main(int argc,char** argv){
     }
     std::puts("Dither/wind admission: reference/native sealed order, room suppression and terminal audio failure passed");
 }
+int main(int argc,char** argv){exercise<false>(argc,argv);exercise<true>(argc,argv);}

@@ -5,7 +5,7 @@ namespace downwell {
 // Native counterpart of StoredDitherCollisionPass's production admission.
 // Collect once using all source identities; filtering must not change the
 // historical spatial tree, dirty-list retention or the sealed pair order.
-template<unsigned Capacity=16384> class GameplayDitherCollisionPass {
+template<unsigned Capacity=16384,bool PreparedPairs=true> class GameplayDitherCollisionPass {
 public:
     GameplayDitherCollisionPass(GameplayCollisionOwner& owner,const SpriteMaskPack& masks)
         :owner_(owner),masks_(masks){}
@@ -28,6 +28,9 @@ public:
             },[&](const RunnerCollisionEventContext::Frame& event){
                 return event.owner==255?owner_.dispatchTimeFieldWind(event,volume,audio):
                     owner_.dispatchDitherAboveCollision(event);
+            },[&](InstanceHandle a,InstanceHandle b,int first,int second,bool& handled){
+                if constexpr(PreparedPairs)return owner_.preparedDitherWallPair(a,b,first,second,masks_,context,roomState,handled);
+                handled=false;return true;
             });
     }
 private:

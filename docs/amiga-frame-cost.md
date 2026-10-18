@@ -1,5 +1,41 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: prepared dither/wall event plan
+
+The §1.01 native candidate retains full ordered collection but prepares the
+non-solid 61/60 event contract once with its immutable collision resources.
+It removes repeated event/Destroy lookup and generic flag resolution around
+code 991. Exact overlap, queue publication, both direction-specific room
+guards, event context and native destruction remain. Wind and unsupported
+state retain generic dispatch. `GameplayDitherCollisionPass<Capacity,false>`
+retains the generic pair oracle. This does not enable the shipping backend.
+
+Baseline ELF `924c079e94dfbfb19654ef7357b157fc465d94df356c61998a91394cf14ab540`;
+candidate `ba521b5721af0b6497b32cbeeeabe9fc5415a2fdf805b0863b897ab799836d19`.
+Use the candidate build/capture commands in the following section. A separate
+20-field capture beginning at mark 57 verifies complete update 58 again.
+
+| Measurement | Generic | Prepared |
+| --- | ---: | ---: |
+| Whole 164-update fall, PAL fields | 1,448 | 1,346 |
+| First update, PAL fields | 211 | 211 |
+| Updates 57–61 mean, ms | 122.6 | 105.6 |
+| Selected pair execution mean, ms | 34.84 | 18.01 |
+| Update 57, ms | 49.7 | 49.2 |
+| Update 58, ms | 229.2 | 187.3 |
+| Update 59, ms | 42.2 | 42.2 |
+| Update 60, ms | 187.5 | 145.2 |
+| Update 61, ms | 104.5 | 104.4 |
+
+Update 58 independently repeats at 1,330,490 cycles / 187.3 ms. All 165
+state samples match. The host fixture exercises prepared and generic paths
+against the reference owner, comparing wind calls and wall-destruction order;
+room suppression, terminal audio failure and first failed wall notification
+are checked. Normal 512 KiB Chip startup passes. Reports are
+`tmp/prepared-dither-{cost,recheck}/report.txt`; raw traces are removed after
+committing the measurements. Collision collection/tree upkeep and Draw-entry
+retirement remain the large recurring costs; this is not performance closure.
+
 ## Encounter candidate: demand-constructed spatial nodes
 
 This is the §1.01 collision-enabled candidate, **not the shipping backend**.

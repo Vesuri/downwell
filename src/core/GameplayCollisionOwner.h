@@ -95,6 +95,8 @@ public:
         PreparedSpriteGeometry<741> sprites;
         PreparedTerrainBirthBounds terrain;
         PreparedCollisionEvents<386,512> events;
+        PackedObjectEvent ditherWallEvent{};
+        bool ditherWallChecked=false,ditherWallSupported=false;
     };
     struct SkeletonEncounterStorage {
         GameplayWorld::Bones::Storage bones;
@@ -2129,10 +2131,13 @@ public:
     }
     // Migration admission filters the sealed stream, not collection or tree
     // publication. Legacy families stay with their adapters until admitted.
-    template<unsigned Pairs,class Motion,class RoomState,class Admit,class Execute>
+    struct NoPreparedCollisionPair {
+        bool operator()(InstanceHandle,InstanceHandle,int,int,bool& handled)const{handled=false;return true;}
+    };
+    template<unsigned Pairs,class Motion,class RoomState,class Admit,class Execute,class Prepared=NoPreparedCollisionPair>
     bool executeSelectedCollisionPairs(RunnerCollisionPairs<View::capacity,Pairs>& pairs,
         const SpriteMaskPack& masks,RunnerCollisionEventContext& context,
-        Motion& motion,RoomState roomState,Admit admit,Execute execute){
+        Motion& motion,RoomState roomState,Admit admit,Execute execute,Prepared prepared={}){
         if(!valid()||!world_||!world_->effectsSucceeded()||!context.succeeded())return check(false);
         struct Ops {
             GameplayCollisionOwner& owner;const SpriteMaskPack& masks;RunnerCollisionEventContext& context;
@@ -2150,8 +2155,55 @@ public:
         RunnerCollisionDispatch dispatch;
         return check(pairs.dispatch([&](InstanceHandle a,InstanceHandle b){
             const int first=objectOf(a),second=objectOf(b);
-            return first>=0&&second>=0&&(!admit(a,b,first,second)||dispatch.pair(a,b,ops));
+            if(first<0||second<0)return false;
+            if(!admit(a,b,first,second))return true;
+            bool handled=false;
+            return prepared(a,b,first,second,handled)&&(handled||dispatch.pair(a,b,ops));
         }));
+    }
+    // Compiled non-solid 61/60 event plan. Neither event can change object
+    // identity or solidity: code 991 marks OTHER, and wall has no reverse
+    // collision or Destroy handler. Keep generic geometry, queue publication,
+    // room guards, event context and the original destruction operation.
+    template<class RoomState>
+    bool preparedDitherWallPair(InstanceHandle a,InstanceHandle b,int first,int second,
+        const SpriteMaskPack& masks,RunnerCollisionEventContext& context,RoomState roomState,bool& handled){
+        handled=false;
+        if(!native_||!geometry_||!((first==61&&second==60)||(first==60&&second==61)))return true;
+        auto& plan=*geometry_;
+        if(!plan.ditherWallChecked){
+            bool forward=false,reverse=false;PackedObjectEvent unused;
+            if(!collisionEvent(61,60,forward,plan.ditherWallEvent)||
+               !collisionEvent(60,61,reverse,unused))return check(false);
+            const auto& event=plan.ditherWallEvent;
+            plan.ditherWallSupported=forward&&!reverse&&event.ownerObjectId==61&&event.eventType==4&&
+                event.eventSubtype==60&&event.codeId==991&&!objects_.findEvent(60,1,0,unused);
+            plan.ditherWallChecked=true;
+        }
+        if(!plan.ditherWallSupported)return true;
+        // Typed native stores cannot transform into another family during
+        // this event. Only admit the actual dither and terrain storage keys.
+        const auto dither=first==61?a:b,wall=first==60?a:b;
+        if(dither.slot!=View::ditherAboveBase||wall.slot<View::terrainBase||wall.slot>=View::timeFieldBase)return true;
+        Owner::State sa,sb;Owner::Sprite va,vb;
+        if(!nativeCollisionVisual(a,sa,va)||!nativeCollisionVisual(b,sb,vb))return check(false);
+        if((sa.flags|sb.flags)&0x20u)return true; // Generic solid rollback path.
+        handled=true;
+        if(a.slot==b.slot||((sa.flags|sb.flags)&0x100001u))return true;
+        bool hit=false;
+        if(!RunnerSpriteOverlap::test(sa,sb,va,vb,sprites_,masks,RunnerMaskDispatch{},inverseTrig,roundPixel,hit))return check(false);
+        if(!hit||((sa.flags|sb.flags)&2u))return true;
+        if(!queueCollision(b))return false;
+        const auto lookup=[&](InstanceHandle self,InstanceHandle,int& subtype,bool& found,PackedObjectEvent& event){
+            found=self.slot==dither.slot;subtype=found?60:61;
+            if(found)event=plan.ditherWallEvent;
+            return true;
+        };
+        const auto execute=[&](const RunnerCollisionEventContext::Frame&){
+            return world_->destroyNativeTerrain({wall.slot-View::terrainBase,wall.generation});
+        };
+        return check(context.dispatch(a,b,roomState(),lookup,execute)&&world_->effectsSucceeded()&&
+                     context.dispatch(b,a,roomState(),lookup,execute)&&world_->effectsSucceeded());
     }
     // Diagnostic traversal only: this is not spatial candidate selection.
     // Spatial refresh is explicit; collision consumption still requires
