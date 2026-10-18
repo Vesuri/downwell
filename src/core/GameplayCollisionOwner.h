@@ -586,6 +586,35 @@ private:
 #endif
         return visitNativeOrdinaryRegistered(first,last,visit);
     }
+    // Pinned objThin End Step observes only resource 93. Keep its existing
+    // sparse ordinary-family traversal when collision admission also registers
+    // walls, and merge source-owned thin records in the same registration order.
+    template<class Visit> bool visitNativeThinRegistered(Visit visit)const{
+        auto ordinary=[&](auto emit){
+            return table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
+                [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},emit);
+        };
+#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
+        const auto* terrain=world_?world_->nativeTerrainInstances():nullptr;
+        if(terrain&&terrain->sourcePopulation()){
+            unsigned after=0,order=0;InstanceHandle local;int object=0;
+            bool present=terrain->nextSourceRegistration(after,local,object,order);
+            auto before=[&](unsigned limit){
+                while(present&&(!limit||order<limit)){
+                    const InstanceHandle h{View::terrainBase+local.slot,local.generation};
+                    std::uint32_t flags;
+                    if(!eligibilityFlags(h,flags)||!visit(h,object,flags))return false;
+                    after=order;present=terrain->nextSourceRegistration(after,local,object,order);
+                }return true;
+            };
+            return ordinary([&](InstanceHandle h,int object,std::uint32_t flags){
+                const unsigned stamp=terrain->registrationOrder({h.slot-View::terrainBase,h.generation});
+                return before(stamp)&&visit(h,object,flags);
+            })&&before(0);
+        }
+#endif
+        return ordinary(visit);
+    }
     template<class Visit> bool visitNativeOrdinaryRegistered(unsigned first,unsigned last,Visit visit)const{
         const bool boxes=nativeBoxes_&&last>View::breakableBase&&first<View::terrainBase;
         const bool fields=nativeFields_&&last>View::timeFieldBase&&first<View::goalFieldBase;
@@ -3190,12 +3219,7 @@ private:
             };
         // The retained actor projection deliberately excludes terrain.
         const bool okay=check(native_?
-#ifdef DOWNWELL_TERRAIN_SOURCE_RECORDS
-            visitNativeRegistered(View::terrainBase,View::timeFieldBase,visit):
-#else
-            table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
-                [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},visit):
-#endif
+            visitNativeThinRegistered(visit):
             owner_.visitRegistrationRange(View::terrainBase,View::timeFieldBase,
                 [&](InstanceHandle h,int object,const Owner::State& state){return visit(h,object,state.flags);}));
         if(retain&&okay)thinRetirementWindow_.complete(proof);

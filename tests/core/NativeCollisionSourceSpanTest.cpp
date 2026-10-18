@@ -68,6 +68,20 @@ int main(){
             }));
             witness.push_back(0xfffffffdu);
         }
+        const unsigned beforeRetirement=terrain->size();
+        // Exercise the actual End Step route with collision-enabled wall
+        // registrations present. Source and retained thin records must merge
+        // identically, retire above the camera, and leave ordinary walls alone.
+        for(unsigned tick=0;tick<180;++tick){
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+            assert(owner->prepareDraw());
+            witness.push_back(terrain->size());
+            assert(owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t flags){
+                witness.insert(witness.end(),{h.slot,h.generation,unsigned(object),flags});return true;
+            }));
+            witness.push_back(0xfffffffcu);
+        }
+        assert(terrain->size()<beforeRetirement);
         if(!retained)reference=witness;else assert(witness==reference);
     }
     std::puts("Collision-enabled source spans: admitted records, pair/tree order, activation and retirement match retained construction");
