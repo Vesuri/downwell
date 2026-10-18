@@ -2273,6 +2273,11 @@ build/amiga-wind-bank-test: tests/platform/amiga/WindBankTest.cpp src/platform/a
 test-amiga-wind-bank: generated/amiga-wind.bin build/amiga-wind-bank-test
 	python3 tests/amiga-wind-bank-test.py
 	./build/amiga-wind-bank-test generated/amiga-wind.bin
+
+.PHONY: verify-amiga-wind-audio
+verify-amiga-wind-audio: test-amiga-wind-bank
+	. amiga/env.sh && $(MAKE) -C amiga -j4 wind-audio-probe
+	VERIFY_PROGRAM=out/WindAudioProbe VERIFY_TIMEOUT_SECONDS=180 GDB_SOURCE=verify_wind_audio.gdb READY_MARKER=DOWNWELL_WIND_AUDIO_READY READY_DESCRIPTION='wind audio DMA stream' bash amiga/verify_startup.sh
 build/stored-shop-child-test: tests/core/StoredShopChildTest.cpp src/core/ObjectPack.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)

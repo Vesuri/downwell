@@ -16,6 +16,9 @@ extern struct GfxBase* GfxBase;
 struct DosLibrary* DOSBase = 0;
 
 volatile UWORD AmigaPlatform::vblankCount_ = 0;
+void (*AmigaPlatform::vblankService_)(void*) = 0;
+void* AmigaPlatform::vblankServiceContext_ = 0;
+void (*AmigaPlatform::vblankServiceRetire_)(void*) = 0;
 
 static_assert(__builtin_offsetof(struct ExecBase, IntVects) == 84,
               "ExecBase IntVects layout must match the VERTB takeover");
@@ -111,7 +114,24 @@ ULONG AmigaPlatform::vblankHandler()
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
     downwellProfileVblank();
 #endif
+    if(vblankService_)vblankService_(vblankServiceContext_);
     return 0;
+}
+
+bool AmigaPlatform::attachVblankService(void (*service)(void*),void* context,void (*retire)(void*))
+{
+    if(!active_||!service||!context||!retire)return false;
+    Disable();
+    const bool available=!vblankService_;
+    if(available){vblankServiceContext_=context;vblankServiceRetire_=retire;vblankService_=service;}
+    Enable();return available;
+}
+
+void AmigaPlatform::detachVblankService(void* context)
+{
+    Disable();
+    if(vblankServiceContext_==context){vblankService_=0;vblankServiceContext_=0;vblankServiceRetire_=0;}
+    Enable();
 }
 
 bool AmigaPlatform::takeover(const CopperList& firstCopper,
@@ -219,6 +239,10 @@ void AmigaPlatform::serviceIdleUntilVblank(UWORD start,bool (*idleWork)(void*),v
 void AmigaPlatform::restore()
 {
     if (!active_) return;
+
+    // Retire a borrowed device before restoring OS interrupts, including on
+    // early-return paths. Its detach clears this callback before freeing state.
+    if(vblankServiceRetire_)vblankServiceRetire_(vblankServiceContext_);
 
     publishedCopper_ = 0;
     AmigaHardware::setInterrupts(INTF_VERTB, false);

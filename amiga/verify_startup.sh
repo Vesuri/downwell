@@ -16,6 +16,7 @@ READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-120}"
 VERIFY_STACK_BYTES="${VERIFY_STACK_BYTES:-8192}"
 VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
+VERIFY_PROGRAM="${VERIFY_PROGRAM:-out/Downwell}"
 case "$VERIFY_CHIP_KB" in
   512|1024) ;;
   *) echo "VERIFY_CHIP_KB must be 512 or 1024"; exit 1 ;;
@@ -29,7 +30,7 @@ if ! [[ "$VERIFY_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   exit 1
 fi
 
-[ -f out/Downwell.exe ] || { echo "normal build not found"; exit 1; }
+[ -f "$VERIFY_PROGRAM.exe" ] || { echo "verification executable not found: $VERIFY_PROGRAM.exe"; exit 1; }
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
 
 # Claiming the debugger port also stops the prior project emulator.  Do that
@@ -39,7 +40,7 @@ fsuae_claim_port
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
 printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
-cp -f out/Downwell.exe "$DH1/Downwell"
+cp -f "$VERIFY_PROGRAM.exe" "$DH1/Downwell"
 cp -f out/Downwell.boot "$DH1/Downwell.boot"
 cp -f out/Downwell.front "$DH1/Downwell.front"
 cp -f out/Downwell.planes "$DH1/Downwell.planes"
@@ -49,6 +50,9 @@ cp -f out/Downwell.cavernplanes "$DH1/Downwell.cavernplanes"
 for bank in results shop clear fields columns patterns exitmask selectionmask hud entrymask terrain; do
   cp -f "out/Downwell.$bank" "$DH1/Downwell.$bank"
 done
+if [ "$VERIFY_PROGRAM" = out/WindAudioProbe ]; then
+  cp -f out/Downwell.wind "$DH1/Downwell.wind"
+fi
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
   "$RUN/gdb-ready.marker" "$DH1/Downwell.reject-draw"
@@ -97,7 +101,7 @@ lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 || {
 
 GDB_SCRIPT="$(fsuae_gdb_script "$GDB_SOURCE")"
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
-  "$GDB" -q -batch -x "$GDB_SCRIPT" out/Downwell.elf \
+  "$GDB" -q -batch -x "$GDB_SCRIPT" "$VERIFY_PROGRAM.elf" \
   > "$RUN/gdb-startup.log" 2>&1 &
 GDB_PID=$!
 
@@ -117,9 +121,14 @@ done
 if kill -0 "$GDB_PID" 2>/dev/null; then
   kill "$GDB_PID" 2>/dev/null || true
   wait "$GDB_PID" 2>/dev/null || true
-  echo "debugger did not reach ${READY_DESCRIPTION} within ${VERIFY_TIMEOUT_SECONDS}s"
-  tail -80 "$RUN/gdb-startup.log"
-  exit 1
+  # The successful script writes its marker only after all target assertions.
+  # Closing FS-UAE can race GDB's detach/exit. That is cleanup, not a timeout;
+  # still require the exact success line below, as well as the file marker.
+  if [ ! -f "$RUN/gdb-ready.marker" ]; then
+    echo "debugger did not reach ${READY_DESCRIPTION} within ${VERIFY_TIMEOUT_SECONDS}s"
+    tail -80 "$RUN/gdb-startup.log"
+    exit 1
+  fi
 fi
 wait "$GDB_PID" 2>/dev/null || true
 

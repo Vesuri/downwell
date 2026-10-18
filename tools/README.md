@@ -69,7 +69,7 @@ without normalisation or baked gain. It records extraction/conversion versions,
 input hashes and the output hash in `generated/amiga-wind.json`. The `.bin`
 source bank has a reviewed 2 MiB **Fast RAM** ceiling; it must not be linked
 into the executable or loaded wholesale into Chip RAM. It is not yet installed
-by the normal build: playback and scene residency are still §1.01 work.
+by the normal build: production session/scene binding is still §1.01 work.
 
 `WindBank` borrows validated bytes and rejects missing/duplicate resource IDs,
 noncontiguous or out-of-range samples, unreviewed rates, and invalid padding.
@@ -81,6 +81,20 @@ excluded from its sample count. No pointers or copyrighted payloads are committe
 Period 161 plays at 22,030.4037 Hz on PAL (0.00184% above the offline rate).
 The currently admitted source event permits only one concurrent wind voice;
 this bank does not claim admission of the game's other sounds or music.
+
+`make verify-amiga-wind-audio` runs an isolated 68000 executable (not a replacement
+for `out/Downwell.exe`) on the bounded 512 KiB Chip / 8 MiB Fast A500 fixture.
+`AmigaWindAudio` uses two 4096-byte Chip fragments plus a silent reload word
+(8,200 allocated bytes), centred on Paula channels 0 and 1. A VBlank service
+owns DMA stop/start; the audio interrupt copies only prepared PCM and queues
+the next fragment. Completion is driven by real Paula reload interrupts, not
+game-update counts. No decoder or floating-point math executes in interrupts.
+The fixture invokes the shared `TimeFieldWind` script, checks its playing guard,
+resource/channel/gain state, every queued PCM byte, block playback intervals,
+end-of-sample silence, complete lease release and platform-driven retirement.
+PCM comparisons run outside IRQs and reject a buffer reused during inspection.
+The normal game does not acquire this service until its collision environment
+is wired; that production integration remains §1.01 work.
 
 `amiga_scene_contract.py` is the explicit native art admission boundary used by
 the production exporters. Adding art to `SELECTIONS` does not assign it to the

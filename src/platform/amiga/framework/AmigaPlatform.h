@@ -31,6 +31,11 @@ public:
     // reserveLines is a scheduling margin, not a preemptive execution limit.
     void waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const;
     static UWORD vblankCount() { return vblankCount_; }
+    // One optional device service, after beam-critical display publication and
+    // profiling. The owner must detach before releasing its state or restoring
+    // the machine; no service runs while DOS temporarily owns VERTB.
+    bool attachVblankService(void (*service)(void*),void* context,void (*retire)(void*));
+    void detachVblankService(void* context);
     // Scene-boundary file access: one Open/Read/Close of the whole file into
     // destination (Chip is fine). While it runs the OS gets back its VERTB
     // servers, interrupts and disk DMA; the display stays owned. Drain the
@@ -47,6 +52,9 @@ private:
     void beginIo();
     void endIo();
     static volatile UWORD vblankCount_;
+    static void (*vblankService_)(void*);
+    static void* vblankServiceContext_;
+    static void (*vblankServiceRetire_)(void*);
     const UWORD* publishedCopper_;
     UWORD publishedVblank_;
 

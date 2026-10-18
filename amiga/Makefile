@@ -899,6 +899,35 @@ obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
+# Isolated real-Paula fixture; does not replace the normal game executable.
+.PHONY: wind-audio-probe
+wind-audio-probe: out/WindAudioProbe.exe out/Downwell.wind
+
+out/Downwell.wind: $(REPO)/generated/amiga-wind.bin
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(REPO)/generated/amiga-wind.bin: $(REPO)/tools/generate-amiga-wind-bank.py
+	$(MAKE) -C $(REPO) generated/amiga-wind.bin
+
+$(REPO)/generated/amiga-wind.h: $(REPO)/generated/amiga-wind.bin
+	@test -f $@ || (cd $(REPO) && python3 tools/generate-amiga-wind-bank.py)
+
+obj/WindAudioProbe.o: $(REPO)/tests/platform/amiga/WindAudioProbe.cpp $(AMIGA_SRC)/AmigaWindAudio.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -DDOWNWELL_WIND_AUDIO_VERIFY -c -o $@ $<
+
+obj/WindAudioProbeDriver.o: $(AMIGA_SRC)/AmigaWindAudio.cpp $(AMIGA_SRC)/AmigaWindAudio.h $(AMIGA_SRC)/WindBank.h $(REPO)/generated/amiga-wind.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -I$(REPO)/generated -DDOWNWELL_WIND_AUDIO_VERIFY -c -o $@ $<
+
+out/WindAudioProbe.elf: obj/WindAudioProbe.o obj/WindAudioProbeDriver.o obj/AmigaPlatform.o obj/AmigaHardware.o obj/CopperList.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/WindAudioProbe.map $^ -o $@
+
+out/WindAudioProbe.exe: out/WindAudioProbe.elf
+	elf2hunk $< $@ -s
+
 obj/AmigaProfile.o: $(AMIGA_SRC)/AmigaProfile.cpp $(AMIGA_SRC)/AmigaProfile.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
@@ -1248,3 +1277,4 @@ clean:
 	$(RM) -r obj out
 
 -include $(OBJECTS:.o=.d)
+-include obj/WindAudioProbe.d obj/WindAudioProbeDriver.d

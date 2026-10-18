@@ -374,10 +374,10 @@ interfaces. Shared Shop input is not yet a replacement for the separate
 startup/menu control state or the source gamepad-cancel input. SDL currently
 loads only wind sounds 349–355; load the actual
 resources required by each admitted event before enabling it. Define equivalent
-Amiga audio/resource bindings, not dummy successful callbacks. Wire the prepared
-wind bank through a bounded Chip-buffer playback service and scene-local Fast
-residency; its format/admission contract is in `tools/README.md`. The bank alone
-does not enable native sound events or satisfy this gate.
+Amiga audio/resource bindings, not dummy successful callbacks. Bind
+`AmigaWindAudio` to the native collision environment and scene lifecycle; its
+bank, driver and verification contract are in `tools/README.md`. The isolated
+device fixture does not enable native gameplay sound events or satisfy this gate.
 
 **Done when:** Normal startup/shortcut, update, Draw, level transition and Retry
 all construct/use/retire the session on both platforms. A deliberate callback
