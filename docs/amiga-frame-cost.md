@@ -590,6 +590,23 @@ Evidence: `tmp/c-band-120-report.txt`, `tmp/c-band-160-recheck-report.txt`,
 - 120: `7372457b5c5901d1e809d71bb6b3f8b22636959dfee04ba4937e2c844575460a`
 - 159 recheck: `5755bfcd0e6781eca65abdda825326988fd0eda3b5d3cdfdf87c25175b6ad975`
 
+### Backing-row reuse census (diagnostic, not timing)
+
+An instrumented band-candidate run compared all 22 incoming words with the
+old Chip backing before each transfer. Excluding the initial 300-row upload,
+**257 of 1,024 rows** were already identical: entrance 65/256, quiet
+generation 43/464, first burst 96/96, enemies 53/192, landing 0/16.
+Of 651 band-backed rows, 192 were identical. The final transfers added no
+unchanged rows. This is insufficient evidence for a reuse cache as the next
+worst-update fix; no cache was implemented.
+
+The census itself changes deadline-based paint-ahead scheduling (for example,
+update 160 performs no transfer in this run, unlike the timing capture).
+Do not apply these per-update counts to the uninstrumented frame timings,
+or infer a speed-up from the aggregate fraction. All 165 selected state
+samples still match; 80 native composed rows pass the portable oracle.
+Evidence: `tmp/c-backing-census-gdb.log`. The one-off probe was removed.
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
