@@ -34,5 +34,30 @@ int main(){
     EncounterBoundary duplicate;
     assert(duplicate.start([]{return true;}));
     assert(!duplicate.start([&]{++calls;return true;})&&calls==7);
+    EncounterBoundary split;
+    assert(split.start([]{return true;}));
+    {
+        EncounterBoundary::Frame frame(split);
+        assert(frame.valid()&&split.phase()==Phase::update&&!frame.drawing());
+        assert(frame.beginDraw()&&frame.drawing());
+        assert(frame.finish()&&split.phase()==Phase::idle);
+    }
+    {
+        EncounterBoundary::Frame handoff(split);
+        assert(handoff.valid()&&handoff.finish()); // Update-only room handoff.
+    }
+    {
+        EncounterBoundary::Frame abandoned(split);
+        assert(abandoned.valid()); // Unchecked early exit is terminal.
+    }
+    assert(!split.succeeded()&&split.phase()==Phase::idle);
+    EncounterBoundary reentrant;
+    assert(reentrant.start([]{return true;}));
+    {
+        EncounterBoundary::Frame outer(reentrant);
+        {EncounterBoundary::Frame inner(reentrant);assert(!inner.valid());}
+        assert(reentrant.phase()==Phase::update&&!outer.valid()&&!outer.finish());
+    }
+    assert(!reentrant.succeeded());
     std::puts("Encounter startup/update/Draw, nested failure and retirement boundaries passed");
 }

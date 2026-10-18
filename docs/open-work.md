@@ -363,13 +363,16 @@ Important current boundaries to remove:
 ### Milestone I — real session ownership and a complete Shop
 
 #### 1.01 Install a production encounter session
-**Work:** Give each frontend a session-lifetime owner for registered event
-environments, rather than assembling them only inside tests. Reuse the shared
-core APIs; platform code supplies devices, assets and presentation only.
-Define one update boundary and one Draw boundary that install the required
-scopes, preserve nested callbacks, and propagate terminal failure. Wire settings,
+**Work:** Finish production environment wiring in `StoredEncounterSession` and
+`GameplayEncounterSession`; their boundary contract is in
+[scene architecture](scene-architecture.md#encounter-session-boundary).
+Install each admitted registered event's real scopes inside those update/Draw
+boundaries rather than assembling them only in tests. Reuse the shared core
+APIs; platform code supplies devices, assets and presentation only. Wire settings,
 shared input consumption, language/font state, tile/view reads and real audio
-interfaces. SDL currently loads only wind sounds 349–355; load the actual
+interfaces. Shared Shop input is not yet a replacement for the separate
+startup/menu control state or the source gamepad-cancel input. SDL currently
+loads only wind sounds 349–355; load the actual
 resources required by each admitted event before enabling it. Define equivalent
 Amiga audio/resource bindings, not dummy successful callbacks.
 

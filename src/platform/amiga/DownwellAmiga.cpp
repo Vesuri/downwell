@@ -246,6 +246,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/GameplayCollisionOwner.h"
+#include "core/GameplayEncounterSession.h"
 #include "AmigaSpatialTreeStorage.h"
 #include "AmigaSpatialJournalStorage.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
@@ -795,6 +796,12 @@ volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
 volatile ULONG gDownwellResultsRestartCount;
 volatile ULONG gDownwellResultsRestartMask;
+// Only the existing results-verification build admits this fault injection.
+// A real checked callback rejects Draw. The emulator debugger drops memory
+// writes, so the target reads a disposable fixture marker before takeover.
+volatile ULONG gDownwellEncounterRejectDraw;
+volatile ULONG gDownwellEncounterDrawRejected;
+volatile ULONG gDownwellEncounterFailurePublications;
 volatile ULONG gDownwellResultsHudChecks, gDownwellResultsHudFailures;
 volatile ULONG gDownwellResultsBankChecks, gDownwellResultsBankFailures;
 __attribute__((noinline, used)) void downwellResultsRestartReady() { __asm__ volatile("" ::: "memory"); }
@@ -1880,6 +1887,10 @@ __attribute__((noinline)) static int runDownwell(void) {
     if(gCoverageWordVerifiedCases!=80)return 20;
 #endif
     AmigaPlatform platform;
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+    UBYTE rejectDrawMarker=0;
+    gDownwellEncounterRejectDraw=platform.loadFile("Downwell.reject-draw",&rejectDrawMarker,1)>=0;
+#endif
     sceneAssetPlatform = &platform;
     UpgradeSource upgradeSource;
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -1957,6 +1968,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
+    downwell::GameplayEncounterSession encounterSession(port,collisionOwner);
+    if(!encounterSession.start())return 20;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
     {
         // Explicit-ID lifecycle fixture, not automatic production admission.
@@ -2730,6 +2743,8 @@ __attribute__((noinline)) static int runDownwell(void) {
             exitCode = 0;
             break;
         }
+        downwell::GameplayEncounterSession::Frame encounterFrame(encounterSession);
+        if(!encounterFrame.valid())break;
         DW_PROFILE_FRAME((unsigned)scenes.scene());
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
         AmigaFrameBudget frameBudget(frameWorkStamp());
@@ -2808,7 +2823,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
             downwell::Input replayInput;
             if (!verificationReplay.frame(port.tick(), replayInput)) {
-                exitCode = 0;
+                exitCode = encounterFrame.finish()?0:20;
                 break;
             }
             packedInput = downwell::packReplayInput(replayInput);
@@ -3014,6 +3029,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         break;
                 }
                 if (presentedScene == AmigaScene::splash) {
+                    if(!encounterFrame.beginDraw())break;
                     if (presentationChanged || splashDitherChanged) {
                         const CopperList* splashProgram = nullptr;
                         bool alternating = false;
@@ -3024,6 +3040,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                             presentedSplashDither, back, nullSprite, palette, alternating);
                         if (!splashProgram) break;
                         if (alternating) front = back;
+                        if(!encounterFrame.publishable())break;
                         platform.publish(*splashProgram);
 #ifdef DOWNWELL_SCENE_VERIFY
                         expectedSplashCopper = splashProgram->data();
@@ -3059,6 +3076,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                     // Splash owns this frame. Falling through would publish
                     // the gameplay list over it on every stage transition.
+                    if(!encounterFrame.finish())break;
                     continue;
                 }
                 else if (presentedScene == AmigaScene::menu) {
@@ -3279,6 +3297,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     DW_PROFILE_PHASE(profileOther);
                 }
                 if (presentedScene == AmigaScene::menu) {
+                    if(!encounterFrame.beginDraw())break;
                     if (presentationChanged)
                         gardenScene.enter();
                     AmigaGardenScene::Frame garden;
@@ -3304,6 +3323,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                             ++gDownwellMenuCopperPatchFailures;
 #endif
                     DW_PROFILE_PHASE(profilePublish);
+                    if(!encounterFrame.publishable())break;
                     platform.publish(gardenScene.copper(back));
 #ifdef DOWNWELL_SCENE_VERIFY
                     if (menuEntry && menuScroll.backgroundVisibleLines == 0)
@@ -3390,9 +3410,11 @@ __attribute__((noinline)) static int runDownwell(void) {
                         downwellMenuEntryScrollReady();
                     }
 #endif
+                    if(!encounterFrame.finish())break;
                     continue;
                 }
                 if (presentedScene == AmigaScene::styleSelect) {
+                    if(!encounterFrame.beginDraw())break;
                     AmigaStyleScene::Frame style;
                     if (!styleScene.render(back, scenes, style))
                         break;
@@ -3463,6 +3485,16 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
 #endif
                     DW_PROFILE_PHASE(profilePublish);
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+                    if(gDownwellEncounterRejectDraw){
+                        port.withShopStepState([](auto&,auto&){return false;});
+                        gDownwellEncounterDrawRejected=1;
+                    }
+#endif
+                    if(!encounterFrame.publishable())break;
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+                    if(gDownwellEncounterRejectDraw)++gDownwellEncounterFailurePublications;
+#endif
                     platform.publish(styleScene.copper(back));
                     front = back;
                     DW_PROFILE_PHASE(profileOther);
@@ -3508,9 +3540,11 @@ __attribute__((noinline)) static int runDownwell(void) {
                         downwellSelectedStyleFrameReady();
                     }
 #endif
+                    if(!encounterFrame.finish())break;
                     continue;
                 }
                 if (presentationChanged) {
+                    if(!encounterFrame.beginDraw())break;
                     syncGameRows(gameDisplay[back], gameBitmap, back);
                     if (!gameplayScene.build(back,
                             gameDisplay[back], hudBitmap,
@@ -3522,6 +3556,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                             enemySprites[back], palette,
                             port.ringOrigin()))
                         break;
+                    if(!encounterFrame.publishable())break;
                     platform.publish(gameplayScene.copper(back));
                     front = back;
                 }
@@ -3535,11 +3570,14 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
                     downwellSceneGameplayReady();
 #endif
+                    if(!encounterFrame.finish())break;
                     continue;
                 }
             }
-            if (scenes.scene() != AmigaScene::gameplay)
+            if (scenes.scene() != AmigaScene::gameplay){
+                if(!encounterFrame.finish())break;
                 continue;
+            }
 #ifdef DOWNWELL_SKIP_LEVEL
             if (skipLevelPending) {
                 // Initialization has now bound terrain and the entry RNG.
@@ -3610,8 +3648,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     ++gDownwellClearReentries;
                     gDownwellClearGameplayUpdates = 0;
 #endif
+                    if(!encounterFrame.finish())break;
                     continue;
                 }
+                if(!encounterFrame.beginDraw())break;
                 const auto& room = port.levelClear();
                 const auto& snapshot = port.levelClearFrame();
                 const bool bankChanged = clear.needsArtwork(port);
@@ -3719,7 +3759,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     downwellClearProbe();
 #endif
                 DW_PROFILE_PHASE(profileClearPublish);
+                if(!encounterFrame.publishable())break;
                 platform.publish(clear.copper(back)); front = back;
+                if(!encounterFrame.finish())break;
                 continue;
             }
 #endif
@@ -3862,13 +3904,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                 newRunWorldPending = true;
                 sceneResetRequested = true;
                 resultsWasActive = false;
+                if(!encounterFrame.finish())break;
                 continue;
             }
 #endif
             DW_PROFILE_PHASE(profileTitle);
             // The runner sweeps marked instances at Draw entry. Inter-phase
             // reconciliation deliberately keeps those identities alive.
-            if (!collisionOwner.prepareDraw()) { exitCode=20; break; }
+            if (!encounterFrame.beginDraw(true)) { exitCode=20; break; }
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
 #ifdef DOWNWELL_CAMERA_VERIFY
@@ -4558,6 +4601,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             DW_PROFILE_PHASE(profilePublish);
+            if(!encounterFrame.publishable()){exitCode=20;break;}
             platform.publish(gameplayScene.copper(back));
             overlapNextStep = true;
 #ifdef DOWNWELL_FRAME_DUMP
@@ -4877,6 +4921,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
         }
+        if(!encounterFrame.finish()){exitCode=20;break;}
         lastPortCheckpoint = port.trajectoryDigest();
 #ifdef DOWNWELL_REPLAY_VERIFY
 #ifdef DOWNWELL_REPLAY_FRAME_TRACE
@@ -4950,6 +4995,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     }
 
+    if(!encounterSession.retire())exitCode=20;
     platform.restore();
     memory.release();
 #ifdef DOWNWELL_CLEAR_VERIFY

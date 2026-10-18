@@ -51,7 +51,7 @@ for bank in results shop clear fields columns patterns exitmask selectionmask hu
 done
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
-  "$RUN/gdb-ready.marker"
+  "$RUN/gdb-ready.marker" "$DH1/Downwell.reject-draw"
 
 cleanup() {
   if [ -n "${GDB_PID:-}" ]; then
@@ -59,6 +59,7 @@ cleanup() {
     wait "$GDB_PID" 2>/dev/null || true
   fi
   fsuae_stop
+  rm -f "$DH1/Downwell.reject-draw"
 }
 trap cleanup EXIT
 trap 'exit 130' INT

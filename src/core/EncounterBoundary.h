@@ -30,6 +30,37 @@ public:
     template<class Body> bool draw(Body body){
         return started_?execute(Phase::draw,body):fail();
     }
+    // Split-loop frontends need a lexical owner across update and Draw without
+    // moving hardware staging into game logic. An early return/break cannot
+    // silently close a successful frame: completion is explicit.
+    class Frame {
+    public:
+        explicit Frame(EncounterBoundary& boundary):boundary_(boundary){
+            if(!boundary_.started_||!boundary_.good_||boundary_.phase_!=Phase::idle){
+                boundary_.fail();return;
+            }
+            owns_=true;boundary_.phase_=Phase::update;
+        }
+        Frame(const Frame&)=delete;
+        Frame& operator=(const Frame&)=delete;
+        ~Frame(){
+            if(owns_){boundary_.fail();boundary_.phase_=Phase::idle;}
+        }
+        bool valid()const{return owns_&&boundary_.good_;}
+        bool beginDraw(){
+            if(!valid()||boundary_.phase_!=Phase::update)return boundary_.fail();
+            boundary_.phase_=Phase::draw;return true;
+        }
+        bool drawing()const{return valid()&&boundary_.phase_==Phase::draw;}
+        bool finish(){
+            if(!owns_)return boundary_.fail();
+            owns_=false;boundary_.phase_=Phase::idle;return boundary_.good_;
+        }
+        bool fail(){return boundary_.fail();}
+    private:
+        EncounterBoundary& boundary_;
+        bool owns_=false;
+    };
 private:
     template<class Body> bool execute(Phase next,Body body){
         if(!good_||phase_!=Phase::idle)return fail();

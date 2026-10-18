@@ -47,6 +47,24 @@ evidence. Missing resources, unbound registered Draw, recursive entry and a
 caller ignoring nested failure are negative cases. Cross-target session
 integration remains governed by §1.01 in the work queue.
 
+The Amiga frontend retains `GameplayEncounterSession` across its scene loop.
+Its lexical frame starts in update, explicitly enters Draw, checks health before
+publishing a rendered Copper list, and explicitly completes. Early breaks leave
+an incomplete frame and latch failure; room handoffs may complete without Draw.
+The gameplay Draw boundary owns the existing deferred-destruction sweep. Blank
+lists used to retire DMA before replacing assets are transition staging, not
+successful scene Draw publication. A normal quit retires the session; a failed
+session returns 20 even if a later world reset cleared a room-local status.
+This boundary does not itself admit additional event families or supply missing
+audio/environment callbacks. Native ownership's existing observed-failure latch
+makes health checks constant-time rather than another family/catalogue walk.
+`make verify-amiga-encounter-failure` uses the existing results-verification
+build and a disposable `Downwell.reject-draw` marker in the mounted test drive.
+The target reads the marker before takeover, then executes a rejecting checked
+callback in style Draw. The verifier requires zero subsequent style publications
+and an actual return code of 20. The launcher removes the marker before and
+after runs; normal builds contain neither the marker read nor the callback.
+
 ## Scene owners
 
 The Amiga scene translation units are `AmigaPublisherScene`,

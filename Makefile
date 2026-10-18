@@ -2252,6 +2252,15 @@ build/shop-input-binding-test: tests/core/ShopInputBindingTest.cpp src/core/Game
 test: test-shop-input-binding
 test-shop-input-binding: build/shop-input-binding-test
 	./build/shop-input-binding-test
+
+build/gameplay-encounter-session-test: tests/core/GameplayEncounterSessionTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+.PHONY: test-gameplay-encounter-session
+test: test-gameplay-encounter-session
+test-gameplay-encounter-session: build/gameplay-encounter-session-test
+	./build/gameplay-encounter-session-test
 build/stored-shop-child-test: tests/core/StoredShopChildTest.cpp src/core/ObjectPack.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
@@ -3350,6 +3359,10 @@ verify-amiga-pattern-failure:
 
 verify-amiga-results-restart:
 	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_results_restart.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="native scene admission across all results destinations and gameplay reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-180} amiga/verify_startup.sh'
+
+.PHONY: verify-amiga-encounter-failure
+verify-amiga-encounter-failure:
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_encounter_failure.gdb READY_MARKER=DOWNWELL_ENCOUNTER_FAILURE_READY READY_DESCRIPTION="terminal encounter failure during native Draw" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh'
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'
