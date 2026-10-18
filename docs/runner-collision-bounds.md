@@ -43,6 +43,15 @@ machine code, not runtime results. Work priorities remain in [open-work.md](open
 
 ## Cache refresh and spatial publication
 
+Native terrain's prepared default geometry follows collision-resource identity,
+not drawing-sprite identity. An explicit current/cached sprite still uses the
+prepared shape when it equals the default sprite or the object has a fixed
+nonnegative mask ID. This follows `SpriteCollisionPack::collisionSprite`'s mask
+precedence. Different unmasked sprites, moved query-cache positions and positions
+outside the prepared grid retain the general geometry path. Reusing geometry
+does not skip dirty-queue visits, cache writes, removal/reinsertion or change
+spatial publication order; the scalar owner remains the differential oracle.
+
 At `0x466045` the routine saves the old cached bounds before resolving the
 mask/sprite. Failed lookup (`0x466077..0x4660b9`) copies position into both
 endpoints, clears instance bit `0x200`, and forces the update argument to zero.

@@ -747,9 +747,17 @@ private:
     }
     bool nativeTerrainBirthBounds(const GameplayWorld::NativeTerrain::Identity& id,
         RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite=-2){
-        if(sprite==-2&&geometry_&&geometry_->terrain.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
         const auto* definition=objectDefaults_.get(id.object);
-        if(!definition||!x.assignInteger(id.x)||!y.assignInteger(id.y))return check(false);
+        if(!definition)return check(false);
+        // Match collisionSprite's mask precedence, not the drawing sprite.
+        // Authored wall masks remain immutable when Create chooses the area's
+        // tile art. Both cached and current geometry can therefore borrow the
+        // same prepared resource; a genuinely changed unmasked sprite cannot.
+        const bool defaultGeometry=sprite==-2||sprite==definition->spriteId||definition->maskId>=0;
+        if(defaultGeometry&&geometry_&&geometry_->terrain.at(id.object,id.x,id.y,x,y,bounds,precise)){
+            found=true;return true;
+        }
+        if(!x.assignInteger(id.x)||!y.assignInteger(id.y))return check(false);
         PackedSpriteCollision resource;
         found=sprites_.collisionSprite(sprite==-2?definition->spriteId:sprite,definition->maskId,resource);
         precise=found&&resource.collisionMode==1;
