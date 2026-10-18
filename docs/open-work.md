@@ -363,6 +363,14 @@ Important current boundaries to remove:
 ### Milestone I — real session ownership and a complete Shop
 
 #### 1.01 Install a production encounter session
+**Prerequisite brought forward (authorized):** Install the minimum native
+ordered query/dispatch admission needed by dither and wind from 1.05/1.07 here.
+Keep terrain identity in runs, retain source dirty-list/tree ordering, and own
+collision/audio leases only in the scenes that use them. Compare against the
+reference owner, check 512 KiB Chip startup and measure the initial fall before
+accepting the production default. Do not disable the external-backend guard
+without replacing it with an explicit, verified scene admission. The broader
+families and verification gates of 1.05/1.07 remain there.
 **Work:** Finish production environment wiring in `StoredEncounterSession` and
 `GameplayEncounterSession`; their boundary contract is in
 [scene architecture](scene-architecture.md#encounter-session-boundary).

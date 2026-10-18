@@ -1980,6 +1980,15 @@ public:
     bool executeCollisionPairs(RunnerCollisionPairs<View::capacity,Pairs>& pairs,
         const SpriteMaskPack& masks,RunnerCollisionEventContext& context,
         Motion& motion,RoomState roomState,Execute execute){
+        return executeSelectedCollisionPairs(pairs,masks,context,motion,roomState,
+            [](InstanceHandle,InstanceHandle,int,int){return true;},execute);
+    }
+    // Migration admission filters the sealed stream, not collection or tree
+    // publication. Legacy families stay with their adapters until admitted.
+    template<unsigned Pairs,class Motion,class RoomState,class Admit,class Execute>
+    bool executeSelectedCollisionPairs(RunnerCollisionPairs<View::capacity,Pairs>& pairs,
+        const SpriteMaskPack& masks,RunnerCollisionEventContext& context,
+        Motion& motion,RoomState roomState,Admit admit,Execute execute){
         if(!valid()||!world_||!world_->effectsSucceeded()||!context.succeeded())return check(false);
         struct Ops {
             GameplayCollisionOwner& owner;const SpriteMaskPack& masks;RunnerCollisionEventContext& context;
@@ -1995,7 +2004,10 @@ public:
             }
         } ops{*this,masks,context,motion,roomState,execute};
         RunnerCollisionDispatch dispatch;
-        return check(pairs.dispatch([&](InstanceHandle a,InstanceHandle b){return dispatch.pair(a,b,ops);}));
+        return check(pairs.dispatch([&](InstanceHandle a,InstanceHandle b){
+            const int first=objectOf(a),second=objectOf(b);
+            return first>=0&&second>=0&&(!admit(a,b,first,second)||dispatch.pair(a,b,ops));
+        }));
     }
     // Diagnostic traversal only: this is not spatial candidate selection.
     // Spatial refresh is explicit; collision consumption still requires

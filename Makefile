@@ -2286,6 +2286,14 @@ test: test-gameplay-encounter-session
 test-gameplay-encounter-session: build/gameplay-encounter-session-test
 	./build/gameplay-encounter-session-test
 
+build/gameplay-dither-pass-test: tests/core/GameplayDitherCollisionPassTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+.PHONY: test-gameplay-dither-pass
+test: test-gameplay-dither-pass
+test-gameplay-dither-pass: build/gameplay-dither-pass-test
+	./build/gameplay-dither-pass-test
+
 generated/amiga-wind.bin: tools/generate-amiga-wind-bank.py extracted/audio/manifest.json data/data.win $(wildcard extracted/audio/sound-effects/349_sfxMagicWind*.ogg extracted/audio/sound-effects/35[0-5]_sfxMagicWind*.ogg)
 	python3 tools/generate-amiga-wind-bank.py
 

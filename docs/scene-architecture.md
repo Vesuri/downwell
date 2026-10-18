@@ -30,6 +30,18 @@ constant in the collision callback. Adding a family requires its concrete
 update/Draw scopes and resource dependencies; having a registered record alone
 does not authorize skipping its unbound events.
 
+`GameplayDitherCollisionPass` supplies the equivalent narrow native admission.
+It collects the complete owner stream before selecting the 61/60 and
+255-or-371/35 pairs; it does not build a second spatial index or scan fields in
+storage order. `executeSelectedCollisionPairs` shares the complete dispatch
+wrapper with the retained reference path. Room presence/pending-change is a
+live caller-supplied read for each event direction. The pass requires explicit
+collision backing and masks; an external-only owner cannot silently run it.
+Its host differential combines overlapping fields and authored wall pruning,
+checks the selected field's sound/RNG against the reference owner, and exercises
+the real world collision-phase hook and Draw-time retirement. This fixture is
+not evidence that the Amiga frontend has acquired those production leases.
+
 `EncounterSettings` keeps `gameVolume` separate from device master gain.
 `scrLoadSave` assembly loads the INI `option/masterGain` default 0.6 and calls
 `audio_master_gain`; it does not overwrite the per-sound gain. The stored session
