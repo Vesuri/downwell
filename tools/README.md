@@ -96,6 +96,16 @@ PCM comparisons run outside IRQs and reject a buffer reused during inspection.
 The normal game does not acquire this service until its collision environment
 is wired; that production integration remains §1.01 work.
 
+`tools/generate-encounter-masks.py` derives the narrow dither/wind mask bank
+from the verified original-mask pack. It pins the admitted objects' sprite/mask
+defaults and retains original mask bytes for resources 31, 128, 585 and 616.
+`generated/downwell-encounter-masks.dwsm` is 34,256 bytes, intended for a Fast RAM
+scene lease, not linked data or Chip RAM. Its manifest records source/extractor,
+input and generator hashes, numeric resource IDs and a fixed byte ceiling.
+`make test-encounter-masks` checks exact payloads, rejects malformed/missing
+dependencies and runs the native/reference ordered admission fixture using only
+the subset. This does not load or enable the production scene lease by itself.
+
 `amiga_scene_contract.py` is the explicit native art admission boundary used by
 the production exporters. Adding art to `SELECTIONS` does not assign it to the
 gameplay bank: every encoded resource and prepared variant needs a declared

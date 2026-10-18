@@ -2294,6 +2294,15 @@ test: test-gameplay-dither-pass
 test-gameplay-dither-pass: build/gameplay-dither-pass-test
 	./build/gameplay-dither-pass-test
 
+generated/downwell-encounter-masks.dwsm: tools/generate-encounter-masks.py generated/downwell-sprite-masks.dwsm generated/downwell-sprite-masks.manifest.json extracted/utmt-0.9.2.0/manifest.json
+	python3 tools/generate-encounter-masks.py
+.PHONY: test-encounter-masks
+test: test-encounter-masks
+test-encounter-masks: generated/downwell-encounter-masks.dwsm build/gameplay-dither-pass-test
+	python3 tools/generate-encounter-masks.py --check
+	python3 tests/encounter-masks-test.py
+	./build/gameplay-dither-pass-test generated/downwell-encounter-masks.dwsm
+
 generated/amiga-wind.bin: tools/generate-amiga-wind-bank.py extracted/audio/manifest.json data/data.win $(wildcard extracted/audio/sound-effects/349_sfxMagicWind*.ogg extracted/audio/sound-effects/35[0-5]_sfxMagicWind*.ogg)
 	python3 tools/generate-amiga-wind-bank.py
 
