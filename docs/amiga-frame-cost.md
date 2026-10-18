@@ -1,5 +1,42 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: demand-constructed spatial nodes
+
+This is the §1.01 collision-enabled candidate, **not the shipping backend**.
+The node pool reserves the same capacity but constructs only the root and
+fresh high-water nodes. Recycled nodes retain their entries. Allocation order,
+tree mutations and query order are unchanged; the eager pool remains the
+`RunnerSpatialIndex` third-template-argument `false` oracle.
+
+Exact saved baseline ELF `8e707bb3cfce16556cd8a4a181904a5ed53ff08f61ddebb458488d96fdbdecb9`;
+candidate `924c079e94dfbfb19654ef7357b157fc465d94df356c61998a91394cf14ab540`.
+Build with `scene_collision_candidate.mk`, `FPSCOUNT=1 PROFILE_AUTORUN=1
+DETERMINISTIC=1 TRACE_FRAMES=165 PROFILE_FRAMES=600 PROFILE_IDLE=1
+SKIP_TO_GAME=1 STRIP=1`. Run `profile_quiet_cadence.gdb`; capture 100 PAL fields
+at the first `downwellTraceFrameMark` and separately at mark 56. Report the
+former with `--partial-frame 1`, the latter with `--frames 57-61`.
+The first capture attributes construction cost only, not a complete update.
+
+| Measurement | Eager | Demand-constructed |
+| --- | ---: | ---: |
+| Tree acquisition, ms (exact baseline re-captured) | 535.08 | 16.31 |
+| Whole 164-update fall, PAL fields | 1,478 | 1,448 |
+| First update, PAL fields | 237 | 211 |
+| Updates 57–61 mean, ms | 122.7 | 122.6 |
+| Update 57, ms | 49.7 | 49.7 |
+| Update 58, ms | 229.4 | 229.2 |
+| Update 59, ms | 42.2 | 42.2 |
+| Update 60, ms | 187.4 | 187.5 |
+| Update 61, ms | 104.8 | 104.5 |
+
+All 165 state samples match. The recurring window is unchanged within noise;
+this removes a startup construction cost, not the remaining per-update
+collision bottleneck. The capacity differential covers 3,963-instance churn;
+reset/fractional-conversion and construction-count tests retain the eager
+oracle. Normal 512 KiB Chip startup and native link audits pass. Reports are
+`tmp/lazy-spatial-{baseline,first,recurring}/report.txt`; raw traces are removed
+after committing the measurements.
+
 ## Complete initial fall against the 20 ms budget — `45e96a9c`, 2026-10-12
 
 This was the open-work section 0 baseline before item A; the current state

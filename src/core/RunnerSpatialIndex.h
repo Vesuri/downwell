@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_INDEX_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INDEX_H
 #include "RunnerSpatialNode.h"
+#include "RunnerSpatialNodePool.h"
 #include "RunnerSpatialLine.h"
 #include "Profile.h"
 #include "ProfileCounters.h"
@@ -9,7 +10,7 @@ namespace downwell {
 // maintain the runner's dirty queue.
 // A failed mutation latches failure: partially changed trees cannot be queried.
 // Clear is required before reuse. Callbacks must not mutate this owner.
-template<unsigned Capacity,bool IntegralStorage=true> class RunnerSpatialIndex {
+template<unsigned Capacity,bool IntegralStorage=true,bool LazyConstruction=true> class RunnerSpatialIndex {
     static_assert(Capacity>0,"Spatial index needs a root");
     using Math=RunnerSpatialSplit;
     // One representation per tree. The union adds no per-node memory. Whole
@@ -32,6 +33,7 @@ template<unsigned Capacity,bool IntegralStorage=true> class RunnerSpatialIndex {
     };
 public:
     using Box=Math::Box;
+    RunnerSpatialIndex(){nodes_.start(0);}
     void clear(){
         used_=live_=1;root_=0;free_=Capacity;good_=true;pixelMode_=IntegralStorage;
         nodes_[0].count=0;nodes_[0].level=0;
@@ -95,7 +97,7 @@ private:
     // Mutation is non-reentrant. Retain bounded descent scratch with its owner
     // rather than stacking it under generated-instance Create and world Step.
     unsigned parents_[depthLimit]{},selections_[depthLimit]{};
-    Node nodes_[Capacity]={};unsigned links_[Capacity]={};
+    RunnerSpatialNodePool<Node,Capacity,LazyConstruction> nodes_;unsigned links_[Capacity]={};
     unsigned used_=1,live_=1,root_=0,free_=Capacity;bool good_=true;
     bool pixelMode_=IntegralStorage;
     static bool negativeZero(const Box& b){
@@ -154,7 +156,7 @@ private:
     }
     bool allocate(int level,unsigned& result){
         if(free_!=Capacity){result=free_;free_=links_[result];}
-        else {if(used_==Capacity)return false;result=used_++;}
+        else {if(used_==Capacity)return false;result=used_++;nodes_.start(result);}
         // Only [0,count) is live. Every append/split overwrites its new entry;
         // stale union members beyond count must never be read or converted.
         ++live_;nodes_[result].count=0;nodes_[result].level=level;return true;
