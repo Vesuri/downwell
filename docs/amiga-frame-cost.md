@@ -725,6 +725,39 @@ restored after each run. Trace ELF hashes:
 - 120: `6ae3c402e8f15243b51307085a2ec6af11ed7d9ea7add9bbacc8fbff8000b905`;
 - 138 recheck: `08d074f125845f059b9ff90b2f97de0335b3f8c9dfa804ef97957f91527345e0`.
 
+### Remaining command collection: update 139
+
+Re-attribution of the unchanged `d-shop-family-120` capture (ELF hash above),
+restricted to complete update 139, measures **1.96 ms** in
+`AmigaGameplayDrawList::collect`, including **1.53 ms** through the read-only
+actor visitor. The callback reads current player/enemy positions and animation,
+projects the dither, tests visibility and emits commands. The retained order
+already exists in `GameplayCollisionOwner::drawOrder_`, invalidated by layer
+and capture revisions; this is not 1.53 ms of rebuilding or sorting the room.
+A second order cache cannot claim that inclusive cost as its saving.
+
+The marker-to-marker update is **21.61 ms**, including publication-fence
+waiting. The older top-six report omitted that fence from the displayed
+parts and therefore counted it as work. This is attribution, not a new timing
+run or an optimization result. Reports: `tmp/d-draw-139-analysis.txt` and
+`tmp/d-append-139-analysis.txt`, produced with `--frames=139
+--require-complete --focus=AmigaGameplayDrawList::collect` and the lambda
+breakdown respectively. No production code changed for this census.
+
+Reprocessing the same capture with `--work-summary` and explicit
+`--work-wait='runDownwell()::{lambda#9}'` retains unrounded cycle totals and
+all attributed fence cycles, even below the top-six cutoff. This symbol is
+the publication fence in this captured ELF; it includes its idle RNG service,
+as did the earlier metric. It is not a claim that every excluded instruction
+is a spin instruction. Verify the symbol again for another build.
+`tmp/d-shop-family-120-work.json` gives updates 137–162 **18.9 ms mean,
+20.6 ms worst (139), four over 20 ms, 2 ms excess**, versus the conservative
+rounded/top-six report's 19.0/21.6/four/3. The failing updates remain
+139, 144, 146 and 160. This is a measurement correction, not a performance
+improvement or C acceptance. Earlier windows must also be recaptured or
+reprocessed before claiming an exact whole-fall comparison; do not mix
+these corrected values with old reports as an optimization gain.
+
 ### Backing-row reuse census (diagnostic, not timing)
 
 An instrumented band-candidate run compared all 22 incoming words with the

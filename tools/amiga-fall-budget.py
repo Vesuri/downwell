@@ -3,6 +3,10 @@
 
 Input is one or more reports written by tools/amiga-trace-report.py for
 overlapping captures of the same build (see docs/open-work.md section 0).
+Prefer JSON from --work-summary with an explicitly verified --work-wait:
+it retains unrounded cycles and waits below the displayed top-six cutoff.
+The named wait scope includes all its children, including idle RNG service.
+Do not mix exact summaries and historical text estimates for an A/B claim.
 Each report's per-frame table is read; the first report that covers a frame
 wins. An update's work is its marker-to-marker time minus the publication
 wait (`runDownwell()::{lambda#9}`, AmigaPlatform::waitPublished) when the
@@ -13,6 +17,7 @@ the smallest listed part and is counted as work.
       [--frames] [--window=NAME:FIRST-LAST ...]
 """
 import argparse
+import json
 import re
 import sys
 
@@ -32,7 +37,29 @@ def parse(paths):
     frames = {}
     for path in paths:
         with open(path) as report:
-            for line in report:
+            content = report.read()
+            if content.lstrip().startswith('{'):
+                data = json.loads(content)
+                if (data.get('schema') != 'downwell-frame-work/v1' or
+                        data.get('pal_field_cycles') != 142102 or data.get('partial_frames') or
+                        not data.get('wait_symbol')):
+                    raise ValueError('invalid complete-frame work summary: ' + str(path))
+                seen = set()
+                for row in data['frames']:
+                    f, total, wait = row['frame'], row['cycles'], row['wait_cycles']
+                    if (any(type(v) is not int for v in (f, total, wait)) or
+                            f < 1 or total <= 0 or not 0 <= wait <= total or f in seen):
+                        raise ValueError('invalid or duplicate frame in ' + str(path))
+                    seen.add(f)
+                    parts = row['parts_cycles']
+                    if (any(type(v) is not int or v < 0 for v in parts.values()) or
+                            sum(parts.values()) != total):
+                        raise ValueError('frame parts do not account for total in ' + str(path))
+                    scale = 20 / 142102
+                    frames.setdefault(f, (total * scale, (total - wait) * scale,
+                                          {n: v * scale for n, v in parts.items()}))
+                continue
+            for line in content.splitlines():
                 match = ROW.match(line)
                 if not match or int(match[1]) in frames:
                     continue

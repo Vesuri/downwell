@@ -582,6 +582,10 @@ def main():
                         help='fail unless every requested --frames update is fully captured')
     parser.add_argument('--frame-summary', default=None,
                         help='save exact complete-frame cycles and ELF hash for matched comparisons')
+    parser.add_argument('--work-summary', default=None,
+                        help='save exact selected complete-frame cycles and explicitly named wait cycles')
+    parser.add_argument('--work-wait', default=None,
+                        help='exact logical stack frame to exclude for --work-summary; verify against the captured ELF')
     parser.add_argument('--partial-frame', type=int, default=None,
                         help='attribute only a captured slice of N; never a frame-duration measurement')
     parser.add_argument('--min-fields', type=float, default=0.0,
@@ -660,10 +664,13 @@ def main():
 
     folded = collections.Counter()
     per_frame = collections.defaultdict(collections.Counter)
+    wait_cycles = collections.Counter()
     leaf_lines = collections.Counter()
     selected = 0
     for key, cycles in stacks.items():
         names = logical(key)
+        if args.work_wait and args.work_wait in names:
+            wait_cycles[key[0]] += cycles
         root = names.index('runDownwell') if 'runDownwell' in names else -1
         depth = root + args.breakdown_depth
         bucket = names[depth] if 0 <= root and depth < len(names) else '(self)'
@@ -679,6 +686,23 @@ def main():
 
     def ms(c):
         return c / FIELD_CYCLES * 20.0
+
+    if args.work_summary:
+        if args.partial_frame is not None or not args.work_wait:
+            sys.exit('--work-summary requires complete frames and an explicit --work-wait')
+        if not any(wait_cycles[f] for f in chosen):
+            sys.exit('requested wait symbol was not observed in selected frames')
+        summary = frame_summary({f: frame_cycles[f] for f in chosen}, set(), file_hash(elf))
+        summary['schema'] = 'downwell-frame-work/v1'
+        summary['wait_symbol'] = args.work_wait
+        summary['tool_sha256'] = file_hash(__file__)
+        for row in summary['frames']:
+            f = row['frame']
+            row['wait_cycles'] = wait_cycles[f]
+            row['parts_cycles'] = dict(per_frame[f])
+        with open(args.work_summary, 'w') as target:
+            json.dump(summary, target, indent=2)
+            target.write('\n')
 
     print(f'# Downwell instruction trace: {directory}')
     if args.partial_frame is not None:
