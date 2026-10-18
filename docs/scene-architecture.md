@@ -4,6 +4,39 @@ Game rules belong in `src/core`; scene classes own platform presentation.
 The sole backlog is [remaining work](open-work.md). Implementation history and
 past test results belong in the git log.
 
+## Encounter session boundary
+
+`EncounterBoundary` owns a frontend session's startup/update/Draw/failure state.
+Room changes and Retry run inside its update; they must not reset a terminal
+failure. Event callbacks may nest inside one operation, but invoking another
+whole update or Draw recursively is a binding failure. A callback cannot hide
+a failed nested operation by returning success. Retirement prevents further
+work. There is no per-frame catalogue scan in this boundary.
+
+SDL constructs `StoredEncounterSession` after attaching its collision owner and
+loading the declared sound resources, before applying any startup shortcut.
+`Game` must be constructed with deferred shortcuts for that ordering. The
+session installs its single collision scope for each update, including the
+fast-forwarded shortcut Steps; the scope is removed on every return. The
+frontend no longer retains a callback pointing at a separate local Contacts
+structure. Devices and immutable resource packs outlive the session.
+
+The currently admitted stored collision environment is authored dither plus
+time-field wind, not the full encounter dispatcher. It requires all seven wind
+resources (349–355), with actual decoded samples. An unloaded resource prevents
+startup rather than deferring a silent sound failure into a later contact.
+Settings used by this environment come from the session, not an independent
+constant in the collision callback. Adding a family requires its concrete
+update/Draw scopes and resource dependencies; having a registered record alone
+does not authorize skipping its unbound events.
+
+`make test-encounter-session` exercises full startup and `SKIP_TO_GAME`, then
+level completion and Retry through the session. Exit placement and lethal
+health subtraction are explicit lifecycle fixtures, not natural-encounter
+evidence. Missing resources, unbound registered Draw, recursive entry and a
+caller ignoring nested failure are negative cases. Cross-target session
+integration remains governed by §1.01 in the work queue.
+
 ## Scene owners
 
 The Amiga scene translation units are `AmigaPublisherScene`,

@@ -16,6 +16,9 @@ public:
     AudioSDL(const AudioSDL&)=delete;
     AudioSDL& operator=(const AudioSDL&)=delete;
     bool ready() const {return device_!=0;}
+    bool hasResource(int resource) const {
+        return ready()&&resource>=0&&resource<int(samples_.size())&&!samples_[resource].pcm.empty();
+    }
     bool load(int resource,const char* path,MotionBinary64 gain);
     bool play(int resource,int priority,bool loop,int& voice);
     bool isPlaying(int id,bool& playing);

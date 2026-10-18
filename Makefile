@@ -2077,6 +2077,25 @@ verify-sdl-audio: build/sdl-audio-test
 
 build/sdl-audio-test: src/core/ContactDamageScripts.h src/core/PlayerDamage.h src/core/TypicalPlayerDamage.h src/core/SoundPlayScript.h src/core/MusicDuck.h
 
+build/encounter-boundary-test: tests/core/EncounterBoundaryTest.cpp src/core/EncounterBoundary.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
+SESSION_TEST_SOURCES := tests/platform/StoredEncounterSessionTest.cpp src/platform/sdl/AudioSDL.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES))
+SESSION_TEST_CPPFLAGS := $(filter-out -DDOWNWELL_SKIP_INTRO -DDOWNWELL_SKIP_TO_GAME -DDOWNWELL_SKIP_LEVEL,$(CPPFLAGS))
+build/stored-encounter-session-test: $(SESSION_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(SESSION_TEST_CPPFLAGS) $(CXXFLAGS) -o $@ $(SESSION_TEST_SOURCES) $(LDFLAGS)
+build/stored-encounter-session-skip-test: $(SESSION_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(SESSION_TEST_CPPFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(SESSION_TEST_SOURCES) $(LDFLAGS)
+.PHONY: test-encounter-session
+test: test-encounter-session
+test-encounter-session: build/encounter-boundary-test build/stored-encounter-session-test build/stored-encounter-session-skip-test
+	./build/encounter-boundary-test
+	SDL_AUDIODRIVER=dummy ./build/stored-encounter-session-test
+	SDL_AUDIODRIVER=dummy ./build/stored-encounter-session-skip-test
+
 build/sdl-screenshot-test: tests/platform/SDLScreenshotTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

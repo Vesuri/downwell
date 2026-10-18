@@ -27,8 +27,19 @@ public:
     // Resource-backed owners must attach before a shortcut executes Steps.
     // Idempotent so an explicit initialization cannot replay room creation.
     void applyStartupShortcut();
+    bool startupShortcutApplied()const{return startupShortcutApplied_;}
     void configureCollisionPass(bool (*pass)(void*,StartupRuntime&),void* context){
         collisionPass_=pass;collisionContext_=context;
+    }
+    template<class Pass,class Body> bool withCollisionPass(Pass pass,Body body){
+        if(collisionPass_)return false; // one collision stream, never two passes
+        collisionContext_=&pass;
+        collisionPass_=[](void* p,StartupRuntime& world){return (*static_cast<Pass*>(p))(world);};
+        struct Leave {Game& game;~Leave(){game.configureCollisionPass(nullptr,nullptr);}} leave{*this};
+        return body();
+    }
+    void configureDitherAboveEnvironment(bool lowSpec,bool ending){
+        startup_.configureDitherAboveEnvironment(lowSpec,ending);
     }
 
     // Platform entropy for ResetPlayer/randomize; fixed default for replays.

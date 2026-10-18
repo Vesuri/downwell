@@ -5,7 +5,7 @@
 #include "core/RoomPack.h"
 #include "core/SpritePack.h"
 #include "core/StoredWorldCollision.h"
-#include "core/StoredDitherCollisionPass.h"
+#include "core/StoredEncounterSession.h"
 #include "platform/sdl/PlatformSDL.h"
 #include "platform/sdl/AudioSDL.h"
 #include <cstdio>
@@ -84,38 +84,29 @@ int main() {
     if(!roomPack.valid()||!builderPatternPack.valid()||!collisionOwner||!collisionOwner->valid())return 20;
     downwell::Game game(&roomPack,&objectPack,&builderPatternPack,&effectAssets,collisionOwner->binding(),true);
     if(!collisionOwner->attach(game.startup()))return 20;
-    std::unique_ptr<downwell::StoredDitherCollisionPass> collisionsPass(
-        new(std::nothrow) downwell::StoredDitherCollisionPass(*collisionOwner));
-    if(!collisionsPass)return 20;
     downwell::AudioSDL audio;
     if(!audio.ready())return 20;
     // These seven original resources have gain 1. Decode before gameplay.
-    for(int id=349;id<=355;++id){
+    for(int id=downwell::TimeFieldWind::firstSound;
+        id<downwell::TimeFieldWind::firstSound+downwell::TimeFieldWind::soundCount;++id){
         char path[128];std::snprintf(path,sizeof(path),
             "extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
         if(!audio.load(id,path,downwell::MotionBinary64::fromInteger(1)))return 20;
     }
-    struct Contacts {downwell::StoredDitherCollisionPass& pass;downwell::AudioSDL& audio;};
-    Contacts contacts{*collisionsPass,audio};
-    game.configureCollisionPass([](void* context,downwell::StartupRuntime& world){
-        auto& contacts=*static_cast<Contacts*>(context);
-        return contacts.pass.run(world,downwell::MotionBinary64::fromInteger(1),contacts.audio);
-    },&contacts);
-    game.applyStartupShortcut();
+    using Session=downwell::StoredEncounterSession<downwell::AudioSDL>;
+    std::unique_ptr<Session> session(new(std::nothrow) Session(game,*collisionOwner,audio));
+    if(!session||!session->start())return 20;
     const char* profileOption = std::getenv("DOWNWELL_PROFILE");
     const bool profile = profileOption && std::string(profileOption) == "1";
     const double counterMilliseconds = 1000.0 / SDL_GetPerformanceFrequency();
     unsigned profileFrames = 0;
     double updateMs = 0, drawMs = 0, presentMs = 0, pacingMs = 0, peakWorkMs = 0;
-    while (!game.finished()) {
+    while (!session->finished()) {
         const auto input = platform.pollInput();
         const auto begin = SDL_GetPerformanceCounter();
-        audio.update();
-        game.update(input, static_cast<std::uint32_t>(begin));
-        if (!game.simulationSucceeded()) return 20;
+        if(!session->update(input,static_cast<std::uint32_t>(begin)))return 20;
         const auto updated = profile ? SDL_GetPerformanceCounter() : 0;
-        game.render(platform);
-        if (!game.renderingSucceeded()) return 20;
+        if(!session->draw(platform))return 20;
         const auto drawn = profile ? SDL_GetPerformanceCounter() : 0;
         platform.present();
         const auto presented = profile ? SDL_GetPerformanceCounter() : 0;
@@ -138,5 +129,5 @@ int main() {
             }
         }
     }
-    return 0;
+    return session->retire()?0:20;
 }

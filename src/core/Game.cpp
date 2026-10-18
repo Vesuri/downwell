@@ -91,7 +91,7 @@ void Game::applyStartupShortcut() {
     if (startupShortcutApplied_) return;
     startupShortcutApplied_ = true;
 #ifdef DOWNWELL_SKIP_TO_GAME
-    startup_.skipToGameForTesting();
+    startup_.skipToGameForTesting(collisionPass_,collisionContext_);
 #ifdef DOWNWELL_SKIP_LEVEL
     // Exercise the real collision/alarms/wipe, without generating a whole descent.
     if (startup_.inMainRoom()) startup_.registerLevelExit(static_cast<int>(startup_.mainPlayerY()));

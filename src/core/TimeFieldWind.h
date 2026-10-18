@@ -7,6 +7,7 @@ namespace downwell {
 // global.OLchannel[8]. Audio operations are synchronous and checked.
 class TimeFieldWind {
 public:
+    static constexpr int firstSound=349,soundCount=7;
     int voice=-1;
     SoundPlayState soundState{}; // Standalone reference caller; live fields supply their own.
     bool succeeded()const{return good_;}
@@ -20,7 +21,7 @@ public:
         bool playing=false;
         if(!check(audio.isPlaying(voice,playing)))return false;
         if(playing)return true;
-        sound=349+int(random.chooseIndexSmall(7));
+        sound=firstSound+int(random.chooseIndexSmall(soundCount));
         SoundPlayEnvironment env;env.gameVolume=gameVolume;
         int result=-1;bool returned=false;
         if(!SoundPlayScript::overlap(caller,env,audio,[]{return true;},channel,

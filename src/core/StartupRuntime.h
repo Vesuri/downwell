@@ -98,7 +98,7 @@ enum class PlatformProfile {
 class StartupRuntime {
 public:
     void skipIntroForTesting();
-    void skipToGameForTesting();
+    void skipToGameForTesting(bool (*collisionPass)(void*,StartupRuntime&)=nullptr,void* context=nullptr);
     struct MainBulletState {
         float x = 0.0F;
         float y = 0.0F;

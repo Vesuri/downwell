@@ -254,7 +254,7 @@ void StartupRuntime::skipIntroForTesting() {
         gotoRoom(playMenuRoomId);
 }
 
-void StartupRuntime::skipToGameForTesting() {
+void StartupRuntime::skipToGameForTesting(bool (*collisionPass)(void*,StartupRuntime&),void* context) {
     // Fast-forward the deterministic usual-style entry without presenting any
     // skipped frames. Garden updates consume RNG (not just room Create), so
     // jumping straight to PlayMenu produces a different world from the native
@@ -266,7 +266,10 @@ void StartupRuntime::skipToGameForTesting() {
         if (inMenu()) input.right = true;
         if (inPlayMenu() && playMenuYOffset_ == 0 && !playMenuSelected_)
             input.fire = true;
-        step(input, input.fire);
+        if(collisionPass){
+            if(!stepWithCollisionPass(input,input.fire,[&]{return collisionPass(context,*this);}))break;
+        }else step(input, input.fire);
+        if(!effectsSucceeded()||!deferredCommandsSucceeded_)break;
     }
     // Treat a malformed/missing transition as failed initialization, not a
     // successful shortcut that silently leaves the user in a skipped scene.

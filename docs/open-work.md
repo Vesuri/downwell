@@ -325,9 +325,9 @@ and evidence covering both targets. Existing helpers should be reused unless
 the live integration demonstrates a specific defect.
 
 Important current boundaries to remove:
-- `src/main.cpp` installs `StoredWorldCollision` and the narrower
-  `StoredDitherCollisionPass`; it does not install the registered skeleton or
-  Shop event environments around normal update/render.
+- `StoredEncounterSession` still uses the narrower `StoredDitherCollisionPass`;
+  the registered skeleton and Shop event environments must be installed there
+  around normal update/render as their family integrations are admitted.
 - `DownwellAmiga.cpp` calls the ordinary `port.step(packedInput)`. The registered
   skeleton Step/contact entry points are exercised by tests, not installed here.
 - `Game::render` has registered Shop Draw dispatch, but requires a borrowed
