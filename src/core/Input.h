@@ -9,6 +9,7 @@ struct Input {
     bool right = false;
     bool fire = false;
     bool pause = false;
+    bool cancel = false; // Held cancel control; consumers publish its pressed edge.
 };
 
 } // namespace downwell

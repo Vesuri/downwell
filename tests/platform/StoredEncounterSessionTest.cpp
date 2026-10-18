@@ -83,7 +83,11 @@ int main(){
         assert(game->startup().inMainRoom()&&session->succeeded());
         std::printf("Session main entry: RNG=%u x=%.0f y=%.0f\n",unsigned(game->startup().randomDrawCount()),
             double(game->startup().mainPlayerX()),double(game->startup().mainPlayerY()));
-        for(unsigned i=0;i<164;++i)assert(session->update({})&&session->draw(sink));
+        for(unsigned i=0;i<164;++i){
+            Input input;input.cancel=i<2;
+            assert(session->update(input)&&session->draw(sink));
+            assert(game->startup().shops().input.cancel==(i==0));
+        }
         assert(sink.calls);
         // Lifecycle fixture, not proof of a naturally generated level exit or
         // a combat kill: put the real exit at the player and use the normal

@@ -25,6 +25,14 @@ int main() {
         require(shared.confirm&&shared.right,"a release and press publishes new edges");
         world.reset();
         require(!shared.confirm&&!shared.right&&!world.previous.fire,"room reset clears publication and history");
+        held={};held.pause=true;world.publishInput(held);
+        require(!shared.cancel,"Pause must not masquerade as padCancel");
+        held.cancel=true;world.publishInput(held);
+        require(shared.cancel,"publish the independent padCancel edge");
+        shared.cancel=false;world.publishInput(held);
+        require(!shared.cancel&&world.previous.cancel,"consuming cancel does not recreate its held edge");
+        held.cancel=false;world.publishInput(held);held.cancel=true;world.publishInput(held);
+        require(shared.cancel,"cancel is available again after release");
     }
     for(unsigned area:{1u,3u})for(unsigned reject=0;reject<=3;++reject){
         struct Ops {
@@ -422,8 +430,9 @@ int main() {
     }
     PlayerMotion player;
     unsigned greetings = 0;
-    auto tick = [&](bool fire, bool left = false, bool right = false) {
+    auto tick = [&](bool fire, bool left = false, bool right = false, bool cancel=false) {
         downwell::Input input; input.fire = fire; input.left = left; input.right = right;
+        input.cancel=cancel;
         player.step(input, run.shops.noControl, false, run.shops.interactable);
         run.shops.observePlayer(player.offsetX(), player.offsetY(),
             player.grounded(), player.speedXFixed());
@@ -474,6 +483,10 @@ int main() {
     require(shop->farewellVariant == 0, "exit and reentry do not reroll farewell text");
     require(shop->feedback.goodbye == 0 && shop->feedback.thankful == 0 &&
         !shop->feedback.itemPresent[0], "opening clears keeper thanks/goodbye without respawning contents");
+    tick(false,false,false,true);
+    require(!shop->menu.active&&!run.shops.noControl&&
+        shop->feedback.soundCount==1&&shop->feedback.sounds[0].resource==108,
+        "independent Cancel exits the live Shop and emits source UI cancel feedback");
     using World = downwell::ShopWorld;
     require(World::meets(*shop, -8, -8) && !World::meets(*shop, -9, -8) &&
         World::meets(*shop, 8, 12) && !World::meets(*shop, 9, 12), "inclusive source mask edges");

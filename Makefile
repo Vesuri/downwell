@@ -2100,6 +2100,14 @@ build/sdl-screenshot-test: tests/platform/SDLScreenshotTest.cpp src/platform/sdl
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
+build/sdl-input-test: tests/platform/SDLInputTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp src/core/Replay.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(LDFLAGS)
+.PHONY: test-sdl-input
+test: test-sdl-input
+test-sdl-input: build/sdl-input-test
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build/sdl-input-test
+
 build/sdl-flash-raster-test: tests/platform/SDLFlashRasterTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

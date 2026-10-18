@@ -3121,7 +3121,7 @@ private:
     void initRoomAlarm0();
     void initRoomEndStep(bool advancePressed);
     void stepInternal(bool advancePressed, bool left, bool right, bool fire,
-                      bool anyInput);
+                      bool anyInput,bool cancel=false);
     void updateMenuPlayer(InstanceRecord& instance);
     void updateMenuCamera();
     void updateMainPlayer(InstanceRecord& instance);
@@ -3354,6 +3354,7 @@ private:
     bool inputLeftPressed_ = false;
     bool inputRightPressed_ = false;
     bool inputFire_ = false;
+    bool inputCancel_ = false;
     bool inputFirePressed_ = false;
     bool inputFireReleased_ = false;
     bool anyInput_ = false;

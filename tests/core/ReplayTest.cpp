@@ -25,6 +25,10 @@ void testInputPacking() {
     require(output.left && output.fire, "packed input round trips");
     require(!output.right && !output.pause && !output.quit,
             "unset and local-only flags remain clear");
+    input.cancel=true;
+    require(downwell::packReplayInput(input)==21,"cancel uses the next reserved bit without changing old bits");
+    require(downwell::unpackReplayInput(21).cancel&&!downwell::unpackReplayInput(5).cancel,
+            "old replays have no cancel control; new replays preserve it");
 }
 
 void testHeaderAndValidation() {

@@ -25,7 +25,8 @@ int main(){
         assert(session.start());
         for(unsigned update=0;update<164;++update){
             GameplayEncounterSession::Frame frame(session);assert(frame.valid());
-            world->step(0);
+            world->step(update<2?16:0);
+            assert(world->shops().input.cancel==(update==0));
             assert(frame.beginDraw(true)&&frame.publishable()&&frame.finish());
         }
         {

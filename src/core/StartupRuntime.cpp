@@ -112,6 +112,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     inputLeftPressed_ = false;
     inputRightPressed_ = false;
     inputFire_ = false;
+    inputCancel_ = false;
     inputFirePressed_ = false;
     inputFireReleased_ = false;
     anyInput_ = false;
@@ -349,14 +350,14 @@ bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue 
 
 void StartupRuntime::step(const Input& input, bool advancePressed) {
     stepInternal(advancePressed, input.left, input.right, input.fire,
-                 input.left || input.right || input.fire || input.pause);
+                 input.left || input.right || input.fire || input.pause,input.cancel);
 }
 
 void StartupRuntime::stepInternal(bool advancePressed,
                                   bool left,
                                   bool right,
                                   bool fire,
-                                  bool anyInput) {
+                                  bool anyInput,bool cancel) {
     if (run_.levelClearActive || !run_.effectsSucceeded ||
         !roomLoadSucceeded_ || !deferredCommandsSucceeded_) return; // Result owner uses stepLevelClear.
     if(!sourceBulletDispatch_)for(std::size_t i=0;i<mainBulletCount_;++i)
@@ -403,6 +404,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputLeft_ = left;
     inputRight_ = right;
     inputFire_ = fire;
+    inputCancel_ = cancel;
     anyInput_ = anyInput;
     if (roomId_ == mainRoomId) {
         currencyAccount_.beginStep();
@@ -1635,6 +1637,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.left = inputLeft_;
     input.right = inputRight_;
     input.fire = inputFire_;
+    input.cancel = inputCancel_;
     const int muzzleX=instance.x,muzzleY=instance.y;
     stepGameplayPlayer(mainPlayerMotion_, mainDeath_, run_, currencyAccount_,
         mainPlayerHealth_, random_, input, mainPlayerOriginX_, mainPlayerOriginY_,
@@ -3193,6 +3196,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};
     inputFire_ = input.fire;
+    inputCancel_ = input.cancel;
     inputLeft_ = input.left;
     inputRight_ = input.right;
     inputFirePressed_ = inputFireReleased_ = inputLeftPressed_ = inputRightPressed_ = false;

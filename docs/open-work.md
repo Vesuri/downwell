@@ -371,7 +371,11 @@ boundaries rather than assembling them only in tests. Reuse the shared core
 APIs; platform code supplies devices, assets and presentation only. Wire settings,
 shared input consumption, language/font state, tile/view reads and real audio
 interfaces. Shared Shop input is not yet a replacement for the separate
-startup/menu control state or the source gamepad-cancel input. SDL currently
+startup/menu control state. The shared Cancel input is carried through replays
+and supplied by SDL's controller face 2; bind the native physical control as
+well. Move control-edge history to the session-wide input owner so holding a
+control across room changes/Retry cannot create a new edge from cleared Shop
+history; include startup/menu sampling in that owner. SDL currently
 loads only wind sounds 349–355; load the actual
 resources required by each admitted event before enabling it. Define equivalent
 Amiga audio/resource bindings, not dummy successful callbacks. Bind

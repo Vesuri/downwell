@@ -26,7 +26,11 @@ Input bits are stable across targets:
 | 1 | Right |
 | 2 | Fire / confirm |
 | 3 | Pause |
-| 4–7 | Reserved; write as zero |
+| 4 | Cancel (gamepad face 2) |
+| 5–7 | Reserved; write as zero |
+
+Bit 4 uses a previously zero reserved bit. Existing version-1 captures retain
+their exact inputs; new Cancel captures require a reader with this extension.
 
 `quit` is intentionally excluded because closing a host window is not game
 behavior. Edge-triggered controls are derived from adjacent replay frames, just

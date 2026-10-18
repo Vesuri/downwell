@@ -41,6 +41,7 @@ public:
 
 private:
     SDL_Window* window_ = nullptr;
+    SDL_GameController* controller_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
     SDL_Texture* framebuffer_ = nullptr;
     const SpritePack* spritePack_ = nullptr;

@@ -67,6 +67,7 @@ PlatformSDL::PlatformSDL() {
 }
 
 PlatformSDL::~PlatformSDL() {
+    if(controller_)SDL_GameControllerClose(controller_);
     for(auto* texture:flashFrames_) if(texture) SDL_DestroyTexture(texture);
     if (framebuffer_) SDL_DestroyTexture(framebuffer_);
     for (SDL_Texture* texture : texturePages_) {
@@ -150,6 +151,18 @@ Input PlatformSDL::pollInput() {
     }
 
     const Uint8* keys = SDL_GetKeyboardState(nullptr);
+    // scrControlInput reads gp_face2 separately from Pause. Retain the device
+    // across polls, and allow attachment/removal without changing game state.
+    if(controller_&&!SDL_GameControllerGetAttached(controller_)){
+        SDL_GameControllerClose(controller_);controller_=nullptr;
+    }
+    if(!controller_)for(int index=0;index<SDL_NumJoysticks();++index){
+        if(SDL_IsGameController(index)){
+            controller_=SDL_GameControllerOpen(index);
+            if(controller_)break;
+        }
+    }
+    input.cancel=controller_&&SDL_GameControllerGetButton(controller_,SDL_CONTROLLER_BUTTON_B);
     input.left = keys[SDL_SCANCODE_LEFT] || keys[SDL_SCANCODE_A];
     input.right = keys[SDL_SCANCODE_RIGHT] || keys[SDL_SCANCODE_D];
     input.fire = keys[SDL_SCANCODE_SPACE] || keys[SDL_SCANCODE_Z];

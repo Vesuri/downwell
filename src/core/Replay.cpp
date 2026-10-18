@@ -8,6 +8,7 @@ constexpr std::uint8_t leftFlag = 1U << 0;
 constexpr std::uint8_t rightFlag = 1U << 1;
 constexpr std::uint8_t fireFlag = 1U << 2;
 constexpr std::uint8_t pauseFlag = 1U << 3;
+constexpr std::uint8_t cancelFlag = 1U << 4;
 
 std::uint16_t readU16(const std::uint8_t* bytes) {
     return static_cast<std::uint16_t>(bytes[0]) |
@@ -78,6 +79,7 @@ std::uint8_t packReplayInput(const Input& input) {
     packed |= input.right ? rightFlag : 0;
     packed |= input.fire ? fireFlag : 0;
     packed |= input.pause ? pauseFlag : 0;
+    packed |= input.cancel ? cancelFlag : 0;
     return packed;
 }
 
@@ -87,6 +89,7 @@ Input unpackReplayInput(std::uint8_t packed) {
     input.right = (packed & rightFlag) != 0;
     input.fire = (packed & fireFlag) != 0;
     input.pause = (packed & pauseFlag) != 0;
+    input.cancel = (packed & cancelFlag) != 0;
     return input;
 }
 

@@ -52,7 +52,7 @@ struct ShopWorld {
 
     void publishInput(const Input& held) {
         input = {held.right && !previous.right, held.left && !previous.left,
-                 held.fire && !previous.fire, false};
+                 held.fire && !previous.fire, held.cancel && !previous.cancel};
         previous = held;
     }
 

@@ -56,9 +56,11 @@ compact parents consume that same publication. Registered parent scopes borrow
 it and the world's currency account through the state-owning overloads, rather
 than reconstructing input in a frontend or copying it for each nested visit.
 Raw held history remains separate from consumption, including when the Shop
-family is empty. Room reset clears both. This is the existing keyboard/fire
-subset; it does not map pause to the source's separate `padCancel`, or replace
-the still-separate startup/menu control state. Isolated event fixtures may
+family is empty. Room reset clears both. Cancel is a separate held input/replay
+bit; the shared publication produces its pressed edge, never aliases Pause.
+The SDL controller backend supplies face 2 (B), including device hotplug and
+removal. This does not replace the still-separate startup/menu control state
+or add the remaining gamepad axis/direction semantics. Isolated event fixtures may
 continue to provide explicit input/currency through the reference overloads.
 
 `make test-encounter-session` exercises full startup and `SKIP_TO_GAME`, then
