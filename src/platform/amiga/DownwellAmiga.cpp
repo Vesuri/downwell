@@ -1869,6 +1869,12 @@ __attribute__((noinline, used)) void downwellFrameDump(void) {
 }
 #endif
 
+#ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
+extern "C" {
+volatile unsigned gDownwellEncounterUpdateDraws=0;
+volatile unsigned gDownwellEncounterUpdatePublications=0;
+}
+#endif
 // Keep the large application's frame out of the entry wrapper so a caller
 // with an undersized task stack can fail before any deep initialization.
 __attribute__((noinline)) static int runDownwell(void) {
@@ -3941,6 +3947,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             // The runner sweeps marked instances at Draw entry. Inter-phase
             // reconciliation deliberately keeps those identities alive.
             if (!encounterFrame.beginDraw(true)) { exitCode=20; break; }
+#ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
+            ++gDownwellEncounterUpdateDraws;
+#endif
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
 #ifdef DOWNWELL_CAMERA_VERIFY
@@ -4631,6 +4640,9 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             DW_PROFILE_PHASE(profilePublish);
             if(!encounterFrame.publishable()){exitCode=20;break;}
+#ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
+            ++gDownwellEncounterUpdatePublications;
+#endif
             platform.publish(gameplayScene.copper(back));
             overlapNextStep = true;
 #ifdef DOWNWELL_FRAME_DUMP

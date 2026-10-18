@@ -3447,6 +3447,10 @@ verify-amiga-results-restart:
 	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_results_restart.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="native scene admission across all results destinations and gameplay reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-180} amiga/verify_startup.sh'
 
 .PHONY: verify-amiga-encounter-failure
+.PHONY: verify-amiga-encounter-update-failure
+verify-amiga-encounter-update-failure:
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -f Makefile -f encounter_collision_verify.mk -j4 FPSCOUNT=1 PROFILE_AUTORUN=1 DETERMINISTIC=1 SKIP_LEVEL=1 STRIP=1; GDB_SOURCE=verify_encounter_update_failure.gdb READY_MARKER=DOWNWELL_ENCOUNTER_UPDATE_FAILURE_READY READY_DESCRIPTION="terminal native collision callback failure" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-90} amiga/verify_startup.sh'
+
 verify-amiga-encounter-failure:
 	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_encounter_failure.gdb READY_MARKER=DOWNWELL_ENCOUNTER_FAILURE_READY READY_DESCRIPTION="terminal encounter failure during native Draw" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh'
 

@@ -150,6 +150,17 @@ callback in style Draw. The verifier requires zero subsequent style publications
 and an actual return code of 20. The launcher removes the marker before and
 after runs; normal builds contain neither the marker read nor the callback.
 
+`make verify-amiga-encounter-update-failure` exercises the candidate native
+collision session through the level-end shortcut. Its verification-only audio
+device rejects `isPlaying` inside the real exit-field/player collision event.
+The debugger checks the bound update context at that callback, then requires
+return code 20, no subsequent gameplay Draw entry or publication, and released
+world callbacks and audio device. Direct Draw/publication counters are used:
+the profiler counts aborted update scopes too and is not a publication witness.
+The target enables the candidate through `encounter_collision_verify.mk` only
+for this test and restores the normal build on exit. It does not enable that
+backend for shipping or prove its remaining performance and transition gates.
+
 ## Scene owners
 
 The Amiga scene translation units are `AmigaPublisherScene`,

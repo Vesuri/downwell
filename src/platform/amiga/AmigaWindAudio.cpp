@@ -96,7 +96,20 @@ bool AmigaWindAudio::play(int resource,int /*priority*/,bool loop,int& voice){
     gain_.current.assignInteger(1);updateVolume();
     playing_=true;command_=1;Enable();return true;
 }
+#ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
+extern "C" {
+volatile unsigned gDownwellEncounterAudioRejected=0;
+__attribute__((noinline,used)) bool downwellRejectEncounterAudio(){
+    ++gDownwellEncounterAudioRejected;return false;
+}
+}
+#endif
 bool AmigaWindAudio::isPlaying(int id,bool& playing){
+#ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
+    // Exercise the actual registered wind-contact callback, not a replacement
+    // collision pass. Ordinary builds have no rejection or counter.
+    return downwellRejectEncounterAudio();
+#endif
     Disable();playing=ready()&&playing_&&matches(id);Enable();return ready();
 }
 bool AmigaWindAudio::stop(int id){
