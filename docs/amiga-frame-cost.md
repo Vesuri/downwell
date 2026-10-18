@@ -590,6 +590,141 @@ Evidence: `tmp/c-band-120-report.txt`, `tmp/c-band-160-recheck-report.txt`,
 - 120: `7372457b5c5901d1e809d71bb6b3f8b22636959dfee04ba4937e2c844575460a`
 - 159 recheck: `5755bfcd0e6781eca65abdda825326988fd0eda3b5d3cdfdf87c25175b6ad975`
 
+### Centre-column entry preparation — provisional
+
+Complete band-candidate captures (`tmp/c-band-full-{1,60}-report.txt` plus
+`tmp/c-band-120-report.txt`) measured entrance mean/worst **15.5/20.4 ms**
+and quiet-generation **17.7/22.2 ms**. Update 18 spent 4.0 ms transferring
+terrain: 2.1 ms reading dictionary-backed rows versus 0.6 ms copying pixels.
+
+The next candidate materializes only the authored centre column at scene
+entry, in its existing raster allocation. Side columns remain borrowed;
+there is no additional memory or artwork. Host sanitizer tests pass, including
+396 borrowed/materialized transfer comparisons, retained live replacements,
+dirty-bit preservation and idempotent materialization. Native behavior and
+independent short timing rechecks remain required before acceptance.
+
+Three 100-field captures starting at 1, 60 and 120 give:
+
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance, 2–55 | 14.6 | 17.8 (18) | 0 | 0 |
+| Quiet generation, 56–121 | 17.4 | 20.4 (59) | 1 | 0 |
+| First burst, 122–135 | 18.1 | 33.8 (122) | 2 | 15 |
+| Enemies, 136–162 | 21.3 | 62.8 (136) | 11 | 53 |
+| Landing, 163–164 | 56.7 | 87.3 (163) | 2 | 73 |
+| Whole fall, 2–164 | 17.7 | 87.3 (163) | 16 | 142 |
+
+Update 18's terrain transfer falls to **1.3 ms**. This does not close C:
+137–162 still measures **19.7/23.4 ms**, ten updates over budget and 10 ms
+excess. Update 160 still contains 2.6 ms transfer and 2.3 ms display sync.
+The rounded zero excess in the quiet window is not a pass (update 59 is
+20.4 ms). Normal build restored after every capture.
+
+Evidence: `tmp/c-entry-full-{1,60,120}-report.txt`,
+`tmp/c-entry-raster-sanitize.log`. ELF SHA-256s, respectively:
+
+- `7398a5cb5dcf6242d125cc60b8cd1b96f6cd001aa85193a6a9cc950ff24f6111`
+- `b8bba626d8b6817a8ce744d9ae0f2783a36f00dfd19a413f50cd116050b12d0f`
+- `f1367f0a9fe4d1caf9ccbcaed42b49746069c933c5bea4aae1c2822d8e50d178`
+
+### Row preparation and empty-family dispatch — provisional
+
+The centre-column candidate now also uses packed display-row debts and
+materializes admitted pattern bands into the existing ordinary-memory raster
+ahead of upload. Neither changes the 330,024-byte artwork bank. These remain
+candidates, not accepted defaults; the combined full-fall gates are pending.
+
+With those changes, a 100-field capture starting at 120 measured updates
+137–162 at **19.4 ms mean / 21.6 ms worst**, five updates over budget and
+4 ms excess (`tmp/c-pattern-stage-120-report.txt`).
+
+Skipping the unallocated shop family's Step/End Step and compact Draw passes
+reduces Step by about 0.2 ms and collection by about 0.1 ms. Input history is
+still updated, and membership is checked after the synchronous transition
+callback so a first shop created there runs immediately. The paired capture
+(`tmp/d-empty-shop-120-report.txt`) gives:
+
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| First burst, 122–135 | 17.8 | 33.6 (122) | 1 | 14 |
+| Late fall, 137–162 | 19.4 | 21.3 (160) | 4 | 3 |
+| Landing, 163–164 | 56.4 | 86.9 (163) | 2 | 73 |
+
+Update 162 falls from 21.6 to 20.2 ms, including transfer decreasing from
+2.2 to 1.1 ms because preparation completes earlier. This is scheduling
+headroom, not a 1.4-ms intrinsic saving from shop dispatch. C remains open.
+
+The completed three-capture run (`tmp/d-empty-shop-{1,60,120}-report.txt`,
+100 fields per capture, first report wins overlaps) covers every update 2–164:
+
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance, 2–55 | 14.2 | 17.0 (18) | 0 | 0 |
+| Quiet generation, 56–121 | 16.9 | 20.0 (59) | 0 | 0 |
+| First burst, 122–135 | 17.8 | 33.6 (122) | 1 | 14 |
+| Enemies, 136–162 | 20.9 | 62.3 (136) | 5 | 45 |
+| Landing, 163–164 | 56.4 | 86.9 (163) | 2 | 73 |
+| Whole fall, 2–164 | 17.2 | 86.9 (163) | 8 | 131 |
+
+The remaining non-burst row updates are **143: 20.5, 158: 20.6,
+160: 21.3, 162: 20.2 ms**. Update 59 rounds to 20.0 but is below
+the threshold. Update 98 is 17.9 ms including preparation and terrain upload,
+not an isolated repeat of D's quiet-update workload. Independent short
+rechecks and a cadence run remain pending; neither C nor D is accepted.
+Normal builds were restored after each capture. The added ELF SHA-256s are:
+
+- start 1: `ac20c8df426bfdb5a16390e86a9b10bbd7d8235fdc3ba89c5a3f41f0ce2a83f0`;
+- start 60: `8a04310ebea2f9a1b203574a2019c8da3ec8b989519ee6ea2891bcd28dadd548`.
+
+Host player tests pass with and without `DOWNWELL_REFERENCE_FRAME_WORK`,
+including held input across an empty-family update and synchronous first
+birth. The draw-list oracle passes 600 projections / 4,488 commands. Native
+verification matches all 165 reference state samples and the landing witness;
+80 prepared rows pass the portable pixel oracle with zero failures
+(`tmp/d-empty-shop-state-gdb.log`). Trace ELF SHA-256:
+`84864a99d2aacb3102e64e65d8567a1cd49c410bb5095467ab25b9b76899c767`.
+
+The subsequent whole empty-shop renderer candidate also skips artwork
+snapshots, revision scans and menu discovery when the family is empty.
+Snapshots preserve first-birth detection after reset; raster revisions are
+cleared on the populated-to-empty edge. Candidate/reference sanitizer and
+pixel tests cover a new room reusing the previous room's art revision.
+
+Late-window timing (`tmp/d-shop-family-120-report.txt`) is **19.0 ms mean /
+21.6 ms worst**, four updates over 20 ms. Main-loop self work falls by about
+0.4–0.5 ms, but additional optional preparation now overruns at 139 (21.6),
+144 (20.1) and 146 (20.7); 160 remains 20.3. Updates 158 and 162 become
+19.9 and 19.2. An independent eight-field capture starting at 138 confirms
+139 at **21.6 ms** (`tmp/d-shop-family-139-check-report.txt`). This is not
+accepted: better mean alone does not pass the worst-update gate. Native
+state verification of this extension matches all 165 selected reference
+samples, including the landing witness; 80 prepared-row pixel comparisons
+pass with zero failures (`tmp/d-shop-family-state-gdb.log`). The host terrain
+ownership replay passes all ten tapes / 18,000 frames, reaching 928 terrain
+records. These checks do not establish the timing gate. The completed
+three-capture run covers every update 2–164, using start-1 for 2–98,
+start-60 for 99–121 and start-120 for 122–164:
+
+| Window | Work mean ms | Worst ms (update) | Over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance, 2–55 | 13.7 | 16.5 (18) | 0 | 0 |
+| Quiet generation, 56–121 | 16.4 | 19.5 (59) | 0 | 0 |
+| First burst, 122–135 | 17.3 | 33.2 (122) | 1 | 13 |
+| Enemies, 136–162 | 20.6 | 61.9 (136) | 5 | 45 |
+| Landing, 163–164 | 55.9 | 86.4 (163) | 2 | 72 |
+| Whole fall, 2–164 | 16.8 | 86.4 (163) | 8 | 130 |
+
+Reports: `tmp/d-shop-family-{1,60,120}-report.txt`. Update 98 is 17.5 ms
+with preparation/upload work; this is not D's isolated quiet-update gate.
+The entrance mean still exceeds D's 12-ms target. The normal build is
+restored after each run. Trace ELF hashes:
+
+- 1: `21bc2d6cdc915c8c9803e3c24a1700e720ece0a5c0d900299bc91c8830d8a7fe`;
+- 60: `e0aee86665fe3597d41386c4c2ba5f5bb0bc30b04132e20bb1ab78fd2cb1959c`;
+- 120: `6ae3c402e8f15243b51307085a2ec6af11ed7d9ea7add9bbacc8fbff8000b905`;
+- 138 recheck: `08d074f125845f059b9ff90b2f97de0335b3f8c9dfa804ef97957f91527345e0`.
+
 ### Backing-row reuse census (diagnostic, not timing)
 
 An instrumented band-candidate run compared all 22 incoming words with the
@@ -2741,6 +2876,7 @@ named holds the numbers. Do not retry a row without removing the reason in its l
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Initial-fall §0 C, cost-aware preparation admission | Reserve 1 ms for completion; price admission at 2.5 ms and consume 1–8 pixel rows according to remaining time (materialize 0.3+0.4 ms/row, compose 0.5+0.7, fallback 0.7+0.8) | Against empty-shop-family candidate, 137–162 mean/worst **19.0/21.6 → 18.6/21.2 ms**, over-budget count **4 → 1**, but 163 **86.4 → 90.8 ms** with 4.6 ms required terrain work. Independent 12-field capture confirms 90.8. Reports `tmp/c-job-budget-{120,163-check}-report.txt`; ELFs `fd187ce731e430d67621c50b35847c9b26b449d44369dca2f6bfc70359cf3d3a` / `e44870ca9e68273ae4a294d65e3c19beb91e78f0bac0b4dbd25e1dfcdad719b9`. | Deferred preparation misses the visibility deadline and worsens the landing window; bounded-job host tests and scalar pixels pass but do not satisfy timing. Removed; do not sweep reserve/cost constants. | This row's introducing commit; experiment reverted |
 | Initial-fall §0 D, short display-row CPU publication | At the existing sync point, drain earlier blits and copy initialized spans of at most 16 rows with the CPU; retain blits for larger spans | Against the unchanged-bank composition candidate: 122–135 mean/worst **18.5/33.8 → 19.2/34.5 ms**; 137–162 **20.0/23.2 → 20.5/23.4**, over-budget count **10 → 15**, excess **11 → 20 ms**. Ordinary sync rises from **1.4 to about 2.1 ms**. Reference/candidate ELF SHA-256 `06538fcfaa975c049a330a6270759aa3c16e91b478117d8841c9760ff38529cf` / `79add51ab3874d2e04e0919d56a8b71b54cea52208b01a2c29ef830cd3a890cf`; reports `tmp/c-compose-120-report.txt`, `tmp/d-short-sync-120-report.txt`. | Removing queued setup does not offset CPU copying and serialization for these 176-pixel spans. Both host paths pass 10,000 wrap/damage/pipeline cases, but affected windows regress. Reverted; no strip-size or copy-loop sweep. | This row's introducing commit; experiment reverted |
 | Initial-fall §0 C, deadline-only paint-ahead | Move optional Chip transfers after required rendering, reduce transfers to eight rows, and admit both transfer and plan units only below 17 ms of measured work | Against the direct-row-reference candidate, updates 137–162 mean **20.1 → 20.2 ms**, worst **24.6 → 25.6**, excess **16 → 32 ms**, nine over-budget updates in both. Update 145 now performs **8.3 ms** of required row painting. ELF `d458c4541fc22c971589383c9fab40109b1606a9ef5f255cfd8d4ebb68a592b0`; report `tmp/c-budgeted-120-report.txt`. | The stricter deadline leaves cold rows until exposure: it defers work rather than removing it. Scene/raster/pixel tests pass, but the affected window regresses. Reverted; do not sweep deadline or strip-size variants without first reducing preparation/transfer work. | This row's introducing commit; scheduling experiment reverted |
 | Initial-fall §0 D, camera projection | Retain rounded camera coordinates keyed by the exact position-plus-shake input | Against the counted-frame candidate: update 98 **14.3 → 14.2 ms**; updates 98–121 mean **17.0 → 16.9**, worst **20.3 → 20.2**, one update over 20 ms in both. Reference/candidate ELF SHA-256: `48e1bcac4daab89c2159058ef186fd27858e8e7037ebb4f6b9a857a4b8b5921c` / `f6aff38aaa22800b9afe0011015d5397e1b2a4d42e50d6dbdffcadad3c84b830`. | Within 0.5-ms noise; does not justify retained state. Host runtime output matches the reference; mutation, copy, shake, reset and sanitizer tests pass. No cache/helper variants. | This row's introducing commit; [`retained-camera-projection.patch`](rejected/retained-camera-projection.patch) |
