@@ -1500,9 +1500,14 @@ build/gameplay-external-collision-contract-test build/gameplay-full-collision-co
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 .PHONY: test-gameplay-collision-contract
-test-gameplay-collision-contract: build/gameplay-external-collision-contract-test build/gameplay-full-collision-contract-test
+test-gameplay-collision-contract: build/gameplay-external-collision-contract-test build/gameplay-full-collision-contract-test build/gameplay-scene-collision-contract-test
 	build/gameplay-external-collision-contract-test
 	build/gameplay-full-collision-contract-test
+	build/gameplay-scene-collision-contract-test
+
+build/gameplay-scene-collision-contract-test: tests/core/GameplayCollisionContractTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SCENE_COLLISION_BACKEND -o $@ $(filter %.cpp,$^)
 test: test-gameplay-collision-contract
 
 build/gameplay-room-views-reference-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)

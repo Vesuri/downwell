@@ -48,6 +48,7 @@ template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int Te
     bool live(InstanceHandle h)const{DW_TERRAIN_SLOT_READ(terrainTableRead,h.slot,TerrainFirst,TerrainLast);return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
 public:
     explicit NativeInstanceTable(bool externalOrder=false):externalOrder_(externalOrder){}
+    bool beforeFirstBirth()const{return nextOrder_==1;}
     // Bind once for an append-only external family wholly inside/outside
     // the watched alarm ranges. Keep chronology/revisions, not slot entries.
     bool bindExternalFamily(unsigned first,unsigned end,NativeFamilyBirth& birth){

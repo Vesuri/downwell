@@ -371,6 +371,12 @@ reference owner, check 512 KiB Chip startup and measure the initial fall before
 accepting the production default. Do not disable the external-backend guard
 without replacing it with an explicit, verified scene admission. The broader
 families and verification gates of 1.05/1.07 remain there.
+Before enabling the native scene collision backend, separate query admission
+from the existing native terrain-span and record-backed actor fast paths.
+The candidate full-owner integration has not passed the bounded initial-fall
+gate; keep the external backend as the shipping default until that coupling
+is removed and the complete fall is measured. Preserve source spatial-history
+ordering rather than substituting a current-state-only tree.
 **Work:** Finish production environment wiring in `StoredEncounterSession` and
 `GameplayEncounterSession`; their boundary contract is in
 [scene architecture](scene-architecture.md#encounter-session-boundary).

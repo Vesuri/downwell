@@ -115,6 +115,19 @@ public:
         NativePosition boxes[GameplayWorld::breakableCapacity]{};
     };
     bool hasNativeCollisionStorage()const{return nativeCollisionStorage_!=nullptr;}
+    // Scene entry may attach the derived service before the serialized first
+    // birth. Never reconstruct queues/tree history from an already-live world.
+    bool bindNativeCollisionStorage(NativeCollisionStorage& storage){
+        if(!check(valid()&&native_&&collisionConsumersAdmitted_&&
+            !nativeCollisionStorage_&&!geometry_&&table_.beforeFirstBirth()))return false;
+        auto& geometry=storage.geometry;
+        if(!check(sprites_.prepare(geometry.descriptors,741)&&geometry.sprites.prepare(sprites_)&&
+            geometry.terrain.prepare(objectDefaults_,sprites_)))return false;
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        if(!check(owner_.bindTerrainGeometry(geometry.terrain)))return false;
+#endif
+        nativeCollisionStorage_=&storage;geometry_=&geometry;return true;
+    }
     bool hasScalarControlStorage()const{return owner_.hasControlStorage();}
     bool hasPreparedCollisionGeometry()const{return geometry_!=nullptr;}
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
@@ -1689,7 +1702,7 @@ private:
     void* timeEffectIdContext_=nullptr;
     bool (*timeEffectIdAllocate_)(void*,std::uint32_t&)=nullptr;
     const SpriteMaskPack* timeShardStepMasks_=nullptr; // Borrowed only during selected Step.
-#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+#if defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND) || defined(DOWNWELL_SCENE_COLLISION_BACKEND)
     // The external scene contract admits exactly nativeScenery with native
     // boxes. Do not keep scalar-owner lifecycle branches in every callback
     // when this executable cannot construct that owner in the first place.
@@ -1740,7 +1753,7 @@ public:
         SkeletonEncounterStorage* encounter=nullptr):
         nativeCollisionStorage_(nativeCollision),
         objects_(objects),sprites_(sprites),layers_(rooms),
-#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+#if !defined(DOWNWELL_EXTERNAL_COLLISION_BACKEND) && !defined(DOWNWELL_SCENE_COLLISION_BACKEND)
         native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         sceneryLayers_(ownership==Ownership::nativeScenery),
         nativeBoxes_(ownership==Ownership::nativeScenery&&nativeBoxes),
@@ -1756,6 +1769,9 @@ public:
         // partial reference runner. The scene must still declare its external
         // backend before births; that admission closes the spatial index.
         if(ownership!=Ownership::nativeScenery||!nativeBoxes||reference||nativeCollision){good_=false;return;}
+#endif
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+        if(ownership!=Ownership::nativeScenery||!nativeBoxes||reference){good_=false;return;}
 #endif
         owner_.observeStateFailure(good_);properties_.observeFailure(good_);
         // Only the scalar/reference backend may own these arrays. Native

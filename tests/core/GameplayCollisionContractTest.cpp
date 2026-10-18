@@ -16,13 +16,20 @@ int main() {
     using Owner=GameplayCollisionOwner;
     const auto ob=read("generated/downwell-objects.dwob");
     const auto sb=read("generated/downwell-sprites.dwsc");
+    const auto rb=read("generated/downwell-rooms.dwrm");
     ObjectPack objects(ob.data(),ob.size());
     SpriteCollisionPack sprites(sb.data(),sb.size());
-    assert(objects.valid()&&sprites.valid());
+    RoomPack rooms(rb.data(),rb.size());
+    assert(objects.valid()&&sprites.valid()&&rooms.valid());
 #ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
     constexpr bool restricted=true;
 #else
     constexpr bool restricted=false;
+#endif
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+    constexpr bool scene=true;
+#else
+    constexpr bool scene=false;
 #endif
     const auto create=[&](Owner::Ownership kind,bool boxes,
                           Owner::ReferenceStorage* reference=nullptr,
@@ -39,17 +46,29 @@ int main() {
 
     auto reference=std::make_unique<Owner::ReferenceStorage>();
     auto scalar=create(Owner::Ownership::reference,true,reference.get());
-    assert(scalar->valid()!=restricted);
+    assert(scalar->valid()==!(restricted||scene));
     auto collision=std::make_unique<Owner::NativeCollisionStorage>();
     auto full=create(Owner::Ownership::nativeScenery,true,nullptr,collision.get());
     assert(full->valid()!=restricted);
     auto withoutBoxes=create(Owner::Ownership::nativeScenery,false);
-    assert(withoutBoxes->valid()!=restricted);
+    assert(withoutBoxes->valid()==!(restricted||scene));
     // The restricted build's compile-time ownership must not turn rejected
     // constructor arguments into a silently accepted native scene.
-    if(restricted)for(auto kind:{Owner::Ownership::reference,
+    if(restricted||scene)for(auto kind:{Owner::Ownership::reference,
             Owner::Ownership::nativeTerrain,Owner::Ownership::native}){
         auto incompatible=create(kind,true);
         assert(!incompatible->valid());
+    }
+    auto deferred=create(Owner::Ownership::nativeScenery,true);
+    assert(deferred->valid()&&!deferred->hasNativeCollisionStorage());
+    auto world=std::make_unique<GameplayWorld>(300,true,0,false,
+        deferred->enemyBinding(),deferred->breakableBinding(),deferred->playerBinding(),
+        nullptr,&rooms,GameplayWorld::PlayerBirthTiming::authoredRoom);
+    assert(world->awaitingPlayerBirth()&&deferred->attach(*world));
+    auto lease=std::make_unique<Owner::NativeCollisionStorage>();
+    assert(deferred->bindNativeCollisionStorage(*lease)==!restricted);
+    if(!restricted){
+        assert(deferred->hasNativeCollisionStorage()&&deferred->hasPreparedCollisionGeometry());
+        assert(!deferred->bindNativeCollisionStorage(*lease)&&!deferred->valid());
     }
 }
