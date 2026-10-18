@@ -12,19 +12,21 @@ static std::vector<std::uint8_t> read(const char* path){
 }
 struct Audio {
     bool playing=false,fail=false;std::vector<int> calls;
+    std::vector<MotionBinary64> gains;
+    MotionBinary64 expectedMaster{0x3fe33333u,0x33333333u};
     unsigned stops=0,updates=0;int missing=-1;bool masterOkay=true;
     bool ready()const{return true;}
     bool hasResource(int id)const{return id!=missing;}
     bool stopAll(){++stops;playing=false;return !fail;}
     void update(){++updates;}
-    bool setMasterGain(MotionBinary64 gain){return masterOkay&&gain.high==0x3fe33333u&&gain.low==0x33333333u;}
+    bool setMasterGain(MotionBinary64 gain){return masterOkay&&gain.high==expectedMaster.high&&gain.low==expectedMaster.low;}
     bool isPlaying(int id,bool& out){calls.push_back(id);out=id==900&&playing;return !fail;}
     bool stop(int id){calls.push_back(10000+id);return true;}
     bool play(int id,int priority,bool loop,int& voice){
         assert(priority==90&&!loop);calls.push_back(20000+id);voice=900;playing=true;return true;
     }
     bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-    bool setGain(int,MotionBinary64,int){return true;}
+    bool setGain(int,MotionBinary64 gain,int){gains.push_back(gain);return true;}
     bool setPitch(int,MotionBinary64){return true;}
 };
 template<bool Prepared> static void exercise(int argc,char** argv){
@@ -161,4 +163,62 @@ template<bool Prepared> static void exercise(int argc,char** argv){
     }
     std::puts("Dither/wind admission: reference/native sealed order, room suppression and terminal audio failure passed");
 }
-int main(int argc,char** argv){exercise<false>(argc,argv);exercise<true>(argc,argv);}
+static void sessionInputsAndSettings(int argc,char** argv){
+    const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
+        rb=read("generated/downwell-rooms.dwrm"),mb=read(argc>1?argv[1]:"generated/downwell-sprite-masks.dwsm");
+    ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    RoomPack rooms(rb.data(),rb.size());SpriteMaskPack masks(mb.data(),mb.size());
+    PackedRoom room;assert(rooms.findRoom(11,room));unsigned sourceId=0;
+    for(unsigned i=0;i<room.instanceCount;++i){PackedRoomInstance r;
+        assert(rooms.roomInstance(room,i,r));if(r.objectId==61)sourceId=r.instanceId;
+    }
+    assert(sourceId);
+    for(bool lowSpec:{false,true}){
+        auto owner=makeCollisionOwner(objects,sprites,{}, {},&rooms,GameplayCollisionOwner::Ownership::nativeScenery);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain));
+        GameplayDitherAbove::Snapshot imported;imported.sourceId=sourceId;
+        assert(imported.y.assignInteger(-64)&&world->adoptDitherAbove(imported));
+        const auto dither=world->ditherAbove()->handle();
+        auto& fields=const_cast<GameplayGoalFields&>(world->goalFieldInstances());
+        assert(fields.create(240,176,371));
+        Audio audio;audio.expectedMaster={0x3fe00000u,0};
+        auto roomState=[]{return RunnerCollisionEventContext::RoomState{true,false};};
+        using Environment=GameplayEncounterEnvironment<Audio,decltype(roomState),256>;
+        auto environment=std::make_unique<Environment>(*world,*owner,masks,audio,roomState);
+        environment->settings().masterGain=audio.expectedMaster;
+        environment->settings().gameVolume={0x3fd00000u,0}; // A quarter, before the explicit wind override.
+        environment->settings().lowSpec=lowSpec;
+        GameplayEncounterSession session(*world,*owner);assert(session.start());
+        Input held;held.right=held.left=held.fire=held.cancel=true;
+        {
+            GameplayEncounterSession::Frame frame(session);
+            assert(frame.sampleInput(held)&&frame.bindUpdateEnvironment(*environment));
+            world->step(0);assert(world->effectsSucceeded());
+            const auto* actor=world->ditherAbove()->find(dither);assert(actor&&!actor->destroyRequested);
+            RunnerImageValue expected;assert(expected.assignInteger(lowSpec?-48:-64));
+            assert(actor->y.bits==expected.bits); // Camera y=176: only the 208-pixel branch advances.
+            assert(audio.gains.size()==2&&audio.gains[0].high==0x3fd00000u&&!audio.gains[0].low&&
+                audio.gains[1].high==0x3fe00000u&&!audio.gains[1].low);
+            const auto& edges=session.inputPublication();
+            assert(edges.right&&edges.left&&edges.confirm&&edges.cancel); // Neither admitted event consumes controls.
+            assert(frame.beginDraw(true)&&frame.publishable()&&frame.finish());
+            assert(!world->boundEncounterUpdate(environment.get()));
+        }
+        environment->settings().ending=true; // Must be reread on the next production binding.
+        {
+            GameplayEncounterSession::Frame frame(session);
+            assert(frame.sampleInput(held)&&frame.bindUpdateEnvironment(*environment));
+            world->step(0);assert(world->effectsSucceeded());
+            const auto* actor=world->ditherAbove()->find(dither);assert(actor&&actor->destroyRequested);
+            const auto& edges=session.inputPublication();
+            assert(!edges.right&&!edges.left&&!edges.confirm&&!edges.cancel);
+            assert(frame.beginDraw(true)&&frame.publishable()&&frame.finish());
+        }
+        assert(session.retire());
+    }
+    std::puts("Encounter bindings: live lowSpec/ending, separate master/game/wind gain and unconsumed input passed");
+}
+int main(int argc,char** argv){exercise<false>(argc,argv);exercise<true>(argc,argv);sessionInputsAndSettings(argc,argv);}

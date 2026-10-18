@@ -391,8 +391,9 @@ Install each admitted registered event's real scopes inside those update/Draw
 boundaries rather than assembling them only in tests. Reuse the shared core
 APIs; platform code supplies devices, assets and presentation only. Wire settings,
 shared input consumption, language/font state, tile/view reads and real audio
-interfaces. Audit each admitted consumer's mutation/consumption of the shared
-input publication against its source event. SDL currently
+interfaces. Preserve the [audited admitted-event input and service contract](scene-architecture.md#admitted-environment-reads-and-writes)
+when connecting the final production backend; newly admitted consumers need
+their own source audit and real bindings. SDL currently
 loads only wind sounds 349–355; load the actual
 resources required by each admitted event before enabling it. Define equivalent
 Amiga audio/resource bindings, not dummy successful callbacks. Bind

@@ -30,6 +30,40 @@ constant in the collision callback. Adding a family requires its concrete
 update/Draw scopes and resource dependencies; having a registered record alone
 does not authorize skipping its unbound events.
 
+### Admitted environment reads and writes
+
+The VM assembly in `extracted/utmt-0.9.2.0/Assembly/` defines the narrow
+environment contract below. Resource IDs and event ownership still come from
+the decoded object pack; decompiled GML is not the evidence for these reads.
+
+| Consumer | Required environment | Observable writes |
+| --- | --- | --- |
+| `gml_Object_objDitherAbove_Step_1` | Published object-63 camera x/y; `global.lowSpec`, `global.ending` | x setter, conditional y += 16 at a 272/208-pixel threshold, rounded y setter, optional self destruction, in that order |
+| `gml_Object_objDitherAbove_Collision_objWall_n` | Live OTHER identity | Deferred OTHER destruction; no control, settings or audio access |
+| `gml_Object_objDitherAbove_Draw_0` | Current sprite/image/transform and draw destination | `draw_self`; no text, language/font or tile lookup |
+| `gml_Object_goalTimeField_Collision_objPlayer_n` (also inherited by entry fields) | `global.voidWind`, shared RNG, real audio; `soundPlayOL` with literal channel `"UI"` | If the voice is stopped: choose 349–355, write `self.windsnd`, execute the sound script, write `global.voidWind`, then set that voice's gain to 0.5 |
+| `gml_GlobalScript_soundPlayOL`, UI branch | `global.gameVolume`, audio; caller sound fields and global overlap channel 8 | Stop the selected sound if playing; publish channel/sound fields, play at priority 90 without looping, apply resource gain × gameVolume, pitch 1, then return the live voice |
+
+For UI channel 8, the script does not execute the offscreen view/y checks
+(channels 4/6), music suppression (5), or gunshot ducking (1). Its water
+condition cannot change channel 8's pitch. No admitted consumer reads or
+clears `dLeft`, `dRight`, `dUp` or Cancel. Those edges remain the single mutable
+session publication for consumers that actually use them; no private input
+copy is supplied to dither/wind. Likewise these events require no language/font
+or tile service. Adding a consumer that reads those services must install its
+real binding before admission, not rely on a success stub or a zero default.
+
+The native session binding fixture exercises both lowSpec thresholds, changes
+ending between frames, checks all four input edges remain untouched by the
+admitted update, and checks that held inputs do not become new edges after
+Draw/rebinding. It distinguishes master gain 0.5, gameVolume 0.25 and the wind
+event's final gain 0.5: the sound script's 0.25 write must precede the override.
+The fixture uses production `Frame::bindUpdateEnvironment` and `world.step`;
+its imported dither position and overlapping field are explicit fixtures, not
+evidence of a natural encounter or original Windows-runner execution.
+
+### Native frame binding
+
 `GameplayDitherCollisionPass` supplies the equivalent narrow native admission.
 It collects the complete owner stream before selecting the 61/60 and
 255-or-371/35 pairs; it does not build a second spatial index or scan fields in
