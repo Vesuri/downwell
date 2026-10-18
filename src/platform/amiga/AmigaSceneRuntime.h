@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_SCENE_RUNTIME_H
 
 #include "core/Input.h"
+#include "core/ShopInteraction.h"
 #include "core/ResultsDestination.h"
 #include <cstdint>
 
@@ -16,6 +17,7 @@ class AmigaSceneRuntime {
 public:
     AmigaSceneRuntime();
     void step(const downwell::Input& input);
+    void step(const downwell::Input& input,const downwell::ShopInteraction::Input& edges);
     // Scene-local state only; caller must retire DMA and restore resources,
     // reset the gameplay world and apply the shared RunSession restart.
     bool enterResultsDestination(downwell::ResultsDestination destination);

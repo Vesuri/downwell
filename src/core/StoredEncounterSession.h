@@ -17,6 +17,7 @@ public:
         :game_(game),collision_(collision),audio_(audio),contacts_(collision){}
     StoredEncounterSession(const StoredEncounterSession&)=delete;
     StoredEncounterSession& operator=(const StoredEncounterSession&)=delete;
+    ~StoredEncounterSession(){if(inputBound_)game_.bindEncounterInput(nullptr);}
     EncounterSettings& settings(){return settings_;}
     const EncounterSettings& settings()const{return settings_;}
     bool succeeded()const{return boundary_.succeeded();}
@@ -29,6 +30,8 @@ public:
             for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount;++id)
                 if(!audio_.hasResource(id))return false;
             if(!audio_.stopAll())return false;
+            if(!game_.bindEncounterInput(&input_))return false;
+            inputBound_=true;
             return withUpdateEnvironment([&]{
                 game_.applyStartupShortcut();return worldSucceeded();
             });
@@ -48,11 +51,16 @@ public:
             game_.render(renderer);return game_.renderingSucceeded()&&worldSucceeded();
         });
     }
-    bool retire(){if(!audio_.stopAll())boundary_.fail();return boundary_.retire();}
+    bool retire(){
+        if(!audio_.stopAll())boundary_.fail();
+        if(inputBound_){game_.bindEncounterInput(nullptr);inputBound_=false;}
+        return boundary_.retire();
+    }
 private:
     bool worldSucceeded()const{
         const auto& world=game_.startup();
-        return collision_.valid()&&world.effectsSucceeded()&&world.roomLoadSucceeded()&&world.deferredCommandsSucceeded();
+        return (!inputBound_||game_.boundEncounterInput(&input_))&&
+            collision_.valid()&&world.effectsSucceeded()&&world.roomLoadSucceeded()&&world.deferredCommandsSucceeded();
     }
     template<class Body> bool withUpdateEnvironment(Body body){
         if(!settings_.gameVolume.valid()||!audio_.setMasterGain(settings_.masterGain))return false;
@@ -70,6 +78,8 @@ private:
     Audio& audio_;
     StoredDitherCollisionPass contacts_;
     EncounterSettings settings_;
+    EncounterInput input_;
+    bool inputBound_=false;
     EncounterBoundary boundary_;
 };
 }

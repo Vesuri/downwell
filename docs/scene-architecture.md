@@ -51,17 +51,23 @@ or the later music/resource-group events. `AmigaWindAudio::stopAll` publishes a
 VBlank stop command; a same-update play replaces it with a stop/start command,
 and pending reload IRQs cannot consume the new sample before that boundary.
 
-The shared player phase publishes Shop edges once into `ShopWorld::input`;
-compact parents consume that same publication. Registered parent scopes borrow
-it and the world's currency account through the state-owning overloads, rather
-than reconstructing input in a frontend or copying it for each nested visit.
-Raw held history remains separate from consumption, including when the Shop
-family is empty. Room reset clears both. Cancel is a separate held input/replay
-bit; the shared publication produces its pressed edge, never aliases Pause.
+Each production session owns `EncounterInput`: raw held history and one mutable
+edge publication. Startup, menus and gameplay sample it once per update;
+`ShopWorld::inputState()` and registered parent scopes borrow that publication
+and the world's currency account, rather than copying input for each visit.
+Consumption never alters raw held history. Room changes and Retry preserve that
+history; run reset clears only the publication, so a held control cannot become
+a fresh press after reset. Stored updates sample at `Game::update` entry,
+including level-clear updates; shortcut steps sample their virtual inputs.
+Native frames sample before scene dispatch, and gameplay Draw rejects a missing
+or duplicate sample. Session retirement unbinds the borrowed publication.
+Cancel is a separate held input/replay bit, never an alias for Pause.
 The SDL controller backend supplies face 2 (B), including device hotplug and
-removal. This does not replace the still-separate startup/menu control state
-or add the remaining gamepad axis/direction semantics. Isolated event fixtures may
-continue to provide explicit input/currency through the reference overloads.
+removal. Native scene dispatch uses the same session edges; standalone scene and
+Shop fixtures retain their local-history reference paths. This does not add the
+remaining gamepad axis/direction semantics or native physical Cancel binding.
+Isolated event fixtures may continue to provide explicit input/currency through
+the reference overloads.
 
 `make test-encounter-session` exercises full startup and `SKIP_TO_GAME`, then
 level completion and Retry through the session. Exit placement and lethal

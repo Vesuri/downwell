@@ -226,6 +226,7 @@ void StartupRuntime::resetSceneState() {
 bool StartupRuntime::restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed) {
     if (resultsDestination(action) == ResultsDestination::none) return false;
     if(!runAudio_.reset())return run_.effectsSucceeded=false;
+    if(encounterInput_)encounterInput_->resetPublication();
     if(!ownedEntryRegistration_.clear())return false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
@@ -321,6 +322,7 @@ void StartupRuntime::initRoomCreate() {
 }
 
 void StartupRuntime::step(bool advancePressed) {
+    Input input;input.fire=advancePressed;sampleEncounterInput(input);
     stepInternal(advancePressed, false, false, advancePressed, advancePressed);
 }
 
@@ -349,6 +351,7 @@ bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue 
 }
 
 void StartupRuntime::step(const Input& input, bool advancePressed) {
+    sampleEncounterInput(input);
     stepInternal(advancePressed, input.left, input.right, input.fire,
                  input.left || input.right || input.fire || input.pause,input.cancel);
 }
@@ -401,6 +404,11 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputRightPressed_ = right && !inputRight_;
     inputFirePressed_ = fire && !inputFire_;
     inputFireReleased_ = !fire && inputFire_;
+    if(encounterInput_){
+        const auto& edges=encounterInput_->publication();
+        inputLeftPressed_=edges.left;inputRightPressed_=edges.right;inputFirePressed_=edges.confirm;
+        inputFireReleased_=encounterInput_->fireReleased();
+    }
     inputLeft_ = left;
     inputRight_ = right;
     inputFire_ = fire;

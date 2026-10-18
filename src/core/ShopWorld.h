@@ -49,8 +49,12 @@ struct ShopWorld {
     // than reconstructing dUp from held input. Keep raw history separately:
     // consuming dUp must not manufacture another press on the next update.
     ShopInteraction::Input input;
+    ShopInteraction::Input* borrowedInput=nullptr;
+    ShopInteraction::Input& inputState(){return borrowedInput?*borrowedInput:input;}
+    const ShopInteraction::Input& inputState()const{return borrowedInput?*borrowedInput:input;}
 
     void publishInput(const Input& held) {
+        if(borrowedInput)return; // Session already sampled once, including non-gameplay scenes.
         input = {held.right && !previous.right, held.left && !previous.left,
                  held.fire && !previous.fire, held.cancel && !previous.cancel};
         previous = held;
@@ -243,7 +247,7 @@ public:
             if (!shop.present) continue;
             const ShopInteraction::Context context{meets(shop, x, y),
                 interactable, x > shop.x, criminal, dead};
-            shop.menu.step(input, context, noControl, facing, shop.stock,
+            shop.menu.step(inputState(), context, noControl, facing, shop.stock,
                 currency, choose, grant, [&](ShopInteraction::Effect effect) {
                     if (effect == ShopInteraction::Effect::disableMask)
                         shop.maskEnabled = false;

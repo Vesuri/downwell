@@ -2677,6 +2677,22 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 
 int main(int argc, char** argv) {
     {
+        downwell::EncounterInput input;
+        downwell::Input held;held.fire=true;
+        input.sample(held);
+        AmigaSceneRuntime beforeReset;
+        beforeReset.step(held,input.publication());
+        require(beforeReset.splashStage()==2,"shared fresh Confirm advances native splash");
+        input.resetPublication();
+        AmigaSceneRuntime afterReset;
+        input.sample(held);
+        afterReset.step(held,input.publication());
+        require(afterReset.splashStage()==1,"held Confirm across scene reset is not a fresh press");
+        input.sample({});afterReset.step({},input.publication());
+        input.sample(held);afterReset.step(held,input.publication());
+        require(afterReset.splashStage()==2,"release then press advances native splash");
+    }
+    {
         static GameplayWorld shaken(0,true,0,true),plain(0,true,0,true);
         auto oracle=shaken.randomState();const auto before=shaken.randomDrawCount();
         const int dx=int(oracle.irandom(2))-1,dy=int(oracle.irandom(4))-2;

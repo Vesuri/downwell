@@ -3,6 +3,7 @@
 
 #include "PlayerMotion.h"
 #include "RunAudioBinding.h"
+#include "EncounterInput.h"
 #include "GameplayFrame.h"
 #include "PreparedRoomTerrain.h"
 #include "ScriptEffectRuntimeBinding.h"
@@ -1544,6 +1545,14 @@ public:
         struct Leave {downwell::RunAudioBinding& binding;~Leave(){binding={};}} leave{runAudio_};
         return body();
     }
+    bool bindEncounterInput(downwell::EncounterInput* input){
+        if(input&&encounterInput_&&input!=encounterInput_)return false;
+        encounterInput_=input;run_.shops.borrowedInput=input?&input->publication():nullptr;
+        return true;
+    }
+    bool boundEncounterInput(const downwell::EncounterInput* input)const{
+        return encounterInput_==input&&run_.shops.borrowedInput==(input?&input->publication():nullptr);
+    }
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     // The event part of advanceEnemyRoomAlarm, for a resolved record and an
@@ -2424,7 +2433,7 @@ public:
     const downwell::ShopWorld& shops() const { return run_.shops; }
     template<class Body> bool withShopStepState(Body body){
         if(!run_.effectsSucceeded)return false;
-        return run_.effectsSucceeded=body(run_.shops.input,currencyAccount_)&&run_.effectsSucceeded;
+        return run_.effectsSucceeded=body(run_.shops.inputState(),currencyAccount_)&&run_.effectsSucceeded;
     }
     bool registerSideCameraLocker(int x, int y,unsigned sourceId=0) {
         return run_.effectsSucceeded=run_.effectsSucceeded&&run_.sideCameraLockers.create(x,y,sourceId);
@@ -2682,6 +2691,7 @@ private:
     bool (*collisionPass_)(void*)=nullptr;
     void* collisionPassContext_=nullptr;
     downwell::RunAudioBinding runAudio_;
+    downwell::EncounterInput* encounterInput_=nullptr;
     bool collisionPassExecuting_=false;
     RoomActorDraw roomActorDraw_=nullptr;
     RoomActorDraw roomActorReadOnlyDraw_=nullptr;

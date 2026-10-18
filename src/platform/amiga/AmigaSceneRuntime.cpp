@@ -436,16 +436,18 @@ void AmigaSceneRuntime::stepStyleSelect(const downwell::Input& input,
 
 void AmigaSceneRuntime::step(const downwell::Input& input)
 {
-    const bool leftPressed = input.left && !priorLeft_;
-    const bool rightPressed = input.right && !priorRight_;
-    const bool firePressed = input.fire && !priorFire_;
+    step(input,{input.right&&!priorRight_,input.left&&!priorLeft_,input.fire&&!priorFire_,false});
+}
+
+void AmigaSceneRuntime::step(const downwell::Input& input,const downwell::ShopInteraction::Input& edges)
+{
     ++tick_;
     if (scene_ == AmigaScene::splash)
-        stepSplash(firePressed);
+        stepSplash(edges.confirm);
     else if (scene_ == AmigaScene::menu)
         stepMenu(input);
     else if (scene_ == AmigaScene::styleSelect)
-        stepStyleSelect(input, leftPressed, rightPressed, firePressed);
+        stepStyleSelect(input, edges.left, edges.right, edges.confirm);
     priorLeft_ = input.left;
     priorRight_ = input.right;
     priorFire_ = input.fire;

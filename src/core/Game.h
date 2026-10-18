@@ -28,6 +28,8 @@ public:
     // Idempotent so an explicit initialization cannot replay room creation.
     void applyStartupShortcut();
     bool startupShortcutApplied()const{return startupShortcutApplied_;}
+    bool bindEncounterInput(EncounterInput* input){return startup_.bindEncounterInput(input);}
+    bool boundEncounterInput(const EncounterInput* input)const{return startup_.boundEncounterInput(input);}
     void configureCollisionPass(bool (*pass)(void*,StartupRuntime&),void* context){
         collisionPass_=pass;collisionContext_=context;
     }
@@ -65,6 +67,7 @@ public:
     }
 
 private:
+    void updatePrepared(const Input& input,std::uint32_t restartSeed);
     void renderMenu(Renderer& renderer) const;
     void renderPlayMenu(Renderer& renderer) const;
     void renderMain(Renderer& renderer) const;

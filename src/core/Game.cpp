@@ -102,6 +102,12 @@ void Game::applyStartupShortcut() {
 }
 
 void Game::update(const Input& input, std::uint32_t restartSeed) {
+    if(!startup_.withEncounterInput(input,[&]{
+        updatePrepared(input,restartSeed);return simulationSucceeded_;
+    })){simulationSucceeded_=false;finished_=true;}
+}
+
+void Game::updatePrepared(const Input& input, std::uint32_t restartSeed) {
     const auto failed=[&] {
         if(simulationSucceeded_ && startup_.effectsSucceeded() &&
            startup_.roomLoadSucceeded() && startup_.deferredCommandsSucceeded())return false;
@@ -109,9 +115,13 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
     };
     if(failed())return;
     finished_ = finished_ || input.quit;
+    const auto* edges=startup_.encounterInputEdges();
+    const bool firePressed=edges?edges->confirm:input.fire&&!fire_;
     if (startup_.levelClearActive()) {
+        startup_.sampleEncounterInput(input);
         bool confirm = input.fire;
-        startup_.stepLevelClear(confirm, input.left && !left_, input.right && !right_, heartGoal_,
+        startup_.stepLevelClear(confirm, edges?edges->left:input.left&&!left_,
+            edges?edges->right:input.right&&!right_, heartGoal_,
             [](LevelClearSelection::Effect, unsigned) {});
         if(failed())return;
         if (startup_.nextLevelRequested()) {
@@ -119,9 +129,9 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
             if (!startup_.roomLoadSucceeded()) simulationSucceeded_ = false;
         }
     } else {
-        if(collisionPass_)simulationSucceeded_=startup_.stepWithCollisionPass(input,input.fire&&!fire_,
+        if(collisionPass_)simulationSucceeded_=startup_.stepWithCollisionPass(input,firePressed,
             [&]{return collisionPass_(collisionContext_,startup_);});
-        else startup_.step(input, input.fire && !fire_);
+        else startup_.step(input, firePressed);
         if(failed())return;
         if (startup_.levelResultRequested())
             startup_.enterLevelClear(startup_.playStyle(), heartGoal_);

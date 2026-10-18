@@ -3,6 +3,7 @@
 
 #include "AreaOneBuilder.h"
 #include "RunAudioBinding.h"
+#include "EncounterInput.h"
 #include "RunnerDirectionValue.h"
 #include "RunnerAlarmValue.h"
 #include "BlastWallContact.h"
@@ -148,6 +149,22 @@ public:
     // Call at a room-transition boundary, after consuming the results action.
     // Seed is explicit so randomize can be recorded/replayed by the platform.
     bool restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed);
+    bool bindEncounterInput(EncounterInput* input){
+        if(input&&encounterInput_&&input!=encounterInput_)return false;
+        encounterInput_=input;run_.shops.borrowedInput=input?&input->publication():nullptr;
+        return true;
+    }
+    void sampleEncounterInput(const Input& input){if(encounterInput_&&!sampledInput_)encounterInput_->sample(input);}
+    const ShopInteraction::Input* encounterInputEdges()const{return encounterInput_?&encounterInput_->publication():nullptr;}
+    template<class Body> bool withEncounterInput(const Input& input,Body body){
+        if(sampledInput_)return false;
+        sampleEncounterInput(input);sampledInput_=true;
+        struct Leave {bool& sampled;~Leave(){sampled=false;}} leave{sampledInput_};
+        return body();
+    }
+    bool boundEncounterInput(const EncounterInput* input)const{
+        return encounterInput_==input&&run_.shops.borrowedInput==(input?&input->publication():nullptr);
+    }
     template<class Audio,class Body> bool withRunAudio(Audio& audio,Body body){
         if(runAudio_.stopAll)return false;
         runAudio_=RunAudioBinding::bind(audio);
@@ -2833,7 +2850,7 @@ public:
     template<unsigned Capacity,class CreationAudio,class EnvironmentFor,class Tick>
     bool withShopParentSteps(StoredShopCreationOwner<instanceCapacity,Capacity,CreationAudio>& owner,
         EnvironmentFor environmentFor,Tick tick){
-        return withShopParentSteps(owner,run_.shops.input,currencyAccount_,environmentFor,tick);
+        return withShopParentSteps(owner,run_.shops.inputState(),currencyAccount_,environmentFor,tick);
     }
     // Explicit state is retained for isolated source-event fixtures. Production
     // scopes use the overload above, borrowing the world's live publication.
@@ -3204,6 +3221,8 @@ private:
     }
     void resetSceneState();
     RunAudioBinding runAudio_;
+    EncounterInput* encounterInput_=nullptr;
+    bool sampledInput_=false;
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;
 

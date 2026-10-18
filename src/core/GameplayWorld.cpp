@@ -36,6 +36,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (destination == downwell::ResultsDestination::none) return destination;
     if(!runAudio_.reset()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto runAudio=runAudio_;
+    auto* const encounterInput=encounterInput_;
+    if(encounterInput)encounterInput->resetPublication();
     if(levelNumbers_&&!levelNumbers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(limboShards_&&!limboShards_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredFlash_&&!registeredFlash_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -153,6 +155,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms,playerBirthTiming);
     runAudio_=runAudio;
+    bindEncounterInput(encounterInput);
     run_.backgroundMusicId=backgroundMusic;
     nativeTerrainInstances_=nativeTerrainInstances;
     nativeTerrainBinding_=nativeTerrainBinding;

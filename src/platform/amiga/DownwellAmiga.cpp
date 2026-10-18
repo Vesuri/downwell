@@ -2827,6 +2827,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 break;
             }
             packedInput = downwell::packReplayInput(replayInput);
+            if(!encounterFrame.sampleInput(replayInput))break;
 #else
 #ifdef DOWNWELL_SCENE_VERIFY
             downwell::Input liveInput = sceneVerificationInput(
@@ -2950,6 +2951,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
             packedInput = downwell::packReplayInput(liveInput);
+            if(!encounterFrame.sampleInput(liveInput))break;
 #ifdef DOWNWELL_PROFILE_IDLE
             if (scenes.scene()==AmigaScene::gameplay) {
                 if (packedInput) ++gDownwellIdleInputViolations;
@@ -2957,7 +2959,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             DW_PROFILE_PHASE(profileSimulation);
-            if (!sceneResetRequested) scenes.step(liveInput);
+            if (!sceneResetRequested) scenes.step(liveInput,encounterSession.inputPublication());
             DW_PROFILE_PHASE(profileOther);
             {
                 const bool presentationChanged =

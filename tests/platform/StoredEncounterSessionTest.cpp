@@ -86,7 +86,7 @@ int main(){
         for(unsigned i=0;i<164;++i){
             Input input;input.cancel=i<2;
             assert(session->update(input)&&session->draw(sink));
-            assert(game->startup().shops().input.cancel==(i==0));
+            assert(game->startup().shops().inputState().cancel==(i==0));
         }
         assert(sink.calls);
         // Lifecycle fixture, not proof of a naturally generated level exit or
@@ -94,13 +94,15 @@ int main(){
         // alarms, selection, room handoff, death menu and Retry thereafter.
         auto& world=const_cast<StartupRuntime&>(game->startup());
         world.registerLevelExit(int(world.mainPlayerY()));
-        for(unsigned i=0;i<160;++i)assert(session->update({})&&session->draw(sink));
+        Input heldCancel;heldCancel.cancel=true;
+        for(unsigned i=0;i<160;++i)assert(session->update(heldCancel)&&session->draw(sink));
         assert(world.levelClearActive()&&world.levelClear().selection.visible);
-        Input confirm;confirm.fire=true;
+        Input confirm;confirm.fire=true;confirm.cancel=true;
         for(unsigned i=0;i<240&&world.runStage().level!=2;++i)
             assert(session->update(confirm)&&session->draw(sink));
         assert(world.inMainRoom()&&world.runStage().level==2&&!world.levelClearActive());
-        assert(session->update({})&&session->draw(sink));
+        assert(session->update(heldCancel)&&session->draw(sink));
+        assert(!world.shops().inputState().cancel); // Held across clear -> new room.
         // A looping device voice cannot expire while the CPU fast-forwards
         // the death menu. Only the production ResetPlayer binding can stop it.
         int oldVoice=-1;bool oldPlaying=false;
@@ -112,7 +114,7 @@ int main(){
         assert(world.subtractPlayerHealth(MotionBinary64::fromInteger(world.mainPlayerHealth())));
         bool retried=false;
         for(unsigned i=0;i<900&&!retried;++i){
-            Input input;
+            Input input;input.cancel=true;
             if(world.deathResults().active){
                 const auto& menu=world.deathResults().menu;
                 if(menu.sequenceOver&&!menu.inputDisabled&&!menu.goalPassed)input.fire=true;
@@ -124,6 +126,9 @@ int main(){
         }
         assert(retried&&world.inMainRoom()&&world.mainPlayerHealth()==4&&world.randomSeed()==42);
         assert(audio.stops==stopsBeforeRetry+1&&audio.isPlaying(oldVoice,oldPlaying)&&!oldPlaying);
+        assert(session->update(heldCancel)&&session->draw(sink)&&!world.shops().inputState().cancel);
+        assert(session->update({})&&session->draw(sink));
+        assert(session->update(heldCancel)&&session->draw(sink)&&world.shops().inputState().cancel);
         assert(owner->valid()&&session->succeeded());
         std::puts("Session retained across level completion, death and Retry");
         // There must be no callback borrowing this owner outside the update.
@@ -140,6 +145,7 @@ int main(){
         assert(!session->update({})&&!session->draw(sink));
         assert(game->tick()==tick&&world.randomDrawCount()==rng&&sink.calls==commands);
         assert(!session->retire());
+        assert(!world.shops().borrowedInput);
         // Normal application exit retires a healthy session without requiring
         // the device or world to be destroyed inside the simulation callback.
         auto quitOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
