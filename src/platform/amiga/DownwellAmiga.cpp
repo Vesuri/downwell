@@ -206,6 +206,9 @@ struct PreparedFieldOps {
 #include "AmigaExitMask.h"
 #include "AmigaEntryMask.h"
 #include "AmigaClearPresenter.h"
+#ifdef DOWNWELL_CLEAR_VERIFY
+#include "AmigaClearOracleBuffers.h"
+#endif
 #include "AmigaClearSceneAssets.h"
 #include "AmigaUpgradeScene.h"
 #include "AmigaSplashCache.h"
@@ -564,6 +567,7 @@ volatile ULONG gDownwellClearReentries, gDownwellClearGameplayUpdates;
 volatile ULONG gDownwellClearFieldFrames;
 volatile ULONG gDownwellClearTick;
 volatile ULONG gDownwellClearPhase;
+volatile ULONG gDownwellClearOracleBytes;
 const UBYTE* gDownwellClearActualHud;
 const UBYTE* gDownwellClearExpectedHud;
 const UBYTE* gDownwellClearActualGame;
@@ -1919,7 +1923,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         (unsigned long)(amiga_object_pack_end-amiga_object_pack));
     const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
         (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
-#if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)
+#if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY) && !defined(DOWNWELL_SCENE_COLLISION_BACKEND)
     const downwell::SpriteMaskPack collisionMasks(amiga_collision_masks,
         (unsigned long)(amiga_collision_masks_end-amiga_collision_masks));
     if(!collisionMasks.valid())return 20;
@@ -1936,7 +1940,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     // so it keeps only admitted event order. Scene, field and entry fixtures
     // exercise the complete reference; results/re-entry deliberately exercises
     // shipping native ownership across all three results destinations.
-#if (defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
+#if !defined(DOWNWELL_SCENE_COLLISION_BACKEND) && ((defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY))
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::reference;
 #elif defined(DOWNWELL_SCENERY_LAYERS)
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::nativeScenery;
@@ -1944,7 +1948,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::native;
 #endif
     downwell::GameplayCollisionOwner::ReferenceStorage* referenceStorage=nullptr;
-#if (defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
+#if !defined(DOWNWELL_SCENE_COLLISION_BACKEND) && ((defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY))
     using ReferenceStorage=downwell::GameplayCollisionOwner::ReferenceStorage;
     alignas(ReferenceStorage) static UBYTE referenceMemory[sizeof(ReferenceStorage)];
     referenceStorage=new(referenceMemory) ReferenceStorage;
@@ -2048,6 +2052,9 @@ __attribute__((noinline)) static int runDownwell(void) {
     AmigaSceneRuntime& scenes = *new (sceneStorage) AmigaSceneRuntime;
     alignas(AmigaUpgradeScene) static UBYTE clearStorage[sizeof(AmigaUpgradeScene)];
     auto& clear = *new (clearStorage) AmigaUpgradeScene;
+#ifdef DOWNWELL_CLEAR_VERIFY
+    AmigaClearOracleBuffers clearOracle;
+#endif
     AmigaScene presentedScene = scenes.scene();
 #ifdef DOWNWELL_SKIP_TO_GAME
     // Force the normal main-room presentation setup on the first frame.
@@ -2272,7 +2279,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         worldViewX = mainViewX + port.cameraOffsetX();
         worldViewY = mainInitialViewY + port.cameraOffsetY();
         terrainCollision.index = &terrainIndex;
-#if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY)
+#if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY) && !defined(DOWNWELL_SCENE_COLLISION_BACKEND)
         // Exercise the target's actual precise-mask route, not an occupancy
         // answer. This does not replace the legacy live collision adapters.
         // The verification callback probes resources only, not game events.
@@ -3650,6 +3657,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     releaseGameplayArt();
+#ifdef DOWNWELL_CLEAR_VERIFY
+                    if(!clearOracle.acquire()){exitCode=20;break;}
+                    gDownwellClearOracleBytes=AmigaClearOracleBuffers::bytes;
+#endif
                     if (!upgradeSource.acquire()) { exitCode = 20; break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
@@ -3673,6 +3684,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaHardware::blitterDrain();
                     clear.invalidateDisplay();
                     upgradeSource.release();
+#ifdef DOWNWELL_CLEAR_VERIFY
+                    clearOracle.release();gDownwellClearOracleBytes=0;
+#endif
                     {
                         DW_PROFILE_SCOPE(profileEntryWorld);
                         if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode = 20; break; }
@@ -3735,14 +3749,16 @@ __attribute__((noinline)) static int runDownwell(void) {
                 DW_PROFILE_PHASE(profileClearDrain);
                 AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_CLEAR_VERIFY
-                alignas(2) static UBYTE expectedGame[2][downwellGameRingBytes], expectedHud[2][downwellLayerBytes];
+                UBYTE* expectedGame[2]={clearOracle.game(0),clearOracle.game(1)};
+                UBYTE* expectedHud[2]={clearOracle.hud(0),clearOracle.hud(1)};
                 static AmigaClearPresenter oracle;
                 if (entering) oracle.reset();
                 if (bankChanged) oracle.artworkChanged();
                 AmigaRenderer reference;
                 amigaRendererInit(&reference, expectedGame[back], expectedHud[back]);
                 AmigaClearPresenter::Frame expected;
-                alignas(2) static UBYTE actualGame[downwellGameRingBytes], actualHud[downwellLayerBytes];
+                UBYTE* actualGame=clearOracle.game(2);
+                UBYTE* actualHud=clearOracle.hud(2);
                 gDownwellClearActualHud = actualHud; gDownwellClearExpectedHud = expectedHud[back];
                 gDownwellClearActualGame = actualGame; gDownwellClearExpectedGame = expectedGame[back];
                 // Production banks omit label frame0 when only its offline

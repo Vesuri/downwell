@@ -1,6 +1,18 @@
 set pagination off
 set confirm off
-target remote 127.0.0.1:2345
+if $_isvoid($encounter_clear)
+    set $encounter_clear = 0
+    target remote 127.0.0.1:2345
+end
+break *main
+continue
+set $clear_return_pc=*(unsigned long*)$sp
+tbreak *$clear_return_pc
+commands
+    silent
+    printf "Executable returned %lu before completing level transitions\n", $d0
+    quit 1
+end
 break downwellClearProbe
 commands
 silent
@@ -34,6 +46,10 @@ if gDownwellClearReentries != 2 || gDownwellClearGameplayUpdates != 60
 end
 if gDownwellUpgradeSourceBytes != 0
     printf "Upgrade source still resident after returning to gameplay\n"
+    quit 1
+end
+if gDownwellClearOracleBytes != 0
+    printf "Upgrade pixel-oracle buffers retained in gameplay\n"
     quit 1
 end
 if gDownwellSelectionMaskLoads != 2
@@ -75,6 +91,23 @@ while $word < 64
     set $word = $word + 1
 end
 printf "Two clears and 60 third-level updates passed; %lu planar frames compared\n", gDownwellClearFrames
+if $encounter_clear
+    set $owner=(downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+    set $world=(GameplayWorld*)&'_ZL18portRuntimeStorage.lto_priv.0'
+    if !$owner->native_ || !$owner->collisionConsumersAdmitted_ || !$owner->nativeCollisionStorage_ || $owner->owner_.control_.bank_ || $owner->terrain_.records_
+        printf "Level transitions did not exercise admitted native ownership\n"
+        quit 1
+    end
+    if !$world->encounterUpdateOwner_ || !$world->collisionPass_ || !$world->run_.effectsSucceeded
+        printf "Encounter update scope missing after level transition\n"
+        quit 1
+    end
+    if gDownwellEncounterRunLoads != 1 || gDownwellEncounterSceneLoads != 1 || gDownwellEncounterSceneReleases != 0 || !downwell::AmigaWindAudio::current_
+        printf "Run audio/collision lease did not survive level transitions\n"
+        quit 1
+    end
+    printf "Native encounter scope and run audio retained through both upgrades\n"
+end
 printf "DOWNWELL_CLEAR_READY\n"
 shell touch .run/gdb-ready.marker
 detach

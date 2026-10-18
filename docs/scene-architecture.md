@@ -173,6 +173,21 @@ probe's full sprite-mask pack; the candidate loads its scene encounter bank.
 An early executable return fails the verifier immediately. The make target
 restores the normal build whether verification succeeds or fails.
 
+`make verify-amiga-encounter-clear` uses the native candidate for the existing
+two-upgrade fixture. Exit births are injected; field contact, upgrade selection,
+room replacement and subsequent gameplay use the frontend paths. It retains
+the independent planar comparisons and checks that the run's collision/audio
+lease survives both upgrades. This is not a natural-exit witness. Candidate
+fixtures use native ownership and the scene mask bank, never the reference
+owner's full mask-pack probe.
+
+The clear fixture's six comparison canvases occupy 173,952 bytes of Fast RAM.
+`AmigaClearOracleBuffers` acquires them only after gameplay art retires and
+releases them before next-room admission. They must not occupy permanent BSS
+alongside gameplay banks. Allocation failure returns 20; repeated acquire and
+release are safe. This storage change does not remove any pixel comparisons
+or affect shipping builds.
+
 ## Scene owners
 
 The Amiga scene translation units are `AmigaPublisherScene`,

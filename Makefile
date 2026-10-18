@@ -3182,6 +3182,14 @@ test-amiga-style-retained: generate-amiga-game build/amiga-style-retained-test
 	./build/amiga-style-retained-test generated/amiga-front.dwap
 test: test-amiga-style-retained
 
+.PHONY: test-amiga-clear-oracle-buffers
+build/amiga-clear-oracle-buffers-test: tests/platform/amiga/AmigaClearOracleBuffersTest.cpp src/platform/amiga/AmigaClearOracleBuffers.h src/platform/amiga/AmigaRenderer.h tests/platform/amiga/allocation-compat/exec/memory.h tests/platform/amiga/allocation-compat/proto/exec.h
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/allocation-compat -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
+test-amiga-clear-oracle-buffers: build/amiga-clear-oracle-buffers-test
+	./build/amiga-clear-oracle-buffers-test
+test: test-amiga-clear-oracle-buffers
+
 build/amiga-clear-overlay-test: tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c
@@ -3448,6 +3456,10 @@ verify-amiga-results-restart:
 
 .PHONY: verify-amiga-encounter-failure
 .PHONY: verify-amiga-encounter-reentry
+.PHONY: verify-amiga-encounter-clear
+verify-amiga-encounter-clear:
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -f Makefile -f scene_collision_candidate.mk -j4 CLEAR_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; mkdir -p tmp/encounter-clear-candidate; cp amiga/out/Downwell.exe amiga/out/Downwell.elf tmp/encounter-clear-candidate/; GDB_SOURCE=verify_encounter_clear.gdb READY_MARKER=DOWNWELL_CLEAR_READY READY_DESCRIPTION="native encounter session across two level completions" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-600} amiga/verify_startup.sh'
+
 verify-amiga-encounter-reentry:
 	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -f Makefile -f scene_collision_candidate.mk -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_encounter_reentry.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="production encounter session across Retry and room reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-180} amiga/verify_startup.sh'
 

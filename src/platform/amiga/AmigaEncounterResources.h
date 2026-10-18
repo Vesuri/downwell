@@ -8,7 +8,7 @@
 #include "../../../generated/amiga-encounter-masks.h"
 #include <exec/memory.h>
 #include <proto/exec.h>
-#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+#if defined(DOWNWELL_RESULTS_RESTART_VERIFY) || defined(DOWNWELL_CLEAR_VERIFY)
 extern "C" {
 volatile unsigned gDownwellEncounterSceneLoads=0,gDownwellEncounterSceneReleases=0;
 volatile unsigned gDownwellEncounterRunLoads=0;
@@ -42,7 +42,7 @@ public:
             if(!allocation)return false;
             collision_=new(allocation) Owner::NativeCollisionStorage;
             if(!owner_.bindNativeCollisionStorage(*collision_))return false;
-#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+#if defined(DOWNWELL_RESULTS_RESTART_VERIFY) || defined(DOWNWELL_CLEAR_VERIFY)
             ++gDownwellEncounterRunLoads;
 #endif
         }
@@ -54,7 +54,7 @@ public:
         auto* allocation=AllocMem(sizeof(Environment),MEMF_FAST);
         if(!allocation){releaseScene();return false;}
         environment_=new(allocation) Environment(world_,owner_,maskView_,audio_,Room{&world_});
-#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+#if defined(DOWNWELL_RESULTS_RESTART_VERIFY) || defined(DOWNWELL_CLEAR_VERIFY)
         ++gDownwellEncounterSceneLoads;
 #endif
         return audio_.stopAll();
@@ -63,7 +63,7 @@ public:
         return ready()&&(world_.boundEncounterUpdate(environment_)||frame.bindUpdateEnvironment(*environment_));
     }
     void releaseScene(){
-#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+#if defined(DOWNWELL_RESULTS_RESTART_VERIFY) || defined(DOWNWELL_CLEAR_VERIFY)
         if(environment_)++gDownwellEncounterSceneReleases;
 #endif
         if(environment_){environment_->~Environment();FreeMem(environment_,sizeof(Environment));environment_=nullptr;}
