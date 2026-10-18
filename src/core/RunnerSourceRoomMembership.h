@@ -15,6 +15,10 @@ class RunnerSourceRoomMembership:public RunnerRunRoomMembership<Capacity,First,L
     Terrain* terrain_=nullptr;
     TerrainPublicationClock clock_;
     RunnerRegistrationOrder ordinaryOrder_[Capacity]{};
+    static_assert(Capacity<65535,"Cleanup slot index");
+    std::uint16_t cleanupSlots_[Capacity];
+    unsigned markRevision_=0;
+    bool cleanupInUse_=false;
     bool source(unsigned slot,State& out)const{
         return slot>=First&&slot<Last&&terrain_&&terrain_->sourceRoomState(slot-First,out);
     }
@@ -63,6 +67,29 @@ class RunnerSourceRoomMembership:public RunnerRunRoomMembership<Capacity,First,L
         }
         return true;
     }
+    template<class Visit> bool markedAfter(Visit visit,int first,const State* after){
+        for(int list=first;list<2;++list){unsigned slot=next(list,list==first?after:nullptr,false,true);
+            while(slot!=End){const State value=state(slot);
+                if(!visit(slot,value.depth,list==0))return false;
+                slot=next(list,&value,false,true);
+            }
+        }return true;
+    }
+    void sortCleanup(unsigned count){
+        // In-place heapsort: bounded owner storage, no resource-sized stack.
+        auto sift=[&](unsigned root,unsigned end){
+            while(root<end/2){unsigned child=root*2+1;
+                if(child+1<end&&before(state(cleanupSlots_[child]),state(cleanupSlots_[child+1])))++child;
+                if(!before(state(cleanupSlots_[root]),state(cleanupSlots_[child])))break;
+                const auto value=cleanupSlots_[root];cleanupSlots_[root]=cleanupSlots_[child];cleanupSlots_[child]=value;
+                root=child;
+            }
+        };
+        for(unsigned root=count/2;root;){--root;sift(root,count);}
+        for(unsigned end=count;end>1;){--end;
+            const auto value=cleanupSlots_[0];cleanupSlots_[0]=cleanupSlots_[end];cleanupSlots_[end]=value;sift(0,end);
+        }
+    }
 public:
     static constexpr unsigned End=Capacity;
     using AnimationProjection=typename Base::AnimationProjection;
@@ -74,6 +101,7 @@ public:
     bool marked(unsigned slot)const{State value;return source(slot,value)?value.list>=0&&value.marked:Base::marked(slot);}
     RunnerImageValue depth(unsigned slot)const{return state(slot).depth;}
     bool mark(unsigned slot){
+        ++markRevision_;
         State value;if(!source(slot,value))return Base::mark(slot);
         if(value.list<0)return false;value.marked=true;return terrain_->setSourceRoomState(slot-First,value);
     }
@@ -149,6 +177,7 @@ public:
     }
     template<class Visit> bool visitCleanupChecked(Visit visit){return walk(0,false,visit)&&walk(1,false,visit);}
     template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
+        if(cleanupInUse_)return visitMarkedCleanupOrderedReference(visit);
         State resume;bool changed=false;
         if(!terrain_||!terrain_->sourcePopulation()){
             // No mixed owner exists yet: borrow the ordinary owner's ordered
@@ -165,13 +194,44 @@ public:
             });
             if(!changed)return okay;
         }
-        for(int list=changed?resume.list:0;list<2;++list){
-            unsigned slot=next(list,changed?&resume:nullptr,false,true);changed=false;
-            while(slot!=End){const State value=state(slot);
-                if(!visit(slot,value.depth,list==0))return false;
-                slot=next(list,&value,false,true);
-            }
-        }return true;
+        if(changed)return markedAfter(visit,resume.list,&resume);
+        // The source records and ordinary owner remain authoritative. Borrow
+        // their marks once; callbacks can retire the current entry. New marks,
+        // births or room-key changes resume the original live merge after the
+        // pre-callback key, preserving its observation/failure prefix.
+        cleanupInUse_=true;
+        struct Release {bool& busy;~Release(){busy=false;}} release{cleanupInUse_};
+        unsigned count=0;
+        auto collect=[&](unsigned slot){
+            if(count==Capacity)return false;cleanupSlots_[count++]=std::uint16_t(slot);return true;
+        };
+        if(!terrain_->visitSourceRoomStates([&](unsigned slot,const State& value){
+               return value.list<0||!value.marked||collect(First+slot);
+           }))return false;
+        sortCleanup(count);
+        bool interrupted=false;
+        auto dispatch=[&](unsigned slot){const State value=state(slot);
+            if(value.list<0||!value.marked)return true;
+            resume=value;
+            const auto basis=clock_.basis();const unsigned marks=markRevision_,births=publications();
+            if(!visit(slot,value.depth,value.list==0))return false;
+            interrupted=!basis.same(clock_.basis())||marks!=markRevision_||births!=publications();
+            return !interrupted;
+        };
+        unsigned sourceIndex=0;
+        auto flush=[&](const State* boundary){
+            while(sourceIndex<count){const unsigned slot=cleanupSlots_[sourceIndex];const State value=state(slot);
+                if(value.list>=0&&value.marked&&boundary&&!before(value,*boundary))break;
+                ++sourceIndex;if(!dispatch(slot))return false;
+            }return true;
+        };
+        // Ordinary marks already form an ordered traversal. Sorting them a
+        // second time adds work proportional to the authored wall population.
+        const bool okay=Base::visitMarkedCleanupOrdered([&](unsigned slot,RunnerImageValue depth,bool active){
+            const State boundary{ordinaryOrder_[slot],depth,static_cast<std::int8_t>(active?0:1),true};
+            return flush(&boundary)&&dispatch(slot);
+        })&&flush(nullptr);
+        return interrupted?markedAfter(visit,resume.list,&resume):okay;
     }
     template<class Visit> bool visitMarkedCleanupOrderedReference(Visit visit){
         for(int list=0;list<2;++list){unsigned slot=next(list,nullptr,false,true);

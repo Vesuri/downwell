@@ -13,7 +13,7 @@ template<bool Source> struct Fixture {
     typename RoomType<Source,Terrain>::Type room;
     TerrainPublicationClock layerClock;
     unsigned registration=100,scalarBirths=0,sourceBirths=0,retired=0;
-    unsigned failBirth=0;
+    unsigned failBirth=0,failSourceSpan=0;
     bool supported=true;
     // Counters a source span updates. A lending fixture offers them; any
     // change to its unsupported condition is a topology change.
@@ -45,6 +45,7 @@ template<bool Source> struct Fixture {
                 const typename Terrain::PreparedCells& cells,int tile,TerrainBirthFacts& out,TerrainSourceLease& lease){
             auto& self=*static_cast<Fixture*>(p);
             if(!self.supported)return Terrain::SpanResult::unsupported;
+            if(self.failSourceSpan&&self.sourceSpans+1==self.failSourceSpan)return Terrain::SpanResult::failure;
             const auto basis=self.layerClock.basis();
             out.registration=self.registration;self.registration+=cells.count;
             out.layerId=7;out.layer=0;out.layerLow=basis.low;out.layerHigh=basis.high;
@@ -285,7 +286,53 @@ static std::vector<unsigned> cleanupOrdinary(bool reference,unsigned mutation){
     if(mutation==4)assert((visited==std::vector<unsigned>{0,1}));
     return visited;
 }
+static std::vector<unsigned> cleanupMixed(bool reference,unsigned mutation){
+    auto f=std::make_unique<Fixture<true>>();
+    for(unsigned slot=0;slot<5;++slot)assert(f->room.bind(slot,{slot?0u:0xbf800000u}));
+    assert(f->segment(cells,4,64)&&f->terrain.sourcePopulation()==4);
+    assert(f->room.reconcileChecked([](unsigned slot){return slot==4;},[](unsigned,bool){return true;}));
+    for(unsigned slot:{0u,2u,4u})assert(f->room.mark(slot));
+    for(unsigned slot:{0u,2u})assert(f->terrain.markDestroyed(f->terrain.currentHandle(slot)));
+    std::vector<unsigned> visited;
+    auto visit=[&](unsigned slot,RunnerImageValue,bool){
+        visited.push_back(slot);
+        if(slot==0){
+            if(mutation==1)assert(f->room.mark(1)&&f->terrain.markDestroyed(f->terrain.currentHandle(1)));
+            if(mutation==2)assert(f->segment(cells,1,80)&&f->terrain.markDestroyed(f->terrain.currentHandle(4)));
+            if(mutation==3)assert(f->room.bind(2,{0xc0000000u}));
+            if(mutation==5){unsigned nested=0;
+                assert(!f->room.visitMarkedCleanupOrdered([&](unsigned s,RunnerImageValue,bool){
+                    assert(s==0);++nested;return false;
+                })&&nested==1);
+            }
+        }
+        if(mutation==4&&slot==2)return false;
+        return slot<32?f->room.remove(slot):f->terrain.retire(f->terrain.currentHandle(slot-32));
+    };
+    const bool okay=reference?f->room.visitMarkedCleanupOrderedReference(visit):f->room.visitMarkedCleanupOrdered(visit);
+    if(okay!=(mutation!=4)||visited.empty()){
+        std::fprintf(stderr,"mixed cleanup reference=%d mutation=%u okay=%d visits=",reference,mutation,okay);
+        for(auto slot:visited)std::fprintf(stderr," %u",slot);std::fprintf(stderr,"\n");
+    }
+    assert(okay==(mutation!=4)&&!visited.empty());return visited;
+}
 int main(){
+    {
+        auto f=std::make_unique<Fixture<true>>();
+        assert(f->segment(cells,4,64));
+        for(unsigned slot:{1u,3u}){
+            const auto h=f->terrain.currentHandle(slot);
+            assert(f->terrain.markDestroyed(h)&&f->terrain.retire(h));
+        }
+        f->failSourceSpan=f->sourceSpans+2;
+        assert(!f->segment(cells,4,80)&&!f->terrain.valid());
+        // The first isolated hole was published; failure at the next
+        // segment must not publish its cell or replay the completed prefix.
+        assert(f->terrain.lastLifetime()==5&&f->terrain.size()==3);
+        assert(f->sourceSpans==2&&!f->segment(cells,1,96));
+    }
+    for(unsigned mutation=0;mutation<6;++mutation)
+        assert(cleanupMixed(false,mutation)==cleanupMixed(true,mutation));
     for(unsigned mutation=0;mutation<5;++mutation)
         assert(cleanupOrdinary(false,mutation)==cleanupOrdinary(true,mutation));
     assert(cleanupMarks<false>()==cleanupMarks<true>());

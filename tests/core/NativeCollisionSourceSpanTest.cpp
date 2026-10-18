@@ -35,13 +35,13 @@ int main(){
         if(retained)assert(terrain->sourcePopulation()==terrain->size()-2);
         // Dither cleanup leaves isolated holes in the initial fall. Preserve
         // the scalar first-free identities; do not skip holes to find a larger
-        // free interval. Source admission currently falls back for this row.
+        // free interval. Split source records must retain these identities.
         for(unsigned slot:{20u,22u,24u})assert(terrain->markDestroyed(terrain->currentHandle(slot)));
         assert(owner->prepareDraw());
         const unsigned fragmentedBefore=terrain->sourcePopulation();
         const unsigned nextGeneration=terrain->handle(terrain->size()-1).generation+1;
         assert(terrain->constructPrepared(51,effects,{cells,4,4800,retained,2})&&effects);
-        assert(terrain->sourcePopulation()==fragmentedBefore);
+        assert(terrain->sourcePopulation()==fragmentedBefore+(retained?4u:0u));
         unsigned cell=0;
         for(unsigned slot:{20u,22u,24u,526u}){
             const auto h=terrain->currentHandle(slot);GameplayWorld::NativeTerrain::Identity id;

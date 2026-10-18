@@ -1,5 +1,55 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: indexed source records and cleanup merge
+
+Baseline `bd7ba71e` uses the unchanged `e9174008` candidate executable
+(`ea71f45cee65c2669bb19f7dd94a67f8fa7f50146713b1a11ba346c641637469`).
+The replacement preserves first-free slots by splitting immutable records at
+occupied slots, adds a derived 16-bit slot-to-record locator, and merges marked
+source entries with the existing ordinary ordered cleanup traversal. It does
+not sort ordinary marks again. New marks, room-key changes or source births
+inside a callback resume the reference live traversal after the captured key.
+The two indexes add **12,028 bytes** to the Fast-memory terrain/owner storage;
+there is no new Chip allocation or asset bank.
+
+Same deterministic 512 KiB Chip / 8 MiB Fast initial fall, scene-collision
+candidate enabled; shipping still uses the external backend:
+
+| Measurement | Baseline | Replacement |
+| --- | ---: | ---: |
+| Whole 164-update fall, PAL fields | 1,337 | 1,071 |
+| First update, PAL fields | 211 | 211 |
+| Updates 57–61, mean ms | 101.7 | 101.3 |
+| Update 58, ms | 177.0 | 178.1 |
+| Update 60, ms | 135.2 | 136.9 |
+| Update 61, ms | 104.6 | 100.0 |
+| Update 137, ms | 147.8 | 129.7 |
+| Update 138, ms | 199.9 | 102.2 |
+| Update 138 Draw entry, ms | 121.6 | 30.0 |
+
+The small early-burst regressions are explicit: **+1.1/+1.7 ms**, accepted
+against the **97.7 ms** saving at 138 and **266 fewer PAL fields** overall,
+not presented as a uniform improvement or a 20 ms gameplay result. An
+independent short capture confirms update 138 at **726,420 cycles / 102.2 ms**.
+The baseline late capture completes only 137–138; do not compare its mean to
+the replacement's longer 137–141 window. All 165 state samples agree exactly.
+The collision/tree/activation/retirement differential includes fragmented
+slots; 10 terrain tapes / 18,000 updates agree with retained ownership.
+Lookup reuse/stale-handle and cleanup mutation/failure/nesting checks pass,
+including address/undefined-behavior sanitizers. A failed second fragment
+retains exactly the successful first fragment and prevents later publication.
+
+Replacement ELF SHA-256
+`eb27587d466a8d709f94c6b39d9ef4a36e0592cb2aac9d48f769eaaf6676ffe7`.
+Reports: `tmp/merged-source-{cost,late,baseline-late,late-recheck}/report.txt`
+and `tmp/fragment-source-control/report.txt`; state/cadence witnesses:
+`tmp/merged-source-candidate/`. Raw traces are deleted after committing.
+The default external-backend diagnostic also completes the same fall in
+**178 PAL fields** with the exact landing witness
+(`tmp/source-shipping-candidate/cadence-gdb.log`). This is a shipping-path
+smoke measurement, not a controlled comparison against its historical
+176-field build, and does not close the initial-fall budget.
+
 ## Encounter candidate: ordinary-owner cleanup traversal
 
 The measured candidate has zero source-record terrain instances at marks 58

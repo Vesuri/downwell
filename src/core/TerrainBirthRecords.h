@@ -19,7 +19,8 @@ struct TerrainBirthFacts {
 // Generated row segments only; authored and unsupported scalar construction
 // retain their source path. A changed cell has exactly one mutable owner.
 // Alive bits belong to the segment, so recycling a mutable slot cannot make
-// an older retired identity live again. No per-cell writes occur at birth.
+// an older retired identity live again. A derived slot locator indexes the
+// record; it owns no duplicate identity or mutable runner state.
 template<unsigned Capacity,class Mutable> class TerrainBirthRecords {
     static_assert(Capacity&&Capacity<65535,"Source record capacity");
     struct Record {
@@ -36,9 +37,10 @@ template<unsigned Capacity,class Mutable> class TerrainBirthRecords {
     struct Change {alignas(Mutable) unsigned char bytes[sizeof(Mutable)];};
     Change changes_[Capacity];
     std::uint32_t changedGeneration_[Capacity];
+    std::uint16_t locator_[Capacity]{};
     static std::uint32_t mask(unsigned n){return n>=32?0xffffffffu:n?(1u<<n)-1:0;}
     static bool alive(const Record& r,unsigned offset){return (r.alive[offset>>5]>>(offset&31))&1u;}
-    unsigned find(InstanceHandle h)const{
+    unsigned findReference(InstanceHandle h)const{
         if(!h.generation||h.slot>=Capacity)return used_;
         for(unsigned i=0;i<used_;++i){const auto& r=records_[i];
             if(!r.live||h.slot<r.birth.slot||h.slot-r.birth.slot>=r.count)continue;
@@ -46,6 +48,11 @@ template<unsigned Capacity,class Mutable> class TerrainBirthRecords {
             if(r.birth.generation+offset==h.generation&&alive(r,offset))return i;
         }
         return used_;
+    }
+    unsigned find(InstanceHandle h)const{
+        if(!h.generation||h.slot>=Capacity||!locator_[h.slot])return used_;
+        const unsigned n=locator_[h.slot]-1;const auto& r=records_[n];
+        return r.birth.generation+h.slot-r.birth.slot==h.generation?n:used_;
     }
     Mutable* changed(unsigned slot){return reinterpret_cast<Mutable*>(changes_[slot].bytes);}
     const Mutable* changed(unsigned slot)const{return reinterpret_cast<const Mutable*>(changes_[slot].bytes);}
@@ -104,6 +111,7 @@ public:
         r.next=Capacity;r.previous=tail_;
         if(tail_!=Capacity)records_[tail_].next=n;else head_=n;
         tail_=n;lastGeneration_=birth.generation+count-1;
+        for(unsigned i=0;i<count;++i)locator_[birth.slot+i]=std::uint16_t(n+1);
         published_+=count;population_+=count;
         if(birth.slot+count>highWater_)highWater_=birth.slot+count;
         return true;
@@ -145,13 +153,22 @@ public:
         const auto& r=records_[n];const unsigned offset=h.slot-r.birth.slot;
         out={&r.birth,offset,r.ordinal+offset};return true;
     }
-    InstanceHandle currentHandle(unsigned slot)const{
+    InstanceHandle currentHandleReference(unsigned slot)const{
         for(unsigned i=0;i<used_;++i){const auto& r=records_[i];
             if(!r.live||slot<r.birth.slot||slot-r.birth.slot>=r.count)continue;
             const unsigned offset=slot-r.birth.slot;
             if(alive(r,offset))return {slot,r.birth.generation+offset};
         }
         return {};
+    }
+    InstanceHandle currentHandle(unsigned slot)const{
+        if(slot>=Capacity||!locator_[slot])return {};
+        const auto& r=records_[locator_[slot]-1];
+        return {slot,r.birth.generation+slot-r.birth.slot};
+    }
+    bool lookupMatchesReference(InstanceHandle h)const{
+        const auto a=currentHandle(h.slot),b=currentHandleReference(h.slot);
+        return a.slot==b.slot&&a.generation==b.generation&&find(h)==findReference(h);
     }
     const Mutable* mutation(InstanceHandle h)const{
         return find(h)!=used_&&changedGeneration_[h.slot]==h.generation?changed(h.slot):nullptr;
@@ -169,6 +186,7 @@ public:
     bool retire(InstanceHandle h){
         const unsigned n=find(h);if(n==used_)return false;
         auto& r=records_[n];const unsigned offset=h.slot-r.birth.slot;
+        locator_[h.slot]=0;
         r.alive[offset>>5]&=~(1u<<(offset&31));--r.live;--population_;
         if(changedGeneration_[h.slot]==h.generation){changed(h.slot)->~Mutable();changedGeneration_[h.slot]=0;}
         if(!r.live){
@@ -188,6 +206,7 @@ public:
         return true;
     }
     void clear(){
+        for(auto& locator:locator_)locator=0;
         for(unsigned n=0;n<Capacity;++n)if(changedGeneration_[n]){
             changed(n)->~Mutable();changedGeneration_[n]=0;
         }

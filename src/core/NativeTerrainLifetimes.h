@@ -427,7 +427,18 @@ public:
                 if(!dense)while(slot<Capacity&&runs_.occupied(slot))++slot;
                 const InstanceHandle first{slot,next_};
                 bool free=cells.count<=Capacity-slot&&cells.count<=Capacity-population;
-                if(!dense)for(unsigned i=0;free&&i<cells.count;++i)if(runs_.occupied(slot+i))free=false;
+                if(!dense&&free){
+                    unsigned prefix=0;
+                    while(prefix<cells.count&&!runs_.occupied(slot+prefix))++prefix;
+                    if(prefix<cells.count){
+                        // Split the record, not the allocation sequence: the
+                        // next cell still takes the scalar first-free slot.
+                        PreparedCells part=cells;part.count=prefix;part.platforms=-1;
+                        if(!constructPrepared(tile,effectsSucceeded,part))return false;
+                        part=cells;part.bytes+=2*prefix;part.count-=prefix;part.platforms=-1;
+                        return constructPrepared(tile,effectsSucceeded,part);
+                    }
+                }
                 auto* facts=free?runs_.sources().reserve(first,cells.count):nullptr;
                 if(facts){
                     // The immutable coordinates and identity are supplied

@@ -17,6 +17,10 @@ static TerrainBirthFacts facts(const unsigned char* bytes,unsigned slot,unsigned
     return {bytes,slot,generation,registration,160,51,17,2,0xfffffff0u,3,0xffffffe0u,7,0x42c80000u,{4,4}};
 }
 static void compare(const Store& store,const std::vector<Expected>& expected){
+    for(unsigned slot=0;slot<=64;++slot){
+        assert(store.lookupMatchesReference({slot,0}));
+        assert(store.lookupMatchesReference(store.currentHandle(slot)));
+    }
     assert(store.size()==expected.size());unsigned n=0,changed=0;
     assert(store.visit([&](InstanceHandle h,const Store::Read& read){
         const auto& e=expected.at(n++);
@@ -77,7 +81,8 @@ int main(){
             compare(store,expected);
             // Slot reuse must never resurrect an earlier generation even
             // while other cells in that old immutable segment remain live.
-            for(const auto& h:retired){Store::Read read;assert(!store.read(h,read)&&!store.mutation(h));}
+            for(const auto& h:retired){Store::Read read;
+                assert(store.lookupMatchesReference(h)&&!store.read(h,read)&&!store.mutation(h));}
         }
         const auto published=store.sourcePublicationCount();store.clear();
         assert(!store.size()&&!State::live&&store.sourcePublicationCount()==published);
