@@ -2,6 +2,7 @@
 """Content growth must not silently grow the resident native art bank."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import sys
 import struct
@@ -53,7 +54,12 @@ int main() {
     def test_hud_is_packaged_as_scene_data(self):
         for script in ('run.sh', 'verify_startup.sh', 'verify_replay.sh'):
             text = (ROOT / 'amiga' / script).read_text()
-            self.assertIn('patterns exitmask selectionmask hud entrymask terrain; do', text)
+            loop = re.search(r'^for bank in ([a-z ]+); do$', text, re.MULTILINE)
+            self.assertIsNotNone(loop, script)
+            banks = loop.group(1).split()
+            for bank in ('patterns', 'exitmask', 'selectionmask', 'hud',
+                         'entrymask', 'terrain', 'wind', 'encountermasks'):
+                self.assertEqual(banks.count(bank), 1, (script, bank))
         makefile = (ROOT / 'amiga/Makefile').read_text()
         self.assertIn('$(OUT).hud: $(AMIGA_HUD)', makefile)
         self.assertIn('HUD source must be scene-loaded, not linked', makefile)
