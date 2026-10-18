@@ -770,6 +770,10 @@ private:
         RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite){
         int dx,dy;
         if(!world_||!world_->nativeTerrainInstances()||!world_->nativeTerrainInstances()->cachedOffset(id.handle,dx,dy))return false;
+        return nativeTerrainCachedBounds(id,x,y,bounds,found,precise,sprite,dx,dy);
+    }
+    bool nativeTerrainCachedBounds(const GameplayWorld::NativeTerrain::Identity& id,
+        RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite,int dx,int dy){
         if(!dx&&!dy)return nativeTerrainBirthBounds(id,x,y,bounds,found,precise,sprite);
         const auto* definition=objectDefaults_.get(id.object);
         RunnerImageValue ox,oy,cx,cy;
@@ -803,14 +807,17 @@ private:
         }
         const auto* terrain=world_->nativeTerrainInstances();
         const InstanceHandle local{h.slot-View::terrainBase,h.generation};
-        GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,created;
-        std::uint32_t flags;int current,cached;unsigned imageIndex;
-        if(!terrain->read(local,id,active,destroyed)||!eligibilityFlags(h,flags)||
-            !terrain->appearance(local,current,imageIndex,created)||!terrain->cachedSprite(local,cached))return check(false);
+        GameplayWorld::NativeTerrain::CollisionRead read;
+        if(!terrain->readCollision(local,read))return check(false);
+        const auto& id=read.identity;
+        const auto* definition=objectDefaults_.get(id.object);if(!definition)return check(false);
+        std::uint32_t flags=(definition->initialFlags&~8u)|read.spatial|
+            (((collisionConsumersAdmitted_||id.object==93)&&!read.sourceOwned?
+                table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);
         const auto* objectFlags=families_.flags(unsigned(id.object));if(!objectFlags)return check(false);
         RunnerImageValue x,y;Owner::Box oldBounds,newBounds;bool found,precise;
-        if(!nativeTerrainCachedBounds(id,x,y,oldBounds,found,precise,cached)||
-            !nativeTerrainBirthBounds(id,x,y,newBounds,found,precise,current))return false;
+        if(!nativeTerrainCachedBounds(id,x,y,oldBounds,found,precise,read.cachedSprite,read.cacheX,read.cacheY)||
+            !nativeTerrainBirthBounds(id,x,y,newBounds,found,precise,read.sprite))return false;
         const bool okay=owner_.externalSpatialPublication([&](auto& index){
             return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,oldBounds,
                 found?&newBounds:nullptr,x,y,precise,publish);

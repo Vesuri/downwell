@@ -86,6 +86,20 @@ template<bool Source> struct Fixture {
         bool effects=true;return terrain.constructPrepared(51,effects,{cells,count,y,true})&&effects;
     }
 };
+template<class Terrain> static void collisionRead(const Terrain& terrain,InstanceHandle h){
+    typename Terrain::CollisionRead read;
+    assert(terrain.readCollision(h,read));
+    typename Terrain::Identity id;bool active,destroyed,created;
+    unsigned image;int sprite,cached,x,y;std::uint32_t flags;
+    assert(terrain.read(h,id,active,destroyed)&&terrain.spatialFlags(h,flags)&&
+        terrain.appearance(h,sprite,image,created)&&terrain.cachedSprite(h,cached)&&
+        terrain.cachedOffset(h,x,y));
+    assert(read.identity.handle.slot==id.handle.slot&&read.identity.handle.generation==id.handle.generation&&
+        read.identity.object==id.object&&read.identity.x==id.x&&read.identity.y==id.y&&
+        read.identity.source==id.source&&read.identity.creationCode==id.creationCode);
+    assert(read.spatial==flags&&read.sprite==sprite&&read.cachedSprite==cached&&read.cacheX==x&&read.cacheY==y&&
+        read.sourceOwned==terrain.sourceOwned(h));
+}
 static void compare(const Fixture<false>& scalar,const Fixture<true>& source){
     const auto& a=scalar.terrain;const auto& b=source.terrain;
     assert(a.valid()&&b.valid()&&a.size()==b.size()&&a.lastLifetime()==b.lastLifetime());
@@ -93,6 +107,7 @@ static void compare(const Fixture<false>& scalar,const Fixture<true>& source){
     unsigned ordinal=0;
     assert(b.visit([&](const auto& id,bool active,bool destroyed){
         const auto h=a.handle(ordinal++),bh=b.handle(ordinal-1);
+        collisionRead(a,h);collisionRead(b,bh);
         assert(h.slot==id.handle.slot&&h.generation==id.handle.generation&&bh.slot==h.slot&&bh.generation==h.generation);
         Fixture<false>::Terrain::Identity expected;bool ea,ed;
         assert(a.read(h,expected,ea,ed)&&active==ea&&destroyed==ed);
@@ -204,7 +219,13 @@ static std::vector<std::uint32_t> mixed(bool lend,bool fused=false){
         assert(a->terrain.clear()&&b->terrain.clear());
         a->room.clear();b->room.clear();
         assert(b->terrain.sourcePublicationCount()==count);compare(*a,*b);
-        for(const auto h:retired)assert(!a->terrain.contains(h)&&!b->terrain.contains(h));
+        for(const auto h:retired){
+            assert(!a->terrain.contains(h)&&!b->terrain.contains(h));
+            Fixture<false>::Terrain::CollisionRead ar;Fixture<true>::Terrain::CollisionRead br;
+            ar.sprite=br.sprite=1234;
+            assert(!a->terrain.readCollision(h,ar)&&!b->terrain.readCollision(h,br));
+            assert(ar.sprite==1234&&br.sprite==1234);
+        }
     }
     assert(b->sourceBirths&&b->scalarBirths);
     if(lend)assert(b->sourceSpans<segments/2&&b->sourceBirths+b->scalarBirths<a->scalarBirths);

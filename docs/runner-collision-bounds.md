@@ -51,6 +51,14 @@ precedence. Different unmasked sprites, moved query-cache positions and position
 outside the prepared grid retain the general geometry path. Reusing geometry
 does not skip dirty-queue visits, cache writes, removal/reinsertion or change
 spatial publication order; the scalar owner remains the differential oracle.
+`NativeTerrainLifetimes::readCollision` returns a synchronous projection of
+identity, spatial flags, current/cached sprite and cached-origin offset. Source
+segments and materialized changes remain authoritative; retained constructors
+read their existing fields. The projection is not stored between operations and
+does not read wall animation state that refresh does not consume. Stale handles
+fail without changing the output. The source-record differential exercises this
+projection after mutations, retirement and slot reuse against the individual
+reference getters.
 
 At `0x466045` the routine saves the old cached bounds before resolving the
 mask/sprite. Failed lookup (`0x466077..0x4660b9`) copies position into both

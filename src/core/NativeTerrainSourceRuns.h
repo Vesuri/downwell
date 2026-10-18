@@ -110,6 +110,17 @@ public:
         else out=initialCell(source).*Member;
         return true;
     }
+    bool readCollisionFields(InstanceHandle h,unsigned char& flags,std::int16_t& sprite,
+        PackedWallState& wall)const{
+        SourceRead source;if(!sources_.read(h,source))return false;
+        if(const auto* changed=sources_.mutation(h)){
+            flags=changed->flags;sprite=changed->sprite;wall=changed->wall;
+        }else{
+            flags=source.birth->flags[source.object()==93];
+            sprite=static_cast<std::int16_t>(source.birth->tile);wall=PackedWallState{};
+        }
+        return true;
+    }
     template<class T,T Cell::* Member> T* writeField(unsigned slot){
         const auto h=sources_.currentHandle(slot);if(!h.generation)return nullptr;
         auto* changed=sources_.materialize(h,initialCell);
@@ -167,6 +178,7 @@ class NativeTerrainField {
     T scalar_[Capacity]{};
 public:
     explicit NativeTerrainField(Runs& owner):owner_(owner){}
+    const T& retained(unsigned slot)const{return scalar_[slot];}
     T operator[](unsigned slot)const{
         if constexpr(Source){T value;if(owner_.template readField<T,Member>(slot,value))return value;}
         return scalar_[slot];
@@ -181,6 +193,7 @@ class NativeTerrainField<Capacity,Runs,Publication,T,Member,false> {
     T scalar_[Capacity]{};
 public:
     explicit NativeTerrainField(Runs&){}
+    const T& retained(unsigned slot)const{return scalar_[slot];}
     const T& operator[](unsigned slot)const{return scalar_[slot];}
     T& operator[](unsigned slot){return scalar_[slot];}
 };

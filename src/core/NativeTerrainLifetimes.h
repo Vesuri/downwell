@@ -79,6 +79,26 @@ public:
         return true;
     }
     using Identity=typename Runs::Identity;
+    // A synchronous read, never a second owner or a retained cache. Collision
+    // refresh does not consume wall animation/image index, so do not construct
+    // WallEndStepState just to obtain the current drawing sprite.
+    struct CollisionRead {
+        Identity identity{};
+        std::uint32_t spatial=0;
+        int sprite=-2,cachedSprite=-2,cacheX=0,cacheY=0;
+        bool sourceOwned=false;
+    };
+    bool readCollision(InstanceHandle h,CollisionRead& out)const{
+        Identity id;if(!runs_.read(h,id))return false;
+        unsigned char flags;std::int16_t sprite;PackedWallState wall;
+        bool source=false;
+        if constexpr(SourceRecords)source=runs_.readCollisionFields(h,flags,sprite,wall);
+        if(!source){flags=flags_.retained(h.slot);sprite=createSprite_.retained(h.slot);wall=walls_.retained(h.slot);}
+        int dx,dy;if(!wall.cachedOffset(dx,dy))return false;
+        out={id,(flags&3u)|((flags&4u)?8u:0u)|((flags&8u)?0x200u:0u)|((flags&16u)?0x8000u:0u),
+            sprite,(flags&64u)?sprite:-2,dx,dy,source};
+        return true;
+    }
     enum class SpanResult { unsupported, success, failure };
     // Borrowed AreaOneBuilder prepared-cell stream: two bytes per cell, with
     // object kind in bit 7 and a signed-grid column biased by 32 in bits 0–6.
