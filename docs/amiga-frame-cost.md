@@ -557,6 +557,39 @@ The bank remains 330,024 bytes. Report and folded stacks:
 Trace ELF SHA-256:
 `b8d26c7d1cfb7aa610d57f7517406927421b5f17f7f9ac3e9ebf03082cc5eefa`.
 
+### Band descriptors — provisional, not an accepted default
+
+The next candidate stores one descriptor per admitted 16-line band instead
+of expanding sixteen per-line descriptors. It adds **8,192 gameplay-only
+ordinary-memory bytes**, no Chip bytes and no artwork-bank growth. Existing
+materialized rows and the portable compositor remain the fallback/oracle.
+
+In a 100-field capture starting at 120, update 141's admission costs
+**2.8 ms instead of 4.65 ms**, and its work excluding publication wait is
+**18.9 ms**. The 137–162 window changes from **20.1/22.8 ms mean/worst,
+11 over-budget updates, 13 ms excess** to **19.7/23.5 ms, eight over-budget
+updates, 11 ms excess**. Update 160 is the worst. An independent eight-field
+capture starting at 159 measures it at **23.2 ms**, still including
+**2.6 ms terrain transfer and 2.3 ms display synchronization**. Do not accept
+this candidate on the improved mean: C's per-update gate remains unmet.
+122–135 measures 18.1/34.1 ms, two over budget, 16 ms excess; 163–164 measures
+56.9/87.4 ms, two over budget, 74 ms excess. Whole-fall coverage is not yet
+available for this candidate.
+
+Native pixel verification: **79 composed rows, zero failures**. All **165
+selected state samples** and the exact landing witness match the reference.
+The 18,000-update terrain replay passes. Host fixtures additionally cover
+528 partial/wrapped band transfers, materialized replacement of a band's
+first row, invalidation, and the existing 12,360 scalar pattern/seam/mutation
+comparisons. These observations are not full-frame pixel equivalence.
+
+Evidence: `tmp/c-band-120-report.txt`, `tmp/c-band-160-recheck-report.txt`,
+`tmp/c-band-state-gdb.log`, `tmp/c-band-ownership.log`,
+`tmp/c-band-{raster,pattern}-test.log`. Trace ELF SHA-256s:
+
+- 120: `7372457b5c5901d1e809d71bb6b3f8b22636959dfee04ba4937e2c844575460a`
+- 159 recheck: `5755bfcd0e6781eca65abdda825326988fd0eda3b5d3cdfdf87c25175b6ad975`
+
 ## No-input initial-fall comparison
 
 ### Complete recurring quiet interval
