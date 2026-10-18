@@ -384,6 +384,11 @@ and 1371 RNG draws. Profile the admitted collision collection/tree work and
 remove the regression before shipping this backend; successful allocation and
 matching landing state are not a production performance gate. Keep exact
 selected-pair order, dirty-list retention and spatial history as the oracle.
+Prepared source-record admission also needs to handle the first-free slot
+sequence after dither leaves isolated holes. Do not merely split rows into
+smaller records: that measured attempt made lookup and mixed cleanup slower
+(see the audit's rejected approaches). Remove those repeated scans as part of
+any replacement, and retain the fragmented-slot identity/order differential.
 **Work:** Finish production environment wiring in `StoredEncounterSession` and
 `GameplayEncounterSession`; their boundary contract is in
 [scene architecture](scene-architecture.md#encounter-session-boundary).

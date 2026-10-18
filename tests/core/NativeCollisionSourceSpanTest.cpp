@@ -33,6 +33,23 @@ int main(){
         for(unsigned row=0;row<130;++row)
             assert(terrain->constructPrepared(51,effects,{cells,4,320+int(row)*32,retained,2})&&effects);
         if(retained)assert(terrain->sourcePopulation()==terrain->size()-2);
+        // Dither cleanup leaves isolated holes in the initial fall. Preserve
+        // the scalar first-free identities; do not skip holes to find a larger
+        // free interval. Source admission currently falls back for this row.
+        for(unsigned slot:{20u,22u,24u})assert(terrain->markDestroyed(terrain->currentHandle(slot)));
+        assert(owner->prepareDraw());
+        const unsigned fragmentedBefore=terrain->sourcePopulation();
+        const unsigned nextGeneration=terrain->handle(terrain->size()-1).generation+1;
+        assert(terrain->constructPrepared(51,effects,{cells,4,4800,retained,2})&&effects);
+        assert(terrain->sourcePopulation()==fragmentedBefore);
+        unsigned cell=0;
+        for(unsigned slot:{20u,22u,24u,526u}){
+            const auto h=terrain->currentHandle(slot);GameplayWorld::NativeTerrain::Identity id;
+            bool active,destroyed;
+            assert(h.generation==nextGeneration+cell&&terrain->read(h,id,active,destroyed));
+            assert(id.x==240+int(cell)*16&&id.y==4800&&id.object==(cell&1?93:60)&&active&&!destroyed);
+            ++cell;
+        }
         // The production journal holds 4096 operations. Fill it with real
         // ordered position publications until a four-cell span cannot fit.
         const auto player=world->playerHandle();const auto* playerRecord=world->findPlayer(player);
