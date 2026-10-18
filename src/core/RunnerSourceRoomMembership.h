@@ -149,6 +149,31 @@ public:
     }
     template<class Visit> bool visitCleanupChecked(Visit visit){return walk(0,false,visit)&&walk(1,false,visit);}
     template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
+        State resume;bool changed=false;
+        if(!terrain_||!terrain_->sourcePopulation()){
+            // No mixed owner exists yet: borrow the ordinary owner's ordered
+            // sparse traversal rather than rescan all marks for each successor.
+            // Cleanup may mark later entries and remove the current one. If
+            // it publishes a new room key/source, resume the general merge at
+            // the captured pre-callback key, never replay the callback.
+            const bool okay=Base::visitMarkedCleanupOrdered([&](unsigned slot,RunnerImageValue depth,bool active){
+                resume={ordinaryOrder_[slot],depth,static_cast<std::int8_t>(active?0:1),true};
+                const auto basis=clock_.basis();
+                if(!visit(slot,depth,active))return false;
+                changed=!basis.same(clock_.basis())||(terrain_&&terrain_->sourcePopulation());
+                return !changed;
+            });
+            if(!changed)return okay;
+        }
+        for(int list=changed?resume.list:0;list<2;++list){
+            unsigned slot=next(list,changed?&resume:nullptr,false,true);changed=false;
+            while(slot!=End){const State value=state(slot);
+                if(!visit(slot,value.depth,list==0))return false;
+                slot=next(list,&value,false,true);
+            }
+        }return true;
+    }
+    template<class Visit> bool visitMarkedCleanupOrderedReference(Visit visit){
         for(int list=0;list<2;++list){unsigned slot=next(list,nullptr,false,true);
             while(slot!=End){const State value=state(slot);
                 if(!visit(slot,value.depth,list==0))return false;

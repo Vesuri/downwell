@@ -1,5 +1,38 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: ordinary-owner cleanup traversal
+
+The measured candidate has zero source-record terrain instances at marks 58
+and 59. Its source-room wrapper nevertheless repeatedly scanned ordinary marks
+to merge two owners. The repeated successor search cost 5.13 ms per update
+averaged over 57–61. When no source records exist, cleanup now borrows the
+ordinary owner's sparse ordered traversal. After each callback, a source birth
+or changed publication clock resumes the mixed merge after the captured room
+key, without replaying the callback. The full merge remains
+`visitMarkedCleanupOrderedReference`.
+
+Baseline ELF `ba521b5721af0b6497b32cbeeeabe9fc5415a2fdf805b0863b897ab799836d19`;
+candidate `ea71f45cee65c2669bb19f7dd94a67f8fa7f50146713b1a11ba346c641637469`.
+Same build flags and captures as the following sections.
+
+| Measurement | Merge every successor | Borrow ordinary traversal |
+| --- | ---: | ---: |
+| Whole 164-update fall, PAL fields | 1,346 | 1,337 |
+| First update, PAL fields | 211 | 211 |
+| Updates 57–61 mean, ms | 105.6 | 101.7 |
+| Update 58 Draw entry, ms | 52.5 | 42.4 |
+| Update 60 Draw entry, ms | 52.9 | 42.7 |
+| Updates 57/58/59/60/61, ms | 49.2/187.3/42.2/145.2/104.4 | 49.7/177.0/41.9/135.0/104.9 |
+
+Update 58 independently repeats at 1,257,340 cycles / 177.0 ms (42.6 ms Draw
+entry). Unchanged-update movements are within 0.5 ms noise. All 165 state
+samples match. Source-record differentials and sanitizer tests include later
+marks, self-removal, first source birth, earlier/later room-key publication and
+callback failure. Normal 512 KiB startup passes. Reports:
+`tmp/ordinary-cleanup-{cost,recheck}/report.txt`; raw traces are removed after
+committing measurements. This does not close the collision backend's remaining
+performance gate or enable it for shipping.
+
 ## Encounter candidate: prepared dither/wall event plan
 
 The §1.01 native candidate retains full ordered collection but prepares the

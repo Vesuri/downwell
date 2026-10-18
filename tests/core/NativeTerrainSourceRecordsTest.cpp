@@ -254,7 +254,40 @@ template<bool Source> static std::vector<unsigned> cleanupMarks(){
     assert(visited.size()==5&&visited.back()==4);
     return visited;
 }
+static std::vector<unsigned> cleanupOrdinary(bool reference,unsigned mutation){
+    auto f=std::make_unique<Fixture<true>>();
+    assert(!f->terrain.sourcePopulation());
+    for(unsigned slot=0;slot<3;++slot)assert(f->room.bind(slot,{0}));
+    assert(f->room.mark(0)&&f->room.mark(2));
+    std::vector<unsigned> visited;
+    auto visit=[&](unsigned slot,RunnerImageValue,bool){
+        visited.push_back(slot);
+        if(slot==0){
+            assert(f->room.mark(1));
+            if(mutation==1){
+                const unsigned char wall[]={0};
+                assert(f->segment(wall,1,0)&&f->terrain.sourcePopulation()==1&&f->room.mark(32));
+            }
+            if(mutation==2||mutation==3){
+                RunnerImageValue depth;assert(depth.assignInteger(mutation==2?0:-1));
+                assert(f->room.bind(3,depth)&&f->room.mark(3));
+            }
+        }
+        if(slot==1&&mutation==4)return false;
+        return f->room.remove(slot);
+    };
+    const bool okay=reference?f->room.visitMarkedCleanupOrderedReference(visit):
+        f->room.visitMarkedCleanupOrdered(visit);
+    assert(okay==(mutation!=4));
+    if(mutation==0||mutation==3)assert((visited==std::vector<unsigned>{0,1,2}));
+    if(mutation==1)assert((visited==std::vector<unsigned>{0,1,2,32}));
+    if(mutation==2)assert((visited==std::vector<unsigned>{0,1,2,3}));
+    if(mutation==4)assert((visited==std::vector<unsigned>{0,1}));
+    return visited;
+}
 int main(){
+    for(unsigned mutation=0;mutation<5;++mutation)
+        assert(cleanupOrdinary(false,mutation)==cleanupOrdinary(true,mutation));
     assert(cleanupMarks<false>()==cleanupMarks<true>());
     const auto reference=mixed(false);
     assert(reference==mixed(true)&&reference==mixed(true,true));
