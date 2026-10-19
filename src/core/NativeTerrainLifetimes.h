@@ -83,6 +83,25 @@ public:
         return true;
     }
     using Identity=typename Runs::Identity;
+    struct EligibilityRead {
+        int object=-1;
+        std::uint32_t spatial=0;
+        bool sourceOwned=false,sourceRoomActive=false;
+    };
+    // Read the owning source/retained state once; no appearance or geometry
+    // is needed for eligibility, and nothing survives a subsequent mutation.
+    bool readEligibility(InstanceHandle h,EligibilityRead& out)const{
+        if(!good_)return false;
+        EligibilityRead next;unsigned char flags=0;
+        if constexpr(SourceRecords)
+            next.sourceOwned=runs_.readSourceEligibility(h,next.object,flags,next.sourceRoomActive);
+        if(!next.sourceOwned){
+            Identity id;if(!runs_.read(h,id))return false;
+            next.object=id.object;flags=flags_.retained(h.slot);
+        }
+        next.spatial=(flags&3u)|((flags&4u)?8u:0u)|((flags&8u)?0x200u:0u)|((flags&16u)?0x8000u:0u);
+        out=next;return true;
+    }
     // A synchronous read, never a second owner or a retained cache. Collision
     // refresh does not consume wall animation/image index, so do not construct
     // WallEndStepState just to obtain the current drawing sprite.

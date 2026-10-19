@@ -377,19 +377,19 @@ The candidate full-owner integration has not passed the bounded initial-fall
 gate; keep the external backend as the shipping default until that coupling
 is removed and the complete fall is measured. Preserve source spatial-history
 ordering rather than substituting a current-state-only tree.
-The collision-enabled candidate now completes the fall, but takes 959 PAL
-fields for 164 updates (8.55 FPS; update 1 takes 213 fields). Landing state is
+The collision-enabled candidate now completes the fall, but takes 945 PAL
+fields for 164 updates (8.68 FPS; update 1 takes 210 fields). Landing state is
 tick 164, x 0, y 262144, camera y 1024, grounded, health 4, ammo 8, three enemies,
 and 1371 RNG draws. Profile the admitted collision collection/tree work and
 remove the regression before shipping this backend; successful allocation and
 matching landing state are not a production performance gate. Keep exact
 selected-pair order, dirty-list retention and spatial history as the oracle.
 Include the complete generation update **136** in subsequent performance
-gates, not just the following 137–141 window. At `9d526766` it costs **924.5 ms**:
-collision collection 718.7 ms (tree service 365.5, bound refresh 173.2),
-plus generation 146.8 ms. The [complete-burst audit](amiga-frame-cost.md#encounter-candidate-complete-generation-burst-136)
-records the independent recheck and ownership breakdown. Remove repeated
-terrain-state reconstruction and source tree-maintenance work without changing
+gates, not just the following 137–141 window. It costs **892.6 ms**:
+collision collection 686.6 ms (tree service 367.3, bound refresh 162.2).
+The [eligibility-read audit](amiga-frame-cost.md#encounter-candidate-single-owner-terrain-eligibility-read)
+records the independent recheck and comparison. Remove remaining terrain-bound
+reconstruction and source tree-maintenance work without changing
 dirty-list or tree history; do not substitute small-window averages for this gate.
 **Work:** Finish production environment wiring in `StoredEncounterSession` and
 `GameplayEncounterSession`; their boundary contract is in

@@ -543,6 +543,15 @@ private:
                 out=(out&~0xc208u)|(state->appearanceFlags&0xc208u);return true;
             }
             if(world_&&world_->nativeTerrainInstances()){
+#ifndef DOWNWELL_REFERENCE_TERRAIN_ELIGIBILITY
+                if(h.slot<View::terrainBase||h.slot>=View::timeFieldBase)return false;
+                GameplayWorld::NativeTerrain::EligibilityRead read;
+                if(!world_->nativeTerrainInstances()->readEligibility({h.slot-View::terrainBase,h.generation},read))return false;
+                const auto* definition=objectDefaults_.get(read.object);if(!definition)return false;
+                const bool registered=read.sourceOwned?read.sourceRoomActive:
+                    (collisionConsumersAdmitted_||read.object==93)?table_.externalRegistered(h):room_.active(h.slot);
+                out=(definition->initialFlags&~8u)|read.spatial|(registered?0u:0x80000u);return true;
+#else
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
                 if(View(*world_).readTerrain(h,id,active,destroyed)){
                     const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
@@ -552,6 +561,7 @@ private:
                     out=(definition->initialFlags&~8u)|spatial|
                         (((collisionConsumersAdmitted_||id.object==93)&&!sourceOwned?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
                 }
+#endif
             }
             return false;
         }

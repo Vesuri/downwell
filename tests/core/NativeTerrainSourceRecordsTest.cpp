@@ -102,6 +102,12 @@ template<class Terrain> static void collisionRead(const Terrain& terrain,Instanc
         read.identity.source==id.source&&read.identity.creationCode==id.creationCode);
     assert(read.spatial==flags&&read.sprite==sprite&&read.cachedSprite==cached&&read.cacheX==x&&read.cacheY==y&&
         read.sourceOwned==terrain.sourceOwned(h)&&read.imageIndex==image);
+    typename Terrain::EligibilityRead eligibility;
+    assert(terrain.readEligibility(h,eligibility)&&eligibility.object==id.object&&
+        eligibility.spatial==flags&&eligibility.sourceOwned==terrain.sourceOwned(h));
+    if(eligibility.sourceOwned){RunnerRoomOrderState room;
+        assert(terrain.sourceRoomState(h.slot,room)&&eligibility.sourceRoomActive==(room.list==0));
+    }
 }
 static void compare(const Fixture<false>& scalar,const Fixture<true>& source){
     const auto& a=scalar.terrain;const auto& b=source.terrain;
@@ -228,6 +234,8 @@ static std::vector<std::uint32_t> mixed(bool lend,bool fused=false){
             ar.sprite=br.sprite=1234;
             assert(!a->terrain.readCollision(h,ar)&&!b->terrain.readCollision(h,br));
             assert(ar.sprite==1234&&br.sprite==1234);
+            Fixture<true>::Terrain::EligibilityRead eligibility;eligibility.object=1234;
+            assert(!b->terrain.readEligibility(h,eligibility)&&eligibility.object==1234);
         }
     }
     assert(b->sourceBirths&&b->scalarBirths);

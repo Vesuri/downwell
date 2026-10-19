@@ -1,5 +1,47 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: single-owner terrain eligibility read
+
+Against `9d526766`, read object, spatial flags and source room membership
+together from the existing terrain owner. No geometry/appearance projection,
+new persistent cache or extra owner is involved. Retained terrain still uses
+the original external-registration versus room-membership rule. The full old
+projection is retained under `DOWNWELL_REFERENCE_TERRAIN_ELIGIBILITY`.
+
+The measured target was update 136's repeated eligibility reconstruction:
+46.61 ms in collection plus 23.18 ms in dirty refresh. Those callers now cost
+25.94 and 12.56 ms respectively. Tree service remains 367.3 ms; this does not
+solve the production backend's spatial-history regression.
+
+| Work | Before | Single read |
+| --- | ---: | ---: |
+| Complete update 136, ms | 924.5 | 892.6 |
+| Updates 57–61 mean / worst, ms | 93.7 / 158.9 | 92.8 / 156.8 |
+| Updates 137–141 mean / worst, ms | 75.5 / 86.1 | 75.5 / 86.3 |
+| 164 updates, PAL fields | 959 | 945 |
+| First update, PAL fields | 213 | 210 |
+
+The late worst change is within 0.5-ms noise. Candidate per-update figures are
+57–61: **49.5 / 156.8 / 41.9 / 117.0 / 98.8 ms**;
+137–141: **73.5 / 81.4 / 55.0 / 81.4 / 86.3 ms**.
+The complete burst is **6,342,010 cycles**; an independent 70-field capture
+starting at marker 135 gives **6,341,990 cycles**. A fresh parent capture gives
+**6,568,560 cycles**, reproducing the baseline exactly.
+
+All 165 native state samples match the parent, including exact landing.
+Default/reference collision-owner transcripts match. Fresh source-span
+integration tests pass in both modes, including pair/tree order, activation,
+retirement, reuse and journal-capacity fallback. Source-record ASan/UBSan,
+18,000-update terrain replay and dither/wind tests pass. Failed eligibility
+reads leave outputs untouched. Normal build restored; 512 KiB Chip startup
+and 68000/link audits pass. All owned emulator runs are bounded and stopped.
+
+Candidate ELF SHA-256:
+`949ef0975bed76db7fe599e3cedbbc328ff1ed4d31144ac23397baa5bced3524`.
+Reports: `tmp/terrain-eligibility-{burst,recheck,late,cost,control}/report.txt`;
+matching `.gdb` scripts and `tmp/terrain-eligibility-measure.sh` reproduce
+captures using the saved candidate executable. Raw traces removed after commit.
+
 ## Encounter candidate: complete generation burst 136
 
 Fresh measurement of `9d526766`, using the frozen `actor-trig-candidate` ELF

@@ -134,6 +134,16 @@ public:
         }
         return true;
     }
+    bool readSourceEligibility(InstanceHandle h,int& object,unsigned char& flags,bool& roomActive)const{
+        SourceRead source;if(!sources_.read(h,source))return false;
+        object=source.object();
+        if(const auto* changed=sources_.mutation(h)){
+            flags=changed->flags;roomActive=changed->room.list==0;
+        }else{
+            flags=source.birth->flags[object==93];roomActive=true;
+        }
+        return true;
+    }
     template<class T,T Cell::* Member> T* writeField(unsigned slot){
         const auto h=sources_.currentHandle(slot);if(!h.generation)return nullptr;
         auto* changed=sources_.materialize(h,initialCell);
