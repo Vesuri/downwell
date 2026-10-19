@@ -1,5 +1,47 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: prepared integer tree insertion
+
+Against `8fc97876`, journal service passes immutable prepared terrain geometry
+directly to the tree's integer representation, instead of expanding binary32
+endpoints and decoding them again. The previous burst spends 20.64 ms in
+insertion decoding; this targets that conversion, not tree order or arithmetic
+precision. No history is omitted, combined or delayed; no storage is added.
+Nonintegral tree mode, oversized coordinates and invalid bounds retain the
+original insertion path. The journal oracle is selected with
+`DOWNWELL_REFERENCE_JOURNAL_GEOMETRY_DECODE`.
+
+| Work | Before | Direct prepared insertion |
+| --- | ---: | ---: |
+| Complete update 136, ms | 892.6 | 876.7 |
+| Tree service within 136, ms | 367.29 | 351.85 |
+| Insertion decode within 136, ms | 20.64 | 10.50 |
+| Updates 57–61 mean / worst, ms | 92.8 / 156.8 | 92.4 / 156.0 |
+| Updates 137–141 mean / worst, ms | 75.5 / 86.3 | 75.5 / 86.0 |
+| 164 updates, PAL fields | 945 | 938 |
+| First update, PAL fields | 210 | 205 |
+
+Burst capture: **6,229,140 cycles**. Independent 70-field capture beginning at
+135: **6,227,360 cycles / 876.5 ms**, within noise. Individual updates 57–61:
+**49.7 / 156.0 / 41.6 / 117.0 / 98.0 ms**; 137–141:
+**73.5 / 81.4 / 55.3 / 81.4 / 86.0 ms**. These windows do not establish a
+production-performance pass; ordered tree maintenance remains substantial.
+
+All 165 native states match the parent. Prepared-geometry reference tests cover
+131,072 bounds comparisons and ordered journal histories; source-span integration
+covers activation, retirement, reuse, query ordering and pressure fallback.
+Journal tests additionally cover prepared insertion after binary fallback,
+oversized coordinates, invalid input and split/condensation; ASan/UBSan pass.
+The 18,000-update terrain replay and dither/wind tests pass; the collision-owner
+transcript matches the parent. Normal build restored with clean 68000/link
+audits and verified 512 KiB Chip startup. Captures are bounded and their
+emulators stopped; raw traces removed after commit.
+
+Candidate ELF SHA-256:
+`c1d55c69da12fb09185699716234a69c800f410d9d8106bbe830a6a0171cfa21`.
+Reports: `tmp/journal-pixels-{burst,recheck,cost,late}/report.txt`; matching
+`.gdb` scripts and `tmp/journal-pixels-measure.sh` reproduce the saved candidate.
+
 ## Encounter candidate: single-owner terrain eligibility read
 
 Against `9d526766`, read object, spatial flags and source room membership

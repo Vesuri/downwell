@@ -97,6 +97,44 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
 }
 int main(){
     {
+        // Prepared inserts retain ordering through split/condensation, then a
+        // fractional insert switches both trees to binary storage. Subsequent
+        // prepared inserts must keep working in that representation too.
+        downwell::RunnerSpatialIndex<256> reference,prepared;
+        for(unsigned i=0;i<80;++i){
+            Math::PixelBox p{int(i%13)*16,int(i/13)*16,int(i%13)*16+16,int(i/13)*16+16};
+            assert(reference.insert(Math::encodePixels(p),i)&&prepared.insertPixels(p,i));
+        }
+        for(unsigned i=0;i<80;i+=3){bool a=false,b=false;
+            assert(reference.remove(box(-900,900),i,true,a)&&prepared.remove(box(-900,900),i,true,b)&&a==b);
+        }
+        auto fractional=box(0,0);fractional.left.bits=0x3f000000;
+        assert(reference.insert(fractional,90)&&prepared.insert(fractional,90));
+        for(unsigned i=91;i<110;++i){Math::PixelBox p{-16,int(i),16,int(i)+16};
+            assert(reference.insert(Math::encodePixels(p),i)&&prepared.insertPixels(p,i));
+        }
+        std::vector<unsigned> a,b;
+        assert(reference.query(box(-100,-100,1000,1000),[&](unsigned id){a.push_back(id);return true;}));
+        assert(prepared.query(box(-100,-100,1000,1000),[&](unsigned id){b.push_back(id);return true;}));
+        assert(a==b&&reference.height()==prepared.height()&&reference.nodeCount()==prepared.nodeCount());
+        reference.clear();prepared.clear();
+        // Oversized coordinates must use the same rounded binary32 geometry;
+        // the integer fast path must never silently broaden its domain.
+        for(const auto p:{Math::PixelBox{-0x1000001,-2,-0x1000000,2},
+                          Math::PixelBox{0x1000000,0,0x1000001,1}}){
+            assert(reference.insert(Math::encodePixels(p),123)==prepared.insertPixels(p,123));
+        }
+        a.clear();b.clear();
+        const auto broad=box(-0x2000000,-100,0x4000000,1000);
+        assert(reference.query(broad,[&](unsigned id){a.push_back(id);return true;}));
+        assert(prepared.query(broad,[&](unsigned id){b.push_back(id);return true;}));
+        assert(a==b);
+        reference.clear();prepared.clear();
+        const Math::PixelBox invalid{4,0,1,2};
+        assert(reference.insert(Math::encodePixels(invalid),1)==prepared.insertPixels(invalid,1));
+        assert(reference.valid()==prepared.valid()&&!prepared.valid());
+    }
+    {
         using Journal=downwell::RunnerSpatialJournal<128,32,4,false,
             downwell::RunnerSpatialIndex<128>,downwell::RunnerSpatialJournalLease>;
         using Larger=downwell::RunnerSpatialJournal<128,32,4096,false,

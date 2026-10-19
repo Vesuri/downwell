@@ -30,6 +30,9 @@ public:
     unsigned nodeCount()const{return get()?tree_->nodeCount():0;}
     int height()const{return get()?tree_->height():0;}
     bool insert(Box box,std::uint32_t id){return get()&&checked(tree_->insert(box,id));}
+    bool insertPixels(const RunnerSpatialSplit::PixelBox& box,std::uint32_t id){
+        return get()&&checked(tree_->insertPixels(box,id));
+    }
     bool remove(Box box,std::uint32_t id,bool retry,bool& removed){
         return get()&&checked(tree_->remove(box,id,retry,removed));
     }

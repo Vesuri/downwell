@@ -51,6 +51,19 @@ public:
         if(!insertRoot({stored,0,instance},0)){good_=false;return false;}
         return true;
     }
+    // Immutable prepared geometry already has integer endpoints. Preserve the
+    // same insertion/split history without an encode/decode round trip.
+    // Outside exact binary32 integers use the original entry point.
+    bool insertPixels(const Math::PixelBox& pixel,std::uint32_t instance){
+        if(!good_)return false;
+        if(!pixelMode_||pixel.left<=-0x1000000||pixel.top<=-0x1000000||
+           pixel.right>=0x1000000||pixel.bottom>=0x1000000||
+           pixel.left>pixel.right||pixel.top>pixel.bottom)
+            return insert(Math::encodePixels(pixel),instance);
+        DW_PROFILE_SCOPE(profileSpatialInsert);
+        if(!insertRoot({StoredBox(pixel),0,instance},0)){good_=false;return false;}
+        return true;
+    }
     // Source wrapper can retry against the complete root bounds when the old
     // bounds no longer locate the instance. Not-found is a successful operation
     // with removed=false; an invalid/failed mutation preserves the output flag.
