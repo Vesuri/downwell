@@ -395,6 +395,12 @@ dirty-list or tree history; do not substitute small-window averages for this gat
 
 1. Remove the collision-admission performance regression above. Do not replace
    the complete source pair stream with the narrow dispatch admission.
+   The [query census](amiga-frame-cost.md#collision-query-census-empty-result-traversal)
+   identifies 42 empty queries out of 43 in update 136; traversal costs 69.5 ms
+   separately from journal service. Investigate exact live-partner exclusion,
+   including incoming events and cached bounds, before implementing a filter.
+   Empty observed results alone are not a proof; preserve catch-up/failure
+   prefixes, processed-generation stamps and the entire ordered pair stream.
 2. Promote the scene-local native backend from `scene_collision_candidate.mk`
    to the shipping build only after that gate passes. Preserve the production
    `AmigaEncounterResources` binding of collision history, masks,

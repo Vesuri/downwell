@@ -1,5 +1,49 @@
 # Amiga gameplay frame-cost audit
 
+## Collision query census: empty-result traversal
+
+At `7f4335e2`, a diagnostic-only census records the most recent native collision
+collection pass at selected no-input updates. It does not filter queries or
+pairs. All 165 state samples match the uninstrumented candidate. These counts
+are not timings; use the uninstrumented collection-read trace below for cost.
+
+| Update | Resource | Queries | Visited candidates | Emitted pairs | Empty queries |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 58 | 35, player | 1 | 1 | 0 | 1 |
+| 58 | 60, wall | 2 | 2 | 0 | 2 |
+| 58 | 61, DitherAbove | 1 | 7 | 6 | 0 |
+| 136 | 35, player | 1 | 1 | 0 | 1 |
+| 136 | 60, wall | 28 | 28 | 0 | 28 |
+| 136 | 61, DitherAbove | 1 | 3 | 2 | 0 |
+| 136 | 92, box | 12 | 12 | 0 | 12 |
+| 136 | 119, crawler | 1 | 1 | 0 | 1 |
+| 137 | 35, player | 1 | 1 | 0 | 1 |
+| 137 | 119, crawler | 1 | 1 | 0 | 1 |
+| 141 | 35, player | 1 | 1 | 0 | 1 |
+
+Thus 42 of update 136's 43 queries emit no pairs. Single visited candidates
+are consistent with self-hits, but this census does not record candidate
+identities and does not prove that interpretation. Nor does an empty result
+prove that a query can safely be skipped. In the uninstrumented trace, query
+traversal costs 69.50 ms, separate from the 351.61-ms journal service. An exact
+live-partner exclusion could target the former; it cannot claim the latter.
+It must include both incoming and outgoing resource events, cached bounds,
+all indexed partners, source catch-up/failure timing and processed generations.
+Keep the complete pair stream and dirty-list retention as the oracle.
+
+Reproduce with the normal diagnostic candidate flags plus
+`-f scene_collision_census.mk`, then run `verify_startup.sh` with
+`GDB_SOURCE=profile_collision_census.gdb`, `READY_MARKER=ENCOUNTER_CENSUS_READY`
+and `VERIFY_TIMEOUT_SECONDS=90`. Compare all `STATE` lines to the normal
+candidate. The instrument adds work and debugger stops, so its cadence must
+not be used as a performance result. Counter resets are per collection pass,
+not per frame; multiple passes would report only the last one.
+
+ELF SHA-256: `ae11f04f20c49244e04db688658185cb3c364e9dc707df91227d38ccedbf40e6`.
+Evidence: `tmp/collision-census-candidate/census.log`. The normal build is
+restored with clean 68000/link audits and verified 512 KiB Chip startup;
+all owned emulators are stopped.
+
 ## Encounter candidate: combined terrain collection read
 
 Against `dba74784`, terrain collision collection reads identity, cached sprite

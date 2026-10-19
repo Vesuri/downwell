@@ -40,6 +40,11 @@
 #include "RunnerWithSnapshot.h"
 #include "RunnerAlarmProjection.h"
 namespace downwell {
+#ifdef DOWNWELL_COLLISION_QUERY_CENSUS
+// Diagnostic only: query count, visited candidates, emitted pairs, empty
+// queries by the querying resource. Never use this instrument for timings.
+inline volatile unsigned long collisionQueryCensus[386][4]{};
+#endif
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
 // Optional diagnostic observer; absent from normal code and simulation state.
 void auditActorDrawCache(unsigned outcome,unsigned actors,bool captureChanged,bool layersChanged);
@@ -2066,10 +2071,17 @@ public:
                 frames=sprites_.collisionSprite(p->sprite.spriteId,p->sprite.maskId,resource)?resource.frameCount:0;return true;
             }));
         if(!check(nativeCollisionStorage_!=nullptr))return false;
+#ifdef DOWNWELL_COLLISION_QUERY_CENSUS
+        for(auto& row:collisionQueryCensus)for(auto& count:row)count=0;
+        int censusObject=-1;
+#endif
         return check(RunnerCollisionCollect::run(pairs,nativeCollisionStorage_->collision,nativeCollisionStorage_->retained,indexAvailable,
             [&]{return flushNativeSpatial();},[&](unsigned slot){return handleAt(slot);},
             [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},
             [&](InstanceHandle h,Owner::Box& bounds){
+#ifdef DOWNWELL_COLLISION_QUERY_CENSUS
+                censusObject=objectOf(h);
+#endif
                 if(const auto* actor=nativePosition(h.slot)){bounds=actor->bounds;return true;}
                 if(!world_||!world_->nativeTerrainInstances())return false;
                 const auto* terrain=world_->nativeTerrainInstances();
@@ -2089,7 +2101,20 @@ public:
                     nativeTerrainCachedBounds(id,x,y,bounds,found,precise,cached);
 #endif
             },
-            [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});},
+            [&](Owner::Box box,auto visit){
+#ifdef DOWNWELL_COLLISION_QUERY_CENSUS
+                if(censusObject<0||censusObject>=386)return false;
+                auto& row=collisionQueryCensus[censusObject];++row[0];
+                const unsigned before=pairs.size();
+                const bool okay=owner_.externalSpatialPublication([&](auto& index){return index.query(box,[&](unsigned slot){
+                    ++row[1];return visit(slot);
+                });});
+                const unsigned emitted=pairs.size()-before;row[2]+=emitted;if(!emitted)++row[3];
+                return okay;
+#else
+                return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});
+#endif
+            },
             [&](InstanceHandle self,InstanceHandle other,bool& found){
                 const int a=objectOf(self),b=objectOf(other);
                 return a>=0&&b>=0&&collisionEventExists(a,b,found);
