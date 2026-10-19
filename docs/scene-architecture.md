@@ -76,6 +76,34 @@ checks the selected field's sound/RNG against the reference owner, and exercises
 the real world collision-phase hook and Draw-time retirement. This fixture is
 not evidence that the Amiga frontend has acquired those production leases.
 
+#### Collection cannot use the dispatch admission as its query filter
+
+The serialized collision bindings have incoming as well as outgoing events.
+Resolving both directions through `ObjectPack::collisionEvent` (including
+target and owner ancestry) gives these terrain partner sets:
+
+| Terrain object | Objects with an event in either direction |
+| --- | --- |
+| 60, wall | 61, 110, 142, 153, 188, 223, 225, 226, 259, 265, 269, 276 |
+| 99, inherited wall | Same as 60 |
+| 93, thin platform | 110, 188 |
+
+All listed wall/platform relationships are incoming events. An outgoing-only
+test would incorrectly declare these objects irrelevant. The admitted native
+dispatch set (61/60 and 255-or-371/35) is narrower than this resource set.
+`RunnerCollisionPairs::candidate` tests both directions, appends all event
+pairs and only then stamps each processed identity after its query. Pair
+capacity failure is also before dispatch selection. Therefore dropping queries
+solely because the caller's object has no admitted outgoing handler does not
+preserve the complete collection contract. Nor may unselected pairs be removed
+from the buffer just because this scene's dispatcher does not invoke them.
+
+A future proven-empty query optimization must account for live partners in
+both directions, generation-specific processed stamps, dirty-list retention,
+tree catch-up and failure prefixes. It must preserve the full pair stream, not
+merely the events selected by `GameplayDitherCollisionPass`. This contract does
+not require repeating immutable geometry conversions during tree publication.
+
 `GameplayEncounterEnvironment` borrows that pass, audio device and settings
 for a split native frame. `Frame::bindUpdateEnvironment` requires the session's
 input sample first and rejects rebinding or installation after Draw. Dependency
