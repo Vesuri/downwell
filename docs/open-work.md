@@ -397,8 +397,10 @@ dirty-list or tree history; do not substitute small-window averages for this gat
    the complete source pair stream with the narrow dispatch admission.
    The [query census](amiga-frame-cost.md#collision-query-census-empty-result-traversal)
    identifies 42 empty queries out of 43 in update 136; traversal costs 69.5 ms
-   separately from journal service. Investigate exact live-partner exclusion,
-   including incoming events and cached bounds, before implementing a filter.
+   separately from journal service. A global non-terrain history envelope was
+   measured and rejected (see the audit's rejected-approaches table); do not
+   tune envelope/check-layout variants. Any further exclusion needs an
+   independently priced proof, including incoming events and cached bounds.
    Empty observed results alone are not a proof; preserve catch-up/failure
    prefixes, processed-generation stamps and the entire ordered pair stream.
 2. Promote the scene-local native backend from `scene_collision_candidate.mk`
