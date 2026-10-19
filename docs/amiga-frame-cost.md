@@ -1,5 +1,45 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: select terrain runs before expanding row identities
+
+Against `ee9ee3f4`, the source-record terrain row cursor rejects off-band runs
+before expanding their identities. Selected authored and source cursors still
+merge in immutable birth order, with the same 16-pixel conservative margin.
+Unknown/unbounded artwork retains its full traversal. No drawing operation,
+pixel composition, asset, persistent index or owner storage changes. This
+removes a full-population walk introduced by the source-record backend; it
+does not resume deferred section 0.C's row-composition work.
+`DOWNWELL_REFERENCE_SOURCE_ROW_SCAN` retains the previous full traversal.
+
+Same deterministic scene-collision fall, 512 KiB Chip / 8 MiB Fast:
+
+| Measurement | Parent | Run-selected rows |
+| --- | ---: | ---: |
+| 164 updates, PAL fields | 1,019 | 975 |
+| First update, PAL fields | 213 | 213 |
+| Updates 57–61 mean, ms | 93.7 | 93.7 |
+| Updates 57/58/59/60/61, ms | 49.5/158.9/41.9/117.3/100.9 | 49.7/158.7/42.1/117.0/100.9 |
+| Updates 137–141 mean, ms | 96.3 | 83.4 |
+| Wall traversal including drawing, ms/update in 137–141 | 25.51 | 12.62 |
+| Updates 137/138/139/140/141, ms | 129.6/81.4/71.8/81.4/117.1 | 112.6/81.4/55.3/81.2/86.4 |
+
+The late parent window was recaptured in this session; early/cadence parent
+figures are the saved build's preceding measurements. Independent update-141
+capture: **613,700 cycles / 86.4 ms**. All 165 native state samples and the
+reference/native collision-owner witnesses agree. Ordered row selection is
+checked against the full traversal across mixed births, holes/reuse, empty
+bands, margin boundaries, extreme coordinates and callback failure. Source
+fixtures also pass ASan/UBSan; terrain ownership, the 18,000-update replay,
+mixed collision-source and dither/wind tests pass. Normal 512 KiB Chip startup
+and the 68000 build audits pass. The candidate still fails its production
+performance gate and remains diagnostic.
+
+Candidate ELF SHA-256
+`d03d0cc5d528c5076c03b14c91d804f091dcd9382c68ab14343d8c5b12f7a8ab`.
+Reports: `tmp/selected-rows-{control,cost,late,recheck}/report.txt`;
+state/cadence: `tmp/selected-rows-candidate/`; host witnesses:
+`tmp/selected-rows-{owner,reference}.txt`. Raw traces are removed after commit.
+
 ## Encounter candidate: collect cleanup marks from their existing owner
 
 Against `4e65a7e1`, source cleanup reads only materialized room state from the

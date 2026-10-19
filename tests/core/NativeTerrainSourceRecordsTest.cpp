@@ -2,6 +2,7 @@
 #include "core/RunnerSourceRoomMembership.h"
 #include <cassert>
 #include <algorithm>
+#include <climits>
 #include <cstdio>
 #include <memory>
 #include <vector>
@@ -317,7 +318,38 @@ static std::vector<unsigned> cleanupMixed(bool reference,unsigned mutation){
     }
     assert(okay==(mutation!=4)&&!visited.empty());return visited;
 }
+static void selectedSourceRows(){
+    NativeTerrainSourceRuns<64,TerrainIdentityOnly> runs;
+    unsigned generation=1,slot=0;
+    for(int row:{INT_MIN,-32,0,16,32,INT_MAX}){
+        assert(runs.append({slot++,generation++},60,7,row));
+        TerrainBirthFacts facts{};facts.cells=cells;facts.slot=slot;facts.generation=generation;
+        facts.registration=generation;facts.y=row;
+        assert(runs.sources().append(facts,4));slot+=4;generation+=4;
+    }
+    assert(runs.retire(runs.currentHandle(2)));
+    TerrainBirthFacts reused{};reused.cells=cells;reused.slot=2;reused.generation=generation++;
+    reused.registration=generation;reused.y=16;assert(runs.sources().append(reused,1));
+    for(int first:{INT_MIN,-48,-16,-15,0,1,16,17,31,32,47,48,INT_MAX}){
+        for(int end:{INT_MIN,-16,0,16,32,48,INT_MAX}){
+            std::vector<unsigned> expected,actual;
+            assert(runs.visitRowsReference(first,end,[&](const auto& id){
+                expected.push_back(id.handle.generation);return true;
+            }));
+            assert(runs.visitRows(first,end,[&](const auto& id){
+                actual.push_back(id.handle.generation);return true;
+            }));
+            assert(actual==expected);
+            unsigned visited=0;
+            const bool okay=runs.visitRows(first,end,[&](const auto& id){
+                assert(id.handle.generation==expected.front());++visited;return false;
+            });
+            assert(okay==expected.empty()&&visited==unsigned(!expected.empty()));
+        }
+    }
+}
 int main(){
+    selectedSourceRows();
     {
         auto f=std::make_unique<Fixture<true>>();
         auto check=[&](){

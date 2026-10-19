@@ -129,13 +129,19 @@ public:
         }
         unsigned registration()const{return birth->registration+offset;}
     };
-    class Cursor {
+    template<bool Rows> class SelectedCursor {
         const TerrainBirthRecords& owner_;
         unsigned record_,offset_=0;
+        int first_,end_;
     public:
-        explicit Cursor(const TerrainBirthRecords& owner):owner_(owner),record_(owner.head_){}
+        explicit SelectedCursor(const TerrainBirthRecords& owner,int first=0,int end=0):
+            owner_(owner),record_(owner.head_),first_(first),end_(end){}
         bool take(InstanceHandle& handle,Read& out){
             while(record_!=Capacity){const auto& r=owner_.records_[record_];
+                if constexpr(Rows)if((r.birth.y<first_&&unsigned(first_)-unsigned(r.birth.y)>=16u)||
+                    (r.birth.y>=end_&&unsigned(r.birth.y)-unsigned(end_)>=16u)){
+                    record_=r.next;offset_=0;continue;
+                }
                 while(offset_<r.count){const unsigned i=offset_++;
                     if(!alive(r,i))continue;
                     handle={r.birth.slot+i,r.birth.generation+i};out={&r.birth,i,r.ordinal+i};return true;
@@ -145,6 +151,7 @@ public:
             return false;
         }
     };
+    using Cursor=SelectedCursor<false>;
     unsigned runCount()const{
         unsigned count=0;for(unsigned n=head_;n!=Capacity;n=records_[n].next)++count;return count;
     }

@@ -68,13 +68,19 @@ public:
     };
     // Borrowed, read-only chronology cursor. A source-record owner can merge
     // authored/scalar lifetimes without maintaining a second identity list.
-    class Cursor {
+    template<bool Rows> class SelectedCursor {
         const TerrainOwnershipRuns& owner_;
         unsigned run_,offset_=0;
+        int first_,end_;
     public:
-        explicit Cursor(const TerrainOwnershipRuns& owner):owner_(owner),run_(owner.head_){}
+        explicit SelectedCursor(const TerrainOwnershipRuns& owner,int first=0,int end=0):
+            owner_(owner),run_(owner.head_),first_(first),end_(end){}
         bool take(Identity& out){
             while(run_!=End){const auto& r=owner_.runs_[run_];
+                if constexpr(Rows)if((r.y<first_&&unsigned(first_)-unsigned(r.y)>=16u)||
+                    (r.y>=end_&&unsigned(r.y)-unsigned(end_)>=16u)){
+                    run_=r.next;offset_=0;continue;
+                }
                 while(offset_<r.count){const unsigned i=offset_++,slot=r.first+i;
                     if(owner_.locator_[slot]!=run_+1)continue;
                     out={{slot,r.generation+i},r.objectAt(i),r.xAt(i),r.y,r.creationCode,r.sourceId()};return true;
@@ -84,6 +90,7 @@ public:
             return false;
         }
     };
+    using Cursor=SelectedCursor<false>;
     unsigned size()const{return population_;}
     void clear(){
         for(auto& locator:locator_)locator=0;

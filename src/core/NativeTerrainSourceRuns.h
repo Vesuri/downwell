@@ -139,9 +139,9 @@ public:
         auto* changed=sources_.materialize(h,initialCell);
         return changed?&(changed->*Member):nullptr;
     }
-    class Cursor {
-        typename Base::Cursor scalar_;
-        typename Sources::Cursor source_;
+    template<bool Rows> class SelectedCursor {
+        typename Base::template SelectedCursor<Rows> scalar_;
+        typename Sources::template SelectedCursor<Rows> source_;
         Identity scalarNext_,sourceNext_;
         bool scalarLive_,sourceLive_;
         bool takeSource(){
@@ -150,7 +150,8 @@ public:
             sourceNext_=identity(h,source);return true;
         }
     public:
-        explicit Cursor(const NativeTerrainSourceRuns& owner):scalar_(owner),source_(owner.sources_),
+        explicit SelectedCursor(const NativeTerrainSourceRuns& owner,int first=0,int end=0):
+            scalar_(owner,first,end),source_(owner.sources_,first,end),
             scalarLive_(scalar_.take(scalarNext_)),sourceLive_(takeSource()){}
         bool take(Identity& out){
             if(!scalarLive_&&!sourceLive_)return false;
@@ -160,6 +161,7 @@ public:
             return true;
         }
     };
+    using Cursor=SelectedCursor<false>;
     InstanceHandle handle(unsigned ordinal)const{
         Cursor cursor(*this);Identity id;
         while(cursor.take(id))if(!ordinal--)return id.handle;
@@ -169,6 +171,18 @@ public:
         Cursor cursor(*this);Identity id;while(cursor.take(id))if(!visit(id))return false;return true;
     }
     template<class Visit> bool visitRows(int first,int end,Visit visit)const{
+#ifdef DOWNWELL_REFERENCE_SOURCE_ROW_SCAN
+        return visitRowsReference(first,end,visit);
+#else
+        if(first>=end)return true;
+        // Reject whole source/retained runs before expanding identities, then
+        // merge the remaining cursors in the same immutable birth order.
+        SelectedCursor<true> cursor(*this,first,end);Identity id;
+        while(cursor.take(id))if(!visit(id))return false;
+        return true;
+#endif
+    }
+    template<class Visit> bool visitRowsReference(int first,int end,Visit visit)const{
         if(first>=end)return true;
         return this->visit([&](const Identity& id){
             return ((id.y<first&&unsigned(first)-unsigned(id.y)>=16u)||
