@@ -1,5 +1,49 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: exact prepared crawler bounds trigonometry
+
+Against `ac0a5543`, prepare the six raw quarter-turn results used by native
+crawler bounds. Source Step assigns movedir or movedir+180; Alarm 0 selects
+0/90/180/270, so 360/450 must not be normalized. The read-only native census
+(`tmp/actor-trig-census.log`) observes one `refreshNativeActor` trig call in
+the 137–141 window, with radians `400921fb:60000000` (the 180-degree wrapper
+result). Its cost is **7.58 ms averaged over five updates**, not five calls.
+
+`PreparedActorBoundsTrig` contains exact binary32 results of the existing
+degree wrapper, recovered trig program and narrowing operation. Preserve its
+tiny nonzero components; do not substitute ideal quadrants. Every other angle
+uses the old computation. `DOWNWELL_REFERENCE_ACTOR_BOUNDS_TRIG` retains the
+whole runtime path. No lifetime cache, asset bank or mutable storage is added.
+
+Same deterministic scene-collision fall, 512 KiB Chip / 8 MiB Fast:
+
+| Measurement | Parent | Prepared results |
+| --- | ---: | ---: |
+| 164 updates, PAL fields | 975 | 959 |
+| First update, PAL fields | 213 | 213 |
+| Updates 57–61 mean, ms | 93.7 | 93.7 |
+| Updates 57/58/59/60/61, ms | 49.7/158.7/42.1/117.0/100.9 | 49.7/158.9/41.9/117.0/100.9 |
+| Updates 137–141 mean, ms | 83.4 | 75.5 |
+| Actor bounds refresh, ms/update in 137–141 | 13.34 | 5.42 |
+| Updates 137/138/139/140/141, ms | 112.6/81.4/55.3/81.2/86.4 | 73.6/81.4/55.1/81.4/86.1 |
+
+The late parent window was recaptured in this session; early/cadence parent
+figures are the saved build's preceding measurements. Independent update-137
+capture: **522,630 cycles / 73.6 ms**. The initial 20-field recheck contained
+no complete update and was not counted; the 50-field recheck completed 137.
+All 165 native state samples and reference/native collision-owner witnesses
+agree. `verify-smoke-trig` checks the source extraction, all six exact lookup
+results, rejected adjacent/signed keys, and 60,000 source-program/scalar pairs.
+The 18,000-update terrain replay and dither/wind tests pass, as do normal
+512 KiB Chip startup and 68000 build audits. This removes a measured burst,
+not the remaining production performance gate; the backend stays diagnostic.
+
+Candidate ELF SHA-256
+`6d166f64dc2ed72baeb35eb7e16f0324490162bde975e8745efdea3fe0aacd8f`.
+Reports: `tmp/actor-trig-{control,cost,late,recheck}/report.txt`;
+state/cadence: `tmp/actor-trig-candidate/`; host witnesses:
+`tmp/actor-trig-{owner,reference}.txt`. Raw traces are removed after commit.
+
 ## Encounter candidate: select terrain runs before expanding row identities
 
 Against `ee9ee3f4`, the source-record terrain row cursor rejects off-band runs

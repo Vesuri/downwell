@@ -30,6 +30,7 @@
 #include "ObjectAlarmMetadata.h"
 #include "Profile.h"
 #include "PreparedUnitSpriteBounds.h"
+#include "PreparedActorBoundsTrig.h"
 #include "PreparedTerrainBirthBounds.h"
 #include "RunnerBorrowedState.h"
 #include "NativeInstanceTable.h"
@@ -736,9 +737,14 @@ private:
             const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
             RunnerImageValue cosine{},sine{};
             if(rotated){
+#ifndef DOWNWELL_REFERENCE_ACTOR_BOUNDS_TRIG
+                if(!PreparedActorBoundsTrig::at(sprite.angle,cosine,sine))
+#endif
+                {
                 RunnerImageValue radians;MotionBinary64 c,s;
                 if(!SmokeDirection::radians(sprite.angle,radians)||!smokeTrig(radians.promoted(),c,s)||
                     !cosine.assign(c)||!sine.assign(s))return check(false);
+                }
             }
             if(!RunnerSpriteBounds::fromSprite(resource,state->x,state->y,sprite.scaleX,sprite.scaleY,
                 rotated,cosine,sine,true,[](auto v,std::int32_t& n){return v.roundPixel(n);},bounds))return check(false);

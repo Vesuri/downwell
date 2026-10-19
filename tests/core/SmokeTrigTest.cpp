@@ -1,5 +1,6 @@
 #include "core/SmokeTrig.h"
 #include "core/SmokeDirection.h"
+#include "core/PreparedActorBoundsTrig.h"
 #include "core/GameMakerRandom.h"
 #include <cmath>
 #include <cstring>
@@ -19,6 +20,18 @@ struct Scalar {
     bool integer(int& out)const{out=int(std::nearbyint(value));return true;}
 };
 int main(){
+    for(int degrees=0;degrees<=450;degrees+=90){
+        downwell::RunnerImageValue angle,radians,c,s,expectedC,expectedS;
+        MotionBinary64 dc,ds;
+        check(angle.assignInteger(degrees)&&downwell::SmokeDirection::radians(angle,radians)&&
+            downwell::smokeTrig(radians.promoted(),dc,ds)&&expectedC.assign(dc)&&expectedS.assign(ds));
+        check(downwell::PreparedActorBoundsTrig::at(angle,c,s)&&
+            c.bits==expectedC.bits&&s.bits==expectedS.bits);
+        for(auto unsupported:{angle.bits-1,angle.bits+1,angle.bits|0x80000000u}){
+            c.bits=123;s.bits=456;
+            check(!downwell::PreparedActorBoundsTrig::at({unsupported},c,s)&&c.bits==123&&s.bits==456);
+        }
+    }
     downwell::GameMakerRandom random(42);
     unsigned count=0;
     // Source endpoints, the smallest nonzero WELL-derived smoke angle and
