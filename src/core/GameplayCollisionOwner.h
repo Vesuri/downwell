@@ -2074,10 +2074,20 @@ public:
                 if(!world_||!world_->nativeTerrainInstances())return false;
                 const auto* terrain=world_->nativeTerrainInstances();
                 const InstanceHandle local{h.slot-View::terrainBase,h.generation};
+#ifndef DOWNWELL_REFERENCE_COLLECTION_TERRAIN_READS
+                // One synchronous owner read supplies the same cached geometry.
+                // Do not retain this across flush/query callbacks or mutations.
+                GameplayWorld::NativeTerrain::CollisionRead read;
+                if(!terrain->readCollision(local,read))return false;
+                bool found,precise;RunnerImageValue x,y;
+                return nativeTerrainCachedBounds(read.identity,x,y,bounds,found,precise,
+                    read.cachedSprite,read.cacheX,read.cacheY);
+#else
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,found,precise;int cached;
                 RunnerImageValue x,y;
                 return terrain->read(local,id,active,destroyed)&&terrain->cachedSprite(local,cached)&&
                     nativeTerrainCachedBounds(id,x,y,bounds,found,precise,cached);
+#endif
             },
             [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});},
             [&](InstanceHandle self,InstanceHandle other,bool& found){

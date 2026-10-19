@@ -205,6 +205,12 @@ static std::vector<std::uint32_t> mixed(bool lend,bool fused=false){
                 assert(a->reconcile()&&b->reconcile());compare(*a,*b);
             }
             assert(a->terrain.publishCachedOffset(h,16,0)&&b->terrain.publishCachedOffset(h,16,0));
+            collisionRead(a->terrain,h);collisionRead(b->terrain,h);
+            for(const auto offset:std::vector<std::pair<int,int>>{{-16,0},{0,16},{0,-16}}){
+                assert(a->terrain.publishCachedOffset(h,offset.first,offset.second)&&
+                    b->terrain.publishCachedOffset(h,offset.first,offset.second));
+                collisionRead(a->terrain,h);collisionRead(b->terrain,h);
+            }
             assert(a->terrain.publishIndexed(h)&&b->terrain.publishIndexed(h));
             assert(a->terrain.publishRefreshedBounds(h,0x8208)&&b->terrain.publishRefreshedBounds(h,0x8208));
             auto layer=*a->terrain.layerState(h);layer.inactive=true;layer.order.serial.low+=1000;

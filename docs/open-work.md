@@ -377,17 +377,17 @@ The candidate full-owner integration has not passed the bounded initial-fall
 gate; keep the external backend as the shipping default until that coupling
 is removed and the complete fall is measured. Preserve source spatial-history
 ordering rather than substituting a current-state-only tree.
-The collision-enabled candidate now completes the fall, but takes 935 PAL
-fields for 164 updates (8.77 FPS; update 1 takes 205 fields). Landing state is
+The collision-enabled candidate now completes the fall, but takes 927 PAL
+fields for 164 updates (8.85 FPS; update 1 takes 202 fields). Landing state is
 tick 164, x 0, y 262144, camera y 1024, grounded, health 4, ammo 8, three enemies,
 and 1371 RNG draws. Profile the admitted collision collection/tree work and
 remove the regression before shipping this backend; successful allocation and
 matching landing state are not a production performance gate. Keep exact
 selected-pair order, dirty-list retention and spatial history as the oracle.
 Include the complete generation update **136** in subsequent performance
-gates, not just the following 137–141 window. It costs **858.5 ms**;
-tree service alone remains 351.5 ms.
-The [source-admission audit](amiga-frame-cost.md#encounter-candidate-source-record-admission)
+gates, not just the following 137–141 window. It costs **840.8 ms**;
+tree service alone remains 351.6 ms.
+The [collection-read audit](amiga-frame-cost.md#encounter-candidate-combined-terrain-collection-read)
 records the independent recheck and comparison. Remove remaining terrain-bound
 reconstruction and source tree-maintenance work without changing
 dirty-list or tree history; do not substitute small-window averages for this gate.

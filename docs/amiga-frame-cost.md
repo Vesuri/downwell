@@ -1,5 +1,45 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: combined terrain collection read
+
+Against `dba74784`, terrain collision collection reads identity, cached sprite
+and cached offset together from the existing owner instead of reconstructing
+the record independently for each property. The old collection spends
+12.15 ms in identity reads, 9.47 ms in cached-sprite reads and 7.13 ms in
+cached-offset reads during update 136; the combined read costs 10.54 ms.
+No state survives a callback, and no tree operation, dirty-list entry, pair or
+failure prefix is omitted. `DOWNWELL_REFERENCE_COLLECTION_TERRAIN_READS`
+retains the original path.
+
+| Work | Before | Combined read |
+| --- | ---: | ---: |
+| Complete update 136, ms | 858.5 | 840.8 |
+| Updates 57–61 mean / worst, ms | 92.4 / 155.7 | 92.2 / 155.2 |
+| Updates 137–141 mean / worst, ms | 75.5 / 86.5 | 75.3 / 85.5 |
+| 164 updates, PAL fields | 935 | 927 |
+| First update, PAL fields | 205 | 202 |
+
+Burst: **5,973,840 cycles**. Independent recheck: **5,973,920 cycles**,
+also 840.8 ms. Individual early updates:
+**49.2 / 155.2 / 41.9 / 117.9 / 96.6 ms**; late:
+**73.3 / 81.4 / 55.1 / 81.3 / 85.5 ms**. Both window worsts improve.
+Update 60 moves by 1.0 ms, predominantly in beginDraw (32.5 to 33.1 ms),
+outside the changed Step collection; do not claim an individual-frame win there.
+Tree service is still 351.61 ms: production admission remains blocked by cost.
+
+All 165 native states match. Default/reference owner transcripts and source-span
+pair/tree ordering checks pass. The owner-read fixture now checks all supported
+nonzero temporary offsets before refresh resets them, on source and retained
+records. Source-record tests, ASan/UBSan, the 18,000-update replay and dither/wind
+checks pass. Normal build restored with clean 68000/link audits and verified
+512 KiB Chip startup; all owned emulators stopped.
+
+Candidate ELF SHA-256:
+`966de48eb7492533c3d8c05213a14379bf0baed1b3493d3792b1569adc148c54`.
+Reports: `tmp/collection-read-{burst,recheck,cost,late}/report.txt`;
+`tmp/collection-read-measure.sh` and matching `.gdb` scripts reproduce captures.
+Raw traces removed after committing measurements.
+
 ## Encounter candidate: source-record admission
 
 Against `8cf8322a`, replace the historical-record occupancy scan in
