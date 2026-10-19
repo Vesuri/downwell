@@ -78,6 +78,21 @@ not evidence that the Amiga frontend has acquired those production leases.
 
 #### Collection cannot use the dispatch admission as its query filter
 
+The admitted events already have observable ordering witnesses. VM code 991
+(`objDitherAbove Collision objWall_n`) invokes `instance_destroy` on OTHER.
+Although its GML body does not draw RNG, native destruction publishes ordered
+presentation/collision notifications and can fail partway through them; equal
+final sets of destroyed walls alone are not an equivalence check. VM code for
+`goalTimeField Collision objPlayer_n` first tests `global.voidWind`, chooses a
+sound into the contacting field's `windsnd` only when the voice is idle, starts
+that voice and sets its gain. With overlapping fields, the first contact owns
+the selected sound and RNG draw. Sorting contacts by resource/instance ID is
+therefore not a substitute for proving the original order.
+`GameplayDitherCollisionPassTest` checks per-field sound ownership, ordered
+wall notifications, pending-room suppression and the first failed callback's
+prefix. Any alternative internal representation must retain these witnesses;
+port-to-port agreement or an unchanged final player state alone is inadequate.
+
 The serialized collision bindings have incoming as well as outgoing events.
 Resolving both directions through `ObjectPack::collisionEvent` (including
 target and owner ancestry) gives these terrain partner sets:
