@@ -1,5 +1,47 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: complete generation burst 136
+
+Fresh measurement of `9d526766`, using the frozen `actor-trig-candidate` ELF
+and its deterministic no-input scene-collision fall (512 KiB Chip / 8 MiB
+Fast). Start at marker 135, not 136, so the entire generation update is counted.
+The preceding 137–141 reports remain valid for those updates, but excluded
+this much larger burst and cannot establish its improvement.
+
+| Work in update 136 | ms |
+| --- | ---: |
+| Entire update | 924.49 |
+| World Step | 901.65 |
+| Collision collection | 718.74 |
+| Tree journal service (within collection) | 365.51 |
+| Tree inserts / removes (within service) | 282.29 / 71.34 |
+| Tree child selection (within insertion) | 118.95 |
+| Tree partitioning (within insertion) | 57.10 |
+| Tree queries after catch-up | 68.79 |
+| Dirty spatial refresh | 173.24 |
+| Terrain bounds refresh (within dirty refresh) | 96.95 |
+| Actor bounds refresh (within dirty refresh) | 38.89 |
+| Eligibility reads in collection / dirty refresh | 46.61 / 23.18 |
+| Terrain generation | 146.79 |
+| Selected collision execution | 13.87 |
+| Draw entry | 13.0 |
+
+Nested rows are not additive. Most of the regression is live ownership and
+spatial publication, not row drawing. In particular, eligibility currently
+reacquires terrain identity, flags, source ownership and room membership
+through separate projections. An owner-level read can remove repeated
+reconstruction; it must still observe current marks/activation/registration.
+Tree insert/remove ordering cannot be dropped even when bounds are equal.
+
+First capture: **6,568,560 cycles**. Independent 70-field capture starting at
+135: **6,568,540 cycles**, also **924.5 ms**. Both include a complete 136.
+No runtime change or performance improvement is claimed by this audit.
+ELF SHA-256: `6d166f64dc2ed72baeb35eb7e16f0324490162bde975e8745efdea3fe0aacd8f`.
+Reports: `tmp/encounter-burst-136/report.txt` and
+`tmp/encounter-burst-136-recheck/report.txt`; scripts have the same directory
+stems plus `.gdb`. Raw traces are removed after commit. The normal build was
+not changed; both bounded emulators were stopped by the verification wrapper.
+
 ## Encounter candidate: exact prepared crawler bounds trigonometry
 
 Against `ac0a5543`, prepare the six raw quarter-turn results used by native

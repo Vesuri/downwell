@@ -384,6 +384,13 @@ and 1371 RNG draws. Profile the admitted collision collection/tree work and
 remove the regression before shipping this backend; successful allocation and
 matching landing state are not a production performance gate. Keep exact
 selected-pair order, dirty-list retention and spatial history as the oracle.
+Include the complete generation update **136** in subsequent performance
+gates, not just the following 137–141 window. At `9d526766` it costs **924.5 ms**:
+collision collection 718.7 ms (tree service 365.5, bound refresh 173.2),
+plus generation 146.8 ms. The [complete-burst audit](amiga-frame-cost.md#encounter-candidate-complete-generation-burst-136)
+records the independent recheck and ownership breakdown. Remove repeated
+terrain-state reconstruction and source tree-maintenance work without changing
+dirty-list or tree history; do not substitute small-window averages for this gate.
 **Work:** Finish production environment wiring in `StoredEncounterSession` and
 `GameplayEncounterSession`; their boundary contract is in
 [scene architecture](scene-architecture.md#encounter-session-boundary).
