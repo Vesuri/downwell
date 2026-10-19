@@ -76,7 +76,14 @@ checks the selected field's sound/RNG against the reference owner, and exercises
 the real world collision-phase hook and Draw-time retirement. This fixture is
 not evidence that the Amiga frontend has acquired those production leases.
 
-#### Collection cannot use the dispatch admission as its query filter
+#### Behavior-equivalent collision backends
+
+The production backend is authorized to differ from the runner's internal
+tree and dirty-list history. The full runner remains the reference, not a
+required production data structure. Equivalence covers observable event order,
+RNG/audio ownership, destruction notifications and failure behavior. A scene's
+narrow dispatch admission is not, by itself, proof that other collection work
+can be removed.
 
 The admitted events already have observable ordering witnesses. VM code 991
 (`objDitherAbove Collision objWall_n`) invokes `instance_destroy` on OTHER.
@@ -92,6 +99,16 @@ therefore not a substitute for proving the original order.
 wall notifications, pending-room suppression and the first failed callback's
 prefix. Any alternative internal representation must retain these witnesses;
 port-to-port agreement or an unchanged final player state alone is inadequate.
+
+Contact order depends on non-contacting births too. The dither-pass fixture
+pins the same eight contacted walls with 48 distant walls created before,
+after, or on both sides of their births. Creating the distant group first
+changes the reference destruction order even though none of those distant
+walls touches the dither. A position-sorted or birth-sorted contact list cannot
+replace that order. The fixture checks every failing notification prefix as
+well as successful dispatch; `DOWNWELL_CONTACT_ORDER_WITNESS=1` prints the
+transcripts. These are retained-runner regression witnesses, not new captures
+from the Windows executable.
 
 The serialized collision bindings have incoming as well as outgoing events.
 Resolving both directions through `ObjectPack::collisionEvent` (including
@@ -110,8 +127,9 @@ dispatch set (61/60 and 255-or-371/35) is narrower than this resource set.
 pairs and only then stamps each processed identity after its query. Pair
 capacity failure is also before dispatch selection. Therefore dropping queries
 solely because the caller's object has no admitted outgoing handler does not
-preserve the complete collection contract. Nor may unselected pairs be removed
-from the buffer just because this scene's dispatcher does not invoke them.
+preserve the complete reference collection contract. A replacement may omit
+unselected pairs only with a separate proof that observable behavior, including
+failure prefixes, remains equivalent; dispatcher selection alone is insufficient.
 
 A future proven-empty query optimization must account for live partners in
 both directions, generation-specific processed stamps, dirty-list retention,

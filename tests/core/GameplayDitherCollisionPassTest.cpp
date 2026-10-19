@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 #include <cstdio>
+#include <cstdlib>
 using namespace downwell;
 static std::vector<std::uint8_t> read(const char* path){
     std::ifstream in(path,std::ios::binary);assert(in);return {std::istreambuf_iterator<char>(in),{}};
@@ -29,7 +30,7 @@ struct Audio {
     bool setGain(int,MotionBinary64 gain,int){gains.push_back(gain);return true;}
     bool setPitch(int,MotionBinary64){return true;}
 };
-template<bool Prepared> static void exercise(int argc,char** argv){
+template<bool Prepared> static void exercise(int argc,char** argv,unsigned history=0){
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
         rb=read("generated/downwell-rooms.dwrm"),mb=read(argc>1?argv[1]:"generated/downwell-sprite-masks.dwsm");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
@@ -37,11 +38,11 @@ template<bool Prepared> static void exercise(int argc,char** argv){
     assert(objects.valid()&&sprites.valid()&&rooms.valid()&&masks.valid());
     std::vector<int> reference,referenceDestroyed;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery}){
-        for(unsigned failure=0;failure<3;++failure){
+        for(unsigned failure=0;failure<10;++failure){
             struct Presentation {
-                bool reject=false;std::vector<int> destroyed;
+                unsigned rejectAt=0;std::vector<int> destroyed;
                 bool changed(int x,int y,int before,int after){
-                    if(before>=0&&after<0){destroyed.push_back(x);destroyed.push_back(y);return !reject;}
+                    if(before>=0&&after<0){destroyed.push_back(x);destroyed.push_back(y);return destroyed.size()/2!=rejectAt;}
                     return true;
                 }
             } presentation;
@@ -52,12 +53,24 @@ template<bool Prepared> static void exercise(int argc,char** argv){
             auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
             assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&world->createAuthoredDitherAbove());
             GameMakerRandom random;
+            // Remote, non-contacting births still alter the reference spatial
+            // tree. A replacement must not infer ordering from one tidy fixture.
+            auto remoteWalls=[&]{
+                for(unsigned i=0;i<48;++i){
+                    const int x=2048+int(i%8)*16,y=1024+int(i/8)*16;
+                    if(native)assert(terrain->append(60,x,y));
+                    else assert(owner->terrain().append(60,x,y,true));
+                }
+            };
+            if(history==1||history==3)remoteWalls();
+            const unsigned wallBase=history==1||history==3?48:0;
             for(unsigned i=0;i<8;++i){
                 if(native){assert(terrain->append(60,496+int(i)*16,-128));
-                    assert(terrain->createProperties(terrain->handle(i),51));}
+                    assert(terrain->createProperties(terrain->handle(wallBase+i),51));}
                 else {assert(owner->terrain().append(60,496+int(i)*16,-128,true));
-                    assert(owner->terrain().createProperties(owner->terrain().handle(i),51,false,random));}
+                    assert(owner->terrain().createProperties(owner->terrain().handle(wallBase+i),51,false,random));}
             }
+            if(history==2||history==3)remoteWalls();
             auto& fields=const_cast<GameplayGoalFields&>(world->goalFieldInstances());
             // Retained overlapping entry fields; normal first-level Create
             // destroys its entry field. This is an explicit ordering fixture.
@@ -70,17 +83,25 @@ template<bool Prepared> static void exercise(int argc,char** argv){
             assert(pass->run(*world,MotionBinary64::fromInteger(1),audio,room));
             assert(audio.calls.empty()&&world->randomDrawCount()==before);
             pending=false;
-            presentation.reject=failure==2;
+            presentation.rejectAt=failure>=2?failure-1:0;
             // Source dispatcher retains dirty collision entries for next pass.
             const bool okay=pass->run(*world,MotionBinary64::fromInteger(1),audio,room);
             assert(okay==!failure);
-            if(failure!=2)assert(!audio.calls.empty());
-            else assert(presentation.destroyed.size()==2); // Stop at the first failed wall notification.
+            // Pin the runner oracle's ordered notifications, including every
+            // possible failing prefix. Remote non-contacting births change it.
+            const std::vector<int> expected=history==1?
+                std::vector<int>{496,-128,528,-128,544,-128,512,-128,560,-128,576,-128,608,-128,592,-128}:
+                std::vector<int>{560,-128,576,-128,608,-128,592,-128,496,-128,528,-128,544,-128,512,-128};
+            if(failure<2)assert(!audio.calls.empty());
+            else assert(presentation.destroyed.size()==2*(failure-1));
+            assert(presentation.destroyed.size()<=expected.size());
+            for(unsigned i=0;i<presentation.destroyed.size();++i)assert(presentation.destroyed[i]==expected[i]);
+            if(!failure)assert(presentation.destroyed==expected);
             if(failure){
                 assert(!owner->valid());
                 // The scalar terrain observer latches its owner, whereas
                 // native destruction also passes through world.effects.
-                if(failure!=2||native)assert(!world->effectsSucceeded());
+                if(failure<2||native)assert(!world->effectsSucceeded());
                 const auto count=audio.calls.size();
                 assert(!pass->run(*world,MotionBinary64::fromInteger(1),audio,room)&&audio.calls.size()==count);
             }else{
@@ -88,13 +109,19 @@ template<bool Prepared> static void exercise(int argc,char** argv){
                 // Which overlapping lifetime owns the RNG-selected sound is
                 // observable even though both contacts share the same voice.
                 for(unsigned i=0;i<2;++i)audio.calls.push_back(fields.find(fields.handle(i))->windSound);
+                if(std::getenv("DOWNWELL_CONTACT_ORDER_WITNESS")){
+                    std::printf("ORDER prepared=%u native=%u history=%u walls=",unsigned(Prepared),unsigned(native),history);
+                    for(auto coordinate:presentation.destroyed)std::printf("%d,",coordinate);
+                    std::printf(" audio=");for(auto call:audio.calls)std::printf("%d,",call);
+                    std::puts("");
+                }
                 if(mode==GameplayCollisionOwner::Ownership::reference){reference=audio.calls;referenceDestroyed=presentation.destroyed;}
                 else assert(audio.calls==reference&&presentation.destroyed==referenceDestroyed);
                 unsigned destroyed=0;
                 for(unsigned i=0;i<8;++i){
                     if(native){GameplayWorld::NativeTerrain::Identity id;bool active,dead;
-                        assert(terrain->read(terrain->handle(i),id,active,dead));destroyed+=dead;}
-                    else destroyed+=owner->terrain().find(owner->terrain().handle(i))->destroyRequested;
+                        assert(terrain->read(terrain->handle(wallBase+i),id,active,dead));destroyed+=dead;}
+                    else destroyed+=owner->terrain().find(owner->terrain().handle(wallBase+i))->destroyRequested;
                 }
                 assert(destroyed>0); // Same sealed stream also executed code 991.
                 const auto queries=audio.calls.size();unsigned passes=0;
@@ -221,4 +248,7 @@ static void sessionInputsAndSettings(int argc,char** argv){
     }
     std::puts("Encounter bindings: live lowSpec/ending, separate master/game/wind gain and unconsumed input passed");
 }
-int main(int argc,char** argv){exercise<false>(argc,argv);exercise<true>(argc,argv);sessionInputsAndSettings(argc,argv);}
+int main(int argc,char** argv){
+    for(unsigned history=0;history<4;++history){exercise<false>(argc,argv,history);exercise<true>(argc,argv,history);}
+    sessionInputsAndSettings(argc,argv);
+}

@@ -365,7 +365,7 @@ Important current boundaries to remove:
 #### 1.01 Install a production encounter session
 **Prerequisite brought forward (authorized):** Install the minimum native
 ordered query/dispatch admission needed by dither and wind from 1.05/1.07 here.
-Keep terrain identity in runs, retain source dirty-list/tree ordering, and own
+Keep terrain identity in runs, preserve observable source event ordering, and own
 collision/audio leases only in the scenes that use them. Compare against the
 reference owner, check 512 KiB Chip startup and measure the initial fall before
 accepting the production default. Do not disable the external-backend guard
@@ -375,34 +375,44 @@ Before enabling the native scene collision backend, separate query admission
 from the existing native terrain-span and record-backed actor fast paths.
 The candidate full-owner integration has not passed the bounded initial-fall
 gate; keep the external backend as the shipping default until that coupling
-is removed and the complete fall is measured. Preserve source spatial-history
-ordering rather than substituting a current-state-only tree.
+is removed and the complete fall is measured. **Authorized backend freedom:**
+the production backend may use a different internal representation and need
+not reproduce identical tree or dirty-list history. Prove equivalent observable
+event order, RNG/audio ownership, destruction notifications and failure behavior
+against the retained full runner oracle; matching final state alone is insufficient.
 The collision-enabled candidate now completes the fall, but takes 927 PAL
 fields for 164 updates (8.85 FPS; update 1 takes 202 fields). Landing state is
 tick 164, x 0, y 262144, camera y 1024, grounded, health 4, ammo 8, three enemies,
 and 1371 RNG draws. Profile the admitted collision collection/tree work and
 remove the regression before shipping this backend; successful allocation and
 matching landing state are not a production performance gate. Keep exact
-selected-pair order, dirty-list retention and spatial history as the oracle.
+selected-pair order, dirty-list retention and spatial history in the oracle.
 Include the complete generation update **136** in subsequent performance
 gates, not just the following 137–141 window. It costs **840.8 ms**;
 tree service alone remains 351.6 ms.
 The [collection-read audit](amiga-frame-cost.md#encounter-candidate-combined-terrain-collection-read)
 records the independent recheck and comparison. Remove remaining terrain-bound
-reconstruction and source tree-maintenance work without changing
-dirty-list or tree history; do not substitute small-window averages for this gate.
+reconstruction and source tree-maintenance work through a behavior-equivalent
+backend; do not substitute small-window averages for this gate.
 **Remaining integration gates:**
 
-1. Remove the collision-admission performance regression above. Do not replace
-   the complete source pair stream with the narrow dispatch admission.
+1. Remove the collision-admission performance regression above with a shared,
+   explicit scene-specific backend. First establish the ordering rule for each
+   admitted event family from the source and oracle, including overlapping wind
+   fields, wall destruction, pending room changes and failing callbacks. Compare
+   ordered callback transcripts and intermediate state, not only final digests.
+   Keep the complete source collector compiled as the reference. A narrower
+   production collector is permitted only after proving the omitted work has
+   no observable effect, including incoming events and failure behavior.
    The [query census](amiga-frame-cost.md#collision-query-census-empty-result-traversal)
    identifies 42 empty queries out of 43 in update 136; traversal costs 69.5 ms
    separately from journal service. A global non-terrain history envelope was
    measured and rejected (see the audit's rejected-approaches table); do not
    tune envelope/check-layout variants. Any further exclusion needs an
    independently priced proof, including incoming events and cached bounds.
-   Empty observed results alone are not a proof; preserve catch-up/failure
-   prefixes, processed-generation stamps and the entire ordered pair stream.
+   Empty observed results alone are not a proof. Internal catch-up, generation
+   stamps and unobserved pairs may differ; observable callback/failure prefixes
+   must not. Add negative tests that detect dropped or reordered admitted events.
 2. Promote the scene-local native backend from `scene_collision_candidate.mk`
    to the shipping build only after that gate passes. Preserve the production
    `AmigaEncounterResources` binding of collision history, masks,
