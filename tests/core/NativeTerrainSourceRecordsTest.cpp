@@ -1,6 +1,7 @@
 #include "core/NativeTerrainLifetimes.h"
 #include "core/RunnerSourceRoomMembership.h"
 #include <cassert>
+#include <algorithm>
 #include <cstdio>
 #include <memory>
 #include <vector>
@@ -317,6 +318,31 @@ static std::vector<unsigned> cleanupMixed(bool reference,unsigned mutation){
     assert(okay==(mutation!=4)&&!visited.empty());return visited;
 }
 int main(){
+    {
+        auto f=std::make_unique<Fixture<true>>();
+        auto check=[&](){
+            std::vector<unsigned> expected,actual;
+            assert(f->terrain.visitSourceRoomStates([&](unsigned slot,const RunnerRoomOrderState& room){
+                if(room.list>=0&&room.marked)expected.push_back(slot);return true;
+            }));
+            assert(f->terrain.visitMarkedSourceRoomStates([&](unsigned slot,const RunnerRoomOrderState& room){
+                assert(room.list>=0&&room.marked);actual.push_back(slot);return true;
+            }));
+            std::sort(expected.begin(),expected.end());std::sort(actual.begin(),actual.end());
+            assert(expected==actual);
+        };
+        assert(f->segment(cells,4,64));check();
+        assert(f->terrain.markDestroyed(f->terrain.currentHandle(1)));check();
+        unsigned visited=0;
+        assert(!f->terrain.visitMarkedSourceRoomStates([&](unsigned slot,const RunnerRoomOrderState&){
+            assert(slot==1);++visited;return false;
+        })&&visited==1);
+        assert(f->terrain.retire(f->terrain.currentHandle(1)));check();
+        assert(f->segment(cells,1,80));check(); // Reused slot must not inherit its old mark.
+        assert(f->room.mark(33));check();
+        f->room.clear();check(); // A removed room entry is not a cleanup candidate.
+        f->terrain.clear();check();
+    }
     {
         auto f=std::make_unique<Fixture<true>>();
         assert(f->segment(cells,4,64));

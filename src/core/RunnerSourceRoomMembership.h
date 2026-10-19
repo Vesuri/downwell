@@ -205,8 +205,8 @@ public:
         auto collect=[&](unsigned slot){
             if(count==Capacity)return false;cleanupSlots_[count++]=std::uint16_t(slot);return true;
         };
-        if(!terrain_->visitSourceRoomStates([&](unsigned slot,const State& value){
-               return value.list<0||!value.marked||collect(First+slot);
+        if(!terrain_->visitMarkedSourceRoomStates([&](unsigned slot,const State&){
+               return collect(First+slot);
            }))return false;
         sortCleanup(count);
         bool interrupted=false;

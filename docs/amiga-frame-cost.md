@@ -1,5 +1,42 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: collect cleanup marks from their existing owner
+
+Against `4e65a7e1`, source cleanup reads only materialized room state from the
+existing changed-cell owner. Initial source state is unmarked; reconstructing
+every birth to discover that fact is unnecessary. The scan uses the owner's
+existing generation map, without a second membership table or new storage.
+Collected marks still go through the same ordering, merge and live-mutation
+fallback. `DOWNWELL_REFERENCE_SOURCE_CLEANUP_SCAN` retains the complete old scan.
+
+Same deterministic scene-collision fall, 512 KiB Chip / 8 MiB Fast:
+
+| Measurement | Parent | Changed-state scan |
+| --- | ---: | ---: |
+| 164 updates, PAL fields | 1,033 | 1,019 |
+| First update, PAL fields | 213 | 213 |
+| Updates 57–61 mean, ms | 93.8 | 93.7 |
+| Updates 57/58/59/60/61, ms | 49.7/159.2/41.9/117.3/100.8 | 49.5/158.9/41.9/117.3/100.9 |
+| Updates 137–141 mean, ms | 101.1 | 96.3 |
+| Source mark collection, ms/update in 137–141 | 5.36 | 0.63 |
+| Updates 137/138/139/140/141, ms | 129.6/93.5/71.8/93.1/117.3 | 129.6/81.4/71.8/81.4/117.1 |
+
+The late parent window was recaptured in this session; early/cadence parent
+figures are the saved build's preceding measurements. Independent update-138
+capture: **578,610 cycles / 81.4 ms**. All 165 state samples and reference/native
+collision-owner witnesses agree. The 18,000-update terrain replay, source
+mutation/reuse/teardown/failure/nesting fixtures (also ASan/UBSan), mixed
+collision-source fixture and dither/wind tests pass. Normal startup with
+512 KiB Chip and the 68000 build audits pass. No new storage or assets.
+The production collision backend remains diagnostic: this is not its final
+performance gate.
+
+Candidate ELF SHA-256
+`7f5f950b500f4823510a4c968a85b39676d471bef07a65c85353397cb4ece361`.
+Reports: `tmp/changed-cleanup-{control,cost,late,recheck}/report.txt`;
+state/cadence: `tmp/changed-cleanup-candidate/`; host witnesses:
+`tmp/changed-cleanup-{owner,reference}.txt`. Raw traces are removed after commit.
+
 ## Encounter candidate: typed terrain cleanup at Draw entry
 
 Against `93fe0234`, production Draw cleanup retires marked native terrain

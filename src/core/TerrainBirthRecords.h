@@ -173,6 +173,15 @@ public:
     const Mutable* mutation(InstanceHandle h)const{
         return find(h)!=used_&&changedGeneration_[h.slot]==h.generation?changed(h.slot):nullptr;
     }
+    // Unordered, read-only access to the existing exceptional-state owner.
+    // Retirement destroys the cell and clears its generation before reuse;
+    // untouched births have no mutable state to visit. Callbacks must not
+    // publish or retire cells while this traversal is in progress.
+    template<class Visit> bool visitMutations(Visit visit)const{
+        for(unsigned slot=0;slot<highWater_;++slot)
+            if(changedGeneration_[slot]&&!visit(slot,*changed(slot)))return false;
+        return true;
+    }
     template<class Initial> Mutable* materialize(InstanceHandle h,Initial initial){
         // initial is a pure projection, not a game callback or a second birth.
         Read source;if(!read(h,source))return nullptr;

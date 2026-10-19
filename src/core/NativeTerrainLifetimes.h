@@ -78,6 +78,10 @@ public:
         if constexpr(SourceRecords)return runs_.visitSourceRoomStates(visit);
         return true;
     }
+    template<class Visit> bool visitMarkedSourceRoomStates(Visit visit)const{
+        if constexpr(SourceRecords)return runs_.visitMarkedSourceRoomStates(visit);
+        return true;
+    }
     using Identity=typename Runs::Identity;
     // A synchronous read, never a second owner or a retained cache. Collision
     // refresh does not consume wall animation/image index, so do not construct

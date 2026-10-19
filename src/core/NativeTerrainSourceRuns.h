@@ -72,6 +72,19 @@ public:
             return visit(h.slot,RunnerRoomOrderState{source.roomSerial(),{source.birth->roomDepth},0,false});
         });
     }
+    template<class Visit> bool visitMarkedSourceRoomStates(Visit visit)const{
+#ifdef DOWNWELL_REFERENCE_SOURCE_CLEANUP_SCAN
+        return visitSourceRoomStates([&](unsigned slot,const RunnerRoomOrderState& room){
+            return room.list<0||!room.marked||visit(slot,room);
+        });
+#else
+        // Initial source room state is never marked. Only the changed cell
+        // can own a cleanup mark; do not reconstruct every source birth.
+        return sources_.visitMutations([&](unsigned slot,const Cell& cell){
+            return cell.room.list<0||!cell.room.marked||visit(slot,cell.room);
+        });
+#endif
+    }
     unsigned size()const{return Base::size()+sources_.size();}
     unsigned runCount()const{return Base::runCount()+sources_.runCount();}
     bool occupied(unsigned slot)const{return Base::occupied(slot)||sources_.currentHandle(slot).generation;}
