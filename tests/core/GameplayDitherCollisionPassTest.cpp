@@ -12,7 +12,10 @@ static std::vector<std::uint8_t> read(const char* path){
     std::ifstream in(path,std::ios::binary);assert(in);return {std::istreambuf_iterator<char>(in),{}};
 }
 struct Audio {
-    bool playing=false,fail=false;std::vector<int> calls;
+    bool playing=false,fail=false,resourcePlaying=false;std::vector<int> calls;
+    unsigned failOperation=0;
+    std::vector<int> operations;
+    bool operation(int kind){operations.push_back(kind);return operations.size()!=failOperation;}
     std::vector<MotionBinary64> gains;
     MotionBinary64 expectedMaster{0x3fe33333u,0x33333333u};
     unsigned stops=0,updates=0;int missing=-1;bool masterOkay=true;
@@ -21,14 +24,18 @@ struct Audio {
     bool stopAll(){++stops;playing=false;return !fail;}
     void update(){++updates;}
     bool setMasterGain(MotionBinary64 gain){return masterOkay&&gain.high==expectedMaster.high&&gain.low==expectedMaster.low;}
-    bool isPlaying(int id,bool& out){calls.push_back(id);out=id==900&&playing;return !fail;}
-    bool stop(int id){calls.push_back(10000+id);return true;}
+    bool isPlaying(int id,bool& out){calls.push_back(id);
+        out=(id==900&&playing)||(resourcePlaying&&id>=TimeFieldWind::firstSound&&id<TimeFieldWind::firstSound+TimeFieldWind::soundCount);
+        return operation(1)&&!fail;}
+    bool stop(int id){calls.push_back(10000+id);
+        if(!operation(2))return false;resourcePlaying=false;return true;}
     bool play(int id,int priority,bool loop,int& voice){
-        assert(priority==90&&!loop);calls.push_back(20000+id);voice=900;playing=true;return true;
+        assert(priority==90&&!loop);calls.push_back(20000+id);
+        if(!operation(3))return false;voice=900;playing=true;return true;
     }
-    bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-    bool setGain(int,MotionBinary64 gain,int){gains.push_back(gain);return true;}
-    bool setPitch(int,MotionBinary64){return true;}
+    bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return operation(4);}
+    bool setGain(int,MotionBinary64 gain,int){gains.push_back(gain);return operation(5);}
+    bool setPitch(int,MotionBinary64){return operation(6);}
 };
 template<bool Prepared> static void exercise(int argc,char** argv,unsigned history=0){
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
@@ -248,7 +255,66 @@ static void sessionInputsAndSettings(int argc,char** argv){
     }
     std::puts("Encounter bindings: live lowSpec/ending, separate master/game/wind gain and unconsumed input passed");
 }
+static void windFailurePrefixes(int argc,char** argv){
+    const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
+        rb=read("generated/downwell-rooms.dwrm"),mb=read(argc>1?argv[1]:"generated/downwell-sprite-masks.dwsm");
+    ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    RoomPack rooms(rb.data(),rb.size());SpriteMaskPack masks(mb.data(),mb.size());
+    // First contact starts the voice, the second only queries it. Separate
+    // failures at both gain writes and all three playing queries are required.
+    for(bool resourcePlaying:{false,true}){
+    // A selected resource can still be playing while global.voidWind is idle.
+    // soundPlayOL then stops it before creating the new voice.
+    const std::vector<int> expected=resourcePlaying?
+        std::vector<int>{1,1,2,3,4,5,6,1,5,1}:std::vector<int>{1,1,3,4,5,6,1,5,1};
+    std::vector<std::vector<int>> references(expected.size()+1);
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery}){
+        for(unsigned failAt=0;failAt<=expected.size();++failAt){
+            auto owner=makeCollisionOwner(objects,sprites,{}, {},&rooms,mode);
+            const bool native=mode==GameplayCollisionOwner::Ownership::nativeScenery;
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+            assert(owner->attach(*world));
+            auto& fields=const_cast<GameplayGoalFields&>(world->goalFieldInstances());
+            assert(fields.create(240,176,371)&&fields.create(240,176,371));
+            Audio audio;audio.failOperation=failAt;audio.resourcePlaying=resourcePlaying;
+            auto room=[]{return RunnerCollisionEventContext::RoomState{true,false};};
+            using Environment=GameplayEncounterEnvironment<Audio,decltype(room),256>;
+            auto environment=std::make_unique<Environment>(*world,*owner,masks,audio,room);
+            GameplayEncounterSession session(*world,*owner);assert(session.start());
+            {
+                GameplayEncounterSession::Frame frame(session);
+                assert(frame.sampleInput({})&&frame.bindUpdateEnvironment(*environment));
+                world->step(0);
+                const unsigned count=failAt?failAt:unsigned(expected.size());
+                assert(audio.operations.size()==count);
+                for(unsigned i=0;i<count;++i)assert(audio.operations[i]==expected[i]);
+                // Preserve the partial caller state, not merely the fact that
+                // an error occurred. This includes which field consumed RNG.
+                auto witness=audio.calls;
+                witness.push_back(int(world->randomDrawCount()));
+                witness.push_back(world->timeFieldWindVoice());
+                for(unsigned i=0;i<2;++i){
+                    const auto* field=fields.find(fields.handle(i));assert(field);
+                    witness.push_back(field->windSound);witness.push_back(field->sound.sndsnd);
+                }
+                if(!native)references[failAt]=witness;
+                else assert(witness==references[failAt]);
+                if(failAt){
+                    assert(!world->effectsSucceeded()&&!owner->valid());
+                    assert(!frame.beginDraw(true)&&!frame.publishable()&&!frame.finish());
+                    assert(audio.operations.size()==count);
+                }else assert(frame.beginDraw(true)&&frame.publishable()&&frame.finish());
+                assert(!world->boundEncounterUpdate(environment.get()));
+            }
+            assert(session.succeeded()==!failAt);
+        }
+    }
+    }
+    std::puts("Wind audio: idle/replaced resource callback prefixes preserve caller state and stop publication on failure");
+}
 int main(int argc,char** argv){
     for(unsigned history=0;history<4;++history){exercise<false>(argc,argv,history);exercise<true>(argc,argv,history);}
     sessionInputsAndSettings(argc,argv);
+    windFailurePrefixes(argc,argv);
 }
