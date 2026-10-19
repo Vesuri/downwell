@@ -97,6 +97,34 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
 }
 int main(){
     {
+        // Internal area metadata must survive identical reinsertion, shrinking
+        // bounds, node splits/condensation and pool reuse. Compare the complete
+        // ordered stream with the always-binary arithmetic oracle each time.
+        downwell::RunnerSpatialIndex<512> prepared;
+        downwell::RunnerSpatialIndex<512,false> reference;
+        Box live[96];
+        auto compare=[&]{
+            std::vector<unsigned> a,b;
+            const auto all=box(-100000,-100000,200000,200000);
+            assert(prepared.query(all,[&](unsigned id){a.push_back(id);return true;}));
+            assert(reference.query(all,[&](unsigned id){b.push_back(id);return true;}));
+            assert(a==b&&prepared.height()==reference.height()&&prepared.nodeCount()==reference.nodeCount());
+        };
+        for(unsigned i=0;i<96;++i){
+            live[i]=box(int(i%12)*16,int(i/12)*16);
+            assert(prepared.insert(live[i],i)&&reference.insert(live[i],i));compare();
+        }
+        for(unsigned step=0;step<768;++step){
+            const unsigned id=(step*31)%96;bool a=false,b=false;
+            assert(prepared.remove(live[id],id,true,a)&&reference.remove(live[id],id,true,b)&&a&&b);
+            compare();
+            if(step%3==0)live[id]=box(int(id%12)*16,int(step%48)*16);
+            if(step==512)live[id]=box(-65536,-65536,65536,65536); // Area/extent fallback.
+            if(step==640)live[id].left.bits=0x3f000000; // Permanent binary mode.
+            assert(prepared.insert(live[id],id)&&reference.insert(live[id],id));compare();
+        }
+    }
+    {
         // Prepared inserts retain ordering through split/condensation, then a
         // fractional insert switches both trees to binary storage. Subsequent
         // prepared inserts must keep working in that representation too.
