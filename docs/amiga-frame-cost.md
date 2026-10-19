@@ -1,5 +1,45 @@
 # Amiga gameplay frame-cost audit
 
+## Encounter candidate: source-record admission
+
+Against `8cf8322a`, replace the historical-record occupancy scan in
+`TerrainBirthRecords::canAppend` with at most 64 reads from its existing live-slot
+locator. The baseline attributes 18.94 ms of update 136 to that scan. Commit,
+retirement and clear already maintain the locator; no storage or secondary
+ownership is added. Pending reservations remain unpublished. All generation,
+capacity and overflow guards are unchanged. The old scan remains available as
+`DOWNWELL_REFERENCE_SOURCE_ADMISSION_SCAN` and `canAppendReference`.
+
+| Work | Before | Live-slot admission |
+| --- | ---: | ---: |
+| Complete update 136, ms | 876.7 | 858.5 |
+| Updates 57–61 mean / worst, ms | 92.4 / 156.0 | 92.4 / 155.7 |
+| Updates 137–141 mean / worst, ms | 75.5 / 86.0 | 75.5 / 86.5 |
+| 164 updates, PAL fields | 938 | 935 |
+| First update, PAL fields | 205 | 205 |
+
+Full burst: **6,099,920 cycles**; independent 70-field recheck:
+**6,099,930 cycles**, also 858.5 ms. Early updates individually:
+**49.7 / 155.7 / 41.9 / 116.9 / 97.8 ms**; late:
+**73.3 / 81.1 / 55.2 / 81.4 / 86.5 ms**. The late worst moves within
+0.5-ms noise; the complete changed burst saves 18.2 ms. Tree service still
+costs 351.49 ms: this does not pass production-backend performance admission.
+
+All 165 native states match the baseline, including exact landing. Tests compare
+both admission paths throughout the 12,000-mutation/reuse tape, plus pending
+reservations, retired holes, capacity and generation-overflow boundaries.
+Default/reference unit builds and ASan/UBSan pass. Source ownership, transaction
+prefix/failure tests, source-span integration, unchanged collision-owner
+transcript, 18,000-update terrain replay and dither/wind tests pass.
+
+Candidate ELF SHA-256:
+`eeab8707a6dd7e3eac30f7570d6489c2ff2ee97d5140840e10ea0b8cc2e71b0e`.
+Reports: `tmp/source-admission-{burst,recheck,cost,late}/report.txt`;
+`tmp/source-admission-measure.sh` and matching `.gdb` scripts reproduce captures.
+The normal build is restored with clean 68000/link audits and verified
+512 KiB Chip startup; all owned emulators are stopped. Raw captures are
+removed after committing their measurements.
+
 ## Encounter candidate: prepared integer tree insertion
 
 Against `8fc97876`, journal service passes immutable prepared terrain geometry

@@ -68,11 +68,29 @@ public:
     unsigned size()const{return population_;}
     unsigned sourcePublicationCount()const{return published_;}
     bool canAppend(InstanceHandle first,unsigned count)const{
+#ifdef DOWNWELL_REFERENCE_SOURCE_ADMISSION_SCAN
+        return canAppendReference(first,count);
+#else
+        return canAppendImpl<false>(first,count);
+#endif
+    }
+    bool canAppendReference(InstanceHandle first,unsigned count)const{
+        return canAppendImpl<true>(first,count);
+    }
+private:
+    template<bool ScanRecords> bool canAppendImpl(InstanceHandle first,unsigned count)const{
         if(!count||count>64||first.generation<=lastGeneration_||first.slot>=Capacity||count>Capacity-first.slot||
            count>Capacity-population_||count-1>0xffffffffu-first.generation||
            count>0xffffffffu-published_)return false;
         if(first.slot>=highWater_)return true;
         const unsigned end=first.slot+count;
+        if constexpr(!ScanRecords){
+            // Commit/retire/clear already maintain this live-slot locator.
+            // Historical records and retired holes need not be revisited to
+            // admit a new segment. Pending reservations remain unpublished.
+            for(unsigned slot=first.slot;slot<end;++slot)if(locator_[slot])return false;
+            return true;
+        }
         for(unsigned i=0;i<used_;++i){const auto& r=records_[i];
             if(!r.live||end<=r.birth.slot||first.slot>=r.birth.slot+r.count)continue;
             const unsigned begin=first.slot>r.birth.slot?first.slot-r.birth.slot:0;
@@ -81,6 +99,7 @@ public:
         }
         return true;
     }
+public:
     bool append(const TerrainBirthFacts& birth,unsigned count){
         auto* facts=reserve({birth.slot,birth.generation},count);
         if(!facts)return false;

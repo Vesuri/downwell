@@ -18,6 +18,8 @@ static TerrainBirthFacts facts(const unsigned char* bytes,unsigned slot,unsigned
 }
 static void compare(const Store& store,const std::vector<Expected>& expected){
     for(unsigned slot=0;slot<=64;++slot){
+        for(unsigned count:{0u,1u,2u,7u,32u,64u,65u})
+            assert(store.canAppend({slot,0xffff0000u},count)==store.canAppendReference({slot,0xffff0000u},count));
         assert(store.lookupMatchesReference({slot,0}));
         assert(store.lookupMatchesReference(store.currentHandle(slot)));
     }
@@ -40,6 +42,21 @@ static void compare(const Store& store,const std::vector<Expected>& expected){
 int main(){
     unsigned char bytes[128];
     for(unsigned i=0;i<64;++i){bytes[2*i]=static_cast<unsigned char>(32+i+((i&1)?128:0));bytes[2*i+1]=0;}
+    {
+        Store store;
+        assert(store.reserve({4,1},3));
+        assert(store.canAppend({4,1},3)&&store.canAppendReference({4,1},3));
+        store.abandon();
+        assert(store.append(facts(bytes+8,4,1,100),3));
+        assert(store.retire({5,2}));
+        assert(store.canAppend({5,4},1)&&store.canAppendReference({5,4},1));
+        assert(!store.canAppend({5,4},2)&&!store.canAppendReference({5,4},2));
+        for(unsigned generation:{0u,1u,3u,4u,0xfffffffeu,0xffffffffu})
+            for(unsigned count:{0u,1u,2u,64u,65u})
+                assert(store.canAppend({0,generation},count)==store.canAppendReference({0,generation},count));
+        store.clear();
+        assert(store.canAppend({4,4},3)&&store.canAppendReference({4,4},3));
+    }
     // Every successful prefix is immediately visible; unused suffix cells
     // have no identity, mutable state or consumer publication serial.
     for(unsigned prefix=1;prefix<=64;++prefix){
