@@ -2,6 +2,10 @@
 # only src/platform/sdl and main.cpp include SDL headers.
 
 CXX := clang++
+# Define this before any prerequisite list expands it. Several host checks
+# compile multiple sources in one invocation; their .d file covers only the
+# final source and cannot replace these explicit header dependencies.
+HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
@@ -1962,7 +1966,6 @@ verify-gameplay-death-state: generate-room-pack generate-object-pack generate-bu
 # These executables compile multiple translation units in one command. The
 # compiler's single .d file only describes the final input, so explicitly
 # invalidate them on shared header changes rather than trusting stale tools.
-HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc
 $(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_TRACE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gameplay-player-step-test build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test: generated/downwell-goal-mask.h
 build/goal-time-field-test build/shop-world-test build/level-clear-session-test build/combo-state-test: generated/downwell-goal-mask.h
 
@@ -1972,6 +1975,11 @@ generated/downwell-goal-mask.h: tools/generate-goal-mask.py tools/export-goal-ma
 generated/downwell-goal-mask.mask: generated/downwell-goal-mask.h
 	@test -f $@ || python3 tools/generate-goal-mask.py
 $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test build/gameplay-player-step-test: $(HOST_CHECK_HEADERS)
+
+.PHONY: test-host-check-dependencies
+test: test-host-check-dependencies
+test-host-check-dependencies:
+	python3 tests/host-check-dependencies-test.py
 
 test: build/gem-homing-test test-gem-position
 

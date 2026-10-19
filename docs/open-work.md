@@ -391,22 +391,33 @@ The [prepared-geometry audit](amiga-frame-cost.md#encounter-candidate-prepared-i
 records the independent recheck and comparison. Remove remaining terrain-bound
 reconstruction and source tree-maintenance work without changing
 dirty-list or tree history; do not substitute small-window averages for this gate.
-**Work:** Finish production environment wiring in `StoredEncounterSession` and
-`GameplayEncounterSession`; their boundary contract is in
-[scene architecture](scene-architecture.md#encounter-session-boundary).
-Install each admitted registered event's real scopes inside those update/Draw
-boundaries rather than assembling them only in tests. Reuse the shared core
-APIs; platform code supplies devices, assets and presentation only. Wire settings,
-shared input consumption, language/font state, tile/view reads and real audio
-interfaces. Preserve the [audited admitted-event input and service contract](scene-architecture.md#admitted-environment-reads-and-writes)
-when connecting the final production backend; newly admitted consumers need
-their own source audit and real bindings. SDL currently
-loads only wind sounds 349–355; load the actual
-resources required by each admitted event before enabling it. Define equivalent
-Amiga audio/resource bindings, not dummy successful callbacks. Bind
-`AmigaWindAudio` to the native collision environment and scene lifecycle; its
-bank, driver and verification contract are in `tools/README.md`. The isolated
-device fixture does not enable native gameplay sound events or satisfy this gate.
+**Remaining integration gates:**
+
+1. Remove the collision-admission performance regression above. Do not replace
+   the complete source pair stream with the narrow dispatch admission.
+2. Promote the scene-local native backend from `scene_collision_candidate.mk`
+   to the shipping build only after that gate passes. Preserve the production
+   `AmigaEncounterResources` binding of collision history, masks,
+   `GameplayEncounterEnvironment` and `AmigaWindAudio`; do not substitute probe
+   assets or successful no-op audio callbacks. Keep SDL and Amiga on the shared
+   [session boundary](scene-architecture.md#encounter-session-boundary) and
+   [admitted-event service contract](scene-architecture.md#admitted-environment-reads-and-writes).
+   Any additional admitted consumer needs its own resource/read/write audit
+   and real settings, input, language/font, tile/view and audio bindings.
+3. Re-run final-build host gates: `test-encounter-session`,
+   `test-gameplay-encounter-session`, `test-gameplay-dither-pass`,
+   `build/gameplay-scene-collision-contract-test` and
+   `build/native-collision-source-span-test` (execute both binaries).
+   These must rebuild when shared headers change; use
+   `test-host-check-dependencies` to guard against stale verification binaries.
+4. Re-run final-build native gates: normal 512 KiB Chip startup, shortcuts,
+   `verify-amiga-encounter-clear`, `verify-amiga-encounter-reentry`,
+   `verify-amiga-encounter-update-failure` and `verify-amiga-encounter-failure`.
+   Exercise actual production leases and callbacks, not only isolated device
+   fixtures. Confirm release on scene/run exit and return 20 without further
+   Draw/publication after an injected required callback failure. The lifecycle
+   fixtures do not establish naturally generated encounters; those remain in
+   their later numbered tasks.
 
 **Done when:** Normal startup/shortcut, update, Draw, level transition and Retry
 all construct/use/retire the session on both platforms. A deliberate callback
