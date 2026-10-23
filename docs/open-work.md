@@ -67,12 +67,14 @@ ammo and gem HUD, damage numbers, six enemy families (snake 111, ground turtle
 112, frog 113, bat 116, snail 117, crawler 119), compact shops, level exit,
 upgrade selection, level transitions, death, results and Retry all work.
 
-1. **End of world 1.** After clearing 1-3 the build stops: the level advance
-   only covers levels below 3 (`DownwellAmiga.cpp`,
-   `GameplayWorld::prepareNextAreaOneLevel`). Run the original level-3 clear
-   (`Result` and `scrNextLevel` moving to area 2 level 1, with the area-title
-   and music state), then stop at a clear, deliberate end-of-slice point
-   instead of loading area 2.
+1. **End of world 1 — finish verification.** Run the `quiet-fall` landing
+   regression with the endpoint changes, then rerun
+   `tools/verify-world-one-native.py` through successful screenshot export
+   and completion marker. Check the original level-3 clear / `scrNextLevel`
+   boundary (area 2 level 1, destination title and music state) and the
+   deliberate visible end-of-slice without loading area 2. Destination music
+   belongs to the later `levelBeginCue`, not `scrNextLevel`; actual audio is W2.
+   Restore the normal build after verification, then remove this item.
 2. **Spawner 78 and its children.** The production creation path drops object
    78 silently, and `stepRegisteredSpawnerWithWorld` has no production caller,
    so white jellies 115 and red balls 118 never appear. Admit the spawner and

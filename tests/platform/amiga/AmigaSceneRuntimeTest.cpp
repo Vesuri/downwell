@@ -43,9 +43,9 @@ void require(bool condition, const char* message) {
 }
 
 struct LiveSceneWorld {
-    AmigaTerrainFragment fragments[19];
+    AmigaTerrainFragment fragments[amigaAreaOneTerrainFragmentCapacity];
     AmigaTerrainIndex index;
-    AmigaAreaOneTerrainBuilder builder{fragments, 19};
+    AmigaAreaOneTerrainBuilder builder{fragments, amigaAreaOneTerrainFragmentCapacity};
     AmigaTerrainCollisionContext collision;
     const downwell::BuilderPatternPack& patterns;
     const downwell::ObjectPack& objects;
@@ -2380,6 +2380,94 @@ void testBuilderCheckpoints(const char* roomPath, const char* objectPath, const 
 
 // Input-only route: inspect terrain to choose buttons, never modify the world.
 // This checks the actual room builder and collision adapters, not exit fixtures.
+void testWorldOneSlice(const char* roomPath, const char* objectPath, const char* patternPath) {
+    auto rb=readFile(roomPath),ob=readFile(objectPath),pb=readFile(patternPath);
+    downwell::RoomPack rooms(rb.data(),rb.size());
+    downwell::ObjectPack objects(ob.data(),ob.size());
+    downwell::BuilderPatternPack patterns(pb.data(),pb.size());
+    downwell::PackedRoom room;require(rooms.findRoom(11,room),"slice room");
+    static AmigaPortRuntime game(300,false,1201-176,true);
+    game.initializeEntryInput(false); // normal room-entry scrPlayerInit alarm[2]
+    downwell::EncounterInput edges;
+    require(game.bindEncounterInput(&edges),"slice uses production input edges");
+    LiveSceneWorld live(patterns,objects);
+    live.bind(game,rooms,room);
+    std::ofstream tape("tmp/world-one-gameplay.inputs",std::ios::binary);
+    std::ofstream states("tmp/world-one-gameplay.states");
+    require(bool(tape),"open slice input tape");
+    unsigned total=0;
+    for(unsigned level=1;level<=3;++level){
+        int target=240,deepest=176+game.player().offsetY();unsigned stuck=0,updates=0,shopTick=0;
+        require(!game.finishWorldOneSlice(),"cannot finish before Result Alarm 1");
+        for(;updates<8000&&!game.levelResultRequested()&&!game.dead();++updates){
+            const int x=240+game.player().offsetX(),y=176+game.player().offsetY();
+            if(updates%16==0){
+                int best=-1000000;
+                for(int candidate=168;candidate<=312;candidate+=8){
+                    int floor=amigaResolveTerrainLanding(&live.collision,candidate-240,y-176+8);
+                    if(floor==downwell::gameplayNoLanding)floor=y+400-176;
+                    const int score=std::min(floor+176-y,400)*4-std::abs(candidate-x);
+                    if(score>best){best=score;target=candidate;}
+                }
+            }
+            if(y>deepest+8){deepest=y;stuck=0;}else ++stuck;
+            if(stuck>=120)target=(updates/120)%2?168:312;
+            downwell::Input input;
+            input.left=x>target+2;input.right=x<target-2;
+            input.fire=updates%40==0||updates%40==3;
+            if(stuck>=120)input.fire=updates%40==0||updates%40==3;
+            if(game.shops().noControl){
+                input={};input.left=(shopTick%4)==0;input.fire=(shopTick%4)==2;++shopTick;
+            }else shopTick=0;
+            // Release the style-confirm button before the first gameplay press.
+            if(level==1&&updates==0)input={};
+            states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
+                <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
+            const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
+            edges.sample(input);
+            game.step(packed);
+            if(!game.effectsSucceeded()||!game.generationSucceeded()){
+                std::cerr<<"slice failure level="<<level<<" update="<<updates<<" effects="<<game.effectsSucceeded()
+                    <<" generation="<<game.generationSucceeded()<<'\n';
+                require(false,"slice update succeeds");
+            }
+        }
+        std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
+            <<" exit="<<game.levelResultRequested()<<" x="<<game.player().offsetX()<<" y="<<game.player().offsetY()
+            <<" shop="<<game.shops().noControl<<std::endl;
+        require(!game.dead()&&game.levelResultRequested(),"input-only slice reaches exit alive");
+        bool heart=false;require(game.enterLevelClear(0,heart),"slice Result Create");
+        unsigned clear=0;
+        for(;clear<600&&!game.nextLevelRequested();++clear){
+            states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
+                <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
+            bool fire=clear%4==2;downwell::Input input;input.fire=fire;tape.put(char(downwell::packReplayInput(input)));++total;
+            edges.sample(input);
+            require(game.stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"slice Result Step");
+        }
+        require(game.nextLevelRequested(),"slice Result Alarm 1");
+        std::cout<<"Slice clear="<<clear<<" rng="<<game.randomDrawCount()<<std::endl;
+        if(level<3){
+            downwell::Input input;input.fire=true;
+            require(game.prepareNextAreaOneLevel(input,300),"slice next cavern");
+            live.bind(game,rooms,room,true);
+        }else{
+            const int priorMusic=game.backgroundMusicId();
+            const auto priorRandom=game.randomDrawCount();
+            require(game.finishWorldOneSlice(),"slice scrNextLevel boundary");
+            require(game.runStage().area==2&&game.runStage().level==1&&
+                !game.nextLevelRequested()&&!game.levelClearActive(),"slice destination is 2-1");
+            int destinationMusic=-1;
+            require(downwell::RunSession::areaMusic(game.runStage().area,destinationMusic)&&destinationMusic==195,
+                "destination levelBeginCue selects bgmArea2");
+            require(game.backgroundMusicId()==priorMusic&&game.randomDrawCount()==priorRandom,
+                "scrNextLevel neither starts destination music nor consumes RNG before the new room");
+            require(!game.finishWorldOneSlice(),"slice transition is consumed once");
+        }
+    }
+    std::cout<<"World one slice route passed: "<<total<<" inputs\n";
+}
+
 void testNaturalExit(const char* roomPath, const char* objectPath, const char* patternPath) {
     auto rb = readFile(roomPath), ob = readFile(objectPath), pb = readFile(patternPath);
     downwell::RoomPack rooms(rb.data(), rb.size());
@@ -2676,6 +2764,9 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 }
 
 int main(int argc, char** argv) {
+    if(argc>=4&&std::getenv("DOWNWELL_VERIFY_WORLD_ONE_SLICE")){
+        testWorldOneSlice(argv[1],argv[2],argv[3]);return 0;
+    }
     {
         downwell::EncounterInput input;
         downwell::Input held;held.fire=true;

@@ -15,6 +15,9 @@ namespace downwell { struct ProjectileSegment; }
 
 enum {
     amigaInitialTerrainFragmentCount = 19,
+    // scrLevelPat1: levelLength=15+level, inclusive 0..levelLength,
+    // plus the entrance and exit. Level 1-3 therefore needs 21 records.
+    amigaAreaOneTerrainFragmentCapacity = 21,
     amigaTerrainBreakableCapacity = 512,
     amigaTerrainDecorationCapacity = 128
 };

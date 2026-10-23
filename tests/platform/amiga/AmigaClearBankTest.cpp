@@ -32,7 +32,8 @@ int main(int argc, char** argv) {
         if (bytes > maximum) maximum = bytes;
         require(std::memcmp(target + 12, source.data() + 12, 8) == 0, "input provenance prefix preserved");
         const unsigned count = AmigaClearBank::longword(target + 8);
-        require(count >= 9 && count <= 18, "duplicates deduplicated by resource ID/frame");
+        const unsigned sliceLabels=area==1&&level==3?2:0;
+        require(count >= 9+sliceLabels && count <= 18+sliceLabels, "duplicates deduplicated by resource ID/frame");
         unsigned borders = 0;
         unsigned titles = 0;
         for (unsigned i = 0; i < count; ++i) {
@@ -82,7 +83,7 @@ int main(int argc, char** argv) {
         require(outlinedBytes && outlinedBytes <= 31756, "outlined bank fits existing retired storage");
         if (outlinedBytes > maximumOutlined) maximumOutlined = outlinedBytes;
         const unsigned outlinedCount = AmigaClearBank::longword(target+8);
-        require(outlinedCount <= 26, "outlined directory fits bounded scratch storage");
+        require(outlinedCount <= 26+sliceLabels, "outlined directory fits bounded scratch storage");
         for (unsigned id : offers) {
             const unsigned labels[] = {downwell::levelUpgradeNameLabel(id,id<23?owned[id]:0),64300+id};
             for (unsigned label : labels) for (unsigned frame = 0; frame < 2; ++frame) {
@@ -108,6 +109,7 @@ int main(int argc, char** argv) {
     unsigned maximumBase = 0, maximumBundle = 0;
     for (unsigned area=1;area<=4;++area) for (unsigned level=1;level<=3;++level) {
         unsigned bytes=20+26*24+payload(downwell::levelClearStageLabel(area,level),0)+payload(64001,0);
+        if(area==1&&level==3)bytes+=48+payload(64700,0)+payload(64701,0);
         for (unsigned a=area;a<=area+1;++a)
             bytes+=payload(downwell::levelBorderSprite(a),7)+payload(downwell::levelBorderSprite(a),13);
         if(bytes>maximumBase) maximumBase=bytes;
@@ -123,6 +125,7 @@ int main(int argc, char** argv) {
     unsigned preparedBase=0, preparedBundle=0;
     for(unsigned area=1;area<=4;++area) for(unsigned level=1;level<=3;++level) {
         unsigned bytes=20+34*24;
+        if(area==1&&level==3)bytes+=48+payload(64700,0)+payload(64701,0);
         const unsigned titles[]={downwell::levelClearStageLabel(area,level),64001};
         for(unsigned id:titles) {
             bytes+=payload(id,0);
@@ -157,13 +160,14 @@ int main(int argc, char** argv) {
         require(bytes && bytes<=preparedBase+4*preparedBundle,"prepared selection respects the all-offer bound");
         if(bytes>maximumPrepared) maximumPrepared=bytes;
         const unsigned count=AmigaClearBank::longword(bank+8);
-        require(count<=34,"prepared selection fits its bounded record array");
+        require(count<=36,"prepared selection fits its bounded record array");
         unsigned titles=0;
         for(unsigned i=0;i<count;++i) {
             const auto* record=bank+20+i*24;
             const unsigned id=AmigaClearBank::word(record), frame=AmigaClearBank::word(record+2);
             const bool title=id==64001 || id==downwell::levelClearStageLabel(area,level);
             if(title) { require(frame==0 || (frame>=2 && frame<=7),"heading uses only admitted prepared frames"); ++titles; }
+            else if(id==64700 || id==64701) require(frame==0,"slice endpoint uses its prepared plain labels");
             else if(id>=64000) require(frame==1,"production retains only precomposed description/name outlines");
             const auto key=AmigaClearBank::longword(record);
             require(!i || AmigaClearBank::longword(record-24)<key,"prepared directory remains strictly sorted");

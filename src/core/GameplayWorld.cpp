@@ -354,6 +354,16 @@ bool GameplayWorld::retireGameplayRoom() {
     return true;
 }
 
+bool GameplayWorld::finishWorldOneSlice() {
+    if (!run_.effectsSucceeded || !run_.levelClearActive || !run_.nextLevelRequested ||
+        run_.stage.area != 1 || run_.stage.level != 3) return false;
+    if (!retireGameplayRoom()) return false;
+    // scrNextLevel advances globals before room_goto. Do not create the
+    // catacomb builder, player, title instance or audio voice here: those
+    // belong to the next room and levelBeginCue, outside this slice.
+    return run_.advanceAfterLevelClear();
+}
+
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;

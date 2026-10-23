@@ -215,6 +215,7 @@ struct PreparedFieldOps {
 #include "AmigaStyleScene.h"
 #include "AmigaPublisherScene.h"
 #include "AmigaCreditsScene.h"
+#include "AmigaSliceEndScene.h"
 #include "AmigaControlsScene.h"
 #include "AmigaShopMenu.h"
 #ifdef DOWNWELL_SHOP_VERIFY
@@ -738,6 +739,10 @@ extern "C" __attribute__((noinline, used)) void downwellStartupReady(void) {
 }
 
 extern "C" __attribute__((noinline, used)) void downwellFrameLoopReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+extern "C" __attribute__((noinline, used)) void downwellWorldOneComplete(void) {
     __asm__ volatile("" ::: "memory");
 }
 
@@ -2174,12 +2179,12 @@ __attribute__((noinline)) static int runDownwell(void) {
     const downwell::ReplayReader verificationReplay(
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
-    static AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
+    static AmigaTerrainFragment fragments[amigaAreaOneTerrainFragmentCapacity];
     static AmigaTerrainDecoration
         generatedDecorations[amigaTerrainDecorationCapacity];
     alignas(AmigaAreaOneTerrainBuilder) static UBYTE liveBuilderStorage[sizeof(AmigaAreaOneTerrainBuilder)];
     auto& liveBuilder = *new (liveBuilderStorage) AmigaAreaOneTerrainBuilder(fragments,
-        amigaInitialTerrainFragmentCount, nullptr, 0,
+        amigaAreaOneTerrainFragmentCapacity, nullptr, 0,
         generatedDecorations, amigaTerrainDecorationCapacity);
     // Retain native identity/geometry in runs without duplicating generic
     // runner state per wall. Storage must not consume the 8 KiB task stack.
@@ -2593,6 +2598,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     alignas(AmigaCreditsScene) static UBYTE creditsStorage[sizeof(AmigaCreditsScene)];
     auto& creditsScene=*new(creditsStorage) AmigaCreditsScene(
         memory.copper() + downwellCopperWords * 4, downwellCopperWords);
+    AmigaSliceEndScene sliceEnd(memory.copper() + downwellCopperWords * 4, downwellCopperWords);
     alignas(AmigaControlsScene) static UBYTE controlsStorage[sizeof(AmigaControlsScene)];
     auto& controlsScene=*new(controlsStorage) AmigaControlsScene(
         memory.copper() + downwellCopperWords * 5,
@@ -2775,6 +2781,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             exitCode = 0;
             break;
         }
+        if (sliceEnd.presented) { platform.waitVblank(); continue; }
         downwell::GameplayEncounterSession::Frame encounterFrame(encounterSession);
         if(!encounterFrame.valid())break;
         DW_PROFILE_FRAME((unsigned)scenes.scene());
@@ -3676,6 +3683,28 @@ __attribute__((noinline)) static int runDownwell(void) {
                 } else if (!port.nextLevelRequested()) {
                     DW_PROFILE_SCOPE(profileClearStep);
                     if (!clear.step(port, liveInput)) { exitCode = 20; break; }
+                }
+                if (port.nextLevelRequested() && port.runStage().area == 1 && port.runStage().level == 3) {
+                    // Finish Result's original Alarm 1 before stopping at the
+                    // port boundary. Retire DMA before reusing its bitplanes.
+                    splashBlankList.reset(); splashBlankList.move(bplcon0,0);
+                    for (unsigned channel=0;channel<8;++channel) splashBlankList.showSprite(channel,nullSprite);
+                    splashBlankList.finish(); platform.publish(splashBlankList); platform.waitVblank();
+                    AmigaHardware::blitterDrain();
+                    clear.invalidateDisplay();
+                    const UBYTE* bank=memory.menuForeground()+clear.assets.layout.resultsOffset;
+                    if (!port.finishWorldOneSlice() ||
+                        !sliceEnd.prepare(memory.game(),memory.hud(),gameBitmap,bank,clear.assets.bankBytes,nullSprite,palette)) {
+                        exitCode=20;break;
+                    }
+                    if (!encounterFrame.beginDraw() || !encounterFrame.publishable()) break;
+                    platform.publish(sliceEnd.presentation());
+                    sliceEnd.presented=true;
+                    upgradeSource.release();
+                    if (!encounterFrame.finish()) break;
+                    platform.waitVblank();
+                    downwellWorldOneComplete();
+                    continue;
                 }
                 if (port.nextLevelRequested() && port.runStage().area == 1 && port.runStage().level < 3) {
                     splashBlankList.reset(); splashBlankList.move(bplcon0, 0);

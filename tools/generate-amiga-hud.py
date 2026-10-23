@@ -504,6 +504,10 @@ def clear_texts(language_path):
     # Source upgrade caps are at most one; Result Draw appends owned+1.
     for upgrade in range(23):
         texts[64600 + upgrade] = texts[64100 + upgrade] + " 2"
+    # Destination preview at the deliberate world-1 slice boundary, not a
+    # fabricated area-2 room or a levelNumber instance running early.
+    texts[64700] = english["area2"].strip() + "-1"
+    texts[64701] = "WORLD 1 COMPLETE\nEND OF SLICE\n\nESC TO QUIT"
     return texts
 
 
@@ -932,7 +936,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                                originX=sprite["originX"] + offset, originY=offset)
                 encoded.append((heading, offset + 1, dma_width, planar))
 
-        if profile == "clear" and text_id not in (64000, 64001) and not 64500 <= text_id < 64512:
+        if profile == "clear" and text_id not in (64000, 64001, 64700, 64701) and not 64500 <= text_id < 64512:
             # Preserve frame 0 as the five-pass oracle. Frame 1 is the exact
             # four black neighbours followed by white foreground, host-baked.
             bordered = render_bordered_text(manifest, pages, text, "white", centered=True)

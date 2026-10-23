@@ -2644,6 +2644,8 @@ public:
     // Retire the old display first. This resets only room-local runtime state;
     // the owner must rebuild terrain and rebind generation/collision callbacks.
     bool prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin);
+    // Result Alarm 1 / scrNextLevel, stopping before rmMain loads area 2.
+    bool finishWorldOneSlice();
     template<class Builder>
     bool initializeAreaOneBuilder(Builder& builder, int x, int y, unsigned style = 0) {
         return resetAreaOneBuilder(builder,x,y,style)&&createRoomStartField();

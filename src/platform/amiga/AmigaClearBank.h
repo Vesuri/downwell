@@ -31,7 +31,11 @@ struct AmigaClearBank {
         // for every title, icon and text variant on a 68000.
         for (unsigned i = 1; i < sourceCount; ++i)
             if (longword(source + 20 + (i-1)*24) >= longword(source + 20 + i*24)) return 0;
-        unsigned ids[34] = {stageLabel, 64001}, frames[34] = {}, count = 2;
+        unsigned ids[36] = {stageLabel, 64001}, frames[36] = {}, count = 2;
+        if (area == 1 && level == 3) {
+            ids[count++] = 64700;
+            ids[count++] = 64701;
+        }
         if (preparedHeadings) {
             if (!outlined) return 0;
             const unsigned titles[] = {stageLabel, 64001u};
@@ -74,7 +78,7 @@ struct AmigaClearBank {
             }
             ids[j] = id; frames[j] = frame;
         }
-        const std::uint8_t* records[34] = {};
+        const std::uint8_t* records[36] = {};
         unsigned bytes = 20 + count * 24;
         if (bytes > capacity) return 0;
         unsigned sourceIndex = 0;
