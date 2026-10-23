@@ -32,8 +32,9 @@ behavior, both backend integrations and relevant original-game verification.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
-The immediate priority is the **no-input initial fall from the top of the well
-to the first platform**, updates 1–164. The goal is that every update fits one
+**Paused at the user's request while 1.01 is finished** (see Priority and
+scope). The target is the **no-input initial fall from the top of the well to
+the first platform**, updates 1–164. The goal is that every update fits one
 PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
 earlier target of matching the historical 181 fields; reaching that is a
 milestone on the way, not completion.
@@ -56,9 +57,12 @@ C–E come from the earlier
 | Enemies, 136–162 | 24.3 | 64.1 (136) | 14 | 135 |
 | Landing, 163–164 | 65.7 | 100.2 (163) | 2 | 91 |
 
-Three owners account for the remaining excess. Every update over 20 ms in
-137–162 paints a row (C). The items below remove them in order of how much
-over-budget work each one removes. Each item names:
+This is the shipping default. Unaccepted C and D candidates exist behind
+`REFERENCE_ROW_PAINTING=0` and `REFERENCE_FRAME_WORK=0` (both default `1`);
+their measurements are under C and D below. Three owners account for the
+remaining excess. Every update over 20 ms in 137–162 paints a row (C). The
+items below remove them in order of how much over-budget work each one
+removes. Each item names:
 
 - the measured work it removes;
 - its target;
@@ -138,6 +142,16 @@ candidate before closing C. Measurements and test evidence are in
   - scalar pixel comparison across all pattern rows and seams.
 
 ### D. Fixed per-update cost
+
+**Next when section 0 resumes; not accepted as the default.** The candidate
+`REFERENCE_FRAME_WORK=0` (counted destruction results, empty-alarm admission,
+streak-dependent weapon selection, grouped display-row debts) takes the whole
+fall from 19.6/100.2 to 18.2/98.7 ms mean/worst and 47 to 33 updates over
+20 ms, but update 98 is still 14.3 ms and the entrance mean above 12 ms. All
+165 state samples match; full behaviour acceptance and the cadence run are
+still to do. See [the audit](amiga-frame-cost.md#fixed-frame-work-candidate--section-0-d-2026-10-18).
+The quiet-update breakdown below is from `45e96a9c`; re-measure it on the
+candidate before choosing the next removal.
 
 - **Removes part of the 15.6 ms a quiet update costs with nothing to do:**
   - Step 8.8 ms;
@@ -363,44 +377,51 @@ Important current boundaries to remove:
 ### Milestone I — real session ownership and a complete Shop
 
 #### 1.01 Install a production encounter session
-**Prerequisite brought forward (authorized):** Install the minimum native
-ordered query/dispatch admission needed by dither and wind from 1.05/1.07 here.
-Keep terrain identity in runs, preserve observable source event ordering, and own
-collision/audio leases only in the scenes that use them. Compare against the
-reference owner, check 512 KiB Chip startup and measure the initial fall before
-accepting the production default. Do not disable the external-backend guard
-without replacing it with an explicit, verified scene admission. The broader
-families and verification gates of 1.05/1.07 remain there.
-Before enabling the native scene collision backend, separate query admission
-from the existing native terrain-span and record-backed actor fast paths.
-The candidate full-owner integration has not passed the bounded initial-fall
-gate; keep the external backend as the shipping default until that coupling
-is removed and the complete fall is measured. **Authorized backend freedom:**
-the production backend may use a different internal representation and need
-not reproduce identical tree or dirty-list history. Prove equivalent observable
-event order, RNG/audio ownership, destruction notifications and failure behavior
-against the retained full runner oracle; matching final state alone is insufficient.
-The collision-enabled candidate now completes the fall, but takes 927 PAL
-fields for 164 updates (8.85 FPS; update 1 takes 202 fields). Landing state is
-tick 164, x 0, y 262144, camera y 1024, grounded, health 4, ammo 8, three enemies,
-and 1371 RNG draws. Profile the admitted collision collection/tree work and
-remove the regression before shipping this backend; successful allocation and
-matching landing state are not a production performance gate. Keep exact
-selected-pair order, dirty-list retention and spatial history in the oracle.
-Include the complete generation update **136** in subsequent performance
-gates, not just the following 137–141 window. It costs **840.8 ms**;
-tree service alone remains 351.6 ms.
-The [collection-read audit](amiga-frame-cost.md#encounter-candidate-combined-terrain-collection-read)
-records the independent recheck and comparison. Remove remaining terrain-bound
-reconstruction and source tree-maintenance work through a behavior-equivalent
-backend; do not substitute small-window averages for this gate.
+**Scope (prerequisite brought forward, authorized):** install the minimum
+native ordered query/dispatch admission that dither and wind need, from
+1.05/1.07. Keep terrain identity in runs, preserve observable source event
+ordering, and own collision/audio leases only in the scenes that use them. The
+broader families and verification gates of 1.05/1.07 stay there.
+
+**Authorized freedoms:**
+- *Backend representation:* the production backend may use a different
+  internal representation and need not reproduce identical tree or
+  dirty-list history. Prove equivalent observable event order, RNG/audio
+  ownership, destruction notifications and failure behavior against the
+  retained full runner oracle; matching final state alone is insufficient.
+  Keep exact selected-pair order, dirty-list retention and spatial history in
+  that oracle.
+- *Wall-cleanup order:* independent dither wall-cleanup notifications may be
+  reordered. Preserve the exact set of walls removed, their removal update,
+  pixels and gameplay state. A callback failure must stop before
+  Draw/publication, but its partial wall-cleanup order may differ. This does
+  not relax wind contact order, RNG/audio ownership or any other event family.
+
+**Status:** the shipping default keeps the external collision backend. The
+collision-enabled candidate (`scene_collision_candidate.mk`) completes the
+fall with the exact landing state (tick 164, x 0, y 262144, camera y 1024,
+grounded, health 4, ammo 8, three enemies, 1371 RNG draws) but takes **927 PAL
+fields** for 164 updates (8.85 FPS; update 1 takes 202 fields). Generation
+update **136** costs **840.8 ms**, 351.6 ms of it tree journal service; always
+include the complete update 136 in performance gates, not just 137–141. The
+[collection-read audit](amiga-frame-cost.md#encounter-candidate-combined-terrain-collection-read)
+and the audit's encounter-candidate sections record the measurements so far.
+Successful allocation and matching landing state are not a production
+performance gate. Do not disable the external-backend guard without replacing
+it with an explicit, verified scene admission, and first separate query
+admission from the existing native terrain-span and record-backed actor fast
+paths. Remove the remaining terrain-bound reconstruction and source
+tree-maintenance work through a behavior-equivalent backend; do not substitute
+small-window averages for the gate.
 **Remaining integration gates:**
 
 1. Remove the collision-admission performance regression above with a shared,
    explicit scene-specific backend. First establish the ordering rule for each
    admitted event family from the source and oracle, including overlapping wind
    fields, wall destruction, pending room changes and failing callbacks. Compare
-   ordered callback transcripts and intermediate state, not only final digests.
+   ordered wind/audio transcripts and intermediate state, not only final digests.
+   For independent dither cleanup compare per-update wall sets and pixels;
+   exercise failing callbacks without requiring the oracle's partial wall order.
    Keep the complete source collector compiled as the reference. A narrower
    production collector is permitted only after proving the omitted work has
    no observable effect, including incoming events and failure behavior.
@@ -411,10 +432,13 @@ backend; do not substitute small-window averages for this gate.
    tune envelope/check-layout variants. Any further exclusion needs an
    independently priced proof, including incoming events and cached bounds.
    Empty observed results alone are not a proof. Internal catch-up, generation
-   stamps and unobserved pairs may differ; observable callback/failure prefixes
-   must not. Add negative tests that detect dropped or reordered admitted events.
+   stamps and unobserved pairs may differ. Preserve callback/failure prefixes
+   except for the explicitly authorized independent wall-cleanup reordering.
+   Add negative tests for dropped walls, late cleanup, reordered wind contacts
+   and publication after failure.
 2. Promote the scene-local native backend from `scene_collision_candidate.mk`
-   to the shipping build only after that gate passes. Preserve the production
+   to the shipping build only after that gate passes, compared against the
+   reference owner, with the complete initial fall measured. Preserve the production
    `AmigaEncounterResources` binding of collision history, masks,
    `GameplayEncounterEnvironment` and `AmigaWindAudio`; do not substitute probe
    assets or successful no-op audio callbacks. Keep SDL and Amiga on the shared

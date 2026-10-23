@@ -85,11 +85,19 @@ RNG/audio ownership, destruction notifications and failure behavior. A scene's
 narrow dispatch admission is not, by itself, proof that other collection work
 can be removed.
 
+The user authorizes one narrower behavioral exception: independent dither
+wall-cleanup notifications may run in a different order. The removed wall set,
+removal update, pixels and gameplay state must remain equivalent. On callback
+failure, partial cleanup may differ, but execution must stop before Draw or
+publication. Wind contact order and RNG/audio ownership remain exact. This
+exception does not authorize reordering other event families or delaying cleanup.
+
 The admitted events already have observable ordering witnesses. VM code 991
 (`objDitherAbove Collision objWall_n`) invokes `instance_destroy` on OTHER.
 Although its GML body does not draw RNG, native destruction publishes ordered
-presentation/collision notifications and can fail partway through them; equal
-final sets of destroyed walls alone are not an equivalence check. VM code for
+presentation/collision notifications and can fail partway through them. Under
+the authorized exception, compare wall sets at each update and verify terminal
+failure rather than requiring identical partial notification order. VM code for
 `goalTimeField Collision objPlayer_n` first tests `global.voidWind`, chooses a
 sound into the contacting field's `windsnd` only when the voice is idle, starts
 that voice and sets its gain. With overlapping fields, the first contact owns
@@ -97,15 +105,17 @@ the selected sound and RNG draw. Sorting contacts by resource/instance ID is
 therefore not a substitute for proving the original order.
 `GameplayDitherCollisionPassTest` checks per-field sound ownership, ordered
 wall notifications, pending-room suppression and the first failed callback's
-prefix. Any alternative internal representation must retain these witnesses;
-port-to-port agreement or an unchanged final player state alone is inadequate.
+prefix for the retained runner. A replacement must retain the wind witnesses
+and apply the wall-cleanup exception above; port-to-port agreement or an
+unchanged final player state alone is inadequate.
 
 Contact order depends on non-contacting births too. The dither-pass fixture
 pins the same eight contacted walls with 48 distant walls created before,
 after, or on both sides of their births. Creating the distant group first
 changes the reference destruction order even though none of those distant
-walls touches the dither. A position-sorted or birth-sorted contact list cannot
-replace that order. The fixture checks every failing notification prefix as
+walls touches the dither. A position-sorted or birth-sorted contact list does not
+reproduce that order, but may satisfy the authorized cleanup exception. The
+reference fixture checks every failing notification prefix as
 well as successful dispatch; `DOWNWELL_CONTACT_ORDER_WITNESS=1` prints the
 transcripts. These are retained-runner regression witnesses, not new captures
 from the Windows executable.
