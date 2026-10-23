@@ -6,3 +6,6 @@
 # or from the amiga/ directory:
 #   . env.sh
 . "${AMIGA_ENV:-$HOME/.local/share/amiga/env.sh}"
+# Use AmigaXDev's current native debugger/input harness for all Downwell
+# launches. Explicit caller overrides still select another installed build.
+export FSUAE="${FSUAE:-$FSUAE_ARM}"
