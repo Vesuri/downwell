@@ -12,28 +12,164 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Immediate priority, at the user's request: finish **1.01**, the production
-encounter session. Section 0's initial-fall budget remains unresolved; its
-item C is deferred and must not resume without user direction. D remains its
-next fixed-cost item; E still depends on C and D. Keep new session bindings
-scene-local so they do not reintroduce unrelated per-frame work.
-Then finish live skeleton encounters (section 1), following its numbered
-integration tasks: production ownership, generation/query/dispatch, time-stop
-and damage chains, then natural encounter verification. The A500 frame-budget work in
-section 5 remains open; use its measured architectural approach rather than
-tuning small functions or compiler flags. Then make catacombs playable
-(section 2), followed by the remaining content (section 4).
-Apply the fidelity, performance, architecture, memory and
-verification requirements in sections 3 and 5–8 to each integration; they are
-not deferred cleanup phases.
+The goal, set by the user on 2026-10-23, is a **world 1 vertical slice**: the
+first world of Downwell, from boot to the end of level 1-3, fully implemented
+and feature complete in the normal Amiga executable. Work it in this order:
 
-Supporting helpers alone do not close an item. Completion requires the shared
-behavior, both backend integrations and relevant original-game verification.
+1. gameplay and visuals (W1);
+2. audio (W2);
+3. performance (W3, which absorbs section 0 and the world-1 part of section 5).
+
+Restructure the code alongside (WR) so the Amiga build compiles in only what
+world 1 uses, while keeping already-implemented later-world code available.
+Only after W is complete, continue with what world 2 needs: the skeleton
+encounter tasks (section 1), the catacombs (section 2) and the remaining
+content (section 4).
+
+Sections 1, 2 and 4 are parked. Sections 0 and 5 are W3's performance work.
+Sections 3 and 6–8 still apply, but only where they touch world 1.
+
+## W. World 1 vertical slice on the Amiga
+
+World 1 is area 1: the garden and style select, levels 1-1 to 1-3 with their
+shops and side rooms, the clear and upgrade screens, death, results and Retry,
+up to the hand-off to area 2. In the original only `builderCatacomb` creates
+skeletons, so the skeleton encounter (section 1) is not part of it.
+
+### How to work W
+
+- **Bar:** behaviour matches the original game (VM assembly, serialized
+  resources and the source audits in `docs/`), checked by deterministic
+  input-only routes and native state or pixel checks. The existing compact
+  Amiga implementations (`GameplayWorld`, `ShopWorld`, `RunSession` and
+  friends) are acceptable. The registered source-exact owners, SDL parity and
+  original-runner evidence are not required to close a W item. Keep the SDL
+  build compiling and its tests passing; it remains a development reference.
+- **Visible:** an item is done only when a player sees it work in the normal
+  Amiga build on a natural route. Record the route (seed, input, build flags)
+  and the native check in the commit. Helper-only or test-only commits do not
+  close an item.
+- **One item at a time,** in the listed order unless a dependency forces
+  otherwise. Attach any newly discovered prerequisite to an existing item.
+- **Performance during W1/W2:** no 20 ms gate yet, but do not add per-frame
+  work for features that are not present (no empty scans), and keep normal
+  512 KiB Chip startup and the `quiet-fall` landing witness passing. Note any
+  large new cost in the commit for W3.
+- **Restructuring** steps (WR) must be behaviour-neutral and pass the existing
+  gates; do them when they make the next W item easier, not as a separate
+  sweep.
+
+### W1. Gameplay and visuals
+
+Current state of the normal Amiga build: boot, garden, style select,
+area-1 generation and scrolling, movement, stomping and shooting, the health,
+ammo and gem HUD, damage numbers, six enemy families (snake 111, ground turtle
+112, frog 113, bat 116, snail 117, crawler 119), compact shops, level exit,
+upgrade selection, level transitions, death, results and Retry all work.
+
+1. **End of world 1.** After clearing 1-3 the build stops: the level advance
+   only covers levels below 3 (`DownwellAmiga.cpp`,
+   `GameplayWorld::prepareNextAreaOneLevel`). Run the original level-3 clear
+   (`Result` and `scrNextLevel` moving to area 2 level 1, with the area-title
+   and music state), then stop at a clear, deliberate end-of-slice point
+   instead of loading area 2.
+2. **Spawner 78 and its children.** The production creation path drops object
+   78 silently, and `stepRegisteredSpawnerWithWorld` has no production caller,
+   so white jellies 115 and red balls 118 never appear. Admit the spawner and
+   both child families with their per-level channels, motion, deaths and art.
+   Reference: [spawner contract](spawner-source-contract.md).
+3. **Boxes, breakables and rewards.** Box destruction is the removal subset
+   only. Add the ordered smoke, flash, impact, debris, chain reaction and
+   reward creation, `Scattered16` 289 with `breakablesDebris` 370, torches
+   295/296, `gemChunk` 293, and currency spawning, homing and collection.
+   Sound hooks are wired in W2.
+4. **Gun modules and guns.** Object 109 is `GunModule` (not a crate; correct
+   `original-behavior-audit.md`). It is only a tile today. Add the pickup, its
+   heart and battery variants, `moduleText` 373 and `itemNotif` 374, and the
+   gun change across the seven `bStatInitLevel1` guns with their shots and
+   casings. References: [projectile motion](projectile-motion.md),
+   [laser sight](laser-sight.md).
+5. **Side rooms and time-stop.** Time-field circles are drawn, but
+   `pTimeStop` is not connected. Add entry and exit (`parentTimeField` 82,
+   `goalTimeField` 255, `startTimeField` 371), the freeze and resume of the
+   world, time shards and `fxTimeChange` 211, `sideCamLocker` camera, void
+   rooms and their rewards. Wind sound is W2. References:
+   [time-stop identity](time-stop-collision.md),
+   [side cameras](side-camera-lockers.md).
+6. **Enemy and player damage chains.** Complete corpses (`objDeadBody` 263),
+   blood, smoke, hit and flash effects, bullet wall hits, jump and dust
+   effects, and source knockback and immunity on player damage, including the
+   death flash and `DeathMenu` 49 options.
+   Reference: [effect surfaces](effect-surfaces.md).
+7. **Combo and HUD.** Add the on-screen combo counter, `comboDone` rewards at
+   5, 10, 30 and 100, `ComboBreak` 369, `comboRewardText` 383, Gemhigh and the
+   remaining controller-HUD rules, and the `levelNumber` 372 title at each
+   level start.
+8. **Complete shops.** Merchant speech and prompts, keeper behaviour, funded,
+   insufficient and sold-out purchases, the criminal route, and the
+   source shop-placement rules per style.
+   Reference: [Shop contract](shop-port.md).
+9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
+   (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
+   selectable. Reference: [upgrade coverage](upgrade-coverage.md).
+10. **Menus, styles, modes and persistence.** The pause menu and its options,
+    shader, record and confirm menus (adapted to the Amiga); all five styles
+    with their original rules and unlocks (style 2's 6 HP, style 1's shop
+    chance, style 4's forced shop and no upgrades); hard mode; and saving
+    style, options, records and unlock progress to disk. Scope chosen by
+    default from the original; the user may trim it.
+
+### W2. Audio
+
+There is no audio in the normal Amiga build. Convert offline and play on
+Paula, with scene-local residency:
+
+- music: `bgmOverworld` 193 (garden), `bgmArea1` 194, `bgmShopCave` 192, and
+  `bgmSecret` 200 if the void rooms use it;
+- every sound effect world 1 reaches: player and guns, each enemy family,
+  stomps, gems, rock breaks, shopkeeper voices, void enter and exit, combo,
+  menus and the time-field winds (reuse `AmigaWindAudio` and the prepared
+  wind bank);
+- the master gain option and the original voice and priority rules.
+
+Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handling)
+and keep audio out of scenes that do not use it.
+
+### W3. Performance
+
+After W1 and W2: every gameplay update of world 1 within 20 ms on the A500.
+Start with the initial fall (section 0: D, then C, then E), then the rest of
+world 1: dense combat, shops, side rooms and time-stop, and scene handoffs
+judged by transition latency (section 5). Re-measure first; numbers recorded
+before W1 and W2 will be stale. The parked candidates in section 0 (C and D
+selectors) and in 1.01 (the scene collision backend) can be reused here.
+
+### WR. Restructure for world 1
+
+- Remove the `#if` tests of `REFERENCE_*` macros that nothing defines
+  (`REFERENCE_ACTOR_BOUNDS_TRIG`, `REFERENCE_COLLECTION_TERRAIN_READS`,
+  `REFERENCE_COLLISION_VISUAL`, `REFERENCE_JOURNAL_GEOMETRY_DECODE`,
+  `REFERENCE_SOURCE_{ADMISSION,CLEANUP,ROW}_SCAN`,
+  `REFERENCE_TERRAIN_ELIGIBILITY`, `REFERENCE_TYPED_TERRAIN_CLEANUP`) and the
+  `TERRAIN_RUN_STORE` stub, after confirming each is dead.
+- Add one world-1 manifest (areas, rooms, families, upgrades, banks) that
+  drives the existing admission points (`AmigaGameplayAssetAdmission`,
+  `RUNTIME_ROOMS`, `CAVERN_ROOTS`, family storage), plus a map-file gate beside
+  `audit` that fails when a family outside the manifest links code.
+- Park later-world code in its own directory, kept building through host
+  tests: the skeleton and bone families, catacomb builder pieces, and the
+  scene collision backend with its candidate `.mk` files. Cut their include
+  edges from `GameplayWorld.h` and `GameplayCollisionOwner.h`.
+- Move `*_VERIFY` and oracle code out of shipping sources
+  (`DownwellAmiga.cpp` has 279 conditionals) into verify-only objects, keeping
+  the GDB hook surface stable; group the 108 Amiga build knobs into
+  shipping, verify, profile and reference files.
+- Replace the stale `src/platform/amiga/README.md` with the current
+  structure and feature status.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
-**Paused at the user's request while 1.01 is finished** (see Priority and
-scope). The target is the **no-input initial fall from the top of the well to
+**Part of W3 (performance); paused until W1 and W2 are done.** The target is the **no-input initial fall from the top of the well to
 the first platform**, updates 1–164. The goal is that every update fits one
 PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
 earlier target of matching the historical 181 fields; reaching that is a
@@ -323,6 +459,10 @@ reintroduce per-span terrain structures on the generated path.
   non-profile build and stop every owned emulator run before handoff.
 
 ## 1. Finish live skeleton and bone integration
+
+**Parked: world 2.** In the original only `builderCatacomb` creates skeletons.
+Resume after the world 1 slice (W). Task 1.01's scene collision candidate is
+parked with its measurements; W2 and W3 may reuse its wind audio and backend.
 
 ### Scope, completion and working rules
 
@@ -718,6 +858,8 @@ integration does not erase those separate performance/memory requirements.
 
 ## 2. Make catacombs playable
 
+**Parked: world 2.** Resume after the world 1 slice (W).
+
 - Connect recovered patterns and symbol dispatch to both live generators,
   including synchronous actor creation and builder state.
 - Implement skulls, spiders and remaining catacomb hazards: source-specific
@@ -760,6 +902,9 @@ References: [behavior audit](original-behavior-audit.md),
 [side cameras](side-camera-lockers.md).
 
 ## 4. Complete remaining game content
+
+**Parked except where W needs it.** World-1 guns, upgrades, music and sound
+are W items; the rest waits for the later worlds.
 
 - Remaining areas, enemies, hazards, bosses and ending flow.
 - Remaining weapons, styles, upgrades and their interactions; hard-mode rules.
@@ -1098,7 +1243,8 @@ Reference: [scene architecture](scene-architecture.md).
 ## Closing work
 
 Remove an item only when its shared behavior, both backend integrations and
-relevant verification are complete. Record implementation and test results in
+relevant verification are complete; W items follow their own bar (Amiga
+first, see How to work W). Record implementation and test results in
 the cohesive commit, not a second status document or a completed-items section.
 Keep format specifications, source audits and reproducible test instructions in
 the linked technical references; keep priorities and remaining work here.
