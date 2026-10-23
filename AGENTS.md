@@ -11,6 +11,21 @@ The toolchain, emulators, Kickstarts, WHDLoad and the Python environment come fr
 for any port live in AmigaXDev's docs: add or correct them there, and keep only what is
 specific to this game in `docs/`.
 
+Resolve shared documentation from `$AMIGA_SHARE` after sourcing `amiga/env.sh`
+(default `~/.local/share/amiga`), not from this project's `docs/` directory:
+
+- Installed playbooks are at `$AMIGA_SHARE/<basename>.md`, e.g.
+  `$AMIGA_SHARE/new-port-playbook.md` (not `docs/playbooks/` below that directory).
+- Hardware manuals are under `$ADCD` (default
+  `$AMIGA_SHARE/adcd21/Reference`); the AGA guide is `$AGA_GUIDE`.
+- For the other paths in the table below, prefer `$AMIGA_SHARE/docs/<path
+  after docs/>` if installed. The current AmigaXDev installer only installs
+  playbooks, not the full reference-doc tree: otherwise read the corresponding
+  file from `~/Projects/AmigaXDev/docs/`. Relative links in the flattened installed
+  playbooks may likewise require this checkout fallback.
+- Do not copy shared documentation into Downwell or assume the installed tree
+  contains a document without checking it.
+
 | AmigaXDev doc | For |
 | --- | --- |
 | `docs/environment.md` | the shared variables and installed files |
