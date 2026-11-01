@@ -4,39 +4,21 @@ This repository is a behavior-first port of the Windows Steam release of
 Downwell to an SDL host reference implementation and then to native Amiga 500
 68000 code.
 
+## Commits
+
+- Commit as Vesa Halttunen <vesuri@jormas.com>: no signing, no hooks, no
+  co-author trailers.
+
 ## Shared environment and knowledge
 
-The toolchain, emulators, Kickstarts, WHDLoad and the Python environment come from AmigaXDev
-(`make setup` there); `amiga/env.sh` sources `~/.local/share/amiga/env.sh`. Lessons that hold
-for any port live in AmigaXDev's docs: add or correct them there, and keep only what is
-specific to this game in `docs/`.
-
-Resolve shared documentation from `$AMIGA_SHARE` after sourcing `amiga/env.sh`
-(default `~/.local/share/amiga`), not from this project's `docs/` directory:
-
-- Installed playbooks are at `$AMIGA_SHARE/<basename>.md`, e.g.
-  `$AMIGA_SHARE/new-port-playbook.md` (not `docs/playbooks/` below that directory).
-- Hardware manuals are under `$ADCD` (default
-  `$AMIGA_SHARE/adcd21/Reference`); the AGA guide is `$AGA_GUIDE`.
-- For the other paths in the table below, prefer `$AMIGA_SHARE/docs/<path
-  after docs/>` if installed. The current AmigaXDev installer only installs
-  playbooks, not the full reference-doc tree: otherwise read the corresponding
-  file from `~/Projects/AmigaXDev/docs/`. Relative links in the flattened installed
-  playbooks may likewise require this checkout fallback.
-- Do not copy shared documentation into Downwell or assume the installed tree
-  contains a document without checking it.
-
-| AmigaXDev doc | For |
-| --- | --- |
-| `docs/environment.md` | the shared variables and installed files |
-| `docs/playbooks/new-port-playbook.md` | the phases of a port and their gates |
-| `docs/reference/amiga-hardware.md` | Chip bus, takeover, interrupts, copper, blitter, Paula, AGA, the dA JoRMaS framework |
-| `docs/reference/m68k-optimisation.md` | 68000/68020 cost model and code generation |
-| `docs/reference/measurement-method.md` | profiling instruments, A/B discipline, pricing a change |
-| `docs/reference/validation-harness.md` | faithfulness to the original: references, differentials, sabotage |
-| `docs/reference/headless-fsuae.md` | the shared launcher, FS-UAE builds, gdb stub, diag runs |
-| `docs/reference/port-toolchain.md` | flags, linking, link audits, WHDLoad slaves, release archives |
-| `docs/native-port-validation.md` | crash dumps as regressions, installer updates, release archive checks |
+Shared guidance starts at `~/.local/share/amiga/docs/index.md`: read the rows that match the
+task. It routes to the playbooks (this project follows `docs/playbooks/new-port-playbook.md`),
+the references (measurement, validation, 68000 optimisation, Amiga hardware, headless FS-UAE,
+toolchain) and the shared tools and material (`docs/environment.md`; local notes:
+`docs/toolchain.md`). The environment comes from AmigaXDev's `make setup`; `amiga/env.sh`
+sources `~/.local/share/amiga/env.sh` and selects the arm64 FS-UAE. Generic lessons go into
+AmigaXDev's docs (edit them there, then `make share`); this repo keeps what is specific to
+Downwell.
 
 ## Source of truth
 

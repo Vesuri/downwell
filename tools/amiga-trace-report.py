@@ -37,11 +37,13 @@ import sys
 
 FIELD_CYCLES = 142102
 IRQ_PC = 0x7fffffff
-BIN = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.local/opt'), 'bin')
+# AmigaXDev's shared package resolves the installed toolchain under any python3.
+sys.path.insert(0, os.environ.get('AMIGA_PYLIB') or os.path.expanduser('~/.local/share/amiga/pylib'))
+from amigaxdev.env import tool as shared_tool
 
 
 def tool(name):
-    return shutil.which(name) or os.path.join(BIN, name)
+    return shared_tool(name.removeprefix('m68k-amiga-elf-'))
 
 
 class CallSites(dict):

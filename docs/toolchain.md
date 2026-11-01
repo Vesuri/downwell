@@ -18,9 +18,8 @@ together with `elf2hunk`, vasm, FS-UAE, and the matching GDB. AmigaXDev installs
 it with the Kickstarts (`make setup`); `amiga/env.sh` sources its shared
 `~/.local/share/amiga/env.sh`, and AmigaXDev's `docs/environment.md` describes
 the variables (`docs/reference/port-toolchain.md` has the generic build rules).
-Shared documentation is resolved as described in `AGENTS.md`: use installed
-playbooks under `$AMIGA_SHARE` and hardware manuals under `$ADCD`; use the
-AmigaXDev checkout only for reference documents not installed there yet.
+Both are in the installed shared docs under `~/.local/share/amiga/docs/`; hardware manuals
+are under `$ADCD`.
 Activate it with:
 
 ```sh
