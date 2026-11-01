@@ -2410,6 +2410,10 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
         actorFrames.invalidate();
 #endif
+        // A frame without composited effects leaves the previous rows
+        // dirty; bindStorage refuses a dirty surface at the next lease.
+        controllerEffects.surface().clear();
+        AmigaHardware::blitterDrain();
         effectAssets.release();
         AmigaGameplayActors::releaseDamageText();
         hudText.release();

@@ -671,7 +671,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if profile == "game" and sprite_id == 96:
                 canvas = flash_palette_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
-                    166, 168, 170, 173, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
+                    166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
                     458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
@@ -1026,7 +1026,7 @@ def build_records(manifest, extracted, profile, language_path=None):
     if profile in ("game", "clear"):
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
-                  166, 168, 170, 173, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
+                  166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
                   485, 486, 487, 496, 497, 602, 603, 707)
         if profile == "clear":
             actors = UPGRADE_PLAYER_IDS

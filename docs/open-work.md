@@ -63,22 +63,20 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
 
 Current state of the normal Amiga build: boot, garden, style select,
 area-1 generation and scrolling, movement, stomping and shooting, the health,
-ammo and gem HUD, damage numbers, six enemy families (snake 111, ground turtle
-112, frog 113, bat 116, snail 117, crawler 119), compact shops, level exit,
+ammo and gem HUD, damage numbers, six builder-placed enemy families (snake
+111, ground turtle 112, frog 113, bat 116, snail 117, crawler 119) plus the
+level spawner 78 with its white jelly 115 and red ball 118 (normal-mode
+channels, steering motion, stomp and bullet deaths, eye art), compact shops, level exit,
 upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 
-2. **Spawner 78 and its children.** The production creation path drops object
-   78 silently, and `stepRegisteredSpawnerWithWorld` has no production caller,
-   so white jellies 115 and red balls 118 never appear. Admit the spawner and
-   both child families with their per-level channels, motion, deaths and art.
-   Reference: [spawner contract](spawner-source-contract.md).
 3. **Boxes, breakables and rewards.** Box destruction is the removal subset
    only. Add the ordered smoke, flash, impact, debris, chain reaction and
    reward creation, `Scattered16` 289 with `breakablesDebris` 370, torches
    295/296, `gemChunk` 293, and currency spawning, homing and collection.
-   Sound hooks are wired in W2.
+   Sound hooks are wired in W2. The steering enemies' moving-fx 704
+   particles, smoke and flash are here too (their hooks are no-ops).
 4. **Gun modules and guns.** Object 109 is `GunModule` (not a crate; correct
    `original-behavior-audit.md`). It is only a tile today. Add the pickup, its
    heart and battery variants, `moduleText` 373 and `itemNotif` 374, and the
@@ -89,7 +87,8 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
    `pTimeStop` is not connected. Add entry and exit (`parentTimeField` 82,
    `goalTimeField` 255, `startTimeField` 371), the freeze and resume of the
    world, time shards and `fxTimeChange` 211, `sideCamLocker` camera, void
-   rooms and their rewards. Wind sound is W2. References:
+   rooms and their rewards; freeze jellies and red balls too (their steps
+   currently never see time-stop). Wind sound is W2. References:
    [time-stop identity](time-stop-collision.md),
    [side cameras](side-camera-lockers.md).
 6. **Enemy and player damage chains.** Complete corpses (`objDeadBody` 263),
@@ -107,11 +106,14 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
    Reference: [Shop contract](shop-port.md).
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
-   selectable. Reference: [upgrade coverage](upgrade-coverage.md).
+   selectable, including the balloon/decoy target that steering enemies
+   chase (they now always chase the player).
+   Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Menus, styles, modes and persistence.** The pause menu and its options,
     shader, record and confirm menus (adapted to the Amiga); all five styles
     with their original rules and unlocks (style 2's 6 HP, style 1's shop
-    chance, style 4's forced shop and no upgrades); hard mode; and saving
+    chance, style 4's forced shop and no upgrades); hard mode, including the
+    hard spawner sets (only the normal sets are wired); and saving
     style, options, records and unlock progress to disk. Scope chosen by
     default from the original; the user may trim it.
 
@@ -122,7 +124,8 @@ Paula, with scene-local residency:
 
 - music: `bgmOverworld` 193 (garden), `bgmArea1` 194, `bgmShopCave` 192, and
   `bgmSecret` 200 if the void rooms use it;
-- every sound effect world 1 reaches: player and guns, each enemy family,
+- every sound effect world 1 reaches: player and guns, each enemy family
+  (the jelly and red-ball `sound` hooks are no-ops today),
   stomps, gems, rock breaks, shopkeeper voices, void enter and exit, combo,
   menus and the time-field winds (reuse `AmigaWindAudio` and the prepared
   wind bank);
@@ -139,6 +142,9 @@ world 1: dense combat, shops, side rooms and time-stop, and scene handoffs
 judged by transition latency (section 5). Re-measure first; numbers recorded
 before W1 and W2 will be stale. The parked candidates in section 0 (C and D
 selectors) and in 1.01 (the scene collision backend) can be reused here.
+New costs from W1: the spawner step runs every update (quiet-fall rose from
+178 to 181 fields), and each live jelly or red ball calls `portableAtan` and
+binary64 trig every update.
 
 ### WR. Restructure for world 1
 

@@ -245,6 +245,8 @@ bool AmigaGameplayGeneration::step(downwell::GameMakerRandom& random, int viewBo
     downwell::AreaOneBuilderStep result;
     const bool ok = builder_.stepVisible(patterns_, random, viewBottom, result);
     builder_.setPositionPublisher(nullptr,nullptr);
+    // objBuilder (65) Steps before Spawner (78), which reads this flag.
+    runtime_->publishGenerationEndReached(builder_.endReached());
     if (dirtyFirst < 0) dirtyFirst = 0;
     if (dirtyEnd > worldRows) dirtyEnd = worldRows;
     return ok;

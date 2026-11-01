@@ -8,8 +8,14 @@ namespace downwell {
 struct CurrencyCollisionBounds {
     static bool calculate(int sprite,MotionBinary64 x,MotionBinary64 y,ContactBounds& out){
         if(sprite!=133&&sprite!=134)return false;
+        return calculateMask(sprite,x,y,out);
+    }
+    // Any verified unrotated, unit-scale rectangle mask (spawner and
+    // steering-family place_meeting queries use 153, 174 and 702).
+    static bool calculateMask(int sprite,MotionBinary64 x,MotionBinary64 y,ContactBounds& out){
         RunnerImageValue px,py;RunnerSpriteBounds::Box margins,edges;
         const auto local=contactSpriteBounds(sprite);
+        if(local.left>=local.right||local.top>=local.bottom)return false;
         if(!px.assign(x)||!py.assign(y)||!margins.left.assignInteger(local.left)||
             !margins.right.assignInteger(local.right-1)||!margins.top.assignInteger(local.top)||
             !margins.bottom.assignInteger(local.bottom-1))return false;

@@ -351,6 +351,7 @@ bool GameplayWorld::retireGameplayRoom() {
     if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear())return run_.effectsSucceeded=false;
     if(!run_.timeFields.clear())return run_.effectsSucceeded=false;
     if(!run_.sideCameraLockers.clear())return run_.effectsSucceeded=false;
+    resetCompactSpawning();
     return true;
 }
 
@@ -530,6 +531,7 @@ bool GameplayWorld::birthPlayerOwnership() {
     // allocate a dynamic ID or stand in for the remaining room Create order.
     playerInstance_.sourceInstanceId=sourceId;
     playerChildrenStarted_=false;
+    depthMeterY_=playerInstance_.y;
     if(!playerLifecycle_.birth(playerHandle(),playerInstance_)) {
         run_.effectsSucceeded=false;return false;
     }
@@ -625,6 +627,7 @@ bool GameplayWorld::publishEnemyActivation(const EnemyState& enemy, bool active)
 }
 
 bool GameplayWorld::retireEnemyOwnership(EnemyState& enemy) {
+    releaseSteering(enemy);
     if (enemy.identitySlot>=enemyCapacity) return true;
     if (!enemyLifecycle_.retire({enemy.identitySlot,enemy.lifetimeId},enemy)) {
         run_.effectsSucceeded=false;
@@ -1149,6 +1152,8 @@ bool GameplayWorld::advanceEnemyAlarm(EnemyState& enemy,unsigned alarm){
         } else if (enemy.objectId == 119 && alarm0Fired) {
             updateCrawler(enemy, true, cameraPixelX_, viewCameraYQ8());
             enemy.alarm0 = 2;
+        } else if ((enemy.objectId == 115 || enemy.objectId == 118) && (alarm0Fired || alarm1Fired)) {
+            return advanceSteeringAlarm(enemy, alarm0Fired ? 0 : 1);
         }
         return run_.effectsSucceeded;
 }
@@ -1224,6 +1229,9 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
     EnemyState& enemy = *live;
     if (!enemy.active||enemy.destroyRequested)
         return true;
+    // Steering families step whenever active; they have no awake gate.
+    if (enemy.objectId == 115 || enemy.objectId == 118)
+        return stepSteeringEnemy(enemy);
     if (enemy.objectId == 113)
         enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
     if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
@@ -1451,6 +1459,12 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
                 if (!enemy.active || enemy.health <= 0 ||
                     !path.intersects(contact))
                     continue;
+                if (enemy.objectId == 115 || enemy.objectId == 118) {
+                    if (!hitSteeringEnemy(enemy, bullet.trajectory.direction,
+                            downwell::machineGunProfile(bullet.gemHigh).damage))
+                        run_.effectsSucceeded = false;
+                    return true;
+                }
                 const auto impact = downwell::applyStandardBulletImpact(
                     enemy, run_.kills, enemyRandom_,
                     [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
@@ -1639,7 +1653,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemies_[i].active = true;
             enemies_[i].activationPending = false;
             return true;
-        });
+        }, true);
     if(!activation.succeeded){run_.effectsSucceeded=false;return {};}
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
@@ -1821,6 +1835,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     // Spawner 78 follows builder/entry work and precedes breakable Step.
+    if(compactSpawnerLive_&&!stepCompactSpawner(generationCameraY))return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,92)){
         run_.effectsSucceeded=false;return {};
     }
@@ -1975,6 +1990,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
                 x,y,240,176);
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
+    if (steeringPopulation_ && !collideSteeringEnemies()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     if(collisionPass_){
@@ -2016,7 +2032,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 enemies_[enemyCount_].identitySlot=0xffffu;
                 ++retiredEnemies;
                 return true;
-            });
+            },downwell::MainRoomLifetimePhase::endStep,true);
         if(!enemiesRetired){run_.effectsSucceeded=false;return {};}
         const bool boxesRetired=downwell::retireMainRoomObjectsChecked(breakableCount_, 11, 1, viewTop,
             [this](unsigned i) {
@@ -2082,4 +2098,415 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 #endif
     DW_PROFILE_PHASE(profileSimulation);
     return frame;
+}
+
+// ---- Compact spawner 78 and steering families 115/118 -------------------
+
+namespace {
+using SteeringReal=downwell::MotionBinary64;
+SteeringReal exactQ8(long q8){
+    auto value=SteeringReal::fromInteger(static_cast<std::int32_t>(q8));
+    if(!value.zero())value.high-=8u<<20; // Exact division by 256.
+    return value;
+}
+// Q32 turns -> degrees, exactly (turns*360 < 2^53).
+bool turnsDegrees(std::uint32_t turns,SteeringReal& out){
+    auto value=SteeringReal::fromInteger(static_cast<std::int32_t>(turns>>16));
+    if(!value.zero())value.high+=16u<<20;
+    SteeringReal product;
+    if(!value.add(SteeringReal::fromInteger(static_cast<std::int32_t>(turns&0xffffu)))||
+       !downwell::multiplyBinary64(value,SteeringReal::fromInteger(360),product))return false;
+    if(!product.zero())product.high-=32u<<20;
+    out=product;return true;
+}
+// Exact ceil(value*256), for typStompable's yy > ply+2 on the Q8 lattice.
+bool ceilQ8(SteeringReal value,long& out){
+    if(!value.zero())value.high+=8u<<20;
+    std::int32_t nearest;
+    if(!value.roundPixel(nearest)||!value.add(SteeringReal::fromInteger(-nearest)))return false;
+    out=nearest+((!value.zero()&&!(value.high&0x80000000u))?1:0);
+    return true;
+}
+bool steeringObject(int object){return object==115||object==118;}
+}
+
+struct GameplayWorld::SteeringOps {
+    using Real=downwell::MotionBinary64;
+    using Image=downwell::RunnerImageValue;
+    GameplayWorld& world;
+    EnemyState* enemy; // Null during Create: the record is configured after it.
+    downwell::SteeringEnemyBirthState& actor;
+    int alarm0=-1,alarm1=-1;
+    bool player(bool vertical,Real& value){
+        Real x,y;
+        if(!downwell::ContactCoordinates::playerGlobals(world.player_.frameStartXFixed(),
+            world.player_.frameStartYFixed(),240,176,x,y))return false;
+        value=vertical?y:x;return true;
+    }
+    bool playerX(Real& value){return player(false,value);}
+    bool playerY(Real& value){return player(true,value);}
+    // eplx/eply alias plx/ply unless pugDecoy has a nonzero ballooning
+    // instance. This world admits no balloon, so ballooning stays zero.
+    bool enemyPlayerX(Real& value){return player(false,value);}
+    bool enemyPlayerY(Real& value){return player(true,value);}
+    bool pointDirection(Real x,Real y,Real targetX,Real targetY,Real& value){
+        return downwell::RunnerPointDirection::evaluate(x,y,targetX,targetY,value,
+            [](Real dy,Real dx,Real& radians){return downwell::portableAtan(dy,dx,radians);});
+    }
+    bool direction(Real wanted,Real& accepted){
+        Image value;if(!downwell::RunnerDirectionValue::normalize(wanted,value))return false;
+        accepted=value.promoted();return true;
+    }
+    bool position(bool,Image value,Image& accepted){
+        if(!downwell::RunnerSpatialSplit::valid(value))return false;
+        accepted=value;return true;
+    }
+    bool imageSpeed(Image value,Image& accepted){
+        if(!value.promoted().valid())return false;
+        accepted=value;return true;
+    }
+    bool alarm(int number,int ticks){
+        if(number==2)return true; // Neither family has an Alarm 2 event.
+        if(number==0)(enemy?enemy->alarm0:alarm0)=ticks;
+        else if(number==1)(enemy?enemy->alarm1:alarm1)=ticks;
+        else return false;
+        return true;
+    }
+    bool imageIndex(int value){
+        if(!enemy||value)return false;
+        enemy->imagePhase=0;enemy->imageRemainder=0;
+        return world.publishEnemyImage(*enemy,0);
+    }
+    bool sound(int,int,int,int,const char*){return true;} // Audio is W2.
+    bool lengthdir(bool vertical,Real speed,Real angle,Real& value){
+        return downwell::WhiteJellyStep::movementComponent(vertical,speed,angle,value);
+    }
+    bool meeting(Real x,Real y,int object,bool& hit){
+        return enemy&&object==57&&world.steeringWallMeeting(
+            downwell::enemyContactMask(enemy->objectId,enemy->spriteId),x,y,hit);
+    }
+    bool enemyDeath(){ // scrEnemyDeath
+        world.run_.combo.state.enemyDefeated();++world.run_.kills;return true;
+    }
+    // Smoke, flash and moving effect 704 have no RNG at Create here; their
+    // presentation belongs to the effect-chain work. Death draws remain.
+    bool smoke(Real,Real,int,int){return true;}
+    bool flash(Real,Real,int,int,int){return true;}
+    bool movingFx(Real,Real,int,Real,Real,Real){return true;}
+    bool currency(int money){ // scrCurrencySpawn: atrState follows stomped.
+        if(!enemy)return false;
+        enemy->reward=money;world.spawnReward(*enemy,actor.stomped);
+        return world.run_.effectsSucceeded;
+    }
+    // Step-time instance_destroy: like the other compact families' deaths,
+    // retire the record from every room pass by deactivating it. The owner
+    // accepts destruction marks only at its End Step boundary.
+    bool destroy(){
+        if(!enemy||!world.publishEnemyActivation(*enemy,false))return false;
+        enemy->active=false;enemy->activationPending=false;return true;
+    }
+    // The sprite assignment after instance_destroy has no observer left.
+    bool sprite(int value){return enemy&&(!enemy->active||world.publishEnemySprite(*enemy,value));}
+    bool xscale(int sign){
+        if(!enemy||!world.publishEnemyTransform(*enemy,downwell::RunnerTransformField::scaleX,sign))return false;
+        enemy->facing=sign;return true;
+    }
+    bool inView(bool& visible){ // scrInView(0,0,0): strict, builtin x/y.
+        visible=false;
+        const int left=160+world.cameraOffsetX(),top=34+world.cameraOffsetY();
+        int order;
+        if(!downwell::compareRunnerReal(actor.x.promoted(),Real::fromInteger(left),order))return false;
+        if(order<=0)return true;
+        if(!downwell::compareRunnerReal(actor.x.promoted(),Real::fromInteger(left+160),order))return false;
+        if(order>=0)return true;
+        if(!downwell::compareRunnerReal(actor.y.promoted(),Real::fromInteger(top),order))return false;
+        if(order<=0)return true;
+        if(!downwell::compareRunnerReal(actor.y.promoted(),Real::fromInteger(top+284),order))return false;
+        visible=order<0;return true;
+    }
+    bool effectAlarmReset(Real value){
+        std::int32_t ticks;
+        if(!enemy||!downwell::runnerAlarmValue(value,ticks))return false;
+        enemy->alarm0=ticks;return true;
+    }
+    bool emitTimer(Real&){return false;} // Jelly Create never arms Alarm 0.
+};
+
+void GameplayWorld::resetCompactSpawning(){
+    for(unsigned i=0;i<steeringCapacity;++i)steeringOwner_[i]=0;
+    steeringPopulation_=0;compactSpawnerLive_=false;compactSpawnerMask_=-1;generationEndReached_=false;
+}
+
+downwell::SteeringEnemyBirthState* GameplayWorld::steeringActor(const EnemyState& enemy){
+    const int slot=enemy.auxiliaryState;
+    if(!steeringObject(enemy.objectId)||slot<0||unsigned(slot)>=steeringCapacity||
+       !enemy.lifetimeId||steeringOwner_[slot]!=enemy.lifetimeId)return nullptr;
+    if(enemy.objectId==115)return &steering_[slot].jelly;
+    return &steering_[slot].ball;
+}
+
+void GameplayWorld::releaseSteering(const EnemyState& enemy){
+    if(steeringActor(enemy)){steeringOwner_[enemy.auxiliaryState]=0;--steeringPopulation_;}
+}
+
+bool GameplayWorld::redBallEye(const EnemyState& enemy,int& sprite,int& mirror)const{
+    auto* actor=const_cast<GameplayWorld*>(this)->steeringActor(enemy);
+    if(!actor||enemy.objectId!=118)return false;
+    const auto& ball=steering_[enemy.auxiliaryState].ball;
+    if(!ball.eyeInitialized)return false;
+    sprite=ball.eye;mirror=ball.eyeX;return true;
+}
+
+bool GameplayWorld::createCompactSpawner(int y){
+    // scrBuilder's spawner: normal area-one channels only (no hard mode yet).
+    if(compactSpawnerLive_||run_.stage.area!=1||
+       !compactSpawner_.createCaverns(run_.stage.level,false))return run_.effectsSucceeded=false;
+    compactSpawnerY_=downwell::MotionBinary64::fromInteger(y);
+    compactSpawnerMask_=-1;compactSpawnerLive_=true;
+    return true;
+}
+
+bool GameplayWorld::steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+    // parentWall 57: walls and boxes (resolver) plus the compact shop walls.
+    downwell::ContactBounds bounds;unsigned count=0;
+    if(!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
+    if(wallContactResolver_){
+        if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+    }else if(solidResolver_){
+        // Worlds without the instance resolver: grid walls and boxes answer
+        // every covered pixel, in room offsets, as the bullet fallback does.
+        for(int py=bounds.top;py<bounds.bottom&&!count;++py)
+            for(int px=bounds.left;px<bounds.right&&!count;++px)
+                if(solidResolver_(solidResolverContext_,px-240,py-176))count=1;
+    }else return run_.effectsSucceeded=false;
+    bool found=count!=0;
+    if(!found&&!run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))return run_.effectsSucceeded=false;
+    hit=found;return true;
+}
+
+bool GameplayWorld::steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+    // subparentEnemy 83: every compact family. Deactivated records are absent.
+    downwell::ContactBounds bounds;
+    if(!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
+    hit=false;
+    for(unsigned i=0;i<enemyCount_&&!hit;++i){
+        const auto& enemy=enemies_[i];
+        if(!enemy.active||enemy.destroyRequested)continue;
+        hit=downwell::contactBoundsOverlap(bounds,downwell::contactWorldBounds({(enemy.x+240L)*256,(enemy.y+176L)*256,
+            enemy.objectId==117?enemy.motionState:enemy.facing,enemy.imageScaleY(),
+            downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)}));
+    }
+    return true;
+}
+
+struct GameplayWorld::SpawnerOps {
+    using Real=downwell::MotionBinary64;
+    GameplayWorld& world;long cameraQ8;
+    bool playerY(Real& value){
+        Real x;return downwell::ContactCoordinates::playerGlobals(world.player_.frameStartXFixed(),
+            world.player_.frameStartYFixed(),240,176,x,value);
+    }
+    bool area(int& value){value=world.run_.stage.area;return true;}
+    bool fallDepth(Real& value){
+        if(world.playerChildrenStarted_)return world.sourceFallDepth(value);
+        // global.falldepth = yy - objDepthMeter.y; the meter keeps the birth y.
+        Real x,y;
+        if(!downwell::ContactCoordinates::playerGlobals(world.player_.offsetXFixed(),
+            world.player_.offsetYFixed(),240,176,x,y)||
+           !y.add(Real::fromInteger(-world.depthMeterY_)))return false;
+        value=y;return true;
+    }
+    bool death(bool& value){value=world.dead();return true;}
+    bool endReached(bool& value){value=world.generationEndReached_;return true;}
+    bool enemyCount(int& value){
+        value=0;
+        for(unsigned i=0;i<world.enemyCount_;++i)
+            if(world.enemies_[i].active&&!world.enemies_[i].destroyRequested)++value;
+        return true;
+    }
+    bool objectMask(int object,int& value){
+        switch(object){
+            case 115:value=174;return true;
+            case 118:value=153;return true;
+            case 116:value=-1;return true; // enmBat has no explicit mask.
+            default:return false;
+        }
+    }
+    bool mask(int value){world.compactSpawnerMask_=value;return true;}
+    bool meeting(Real x,Real y,int object,bool& hit){
+        const int mask=world.compactSpawnerMask_<0?702:world.compactSpawnerMask_;
+        if(object==57)return world.steeringWallMeeting(mask,x,y,hit);
+        if(object==83)return world.steeringEnemyMeeting(mask,x,y,hit);
+        return false;
+    }
+    // Compact walls are never replaced by depth-100 tiles: where the original
+    // finds a tile, this world still has the wall, which obstructs the same
+    // retry. The final wall-only test then rejects both identically.
+    bool tile(int depth,Real,Real,bool& hit){hit=false;return depth==100;}
+    bool viewY(Real& value){
+        value=exactQ8(cameraQ8);return value.add(Real::fromInteger(34));
+    }
+    bool viewHeight(Real& value){value=Real::fromInteger(284);return true;}
+    bool create(int object,Real x,Real y,unsigned& id){
+        id=1;return world.createSpawnedEnemy(object,x,y);
+    }
+    bool deactivate(unsigned){return true;} // Children are created inactive.
+};
+
+bool GameplayWorld::stepCompactSpawner(long generationCameraY){
+    SpawnerOps ops{*this,generationCameraY};
+    if(!compactSpawner_.step(compactSpawnerY_,enemyRandom_,ops)||!run_.effectsSucceeded)
+        return run_.effectsSucceeded=false;
+    return true;
+}
+
+bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+    std::int32_t px,py;
+    if(!run_.effectsSucceeded||!x.roundPixel(px)||!y.roundPixel(py)||enemyCount_>=enemyCapacity)
+        return run_.effectsSucceeded=false;
+    if(object==116){
+        // enmBat Create, as AreaOneBuilder's: one discarded word, then heading.
+        enemyRandom_.nextU32();
+        const int direction=int(enemyRandom_.irandomSmall(359));
+        const auto profile=downwell::enemyCreateProfile(116);
+        return configureEnemy(enemyCount_,116,153,px-240,py-176,0,0,profile.health,profile.reward,
+            0,0,-1,-1,direction,320,false,false,true,0);
+    }
+    if(!steeringObject(object))return run_.effectsSucceeded=false;
+    unsigned slot=0;
+    while(slot<steeringCapacity&&steeringOwner_[slot])++slot;
+    if(slot==steeringCapacity)return run_.effectsSucceeded=false;
+    downwell::SteeringEnemyBirthState* actor;
+    if(object==115)actor=new(&steering_[slot].jelly) downwell::WhiteJellyStep{};
+    else actor=new(&steering_[slot].ball) downwell::RedBallStep{};
+    SteeringOps ops{*this,nullptr,*actor};
+    downwell::RunnerImageValue cx,cy;
+    if(!cx.assignInteger(px)||!cy.assignInteger(py))return run_.effectsSucceeded=false;
+    const bool born=object==115?steering_[slot].jelly.create(cx,cy,enemyRandom_,ops):
+        steering_[slot].ball.create(cx,cy,enemyRandom_,ops);
+    std::int32_t bx,by;
+    if(!born||!run_.effectsSucceeded||!actor->x.promoted().roundPixel(bx)||!actor->y.promoted().roundPixel(by))
+        return run_.effectsSucceeded=false;
+    // instance_deactivate_object follows Create: born inactive and pending.
+    if(!configureEnemy(enemyCount_,object,object==115?176:702,bx-240,by-176,0,0,actor->health,actor->money,
+        0,int(slot),ops.alarm0,ops.alarm1,0,0,false,false,true,0))return false;
+    auto& enemy=enemies_[enemyCount_-1];
+    enemy.imageSpeed=4; // imgSp 0.2, in twentieths.
+    steeringOwner_[slot]=enemy.lifetimeId;++steeringPopulation_;
+    return true;
+}
+
+bool GameplayWorld::stepSteeringEnemy(EnemyState& enemy){
+    auto* actor=steeringActor(enemy);
+    if(!actor)return run_.effectsSucceeded=false;
+    SteeringOps ops{*this,&enemy,*actor};
+    // pTimeStop is not admitted by this world yet: Step always runs unstopped.
+    const bool stepped=enemy.objectId==115?steering_[enemy.auxiliaryState].jelly.step(false,enemyRandom_,ops):
+        steering_[enemy.auxiliaryState].ball.step(false,enemyRandom_,ops);
+    if(!stepped||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    enemy.health=actor->health;
+    if(!enemy.active){releaseSteering(enemy);enemy.auxiliaryState=-1;return true;}
+    std::int32_t px,py;
+    if(!actor->x.promoted().roundPixel(px)||!actor->y.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+    if(!enemyLifecycle_.recordOwnsAppearance()&&
+       !enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,px,py))
+        return run_.effectsSucceeded=false;
+    enemy.x=px-240;enemy.y=py-176;
+    enemy.preciseX=enemy.x*256L;enemy.preciseY=enemy.y*256L;
+    // image_index wraps at the current sprite's frame count.
+    const unsigned frames=enemy.spriteId==175||enemy.spriteId==703?1u:4u;
+    while((enemy.imagePhase>>8)>=frames)enemy.imagePhase-=frames<<8;
+    if(!publishEnemyImage(enemy,enemy.imagePhase))return false;
+    enemy.imageFrame=enemy.imagePhase>>8;
+    if(enemy.objectId==118){
+        // Draw's eye sector depends only on Step state; record it here.
+        struct DrawOps {
+            const EnemyState& enemy;
+            bool shade(){return true;} // Lighting surface: not on this target.
+            bool drawSelf(){return true;}
+            bool imageIndex(downwell::MotionBinary64& value){
+                value=exactQ8(long(enemy.imagePhase));return true;
+            }
+            bool drawSpriteExt(int,downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64,
+                int,int,int,unsigned,int){return true;}
+        } draw{enemy};
+        // A first Draw in the unmatched (359,360) sector has no eye to draw.
+        (void)steering_[enemy.auxiliaryState].ball.draw(draw);
+    }
+    return true;
+}
+
+bool GameplayWorld::advanceSteeringAlarm(EnemyState& enemy,unsigned alarm){
+    auto* actor=steeringActor(enemy);
+    if(!actor)return run_.effectsSucceeded=false;
+    if(alarm==1){actor->hitStun=false;return true;}
+    if(enemy.objectId==115)return run_.effectsSucceeded=false; // Never armed.
+    SteeringOps ops{*this,&enemy,*actor};
+    return run_.effectsSucceeded=steering_[enemy.auxiliaryState].ball.effectAlarm(false,enemyRandom_,ops)&&
+        run_.effectsSucceeded;
+}
+
+bool GameplayWorld::hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTurns,int damage){
+    // scrTypicalBulletDamage: hit, hitDir = bDir, hitDmg, then ehp -= bdmg.
+    // Death follows in the enemy's own Step, not at the impact.
+    auto* actor=steeringActor(enemy);
+    if(!actor||!turnsDegrees(directionTurns,actor->hitDirection))return run_.effectsSucceeded=false;
+    actor->hit=true;actor->hitDamage+=damage;actor->health-=damage;
+    enemy.health=actor->health;
+    return true;
+}
+
+bool GameplayWorld::collideSteeringEnemies(){
+    // objPlayer_n contacts: typStompable (115) and typical damage (118).
+    for(unsigned i=0;i<enemyCount_;++i){
+        auto& enemy=enemies_[i];
+        if(!steeringObject(enemy.objectId)||!enemy.active||enemy.destroyRequested||enemy.health<=0)continue;
+        auto* actor=steeringActor(enemy);
+        long stompY;
+        if(!actor||!ceilQ8(actor->yy,stompY))return run_.effectsSucceeded=false;
+        stompY-=176L*256;
+        const downwell::ContactActor contact{enemy.x*256L,enemy.y*256L,enemy.facing,1,
+            downwell::enemyContactMask(enemy.objectId,enemy.spriteId)};
+        bool active=true;int health=enemy.health;decltype(run_.kills) defeated=0;
+        bool succeeded=true;
+        const auto result=downwell::applyEnemyContact(enemy.objectId,contact,enemy.x,enemy.y,active,health,
+            player_,health_,invulnerability_,defeated,[]{return true;},run_.upgrades.levels[7]!=0,
+            [&](int x,int y){
+                return succeeded=run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
+                    x,y,240,176);
+            },downwell::NoContactRetirement{},stompY);
+        if(!succeeded||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(result==downwell::EnemyContact::stomp){
+            // scrEnemyStomped: scrDamageToEnemy(100), hit and stomped; the
+            // death, combo and reward follow in the jelly's next Step.
+            actor->health-=100;actor->hit=true;actor->stomped=true;
+            enemy.health=actor->health;
+        }
+    }
+    // Collision events with other enemies: jelly vs subparentEnemy, red ball
+    // vs red ball. Both read the other's published builtin x/y.
+    for(unsigned i=0;i<enemyCount_;++i){
+        auto& self=enemies_[i];
+        if(!steeringObject(self.objectId)||!self.active||self.destroyRequested)continue;
+        const auto selfBounds=downwell::contactWorldBounds({self.x*256L,self.y*256L,self.facing,1,
+            downwell::enemyContactMask(self.objectId,self.spriteId)});
+        for(unsigned j=0;j<enemyCount_;++j){
+            const auto& other=enemies_[j];
+            if(j==i||!other.active||other.destroyRequested||(self.objectId==118&&other.objectId!=118))continue;
+            if(!downwell::contactBoundsOverlap(selfBounds,downwell::contactWorldBounds({other.x*256L,other.y*256L,
+                other.objectId==117?other.motionState:other.facing,other.imageScaleY(),
+                downwell::enemyContactMask(other.objectId,other.spriteId,other.maskId)})))continue;
+            auto* actor=steeringActor(self);
+            if(!actor)return run_.effectsSucceeded=false;
+            struct CollisionOps : SteeringOps {
+                const EnemyState& other;
+                bool otherX(Real& value){value=Real::fromInteger(other.x+240);return true;}
+                bool otherY(Real& value){value=Real::fromInteger(other.y+176);return true;}
+            } ops{{*this,&self,*actor},other};
+            const bool collided=self.objectId==115?steering_[self.auxiliaryState].jelly.enemyContact(enemyRandom_,ops):
+                steering_[self.auxiliaryState].ball.enemyContact(enemyRandom_,ops);
+            if(!collided||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        }
+    }
+    return true;
 }

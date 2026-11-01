@@ -68,6 +68,9 @@ static void verifyEnemyWitnessRetirement(){
 }
 
 int main(int argc,char** argv){
+    // Its StartupRuntime reference and pinned witnesses predate the compact
+    // spawner; spawned children would draw RNG only on the native side.
+    GameplayWorld::compactSpawnerAdmitted=false;
     verifyEnemyWitnessRetirement();
     bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false,enemyWitness=false;
     for(int i=1;i<argc;++i){

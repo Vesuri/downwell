@@ -2540,10 +2540,13 @@ public:
                 }
                 if(kind==View::Kind::enemy){
                     const auto* enemy=self.world_->resolveEnemyLifetime(local);
-                    return enemy&&hasSimpleOutOfViewEndStep(object)&&
+                    // Compact steering 115/118: scrOutofview, and the red
+                    // ball's additional y < view-124.
+                    return enemy&&(hasSimpleOutOfViewEndStep(object)||object==115||object==118)&&
                         retireMainRoomObjectsChecked(1,11,1,topQ12,[&](unsigned){
                             return LifetimeInstance{object,enemy->y+176,enemy->active&&!enemy->destroyRequested};
-                        },[&](unsigned){return self.world_->markEnemyDestroyed(local);});
+                        },[&](unsigned){return self.world_->markEnemyDestroyed(local);},
+                        MainRoomLifetimePhase::endStep,true);
                 }
                 if(object==261&&kind==View::Kind::bullet)return self.endStepBullet(shared,top,interiorSupported?&bulletInterior:nullptr);
                 if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
@@ -3134,7 +3137,10 @@ public:
             const InstanceHandle h{View::enemyBase+enemy.identitySlot,enemy.lifetimeId};
             std::uint32_t flags;
             if(!table_.registered(h)||!table_.flags(h,flags)||(flags&0x100003u))continue;
-            if(!hasSimpleOutOfViewEndStep(table_.objectId(h)))continue;
+            // The red ball's narrower upper bound is not this proof's window;
+            // the jelly's scrOutofview is the simple families' window.
+            if(table_.objectId(h)==118)return true;
+            if(!hasSimpleOutOfViewEndStep(table_.objectId(h))&&table_.objectId(h)!=115)continue;
             StationaryRetirementWindow::Proof position;
             // Same coordinate domain as the retained box proof; the original
             // event remains responsible for unusual or boundary coordinates.
@@ -3235,7 +3241,7 @@ public:
         actorEndStepPhase_.clear();
         if(!check(visitRegistered(View::enemyBase,View::breakableBase,
             [&](InstanceHandle h,int object,std::uint32_t flags){
-                if((flags&0x100003u)||!hasSimpleOutOfViewEndStep(object))return true;
+                if((flags&0x100003u)||(!hasSimpleOutOfViewEndStep(object)&&object!=115&&object!=118))return true;
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         if(!check(visitRegistered(View::bulletBase,View::scriptEffectBase,

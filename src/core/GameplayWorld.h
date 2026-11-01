@@ -53,6 +53,7 @@
 #include "core/CurrencySpawnScript.h"
 #include "core/CurrencyRewardFields.h"
 #include "core/CurrencyCollisionBounds.h"
+#include "core/PortableAtan.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/RegisteredSkeletonStomp.h"
 #include "core/BoneViewRetirement.h"
@@ -2194,6 +2195,7 @@ public:
         if (command.objectId == 82)
             return run_.adoptTimeField(command.x,command.y,command.timeFieldRadiusWord());
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
+        if (command.objectId == 78) return !compactSpawnerAdmitted || createCompactSpawner(command.y);
         if (!terrain(command)) return false;
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
@@ -2930,6 +2932,50 @@ private:
     downwell::StateDigest trajectory_;
 
     void spawnReward(const EnemyState& enemy, bool attracted);
+
+    // Compact spawner 78 and its source-exact steering children 115/118.
+    // Each live steering record owns one pool slot through auxiliaryState,
+    // keyed by its enemy lifetime; Step/alarm/contact events run the shared
+    // WhiteJellyStep/RedBallStep state machines. The registered stores above
+    // remain the reference owners and are not used by this compact world.
+    union SteeringActor {
+        downwell::WhiteJellyStep jelly;
+        downwell::RedBallStep ball;
+        SteeringActor():jelly(){}
+    };
+    static constexpr unsigned steeringCapacity=24;
+    SteeringActor steering_[steeringCapacity];
+    std::uint32_t steeringOwner_[steeringCapacity]{};
+    downwell::SpawnerStep compactSpawner_;
+    downwell::MotionBinary64 compactSpawnerY_{};
+    int compactSpawnerMask_=-1;
+    bool compactSpawnerLive_=false;
+    unsigned steeringPopulation_=0; // Owned pool slots; gates the contact pass.
+    bool generationEndReached_=false;
+    int depthMeterY_=0; // objDepthMeter's published y: the player birth y.
+    struct SteeringOps;
+    struct SpawnerOps;
+    void resetCompactSpawning();
+    downwell::SteeringEnemyBirthState* steeringActor(const EnemyState& enemy);
+    void releaseSteering(const EnemyState& enemy);
+    bool createCompactSpawner(int y);
+    bool stepCompactSpawner(long generationCameraY);
+    bool createSpawnedEnemy(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    bool stepSteeringEnemy(EnemyState& enemy);
+    bool advanceSteeringAlarm(EnemyState& enemy,unsigned alarm);
+    bool hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTurns,int damage);
+    bool collideSteeringEnemies();
+    bool steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+    bool steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+public:
+    // Paired host comparisons whose StartupRuntime reference does not run
+    // object 78 clear this before generation. Production never changes it.
+    static inline bool compactSpawnerAdmitted=true;
+    // objBuilder.endReached, published by the generation frontend.
+    void publishGenerationEndReached(bool reached){generationEndReached_=reached;}
+    // Red-ball Draw's eye, after the most recent Step. False when absent or
+    // before any sector has initialized it (the source has no default).
+    bool redBallEye(const EnemyState& enemy,int& sprite,int& mirror)const;
 };
 
 #endif

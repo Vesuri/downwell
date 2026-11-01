@@ -21,12 +21,12 @@ template<class Player, class Immunity, class Count, class Reward, class Damage,
 EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
     int publishedX, int publishedY, bool& active, int& enemyHealth, Player& player, int& playerHealth,
     Immunity& invulnerability, Count& defeated, Reward reward, bool candle, Damage damage,
-    Retire retire = {}) {
+    Retire retire = {}, long stompY = 0x7fffffffL) {
     if (!active || enemyHealth <= 0 || !playerCanAct(playerHealth)) return EnemyContact::none;
     const ContactActor playerContact{player.offsetXFixed(), player.offsetYFixed(),
                                     player.facing(), 1, 31};
     const auto contact = classifyEnemyContact(playerContact, enemy, object,
-                                             player.frameStartYFixed());
+        player.frameStartYFixed(), stompY == 0x7fffffffL ? enemy.y : stompY);
     if (contact == EnemyContact::stomp) {
         if (!reward()) return EnemyContact::none;
         if (!retire()) return EnemyContact::none;

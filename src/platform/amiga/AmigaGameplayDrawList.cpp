@@ -488,9 +488,15 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
 #ifndef DOWNWELL_REPLAY_VERIFY
                 const auto* enemy=port.resolveEnemyLifetime(key);
                 if(!enemy)return false;
-                return !enemy->active||!enemy->awake||append(enemy->spriteId,enemy->drawFrame(),
-                    downwellPlayfieldX+80+enemy->x-port.cameraOffsetX(),
-                    playerStartY+enemy->y-port.cameraOffsetY(),enemy->objectId!=119&&enemy->facing<0);
+                if(!enemy->active||!enemy->awake)return true;
+                const int x=downwellPlayfieldX+80+enemy->x-port.cameraOffsetX();
+                const int y=playerStartY+enemy->y-port.cameraOffsetY();
+                if(!append(enemy->spriteId,enemy->drawFrame(),x,y,enemy->objectId!=119&&enemy->facing<0))return false;
+                // enmRedBall Draw: the eye follows draw_self at (x,y-5),
+                // with the body's image index and the sector's own mirror.
+                int eye,mirror;
+                return enemy->objectId!=118||!port.redBallEye(*enemy,eye,mirror)||
+                    append(eye,enemy->drawFrame(),x,y-5,mirror<0);
 #else
                 return true;
 #endif

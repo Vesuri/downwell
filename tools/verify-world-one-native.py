@@ -61,6 +61,8 @@ def main():
         previous=-1
         sceneFrame=0
         oldScene=-1
+        oldLevel=-1
+        levelStart=-1
         deadline=time.monotonic()+600
         with Input(g,log=lambda r: log.write(str(r)+'\n')) as controls:
             for frame in range(10000):
@@ -103,7 +105,11 @@ def main():
                     # The normal renderer retires gameplay before Result Create
                     # in a Draw-only iteration. Compare after that creation,
                     # where the host witness for the same tick is recorded.
-                    if tick and tick%16==0 and not resultPending:
+                    if level!=oldLevel: oldLevel=level;levelStart=tick
+                    # The host witness for a level's first tick is recorded
+                    # after next-level creation; native samples input before
+                    # scenes.step builds it. Later checks cover those draws.
+                    if tick and tick%16==0 and not resultPending and tick!=levelStart:
                         observed=checked('printf "CHECK %d %ld %ld %d %u\\n", $w->run_.stage.level,$w->player_.x_,$w->player_.y_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
                         match=re.search(r'CHECK ([\d -]+)',observed)
                         actual=list(map(int,match[1].split())) if match else []

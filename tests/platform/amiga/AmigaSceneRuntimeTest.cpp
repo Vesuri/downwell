@@ -459,10 +459,20 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
     verifyFrogMotion(amiga, reference);
     require(amiga.generationSucceeded(),
             "live terrain generation succeeds throughout the comparison tape");
-    unsigned referenceEnemyCount = 0;
-    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i)
-        if (amigaEnemyHealth(reference.instanceAt(i).objectId)) ++referenceEnemyCount;
-    require(referenceEnemyCount == amiga.enemyCount(),
+    unsigned referenceEnemyCount = 0, referenceSteering = 0, nativeSteering = 0;
+    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+        const int object = reference.instanceAt(i).objectId;
+        if (amigaEnemyHealth(object)) ++referenceEnemyCount;
+        if (object == 115 || object == 118) ++referenceSteering;
+    }
+    for (unsigned i = 0; i < amiga.enemyCount(); ++i) {
+        const int object = amiga.enemyAt(i).objectId;
+        if (object == 115 || object == 118) ++nativeSteering;
+    }
+    if (std::getenv("DOWNWELL_TRACE_STEERING") && referenceSteering != nativeSteering)
+        std::cerr << "STEERING tick=" << amiga.tick() << " native=" << nativeSteering
+                  << " reference=" << referenceSteering << '\n';
+    require(referenceEnemyCount == amiga.enemyCount() - nativeSteering,
             "enemy populations match after births and offscreen destruction throughout this tape");
     if (std::getenv("DOWNWELL_TRACE_BIRTHS")) {
         static unsigned nativeSeen = 0, referenceSeen = 0;
@@ -2398,6 +2408,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     unsigned total=0;
     for(unsigned level=1;level<=3;++level){
         int target=240,deepest=176+game.player().offsetY();unsigned stuck=0,updates=0,shopTick=0;
+        std::uint32_t lastSteering=0;unsigned jellies=0,redBalls=0,steeringKills=0,eyes=0;
         require(!game.finishWorldOneSlice(),"cannot finish before Result Alarm 1");
         for(;updates<8000&&!game.levelResultRequested()&&!game.dead();++updates){
             const int x=240+game.player().offsetX(),y=176+game.player().offsetY();
@@ -2412,10 +2423,37 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             }
             if(y>deepest+8){deepest=y;stuck=0;}else ++stuck;
             if(stuck>=120)target=(updates/120)%2?168:312;
+            // Shoot enemies below (spawner children home in on the player)
+            // and sidestep one level with the player.
+            int threatX=0,threatY=0,threatObject=0;bool below=false,beside=false;
+            for(unsigned i=0;stuck<60&&i<game.enemyCount();++i){
+                const auto& e=game.enemyAt(i);
+                if(!e.active||e.health<=0)continue;
+                const int dx=240+e.x-x,dy=176+e.y-y;
+                const int reach=e.objectId==118?140:96;
+                if(dy>8&&dy<=reach&&std::abs(dx)<=40&&(!below||dy<threatY)){below=true;threatX=dx;threatY=dy;threatObject=e.objectId;}
+                else if(!below&&dy>=-28&&dy<=8&&std::abs(dx)<=36){beside=true;threatX=dx;threatY=dy;}
+            }
+            // Red balls take no stomp: keep falling away from one above.
+            int chaserX=0;bool chased=false;
+            for(unsigned i=0;stuck<60&&i<game.enemyCount();++i){
+                const auto& e=game.enemyAt(i);
+                const int dx=240+e.x-x,dy=176+e.y-y;
+                if(e.active&&e.health>0&&e.objectId==118&&dy<=8&&dy>=-80&&std::abs(dx)<=72){chased=true;chaserX=dx;}
+            }
+            const bool stompable=threatObject==111||threatObject==112||threatObject==113||
+                threatObject==115||threatObject==116;
+            int steer=target;
+            if(below&&(stompable||(threatObject==118&&threatY>28)))steer=x+threatX;
+            else if(below&&threatY<=40)steer=threatX>0?x-24:x+24;
+            else if(beside)steer=threatX>0?x-24:x+24;
+            else if(chased&&std::abs(target-x)<24)steer=chaserX>0?x-32:x+32;
             downwell::Input input;
-            input.left=x>target+2;input.right=x<target-2;
+            input.left=x>steer+2;input.right=x<steer-2;
             input.fire=updates%40==0||updates%40==3;
             if(stuck>=120)input.fire=updates%40==0||updates%40==3;
+            if(chased)input.fire=false;
+            if(below&&std::abs(threatX)<=10)input.fire=updates%4<2;
             if(game.shops().noControl){
                 input={};input.left=(shopTick%4)==0;input.fire=(shopTick%4)==2;++shopTick;
             }else shopTick=0;
@@ -2425,13 +2463,36 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
             const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
             edges.sample(input);
+            const int healthBefore=game.health();
+            std::vector<std::uint32_t> liveSteering;
+            for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                if((e.objectId==115||e.objectId==118)&&e.active)liveSteering.push_back(e.lifetimeId);}
             game.step(packed);
+            for(unsigned i=0;i<game.enemyCount();++i){
+                const auto& e=game.enemyAt(i);
+                if(e.objectId!=115&&e.objectId!=118)continue;
+                if(e.lifetimeId>lastSteering){lastSteering=e.lifetimeId;++(e.objectId==115?jellies:redBalls);}
+                int eye,mirror;if(e.active&&game.redBallEye(e,eye,mirror))++eyes;
+                if(!e.active&&e.health<=0&&std::find(liveSteering.begin(),liveSteering.end(),e.lifetimeId)!=liveSteering.end())
+                    ++steeringKills;
+            }
+            if(std::getenv("DOWNWELL_TRACE_SLICE_DAMAGE")&&game.health()<healthBefore){
+                std::cerr<<"DAMAGE level="<<level<<" update="<<updates<<" hp="<<game.health()<<" player="<<x<<','<<y;
+                for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                    if(e.active&&std::abs(240+e.x-x)<40&&std::abs(176+e.y-y)<40)
+                        std::cerr<<" obj"<<e.objectId<<'@'<<240+e.x<<','<<176+e.y;}
+                std::cerr<<'\n';
+            }
             if(!game.effectsSucceeded()||!game.generationSucceeded()){
                 std::cerr<<"slice failure level="<<level<<" update="<<updates<<" effects="<<game.effectsSucceeded()
                     <<" generation="<<game.generationSucceeded()<<'\n';
                 require(false,"slice update succeeds");
             }
         }
+        std::cout<<"Slice level="<<level<<" jellies="<<jellies<<" redBalls="<<redBalls
+            <<" steeringKills="<<steeringKills<<" eyeFrames="<<eyes<<std::endl;
+        if(level==1)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
+        if(level>=2)require(redBalls&&eyes,"1-2 and 1-3 spawn red balls with drawn eyes");
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
             <<" exit="<<game.levelResultRequested()<<" x="<<game.player().offsetX()<<" y="<<game.player().offsetY()
             <<" shop="<<game.shops().noControl<<std::endl;

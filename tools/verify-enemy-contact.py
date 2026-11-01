@@ -25,7 +25,7 @@ assert [line for line in field_body.splitlines() if line and not line.startswith
     "pushi.e 0", "pop.v.i self.ehp"]
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 208, 278, 460, 569, 585}
+assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 460, 569, 585, 702}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
@@ -35,12 +35,18 @@ for row in records:
                 sprite["marginTop"] - sprite["originY"],
                 sprite["marginBottom"] - sprite["originY"] + 1)
     assert tuple(map(int, row[1:])) == expected, (sprite["name"], row, expected)
-for object_id, mask in ((35, 31), (113, 166), (117, 177), (119, 278), (120, 208)):
+# Spawner children: explicit masks 174/153; Spawner 78 itself uses sprite 702.
+for object_id, mask in ((35, 31), (113, 166), (115, 174), (117, 177), (118, 153), (119, 278), (120, 208)):
     assert manifest["resources"]["objects"][object_id]["textureMaskId"] == mask
 assert manifest["resources"]["objects"][112]["spriteId"] == 186
 assert manifest["resources"]["objects"][248]["spriteId"] == 133
 assert manifest["resources"]["objects"][248]["textureMaskId"] == -1
 assert manifest["resources"]["objects"][116]["spriteId"] == 153
+assert manifest["resources"]["objects"][116]["textureMaskId"] == -1
+assert manifest["resources"]["objects"][78]["spriteId"] == 702
+assert manifest["resources"]["objects"][78]["textureMaskId"] == -1
+for object_id in (115, 116, 118):
+    assert manifest["resources"]["objects"][object_id]["parentId"] == 83
 assert manifest["resources"]["objects"][269]["spriteId"] == 460
 assert manifest["resources"]["objects"][269]["textureMaskId"] == -1
 assert manifest["resources"]["objects"][225]["spriteId"] == 84
@@ -96,4 +102,4 @@ sound_calls = re.findall(
     r'conv\.i\.v\ncall\.i gml_Script_soundPlayOL\(argc=5\)', step)
 assert sound_calls == ["133", "134", "132"]
 assert step.count("call.i gml_Script_soundPlayOL") == 3
-print("18 actor/terrain contact rectangles, smoke wall response and skeleton Step sound calls match pinned source")
+print("20 actor/terrain contact rectangles, smoke wall response and skeleton Step sound calls match pinned source")

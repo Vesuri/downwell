@@ -21,6 +21,7 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 163: return {-6, 7, -4, 5};
         case 164: return {-6, 7, -4, 5};
         case 166: return {-6, 6, -5, 8};
+        case 174: return {-9, 9, -6, 4};
         case 177: return {-7, 7, -6, 7};
         case 186: return {-8, 8, -4, 8};
         case 208: return {-10, 10, -7, 8};
@@ -28,6 +29,7 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 460: return {-5, 5, -4, 5};
         case 569: return {-9, 10, -7, 9};
         case 585: return {-8, 8, -8, 8};
+        case 702: return {-8, 8, -10, 7};
         default: return {0, 0, 0, 0};
     }
 }
@@ -38,6 +40,8 @@ inline int enemyContactMask(int object, int sprite,int explicitMask=-1) {
         case 116: return explicitMask>=0?explicitMask:sprite;
         case 112: return 186; // Create: mask_index = sprite_index
         case 113: return 166; // serialized explicit mask
+        case 115: return 174; // serialized explicit masks, unchanged by hit art
+        case 118: return 153;
         case 117: return 177;
         case 119: return 278;
         case 120: return 208; // Explicit mask: unchanged by throw/hit artwork.
@@ -91,18 +95,25 @@ inline ContactBounds contactPixelBounds(int x, int y, int scaleX, int scaleY, in
 }
 
 enum class EnemyContact { none, stomp, damage };
+// stompY is the Q8 value compared with global.ply. Families whose private yy
+// is not on the Q8 lattice pass its exact ceiling: yy > p+2 <=> ceil > p+512.
 inline EnemyContact classifyEnemyContact(const ContactActor& player,
-    const ContactActor& enemy, int object, long playerStartY) {
+    const ContactActor& enemy, int object, long playerStartY, long stompY) {
     const ContactBounds a = contactWorldBounds(player);
     const ContactBounds b = contactWorldBounds(enemy);
     if (a.left == a.right || b.left == b.right ||
         a.left >= b.right || b.left >= a.right ||
         a.top >= b.bottom || b.top >= a.bottom) return EnemyContact::none;
-    const bool stompable = object == 111 || object == 112 || object == 113 || object == 116;
+    const bool stompable = object == 111 || object == 112 || object == 113 ||
+        object == 115 || object == 116;
     // typStompable compares enemy yy, not rounded y, to global.ply published
     // by scrPlMovement BEFORE the player's integration in this frame.
-    return stompable && enemy.y > playerStartY + 2 * 256
+    return stompable && stompY > playerStartY + 2 * 256
         ? EnemyContact::stomp : EnemyContact::damage;
+}
+inline EnemyContact classifyEnemyContact(const ContactActor& player,
+    const ContactActor& enemy, int object, long playerStartY) {
+    return classifyEnemyContact(player, enemy, object, playerStartY, enemy.y);
 }
 
 } // namespace downwell
