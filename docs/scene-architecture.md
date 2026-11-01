@@ -208,17 +208,13 @@ Isolated event fixtures may continue to provide explicit input/currency through
 the reference overloads.
 
 Native Cancel is the second button on a two-button joystick in port 2 (pin 9,
-POTGOR bit 14, active low); fire remains CIA-A PRA bit 7. `AmigaInput` leases
-that pin through `potgo.resource` before takeover and drives OUTRY/DATRY high
-for the button pull-up prescribed by RKM chapter 8, "Digital I/O On The
-Controller Port". Resource writes mask only those two bits, preserving the
-other port and pins. Missing resource/allocation returns 20 before takeover.
-Retirement returns the pin to input mode and frees the allocation; the resource
-has no CloseResource operation. No per-update resource calls are needed.
-`make test-amiga-input` compiles the real acquisition/cleanup implementation
-against an instrumented resource and checks all 16 input combinations, unrelated
-pins, replay transport and held Cancel across reset. This is not electrical
-testing of a physical joystick or support for CD32 serial-pad decoding.
+`POTINP` bit 14, active low); fire remains CIA-A PRA bit 7. As in Rescue on
+Fractalus, `AmigaInput` only reads `JOY1DAT`, CIA-A PRA and `POTINP`: it neither
+writes POTGO nor uses `potgo.resource`, so input adds no OS dependency or
+startup failure to the takeover. `make test-amiga-input` checks all 16 input
+combinations, unrelated pins, replay transport and held Cancel across reset.
+This is not electrical testing of a physical joystick or support for CD32
+serial-pad decoding.
 
 X is the approved keyboard Cancel binding on SDL and Amiga; Escape quits,
 and Pause remains separate. Keyboard and controller Cancel are ORed before

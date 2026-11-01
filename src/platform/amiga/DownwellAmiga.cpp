@@ -1906,8 +1906,6 @@ __attribute__((noinline)) static int runDownwell(void) {
     if(gCoverageWordVerifiedCases!=80)return 20;
 #endif
     AmigaPlatform platform;
-    AmigaInput controls;
-    if(!controls.ready())return 20;
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
     UBYTE rejectDrawMarker=0;
     gDownwellEncounterRejectDraw=platform.loadFile("Downwell.reject-draw",&rejectDrawMarker,1)>=0;
@@ -2932,7 +2930,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
 #else
-            downwell::Input liveInput = controls.sample();
+            downwell::Input liveInput = AmigaInput::sample();
             liveInput.cancel=keyboard.cancel()||liveInput.cancel;
 #ifdef DOWNWELL_PROFILE_AUTORUN
             static unsigned profileMenuFrames = 0;

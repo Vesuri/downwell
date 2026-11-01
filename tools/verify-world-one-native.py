@@ -56,7 +56,7 @@ def main():
         checked("set $s=(AmigaSceneRuntime*)&'runDownwell()::sceneStorage'")
         # Break at the instruction entry, before volatile device loads. A
         # source-line breakpoint can stop after those loads in optimized code.
-        checked("break *'AmigaInput::sample() const'")
+        checked("break *'AmigaInput::sample'")
         checked('break downwellWorldOneComplete')
         previous=-1
         sceneFrame=0
