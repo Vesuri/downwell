@@ -239,10 +239,15 @@ bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin)
     const unsigned line = downwellDisplayVStartCropped + span - 1;
     const UBYTE* data = (const UBYTE*)game.data + downwellFetchCropBytes +
                         ringOrigin * downwellBytesPerPlaneLine;
+    // After $ffdf the copper can fetch the second wait on line 256, whose
+    // eight-bit position is 0. Repeating $ffdf there waits for the next field
+    // and skips the reload, so line 255 waits for $0001: met on either side
+    // of the boundary and before line 256's first fetch at DDFSTRT.
     return patchPointer(planeOffset_, data) &&
            patchPointer(planeOffset_ + 4, data + downwellGameRingPlaneBytes) &&
            patchWait(wrapWaitOffset_, line < 255 ? line : 255, 0xdf) &&
-           patchWait(wrapWaitOffset_ + 2, line, 0xdf);
+           patchWait(wrapWaitOffset_ + 2, line == 255 ? 0 : line,
+                     line == 255 ? 0x01 : 0xdf);
 }
 
 bool DownwellGameplayCopperList::updateOverlay(const Bitmap& hud)
