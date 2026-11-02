@@ -150,7 +150,7 @@ def overlays(pack):
     records, payload = [], bytearray()
     for i in range(count):
         sprite, frame, ox, oy, w, h, stride, flags, offset, size = struct.unpack_from('>HHhhHHHHII', pack, directory+24*i)
-        if sprite not in (139, 550, 568, 569):
+        if sprite not in (139, 550, 551, 568, 569, 570):
             continue
         assert flags == 3 and w <= 32 and h <= 32
         for flip in (0, 1):

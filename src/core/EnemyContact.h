@@ -26,10 +26,16 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 186: return {-8, 8, -4, 8};
         case 208: return {-10, 10, -7, 8};
         case 278: return {-5, 5, -5, 5};
+        case 458: return {2, 8, -3, 3};
+        case 459: return {-4, 6, -3, 3};
         case 460: return {-5, 5, -4, 5};
+        case 550: return {-6, 6, -1, 8};
+        case 568: return {-6, 6, -5, 7};
         case 569: return {-9, 10, -7, 9};
         case 585: return {-8, 8, -8, 8};
+        case 598: return {-5, 5, -5, 5};
         case 702: return {-8, 8, -10, 7};
+        case 710: return {-2, 2, -2, 2};
         default: return {0, 0, 0, 0};
     }
 }

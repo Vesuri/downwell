@@ -21,6 +21,7 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
+#include <set>
 #include <array>
 #include <algorithm>
 #include <memory>
@@ -162,7 +163,11 @@ struct LiveSceneWorld {
             "room binding retires previous generation damage");
         port.configureGenerationStep(generate, this);
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
-        port.configureSolidResolver(amigaResolveTerrainSolid, &collision);
+        // The normal Amiga build's resolver set (DownwellAmiga.cpp).
+        port.configureSolidResolver(amigaResolveTerrainSolid, &collision, amigaResolveTerrainSegment,
+            amigaResolveTerrainPlayerMask, amigaResolveTerrainWallContacts, amigaResolveTerrainPlatformContact,
+            amigaResolveTerrainCorners);
+        port.configureSolidCells(amigaTerrainSolidCells(collision));
     }
 };
 
@@ -2406,9 +2411,15 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     std::ofstream states("tmp/world-one-gameplay.states");
     require(bool(tape),"open slice input tape");
     unsigned total=0;
+    unsigned routeRedBalls=0,routeEyes=0,routeChunks=0;
     for(unsigned level=1;level<=3;++level){
         int target=240,deepest=176+game.player().offsetY();unsigned stuck=0,updates=0,shopTick=0;
         std::uint32_t lastSteering=0;unsigned jellies=0,redBalls=0,steeringKills=0,eyes=0;
+        // W1.3: boxes, Scattered16, gem chunks and torches on the same route.
+        std::set<std::pair<int,int>> brokenPlants,openedChunks,shotChunks,litTorches,doused,abandoned;
+        int detourX=0,detourY=0;unsigned detourTicks=0,escape=0,jumpHold=0;bool lastFire=false;
+        unsigned peakNoLoop=0,peakMoving=0,peakDebris=0,peakGems=0,peakPlants=0,splashes=0,boxBursts=0;
+        const unsigned blocksBefore=game.blocksDestroyed(),currencyBefore=game.currency();
         require(!game.finishWorldOneSlice(),"cannot finish before Result Alarm 1");
         for(;updates<8000&&!game.levelResultRequested()&&!game.dead();++updates){
             const int x=240+game.player().offsetX(),y=176+game.player().offsetY();
@@ -2453,7 +2464,40 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             input.fire=updates%40==0||updates%40==3;
             if(stuck>=120)input.fire=updates%40==0||updates%40==3;
             if(chased)input.fire=false;
-            if(below&&std::abs(threatX)<=10)input.fire=updates%4<2;
+            if(below&&std::abs(threatX)<=12)input.fire=updates%4<2;
+            // W1.3 detour: visit a gem chunk in a side room off the shaft, jump
+            // onto it and shoot it open. Bounded per target.
+            {
+                const auto& sc=game.compactScenery();
+                int sx=0,sy=0;bool scenery=false;
+                for(unsigned i=0;!scenery&&i<sc.gemChunkEnd;++i){const auto& r=sc.gemChunks[i];
+                    if(r.live&&!r.opened&&!abandoned.count({r.x,r.y})&&
+                       (detourX==r.x&&detourY==r.y?std::abs(r.y-y)<=48:r.y>=y-16&&r.y<=y+120&&std::abs(r.x-x)<=200))
+                        {scenery=true;sx=r.x;sy=r.y;}}
+                if(scenery){
+                    if(detourX!=sx||detourY!=sy){detourX=sx;detourY=sy;detourTicks=0;}
+                    if(++detourTicks>600){abandoned.insert({sx,sy});escape=240;}
+                    // Fight first: the normal threat rules own nearby enemies.
+                    if(!below&&!beside&&!chased){
+                        const bool grounded=game.player().grounded();
+                        input={};input.left=x>sx+1;input.right=x<sx-1;
+                        if(grounded){
+                            // Release, then a held press for a full jump onto the chunk.
+                            if(std::abs(x-sx)<=24&&!lastFire){input.fire=true;jumpHold=1;}
+                        }else if(jumpHold&&jumpHold<16){input.fire=true;++jumpHold;}
+                        else{
+                            jumpHold=0;
+                            // Above it: stomp-shoot downwards like the threat rule.
+                            if(std::abs(x-sx)<=8&&y<sy)input.fire=updates%4<2;
+                        }
+                    }
+                }else if(detourX||detourY){detourX=detourY=0;escape=240;}
+                if(!scenery&&escape){
+                    // Walk back to the shaft, hopping over the room's lip.
+                    --escape;input={};input.left=x>242;input.right=x<238;input.fire=(updates%24)==0;
+                    if(x>=200&&x<=280)escape=0;
+                }
+            }
             if(game.shops().noControl){
                 input={};input.left=(shopTick%4)==0;input.fire=(shopTick%4)==2;++shopTick;
             }else shopTick=0;
@@ -2461,6 +2505,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             if(level==1&&updates==0)input={};
             states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
+            lastFire=input.fire;
             const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
             edges.sample(input);
             const int healthBefore=game.health();
@@ -2468,6 +2513,50 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
                 if((e.objectId==115||e.objectId==118)&&e.active)liveSteering.push_back(e.lifetimeId);}
             game.step(packed);
+            {
+                const auto& fx=game.compactEffects();const auto& sc=game.compactScenery();
+                peakNoLoop=std::max(peakNoLoop,fx.noLoopCount());peakMoving=std::max(peakMoving,fx.movingCount());
+                peakDebris=std::max(peakDebris,game.compactDebris().size());peakGems=std::max(peakGems,game.gemSlotEnd());
+                peakPlants=std::max(peakPlants,sc.scatteredEnd);
+                if(std::getenv("DOWNWELL_TRACE_SLICE_SCENERY"))for(unsigned i=0;i<sc.gemChunkEnd;++i)
+                    if(sc.gemChunks[i].birth==game.tick()){std::cerr<<"CHUNK level="<<level<<" update="<<updates
+                        <<" at="<<sc.gemChunks[i].x<<','<<sc.gemChunks[i].y<<'\n';
+                        for(int ry=sc.gemChunks[i].y-112;ry<=sc.gemChunks[i].y+48;ry+=16){
+                            std::cerr<<ry<<' ';
+                            for(int rx=-16;rx<=496;rx+=16)std::cerr<<(rx==sc.gemChunks[i].x&&ry==sc.gemChunks[i].y?'@':
+                                amigaResolveTerrainSolid(&live.collision,rx-240,ry-176)?'#':'.');
+                            std::cerr<<'\n';
+                        }}
+                if(std::getenv("DOWNWELL_TRACE_SLICE_SCENERY"))for(unsigned i=0;i<sc.fireEnd;++i)
+                    if(sc.fires[i].birth==game.tick()){std::cerr<<"FIRE level="<<level<<" update="<<updates
+                        <<" at="<<sc.fires[i].x<<','<<sc.fires[i].y<<" player="<<x<<','<<y<<'\n';
+                        for(int ry=sc.fires[i].y-104;ry<=sc.fires[i].y+56;ry+=16){
+                            std::cerr<<ry<<' ';
+                            for(int rx=-16;rx<=496;rx+=16)std::cerr<<(rx==sc.fires[i].x&&ry==sc.fires[i].y+8?'T':
+                                amigaResolveTerrainSolid(&live.collision,rx-240,ry-176)?'#':'.');
+                            std::cerr<<'\n';
+                        }}
+                for(unsigned i=0;i<fx.movingCount();++i)
+                    if(fx.moving(i).effect.spriteId==704&&fx.moving(i).effect.imageIndex.bits==0)++splashes;
+                for(unsigned i=0;i<fx.noLoopCount();++i)
+                    if(fx.noLoop(i).effect.spriteId==603&&fx.noLoop(i).effect.imageIndex.bits==0)++boxBursts;
+                for(unsigned i=0;i<sc.scatteredEnd;++i)if(sc.scattered[i].live&&sc.scattered[i].spriteId==551)
+                    brokenPlants.insert({sc.scattered[i].x,sc.scattered[i].y});
+                const bool traceEvents=std::getenv("DOWNWELL_TRACE_SLICE_EVENTS")!=nullptr;
+                for(unsigned i=0;i<sc.gemChunkEnd;++i){const auto& r=sc.gemChunks[i];
+                    if(r.live&&r.wallHp<30)shotChunks.insert({r.x,r.y});
+                    if(r.live&&r.opened&&openedChunks.insert({r.x,r.y}).second&&traceEvents)
+                        std::cerr<<"EVENT chunkOpened tick="<<game.tick()<<'\n';}
+                if(traceEvents)for(unsigned i=0;i<sc.fireEnd;++i)if(sc.fires[i].live&&sc.fires[i].y>y-100&&sc.fires[i].y<y+100)
+                    std::cerr<<"EVENT fireNear tick="<<game.tick()<<" fire="<<sc.fires[i].x<<','<<sc.fires[i].y<<" player="<<x<<','<<y<<'\n';
+                if(traceEvents&&fx.noLoopCount()&&fx.noLoop(fx.noLoopCount()-1).effect.imageIndex.bits==0)
+                    std::cerr<<"EVENT noLoop tick="<<game.tick()<<" sprite="<<fx.noLoop(fx.noLoopCount()-1).effect.spriteId<<'\n';
+                if(traceEvents)for(unsigned i=0;i<fx.movingCount();++i)if(fx.moving(i).effect.spriteId==118&&fx.moving(i).effect.imageIndex.bits==0)
+                    std::cerr<<"EVENT superFlash tick="<<game.tick()<<'\n';
+                for(unsigned i=0;i<sc.torchEnd;++i)if(sc.torches[i].live&&sc.torches[i].allSet&&sc.torches[i].placement>=0)
+                    litTorches.insert({sc.torches[i].x,sc.torches[i].y});
+                for(unsigned i=0;i<sc.fireEnd;++i)if(sc.fires[i].live&&!sc.fires[i].active)doused.insert({sc.fires[i].x,sc.fires[i].y});
+            }
             for(unsigned i=0;i<game.enemyCount();++i){
                 const auto& e=game.enemyAt(i);
                 if(e.objectId!=115&&e.objectId!=118)continue;
@@ -2477,7 +2566,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     ++steeringKills;
             }
             if(std::getenv("DOWNWELL_TRACE_SLICE_DAMAGE")&&game.health()<healthBefore){
-                std::cerr<<"DAMAGE level="<<level<<" update="<<updates<<" hp="<<game.health()<<" player="<<x<<','<<y;
+                std::cerr<<"DAMAGE level="<<level<<" update="<<updates<<" hp="<<game.health()<<" player="<<x<<','<<y
+                    <<" stuck="<<stuck<<" ammo="<<game.player().ammo()<<" below="<<below<<" steer="<<steer;
                 for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
                     if(e.active&&std::abs(240+e.x-x)<40&&std::abs(176+e.y-y)<40)
                         std::cerr<<" obj"<<e.objectId<<'@'<<240+e.x<<','<<176+e.y;}
@@ -2485,17 +2575,30 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             }
             if(!game.effectsSucceeded()||!game.generationSucceeded()){
                 std::cerr<<"slice failure level="<<level<<" update="<<updates<<" effects="<<game.effectsSucceeded()
-                    <<" generation="<<game.generationSucceeded()<<'\n';
+                    <<" generation="<<game.generationSucceeded()<<" fx="<<game.compactEffects().valid()
+                    <<'/'<<game.compactEffects().noLoopCount()<<'/'<<game.compactEffects().movingCount()
+                    <<" debris="<<game.compactDebris().valid()<<'/'<<game.compactDebris().size()
+                    <<" gems="<<game.gemCount()<<'/'<<game.gemSlotEnd()
+                    <<" scenery="<<game.compactScenery().scatteredEnd<<'/'<<game.compactScenery().gemChunkEnd
+                    <<'/'<<game.compactScenery().torchEnd<<'/'<<game.compactScenery().fireEnd<<'\n';
                 require(false,"slice update succeeds");
             }
         }
+        std::cout<<"Slice level="<<level<<" boxes="<<game.blocksDestroyed()-blocksBefore<<" boxBursts="<<boxBursts
+            <<" plants="<<brokenPlants.size()<<" chunksShot="<<shotChunks.size()<<" chunksOpened="<<openedChunks.size()
+            <<" torches="<<litTorches.size()<<" doused="<<doused.size()<<" splashes="<<splashes
+            <<" currency="<<game.currency()-currencyBefore<<" peak noLoop="<<peakNoLoop<<" moving="<<peakMoving
+            <<" debris="<<peakDebris<<" gems="<<peakGems<<" plants="<<peakPlants<<std::endl;
         std::cout<<"Slice level="<<level<<" jellies="<<jellies<<" redBalls="<<redBalls
             <<" steeringKills="<<steeringKills<<" eyeFrames="<<eyes<<std::endl;
-        if(level==1)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
-        if(level>=2)require(redBalls&&eyes,"1-2 and 1-3 spawn red balls with drawn eyes");
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
             <<" exit="<<game.levelResultRequested()<<" x="<<game.player().offsetX()<<" y="<<game.player().offsetY()
             <<" shop="<<game.shops().noControl<<std::endl;
+        if(level==1)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
+        if(level>=2){routeRedBalls+=redBalls;routeEyes+=eyes;}
+        if(level==3)require(routeRedBalls&&routeEyes,"1-2/1-3 spawn red balls with drawn eyes");
+        routeChunks+=openedChunks.size();
+        if(level==3)require(routeChunks,"the route opens a gem chunk");
         require(!game.dead()&&game.levelResultRequested(),"input-only slice reaches exit alive");
         bool heart=false;require(game.enterLevelClear(0,heart),"slice Result Create");
         unsigned clear=0;

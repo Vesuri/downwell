@@ -1089,6 +1089,10 @@ static void checkNativeAnimationPopulation(const ObjectPack& objects,const Sprit
     }
 }
 int main(){
+    // Pinned ownership witnesses and partial collision resolvers predate
+    // W1.3's box bursts and builder scenery (their debris needs wall and
+    // platform contacts).
+    GameplayWorld::compactRoomEffectsAdmitted=false;
 #ifdef DOWNWELL_FRAME_WORK_TEST
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());

@@ -187,7 +187,7 @@ bool AmigaTerrainPainter::preparePatternPiece(AmigaTerrainRaster& raster,const A
         bool decorated=false;
         for(unsigned d=0;d<decorationCount;++d){
             const auto& deco=decorations[d];
-            if(deco.y+24<rowFirst||deco.y-24>=rowFirst+16)continue;
+            if(deco.spriteId<0||deco.y+24<rowFirst||deco.y-24>=rowFirst+16)continue;
             AmigaPatternTerrain::Overlay art;
             if(!patternTerrain.overlay(deco.spriteId,deco.frame,deco.flipX,art))return false;
             // The broad source admission covers neighbouring rows too. Only
@@ -247,7 +247,7 @@ bool AmigaTerrainPainter::borrowPatternRows(AmigaTerrainRaster& raster,const Ami
     for(int r=row;r<=(end+7)/16;++r)if(tiles.first(r*16))return false;
     for(unsigned d=0;d<decorationCount;++d){
         const auto& deco=decorations[d];
-        if(deco.y+24<first||deco.y-24>=end)continue;
+        if(deco.spriteId<0||deco.y+24<first||deco.y-24>=end)continue;
         AmigaPatternTerrain::Overlay art;
         if(!patternTerrain.overlay(deco.spriteId,deco.frame,deco.flipX,art))return false;
         const int top=deco.y-art.originY;
@@ -497,7 +497,7 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     DW_PROFILE_SCOPE(profileTerrainDecorations);
     for (index = 0; index < decorationCount; ++index) {
         const AmigaTerrainDecoration& decoration = decorations[index];
-        if (decoration.y + 24 < firstWorldY ||
+        if (decoration.spriteId < 0 || decoration.y + 24 < firstWorldY ||
             decoration.y - 24 >= finalWorldY)
             continue;
         drawGameAsset(renderer, (UWORD)decoration.spriteId,

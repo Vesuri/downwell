@@ -7,9 +7,12 @@
 #include "core/LevelNumberSurfaceDraw.h"
 class AmigaGameplayDrawList {
 public:
+    // Two particle layers for up to three TorchFires in view.
+    static constexpr unsigned compactFireLayerCapacity = 3 * 2 * downwell::CompactTorchFireRecord::parts;
     static constexpr unsigned capacity = 4 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + GameplayWorld::bulletCapacity +
         GameplayWorld::enemyCapacity + GameplayWorld::gemCapacity + GameplayWorld::boneCapacity + downwell::scriptSpawnEffectCapacity +
-        2 * downwell::ShopWorld::capacity + downwell::GameplayScattered::capacity + downwell::GameplayWhiteJellies::capacity;
+        2 * downwell::ShopWorld::capacity + downwell::GameplayScattered::capacity + downwell::GameplayWhiteJellies::capacity +
+        downwell::gameplayCompactNoLoopCapacity + downwell::gameplayCompactMovingCapacity + compactFireLayerCapacity;
     static constexpr int playerStartY = 142, replayGroundY = 200;
     GameplayBob actors[capacity]{};
     unsigned count = 0;
@@ -50,6 +53,7 @@ public:
     // is only a subtractor: it cannot produce pixels on an empty surface.
     bool hasControllerProducers(const GameplayWorld& world)const{
         return entryCoverVisible||world.gemSlotEnd()||world.smokeEffects().size()||
+            world.compactDebris().size()||
             (world.registeredSmoke()&&world.registeredSmoke()->size())||
             (world.registeredCorpses()&&world.registeredCorpses()->size())||
             (world.debrisInstances()&&world.debrisInstances()->size())||
@@ -69,6 +73,7 @@ public:
     bool promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
         const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
 private:
+    template<class Append> bool drawCompactRoomEffects(const GameplayWorld& world,Append& append,int viewX,int viewY);
     const downwell::FontGlyphMasks* titleGlyphs_=nullptr;
     downwell::LevelNumberTextDrawState* titleText_=nullptr;
     // Admission workspace, never published until the source-ordered pass

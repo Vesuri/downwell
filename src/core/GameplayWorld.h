@@ -96,12 +96,14 @@
 #include "core/GameplayTerrainInstances.h"
 #include "core/NativeTerrainLifetimes.h"
 #include "core/RunnerStepSnapshot.h"
+#include "core/CompactRoomEffects.h"
+#include "core/CompactScenery.h"
 
 #include <cstdint>
 
 enum {
     gameplayWorldBulletCapacity = downwell::gameplayBulletCapacity,
-    gameplayWorldDestroyedCapacity = gameplayWorldBulletCapacity + 1,
+    gameplayWorldDestroyedCapacity = downwell::gameplayRepaintCapacity,
     gameplayWorldEnemyCapacity = 64,
     gameplayWorldGemCapacity = downwell::gameplayGemCapacity
 };
@@ -1509,8 +1511,14 @@ public:
             }
             return true;
         };
-        if constexpr(RetainOrder)return visitRoomActorsReadOnly(visitor);
-        else return visitRoomActors(visitor);
+        bool ok;
+        if constexpr(RetainOrder)ok=visitRoomActorsReadOnly(visitor);
+        else ok=visitRoomActors(visitor);
+        // Compact object-370 debris has no room actors: draw it after them.
+        if(ok&&compactDebris_.size()&&!compactDebris_.visitNewest([&](auto,const downwell::DebrisAnimation& effect){
+            if(ok&&!downwell::DebrisDraw::surface(effect,assets,view,emit))ok=false;
+        }))return false;
+        return ok;
     }
     const downwell::NativeTimeShardRegistration::Record* timeShardForDraw(downwell::InstanceHandle key)const{
         const auto* record=timeShardInstances_?timeShardInstances_->find(key):nullptr;
@@ -2197,6 +2205,11 @@ public:
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (command.objectId == 78) return !compactSpawnerAdmitted || createCompactSpawner(command.y);
         if (!terrain(command)) return false;
+        // Compact world-one scenery. The registered Scattered16 owner adopts
+        // only through createGeneratedInstanceWithSourceIds below.
+        if ((command.objectId == 289 || command.objectId == 293 || command.objectId == 296) &&
+            compactRoomEffectsAdmitted)
+            return createCompactScenery(command);
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;
@@ -2967,10 +2980,68 @@ private:
     bool collideSteeringEnemies();
     bool steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
     bool steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+
+    // Compact world-one effect chains (W1.3): box destruction, scenery
+    // (Scattered16 289, gemChunk 293, TorchFire 295, Torch 296), debris 370,
+    // and the script-spawned no-loop/moving effects they create. These run
+    // only while the registered owners above are unbound.
+    using CompactEffects=downwell::CompactRoomEffects<downwell::gameplayCompactNoLoopCapacity,downwell::gameplayCompactMovingCapacity>;
+    CompactEffects compactEffects_;
+    // Object 370 born by compact boxes and scenery, apart from the registered
+    // debris owner's storage.
+    downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity> compactDebris_;
+    downwell::CompactScenery scenery_;
+    int sceneryRepaintX_[downwell::gameplaySceneryRepaintCapacity]{};
+    int sceneryRepaintY_[downwell::gameplaySceneryRepaintCapacity]{};
+    unsigned sceneryRepaintCount_=0;
+    struct BoxOps;
+    struct SceneryOps;
+    bool resetCompactScenery();
+    bool createCompactScenery(const downwell::DeferredCreateInstance& command);
+    bool advanceCompactSceneryAlarm(unsigned alarm);
+    bool advanceCompactSceneryAnimation();
+    bool stepCompactBox(unsigned index);
+    bool stepCompactScenery();
+    bool collideCompactScenery();
+    bool hitGemChunk(const downwell::ProjectileSegment& path,int damage,bool& hit,bool& consumed);
+    bool hitCompactShootable(const downwell::ProjectileSegment& path,const BulletState& bullet,bool& consumed);
+    bool publishSceneryRepaint(int x,int y);
+    int spawnCompactCurrency(int amount,int x,int y,bool attracted);
+    int spawnCompactBurstGem(int x,int y,long xRange,long xLow,long yRange,long yLow,int amount,bool large);
+    bool attractCompactGem(int slot);
+    bool spawnCompactDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& handle);
+    bool solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool compactInView(int x,int y,bool& visible)const;
 public:
+    const CompactEffects& compactEffects()const{return compactEffects_;}
+    const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity>& compactDebris()const{return compactDebris_;}
+    const downwell::CompactScenery& compactScenery()const{return scenery_;}
+    // Current builder art for one generated scenery decoration, by its
+    // Create position. False: the instance no longer draws (destroyed).
+    bool sceneryAppearance(int objectId,int x,int y,int& sprite,int& frame)const;
+    // gemChunk is a parentWall until it opens and clears its mask.
+    bool gemChunkSolidAt(int x,int y)const;
+    // Player terrain queries in room coordinates (mask 569: -9..+9, -7..+8).
+    bool gemChunkBlocks(int x,int y)const{
+        for(unsigned i=0;i<scenery_.gemChunkEnd;++i){const auto& r=scenery_.gemChunks[i];
+            if(r.live&&!r.opened&&x>=r.x-9&&x<r.x+10&&y>=r.y-7&&y<r.y+9)return true;
+        }
+        return false;
+    }
+    // Landing offset on an unopened chunk's top for the player's -4..+3 span.
+    int gemChunkLanding(int x,int minimumOffsetY,int landing)const{
+        for(unsigned i=0;i<scenery_.gemChunkEnd;++i){const auto& r=scenery_.gemChunks[i];
+            const int top=r.y-191;
+            if(r.live&&!r.opened&&x+3>=r.x-9&&x-4<r.x+10&&top>=minimumOffsetY&&top<landing)landing=top;
+        }
+        return landing;
+    }
     // Paired host comparisons whose StartupRuntime reference does not run
     // object 78 clear this before generation. Production never changes it.
     static inline bool compactSpawnerAdmitted=true;
+    // Likewise for references predating W1.3's box bursts and builder
+    // scenery: boxes keep the removal-only subset, 289/293/296 stay inert.
+    static inline bool compactRoomEffectsAdmitted=true;
     // objBuilder.endReached, published by the generation frontend.
     void publishGenerationEndReached(bool reached){generationEndReached_=reached;}
     // Red-ball Draw's eye, after the most recent Step. False when absent or

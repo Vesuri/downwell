@@ -465,7 +465,9 @@ bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds&
     if(!context.index || !context.index->wallContactsComplete)return false;
     const auto& index=*context.index;
     auto active=[&](unsigned object,int x,int y){
-        return object!=92 || !context.runtime || context.runtime->breakableActiveAt(x-240,y-176);
+        if(!context.runtime)return true;
+        if(object==293)return context.runtime->gemChunkSolidAt(x,y);
+        return object!=92 || context.runtime->breakableActiveAt(x-240,y-176);
     };
     if(query.left>=query.right || query.top>=query.bottom || query.right<=-521 ||
        query.left>=1546 || query.bottom<=-8 || query.top>=8201)return true;
@@ -688,6 +690,8 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
                 ++candidate;
             }
         }
+        if (context.runtime)
+            landing = context.runtime->gemChunkLanding(worldX, minimumOffsetY, landing);
         return landing;
     }
     DW_PROFILE_COUNT(counterLandingFallback);
@@ -785,6 +789,11 @@ bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY) {
         for (unsigned column = 0; column < columns; ++column)
             if (indexActive(context, indexCell(*context.index, xs[column], ys[row]),
                             solidCell, xs[column], ys[row])) return true;
+    // Unopened gem chunks are parentWall too (unaligned 19x16 masks).
+    if (context.runtime)
+        for (unsigned row = 0; row < 2; ++row)
+            for (unsigned column = 0; column < 2; ++column)
+                if (context.runtime->gemChunkBlocks(xs[column], ys[row])) return true;
     return false;
 }
 
@@ -808,7 +817,9 @@ bool amigaResolveTerrainCorners(void* opaque,int left,int top,int right,int bott
                 columns[x]*16+AmigaTerrainIndex::minX-240,rows[y]*16-176)))return true;
         }
     }
-    return false;
+    return context.runtime&&(context.runtime->gemChunkBlocks(left+240,top+176)||
+        context.runtime->gemChunkBlocks(right+240,top+176)||context.runtime->gemChunkBlocks(left+240,bottom+176)||
+        context.runtime->gemChunkBlocks(right+240,bottom+176));
 }
 
 downwell::SolidCellGrid amigaTerrainSolidCells(const AmigaTerrainCollisionContext& context) {
@@ -835,7 +846,8 @@ bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
     if (context.index) {
         DW_PROFILE_COUNT(counterSolidIndexed);
         return indexActive(context, indexCell(*context.index, worldX, worldY),
-                           solidCell, worldX, worldY);
+                           solidCell, worldX, worldY) ||
+            (context.runtime && context.runtime->gemChunkBlocks(worldX, worldY));
     }
     DW_PROFILE_COUNT(counterSolidFallback);
     if (context.rooms != 0 && context.room != 0) {

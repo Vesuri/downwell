@@ -236,6 +236,66 @@ bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& worl
     eligible=true;return true;
 }
 
+namespace {
+// Nearest offline quarter turn (frame page turn*256) for an image_angle.
+bool quarterTurn(downwell::RunnerImageValue angle,unsigned& turn){
+    std::int32_t degrees;
+    if(!angle.promoted().roundPixel(degrees))return false;
+    degrees%=360;if(degrees<0)degrees+=360;
+    turn=unsigned((degrees+45)/90)&3u;return true;
+}
+}
+
+// Compact scrEffectSpawn and emitMovingFx records in birth order, then each TorchFire's red and white particle
+// layers. The offline bank holds the reviewed sprites and quarter turns.
+template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const GameplayWorld& port,
+    Append& append,int viewX,int viewY){
+    const auto& fx=port.compactEffects();
+    const auto place=[&](const downwell::RunnerImageValue& rx,const downwell::RunnerImageValue& ry,int sprite,unsigned frame){
+        std::int32_t x,y;
+        if(!rx.promoted().roundPixel(x)||!ry.promoted().roundPixel(y)){failedSprite=UWORD(sprite);failedFrame=UWORD(frame);return false;}
+        return append(UWORD(sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0);
+    };
+    for(unsigned i=0;i<fx.noLoopCount();++i){
+        const auto& e=fx.noLoop(i).effect;unsigned turn;
+        if(!e.valid||!quarterTurn(e.angle,turn))return false;
+        // 603 and 605 carry offline 0 and 270 degree pages only.
+        if(turn!=0&&turn!=3){failedSprite=UWORD(e.spriteId);return false;}
+        if(!place(e.x,e.y,e.spriteId,turn*256+e.drawFrame()))return false;
+    }
+    for(unsigned i=0;i<fx.movingCount();++i){
+        const auto& e=fx.moving(i).effect;unsigned turn=0;
+        if(!e.valid)return false;
+        // Only the red splash rotates in the bank; smoke puffs, sparkles and
+        // the opening flash are drawn upright.
+        if(e.spriteId==704&&!quarterTurn(e.angle,turn))return false;
+        if(!place(e.x,e.y,e.spriteId,turn*256+e.drawFrame()))return false;
+    }
+    const auto& sc=port.compactScenery();
+    for(unsigned f=0;f<sc.fireEnd;++f){
+        const auto& fire=sc.fires[f];
+        if(!fire.live||fire.y<viewY-32||fire.y>viewY+downwellDisplayHeight+32)continue;
+        for(unsigned layer=0;layer<(fire.active?2u:1u);++layer)
+            for(const auto& part:fire.part){
+                std::int32_t x,y,life=0;
+                if(!part.x.roundPixel(x)||!part.y.roundPixel(y))return false;
+                int order;
+                if(!downwell::compareRunnerReal(part.life,downwell::MotionBinary64::fromInteger(8),order))return false;
+                if(order>=0)continue;
+                // draw_sprite floors the fractional subimage. Life is a
+                // nonnegative double below 8: take its integer part.
+                {
+                    const int exponent=int((part.life.high>>20)&0x7ffu)-1023;
+                    if((part.life.high>>31)||exponent<0)life=0;
+                    else life=std::int32_t(((part.life.high&0xfffffu)|0x100000u)>>(20-exponent));
+                }
+                const int sprite=fire.active?(layer?712:711):83;
+                if(!append(UWORD(sprite),UWORD(life&7),downwellPlayfieldX+x-viewX,y-viewY,0))return false;
+            }
+    }
+    return true;
+}
+
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency,
     const AmigaActorFrames* prepared) {
@@ -309,6 +369,11 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 playerStartY + gem.y - port.cameraOffsetY(), 0))
             ready = false;
     }
+#endif
+
+#ifndef DOWNWELL_REPLAY_VERIFY
+    // Below the room actors (enemies, player) in both world compositions.
+    if(!drawCompactRoomEffects(port,append,worldViewX,worldViewY))ready=false;
 #endif
 
     bool foregroundDrawn=false;

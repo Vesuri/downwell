@@ -66,17 +66,13 @@ area-1 generation and scrolling, movement, stomping and shooting, the health,
 ammo and gem HUD, damage numbers, six builder-placed enemy families (snake
 111, ground turtle 112, frog 113, bat 116, snail 117, crawler 119) plus the
 level spawner 78 with its white jelly 115 and red ball 118 (normal-mode
-channels, steering motion, stomp and bullet deaths, eye art), compact shops, level exit,
+channels, steering motion, stomp and bullet deaths, eye art), box bursts (smoke,
+flash, impact, `breakablesDebris` 370, rewards), `Scattered16` 289, `gemChunk`
+293, torches 295/296, the steering enemies' splash, smoke and flash, compact shops, level exit,
 upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 
-3. **Boxes, breakables and rewards.** Box destruction is the removal subset
-   only. Add the ordered smoke, flash, impact, debris, chain reaction and
-   reward creation, `Scattered16` 289 with `breakablesDebris` 370, torches
-   295/296, `gemChunk` 293, and currency spawning, homing and collection.
-   Sound hooks are wired in W2. The steering enemies' moving-fx 704
-   particles, smoke and flash are here too (their hooks are no-ops).
 4. **Gun modules and guns.** Object 109 is `GunModule` (not a crate; correct
    `original-behavior-audit.md`). It is only a tile today. Add the pickup, its
    heart and battery variants, `moduleText` 373 and `itemNotif` 374, and the
@@ -88,7 +84,10 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
    `goalTimeField` 255, `startTimeField` 371), the freeze and resume of the
    world, time shards and `fxTimeChange` 211, `sideCamLocker` camera, void
    rooms and their rewards; freeze jellies and red balls too (their steps
-   currently never see time-stop). Wind sound is W2. References:
+   currently never see time-stop), and the compact room effects, debris and
+   TorchFire particles. The slice route lights a side-room torch but never
+   brings its TorchFire on screen: show its particles and dousing on the
+   side-room route. Wind sound is W2. References:
    [time-stop identity](time-stop-collision.md),
    [side cameras](side-camera-lockers.md).
 6. **Enemy and player damage chains.** Complete corpses (`objDeadBody` 263),
@@ -107,7 +106,8 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
    selectable, including the balloon/decoy target that steering enemies
-   chase (they now always chase the player).
+   chase (they now always chase the player), box chain reactions (upgrade
+   5) and exploding knees on scenery and boxes (upgrade 0).
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Menus, styles, modes and persistence.** The pause menu and its options,
     shader, record and confirm menus (adapted to the Amiga); all five styles
@@ -126,7 +126,7 @@ Paula, with scene-local residency:
   `bgmSecret` 200 if the void rooms use it;
 - every sound effect world 1 reaches: player and guns, each enemy family
   (the jelly and red-ball `sound` hooks are no-ops today),
-  stomps, gems, rock breaks, shopkeeper voices, void enter and exit, combo,
+  stomps, gems, rock breaks, box, plant, gem-chunk and TorchFire hooks (no-ops), shopkeeper voices, void enter and exit, combo,
   menus and the time-field winds (reuse `AmigaWindAudio` and the prepared
   wind bank);
 - the master gain option and the original voice and priority rules.
@@ -1198,8 +1198,8 @@ Reference: [scene architecture](scene-architecture.md).
   messages within the nested parent Step, not just one replacement per parent.
 - Budget further Chip residency against the measured 20,272-byte cavern
   minimum free space (126,840 bytes before gameplay); remeasure after pack
-  growth and through scene transitions. The cavern DMA bank is 106,574 bytes;
-  the verification-only full union remains 112,970 bytes. Reconcile gameplay-family
+  growth and through scene transitions. The cavern DMA bank is 109,410 bytes;
+  the verification-only full union remains 115,806 bytes. Reconcile gameplay-family
   residency before admitting additional encounter artwork on a stock-memory machine.
   Keep the gate unchanged until residency is reduced or a new whole-program
   allocation measurement justifies a different budget.

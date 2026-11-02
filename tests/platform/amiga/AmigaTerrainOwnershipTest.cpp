@@ -284,6 +284,10 @@ void requireSameBackendTerrain(const Scene& reference,const Scene& other){
 }
 
 int main(int argc,char** argv){
+    // Pinned ownership witnesses and partial collision resolvers predate
+    // W1.3's box bursts and builder scenery (their debris needs wall and
+    // platform contacts).
+    GameplayWorld::compactRoomEffectsAdmitted=false;
     {
         auto actual=std::make_unique<AmigaTerrainIndex>();
         auto oracle=std::make_unique<AmigaTerrainIndex>();

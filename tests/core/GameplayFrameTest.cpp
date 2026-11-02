@@ -12,7 +12,7 @@ static void equal(const GameplayFrame& a,const GameplayFrame& b){
     for(unsigned i=0;i<a.destroyedBlockCount;++i)assert(a.blockX[i]==b.blockX[i]&&a.blockY[i]==b.blockY[i]);
 }
 int main(){
-    constexpr unsigned capacity=downwell::gameplayBulletCapacity+1;
+    constexpr unsigned capacity=downwell::gameplayRepaintCapacity;
     GameplayFrame retained{};
     for(unsigned iteration=0;iteration<500;++iteration){
         GameplayFrame source{};

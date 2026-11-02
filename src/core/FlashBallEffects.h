@@ -115,6 +115,14 @@ public:
             return object==224 && create(px,py,random)!=0;
         });
     }
+    // scrFlashballfx(x,y,Count,Variation,Radius) for the compact callers:
+    // steering deaths (1,0,0) and opened gem chunks (3,0,5).
+    template<unsigned Count,unsigned Variation,unsigned Radius,class Random>
+    bool burst(MotionBinary64 x,MotionBinary64 y,Random& random) {
+        return flashBurstScript<Count,Variation,Radius>(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+            return object==224 && create(px,py,random)!=0;
+        });
+    }
     template<class Random> bool boxBurst(MotionBinary64 x,MotionBinary64 y,Random& random) {
         return boxFlashBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
             return object==224 && create(px,py,random)!=0;

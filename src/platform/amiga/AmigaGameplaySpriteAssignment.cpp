@@ -85,6 +85,9 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
                 amigaRendererResolveSpritePart(&prepared,pack,packEnd,actor.sprite,actor.frame,part,actor.flip)!=0;
         };
         if (!resolve(0)) {
+            // BOB-only room effects (no DMA stream in either facing) end the
+            // channel prefix here; painter order keeps the rest as BOBs.
+            if (actor.prepared && !actor.prepared->partCount[0] && !actor.prepared->partCount[1]) break;
             result.ready = false;
             result.failedSprite = actor.sprite; result.failedFrame = actor.frame;
             break;

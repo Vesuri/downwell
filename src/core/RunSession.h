@@ -434,6 +434,11 @@ struct RunSession {
         if(effectsSucceeded)effectsSucceeded=flashEffects.skeletonBurst(x,y,random);
         return effectsSucceeded;
     }
+    template<unsigned Count,unsigned Variation,unsigned Radius>
+    bool emitFlash(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+        if(effectsSucceeded)effectsSucceeded=flashEffects.template burst<Count,Variation,Radius>(x,y,random);
+        return effectsSucceeded;
+    }
     bool emitBoxFlash(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=flashEffects.boxBurst(x,y,random);
         return effectsSucceeded;

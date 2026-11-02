@@ -148,6 +148,14 @@ SELECTIONS = {
         551: None,   # broken scenery, retaining the selected intact frame
         568: None,   # sprDungTorch
         569: None,   # sprGemChunk
+        570: None,   # sprGemChunkBreak: flashing and opened chunk
+        571: None,   # sprChunkSparkle1 (gem chunk Alarm 1)
+        572: None,   # sprChunkSparkle2
+        118: None,   # sprSuperFlash (opened gem chunk)
+        704: None,   # sprFxRedSplash: steering trails/deaths, quarter turns
+        711: None,   # sprFxFireRed (TorchFire particles)
+        712: None,   # sprFxFireWhite
+        83: None,    # sprFxSmallSmoke (doused TorchFire particles)
         602: None,   # sprFxBoingRed (gem-high muzzle)
         603: None,   # sprFxBoingball (usual gunboot muzzle)
         605: None,   # sprFxImpactSplosion: blast impact, three frames
@@ -316,6 +324,18 @@ def pixel_to_pen(pixel):
     if (red, green, blue) == (0, 0, 0):
         return 3
     raise ValueError(f"HUD pixel is outside the exact four-pen palette: {pixel}")
+
+
+def red_splash_canvas(canvas):
+    # sprFxRedSplash is authored in (255,1,1), visually the HUD red. Map only
+    # that reviewed colour to pen 2; any other colour still fails.
+    mapped = canvas.copy()
+    for y in range(canvas.height):
+        for x in range(canvas.width):
+            pixel = canvas.getpixel((x, y))
+            if pixel[3] and pixel[:3] == (255, 1, 1):
+                mapped.putpixel((x, y), (255, 0, 0, pixel[3]))
+    return mapped
 
 
 def flash_palette_canvas(canvas):
@@ -670,9 +690,12 @@ def build_records(manifest, extracted, profile, language_path=None):
                 encoded.append((dict(sprite, height=repeated.height), 256 + frame_index, dma_width, planar))
             if profile == "game" and sprite_id == 96:
                 canvas = flash_palette_canvas(canvas)
+            if profile == "game" and sprite_id == 704:
+                canvas = red_splash_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
-                    458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605):
+                    458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605,
+                    83, 118, 571, 572, 704, 711, 712):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -680,7 +703,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                 if gun_spread:
                     require(not sprite["smooth"], "spread proof requires nearest-sampled source artwork")
                     verify_projectile_spread_pixels(canvas, sprite["originX"], sprite["originY"])
-                turns = (0, 3) if gun_spread or sprite_id == 605 else range(2 if snail else 4 if sprite_id == 278 else 1)
+                turns = (0, 3) if gun_spread or sprite_id == 605 else range(2 if snail else 4 if sprite_id in (278, 704) else 1)
                 for turn in turns:
                     if turn == 0:
                         variant = canvas
@@ -700,8 +723,12 @@ def build_records(manifest, extracted, profile, language_path=None):
                         for _ in range(turn):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
+                    if bounds is None and sprite_id in (83, 118, 571, 572, 704, 711, 712):
+                        # Fading room effects end on blank frames: keep a
+                        # one-pixel transparent frame at the anchor.
+                        bounds = (ox, oy, ox + 1, oy + 1)
                     require(bounds is not None, "empty oriented actor frame")
-                    if gun_spread or sprite_id in (84, 85, 101, 181, 182, 183, 184, 185, 702, 703):
+                    if gun_spread or sprite_id in (83, 84, 85, 101, 118, 181, 182, 183, 184, 185, 571, 572, 702, 703, 704, 711, 712):
                         # Projectile art and smoke's final single-pixel frame
                         # can sit beyond their origin. Keep that anchor inside
                         # the DMA frame when cropping, without moving pixels.
@@ -726,7 +753,10 @@ def build_records(manifest, extracted, profile, language_path=None):
                     # used planar facing; DMA variants remain independently
                     # generated below and checked against the pixel oracle.
                     # fxSmoke also leaves image_xscale at its default +1.
-                    facings = (False,) if gun_spread or sprite_id in (84, 85, 101, 485, 486, 487, 496, 497, 605) else (False, True)
+                    # Room effects (sparkles, flash, splash, fire, small
+                    # smoke) never set image_xscale either.
+                    facings = (False,) if gun_spread or sprite_id in (83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
+                                                                       605, 704, 711, 712) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]

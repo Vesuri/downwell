@@ -29,6 +29,9 @@
 #include "core/SolidCollision.h"
 #include "PlacementNew.h"
 #include "core/ProjectilePublication.h"
+#include "core/BoxDestructionScript.h"
+#include "core/CurrencyCollisionBounds.h"
+#include "core/BoneViewRetirement.h"
 
 downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
@@ -351,6 +354,7 @@ bool GameplayWorld::retireGameplayRoom() {
     if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear())return run_.effectsSucceeded=false;
     if(!run_.timeFields.clear())return run_.effectsSucceeded=false;
     if(!run_.sideCameraLockers.clear())return run_.effectsSucceeded=false;
+    if(!resetCompactScenery())return false;
     resetCompactSpawning();
     return true;
 }
@@ -556,33 +560,7 @@ bool GameplayWorld::publishPlayerPosition(int x,int y) {
 
 void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
 {
-    if(!run_.effectsSucceeded)return;
-    unsigned next = downwell::compactCurrencySlots(gems_, gemSlotEnd_);
-    unsigned available = gemCapacity - next;
-    // Exhausted keys cannot alias a retired lifetime. Bound births before
-    // Create consumes RNG, just as for exhausted storage capacity.
-    const std::uint32_t identities = nextGemLifetimeId_ ?
-        0xffffffffu - nextGemLifetimeId_ + 1u : 0u;
-    if (identities < available) available = identities;
-    const auto reward=downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
-        available, enemyRandom_, [this, &enemy, attracted, &next](const downwell::CurrencyBirth& birth) {
-        GemState& gem = gems_[next++];
-        gem.lifetimeId = nextGemLifetimeId_++;
-        gem.large = birth.large;
-        gem.amount = birth.amount;
-        gem.age = 0;
-        gem.x = enemy.x;
-        gem.y = enemy.y;
-        gem.preciseX = (long)enemy.x * 256L;
-        gem.preciseY = (long)enemy.y * 256L;
-        gem.motion = birth.motion;
-        gem.speedX = downwell::GemMotion::q8(gem.motion.vx);
-        gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
-        gem.attracted = attracted;
-        gem.active = true;
-    }, run_.upgrades.levels[10] != 0,run_.stage.area);
-    gemSlotEnd_ = next;
-    if(!reward.complete)run_.effectsSucceeded=false;
+    (void)spawnCompactCurrency(enemy.reward,enemy.x,enemy.y,attracted);
 }
 
 unsigned GameplayWorld::gemCount() const
@@ -1098,17 +1076,29 @@ void GameplayWorld::advanceEnemyAlarms()
         if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
         if (enemy.objectId == 116) enemy.batHit.advanceFrame();
     }
-    if(roomAlarms_){if(!roomAlarms_(roomAlarmsContext_))run_.effectsSucceeded=false;return;}
+    if(roomAlarms_){
+        if(!roomAlarms_(roomAlarmsContext_)){run_.effectsSucceeded=false;return;}
+        // Compact gemChunk 293 and debris 370 follow the room's objects at
+        // every index. Their Alarm 0 events draw no RNG, so dispatching them
+        // after the room's later indices preserves the stream.
+        if(scenery_.gemChunkEnd||compactDebris_.size())
+            for(unsigned alarm=0;alarm<3;++alarm)if(!advanceCompactSceneryAlarm(alarm))return;
+        return;
+    }
     if(!captureEnemyStepOrder())return;
     // Match the runner's global alarm-index order. Dispatch each event before
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
-    for (unsigned alarm = 0; alarm < 2; ++alarm) {
+    // Object order within each index: boxes 92, enemies 111-119, then the
+    // compact gemChunk 293 and breakablesDebris 370.
+    const unsigned alarms=scenery_.gemChunkEnd||compactDebris_.size()?3:2;
+    for (unsigned alarm = 0; alarm < alarms; ++alarm) {
       if(alarm==0)for(unsigned i=0;i<breakableCount_;++i)
         if(breakables_[i].lifetimeId&&!advanceBoxRoomAlarm({i,breakables_[i].lifetimeId},alarm))return;
-      for (unsigned i=0;i<enemyStepOrder_.size();++i) {
+      if(alarm<2)for (unsigned i=0;i<enemyStepOrder_.size();++i) {
         if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
         if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
       }
+      if(!advanceCompactSceneryAlarm(alarm))return;
     }
 }
 
@@ -1511,9 +1501,19 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
                     return applied;
                 }
             }
+            if(scenery_.gemChunkEnd){
+                bool hit=false,consumed=false;
+                if(!hitGemChunk(path,downwell::machineGunProfile(bullet.gemHigh).damage,hit,consumed))return true;
+                if(hit)return consumed;
+            }
             // An ordinary, non-wave bullet also stops at unbreakable walls.
             if (solidResolver_ != 0) {
-                if (segmentResolver_) return segmentResolver_(solidResolverContext_, path);
+                if (segmentResolver_) {
+                    if(segmentResolver_(solidResolverContext_, path))return true;
+                    bool consumed=false;
+                    if(!scenery_.empty()&&!hitCompactShootable(path,bullet,consumed))return true;
+                    return consumed;
+                }
                 const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
                 const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
                 const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
@@ -1523,7 +1523,9 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
                         if (solidResolver_(solidResolverContext_, x, y) && path.intersects(x,x+1,y,y+1))
                             return true;
             }
-            return false;
+            bool consumed=false;
+            if(!scenery_.empty()&&!hitCompactShootable(path,bullet,consumed))return true;
+            return consumed;
         },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096,284,
         [this,&bullet]{
             DW_PROFILE_SCOPE(profileBulletPublication);
@@ -1578,6 +1580,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
+    sceneryRepaintCount_=0;
+    (void)advanceCompactSceneryAnimation();
     }
     if(!run_.effectsSucceeded)return {};
     {
@@ -1758,6 +1762,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const std::uint32_t boxStepLastLifetime=nextBreakableLifetimeId_-1;
     const std::uint32_t bulletStepLastLifetime=nextBulletLifetimeId_-1;
     const std::uint32_t gemStepLastLifetime=nextGemLifetimeId_-1;
+    const auto compactEffectStepPhase=compactEffects_.beginPhase();
+    const auto compactDebrisStepPhase=compactDebris_.beginPhase();
     if(!captureEnemyStepOrder())return {};
     if(playerChildrenStarted_&&!publishPlayerFallDepth())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,-1)){
@@ -1866,9 +1872,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
         if(!box.state.exhausted())continue;
         if(destroyedBlockCount==destroyedCapacity){run_.effectsSucceeded=false;return {};}
-        if(!markBreakableDestroyed({i,box.lifetimeId}))return {};
-        destroyedBlockX[destroyedBlockCount]=box.x;
-        destroyedBlockY[destroyedBlockCount++]=box.y;
+        const int boxX=box.x,boxY=box.y;
+        // Healthy boxes only run alarmStop(0), which is inert without pTimeStop.
+        if(compactRoomEffectsAdmitted){if(!stepCompactBox(i))return {};}
+        else if(!markBreakableDestroyed({i,box.lifetimeId}))return {};
+        destroyedBlockX[destroyedBlockCount]=boxX;
+        destroyedBlockY[destroyedBlockCount++]=boxY;
         ++blocksDestroyed_;
     }
 
@@ -1881,6 +1890,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             run_.effectsSucceeded=false;return {};
         }
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
+    }
+    // parentMovingFx (220) follows the enemies, before damage numbers (221).
+    if(compactEffects_.movingCount()&&!compactEffects_.stepMoving(compactEffectStepPhase)){
+        run_.effectsSucceeded=false;return {};
     }
 
     // Flush remaining registered enemies and blood before damage numbers.
@@ -1947,6 +1960,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,370)){
         run_.effectsSucceeded=false;return {};
     }
+    // Scattered16/gemChunk/TorchFire/Torch (289-296), then compact debris 370.
+    if(!scenery_.empty()&&!stepCompactScenery())return {};
+    if(compactDebris_.size()&&!compactDebris_.step(compactDebrisStepPhase,enemyRandom_,
+        [](auto,const downwell::DebrisAnimation&,bool& frozen){frozen=false;return true;}, // No pTimeStop yet.
+        [this](auto,const downwell::DebrisAnimation&,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+            return solidMeeting(598,x,y,true,hit);
+        })){run_.effectsSucceeded=false;return {};}
     if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
         const auto key=debrisStepOrder_.handle(i);
         const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
@@ -1991,6 +2011,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 x,y,240,176);
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
     if (steeringPopulation_ && !collideSteeringEnemies()) return {};
+    if (!scenery_.empty() && !collideCompactScenery()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     if(collisionPass_){
@@ -2089,6 +2110,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     frame.scrollDelta = scrollDelta;
     frame.cameraXChanged = cameraXDelta != 0;
     frame.cameraXDelta = cameraXDelta;
+    // Scenery art changes reuse the 16x16 repaint list after box removals.
+    for(unsigned i=0;i<sceneryRepaintCount_;++i){
+        if(destroyedBlockCount==destroyedCapacity){run_.effectsSucceeded=false;return {};}
+        destroyedBlockX[destroyedBlockCount]=sceneryRepaintX_[i];
+        destroyedBlockY[destroyedBlockCount++]=sceneryRepaintY_[i];
+    }
+    sceneryRepaintCount_=0;
 #ifdef DOWNWELL_REFERENCE_FRAME_WORK
     frame.destroyedBlockCount = destroyedBlockCount;
     for (unsigned index = 0; index < destroyedBlockCount; ++index) {
@@ -2188,11 +2216,17 @@ struct GameplayWorld::SteeringOps {
     bool enemyDeath(){ // scrEnemyDeath
         world.run_.combo.state.enemyDefeated();++world.run_.kills;return true;
     }
-    // Smoke, flash and moving effect 704 have no RNG at Create here; their
-    // presentation belongs to the effect-chain work. Death draws remain.
-    bool smoke(Real,Real,int,int){return true;}
-    bool flash(Real,Real,int,int,int){return true;}
-    bool movingFx(Real,Real,int,Real,Real,Real){return true;}
+    // scrSmoke(x,y,1,0) and scrFlashballfx(x,y,1,0,0) create objects with
+    // Create RNG; emitMovingFx 704 has none.
+    bool smoke(Real x,Real y,int count,int vary){
+        return count==1&&vary==0&&world.emitBoxSmoke(x,y);
+    }
+    bool flash(Real x,Real y,int count,int vary,int radius){
+        return count==1&&vary==0&&radius==0&&world.run_.emitFlash<1,0,0>(x,y,world.enemyRandom_);
+    }
+    bool movingFx(Real x,Real y,int sprite,Real rate,Real angle,Real speed){
+        return world.compactEffects_.spawnMoving(x,y,sprite,rate,angle,speed)||(world.run_.effectsSucceeded=false);
+    }
     bool currency(int money){ // scrCurrencySpawn: atrState follows stomped.
         if(!enemy)return false;
         enemy->reward=money;world.spawnReward(*enemy,actor.stomped);
@@ -2509,4 +2543,425 @@ bool GameplayWorld::collideSteeringEnemies(){
         }
     }
     return true;
+}
+
+// ---- Compact W1.3 chains: boxes, scenery, debris and script effects ----
+
+namespace {
+using SceneryReal=downwell::MotionBinary64;
+// Machine-gun shots face 270 degrees (spread stays within 267..273). Their
+// rectangle masks then rotate a quarter turn: local y becomes -x, x becomes y.
+downwell::ContactBounds compactBulletBounds(bool gemHigh,int x,int y){
+    const auto local=downwell::contactSpriteBounds(downwell::machineGunProfile(gemHigh).sprite);
+    return {x-local.bottom+1,x-local.top+1,y+local.left,y+local.right};
+}
+}
+
+bool GameplayWorld::resetCompactScenery(){
+    compactEffects_.clear();scenery_.clear();sceneryRepaintCount_=0;
+    if(!compactDebris_.clear())return run_.effectsSucceeded=false;
+    return true;
+}
+
+bool GameplayWorld::publishSceneryRepaint(int x,int y){
+    if(sceneryRepaintCount_==downwell::gameplaySceneryRepaintCapacity)return run_.effectsSucceeded=false;
+    sceneryRepaintX_[sceneryRepaintCount_]=x-240;sceneryRepaintY_[sceneryRepaintCount_++]=y-176;
+    return true;
+}
+
+int GameplayWorld::spawnCompactCurrency(int amount,int x,int y,bool attracted){
+    if(!run_.effectsSucceeded)return -1;
+    unsigned next=downwell::compactCurrencySlots(gems_,gemSlotEnd_);
+    unsigned available=gemCapacity-next;
+    // Exhausted keys cannot alias a retired lifetime. Bound births before
+    // Create consumes RNG, just as for exhausted storage capacity.
+    const std::uint32_t identities=nextGemLifetimeId_?0xffffffffu-nextGemLifetimeId_+1u:0u;
+    if(identities<available)available=identities;
+    int last=-1;
+    const auto reward=downwell::spawnCurrencyReward(amount,x,y,attracted,available,enemyRandom_,
+        [&](const downwell::CurrencyBirth& birth){
+        last=int(next);
+        GemState& gem=gems_[next++];
+        gem.lifetimeId=nextGemLifetimeId_++;
+        gem.large=birth.large;gem.amount=birth.amount;gem.age=0;
+        gem.x=x;gem.y=y;gem.preciseX=long(x)*256L;gem.preciseY=long(y)*256L;
+        gem.motion=birth.motion;
+        gem.speedX=downwell::GemMotion::q8(gem.motion.vx);
+        gem.speedY=downwell::GemMotion::q8(gem.motion.vy);
+        gem.attracted=attracted;gem.active=true;
+    },run_.upgrades.levels[10]!=0,run_.stage.area);
+    gemSlotEnd_=next;
+    if(!reward.complete){run_.effectsSucceeded=false;return -1;}
+    return last;
+}
+
+// gemChunk's with-blocks: objCurrency Create (with its RNG), then ugrav
+// 0.045, xsp/ysp random_range draws, Alarm 0 = 20, Alarm 3 = 60, and the
+// opened chunk's getAmount 10/size 1. ugravhard is not modelled by GemMotion.
+int GameplayWorld::spawnCompactBurstGem(int x,int y,long xRange,long xLow,long yRange,long yLow,int amount,bool large){
+    if(!run_.effectsSucceeded)return -1;
+    const unsigned next=downwell::compactCurrencySlots(gems_,gemSlotEnd_);
+    gemSlotEnd_=next;
+    if(next>=gemCapacity||!nextGemLifetimeId_||xRange<=0||yRange<=0){run_.effectsSucceeded=false;return -1;}
+    GemState& gem=gems_[next];
+    gem.motion.initialize(x,y,false,enemyRandom_,run_.upgrades.levels[10]!=0,run_.stage.area);
+    gem.motion.gravity=576;
+    gem.motion.vx=long(enemyRandom_.randomIntegerSmall(std::uint32_t(xRange)))+xLow;
+    gem.motion.vy=long(enemyRandom_.randomIntegerSmall(std::uint32_t(yRange)))+yLow;
+    gem.motion.lifetime.obtainAt=20;gem.motion.lifetime.suckAt=60;
+    gem.lifetimeId=nextGemLifetimeId_++;
+    gem.large=large;gem.amount=amount;gem.age=0;
+    gem.x=x;gem.y=y;gem.preciseX=long(x)*256L;gem.preciseY=long(y)*256L;
+    gem.speedX=downwell::GemMotion::q8(gem.motion.vx);
+    gem.speedY=downwell::GemMotion::q8(gem.motion.vy);
+    gem.attracted=false;gem.active=true;
+    gemSlotEnd_=next+1;
+    return int(next);
+}
+
+bool GameplayWorld::attractCompactGem(int slot){
+    if(slot<0||unsigned(slot)>=gemSlotEnd_||!gems_[slot].active)return run_.effectsSucceeded=false;
+    gems_[slot].motion.attracted=true;gems_[slot].attracted=true;return true;
+}
+
+bool GameplayWorld::spawnCompactDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& handle){
+    if(!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    handle=compactDebris_.create(x,y,run_.stage.area,enemyRandom_);
+    return run_.effectsSucceeded=handle!=0;
+}
+
+// sParentSolid (56) or parentWall (57) place_meeting for a rectangle mask:
+// generated walls, live boxes and shop walls, plus thin platforms for 56.
+bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
+    downwell::ContactBounds bounds;
+    if(!run_.effectsSucceeded||!wallContactResolver_||(platforms&&!platformContactResolver_)||
+       !downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
+    unsigned count=0;
+    if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+    bool found=count!=0;
+    if(!found&&!run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))return run_.effectsSucceeded=false;
+    if(!found&&platforms&&!platformContactResolver_(solidResolverContext_,bounds,found))return run_.effectsSucceeded=false;
+    hit=found;return true;
+}
+
+// scrInView(0,0,0) against the published view of this Step.
+bool GameplayWorld::compactInView(int x,int y,bool& visible)const{
+    auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
+    if(!top.zero())top.high-=8u<<20;
+    return downwell::boneInPublishedView(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),
+        downwell::MotionBinary64::fromInteger(boneViewLeft_),top,
+        downwell::MotionBinary64::fromInteger(160),downwell::MotionBinary64::fromInteger(284),visible);
+}
+
+struct GameplayWorld::SceneryOps {
+    using Real=downwell::MotionBinary64;
+    GameplayWorld& world;
+    int x,y;                // caller's builtin position, room coordinates
+    int gem=-1;             // myGem: the caller's latest objCurrency birth
+    std::uint32_t debris=0; // the latest breakablesDebris birth
+    bool changed=false,destroyed=false;
+    bool fail(){return world.run_.effectsSucceeded=false;}
+    bool sound(int,int,int,int){return true;} // Audio is W2.
+    bool movingFx(Real px,Real py,int sprite,Real rate,Real angle,Real speed){
+        return world.compactEffects_.spawnMoving(px,py,sprite,rate,angle,speed)||fail();
+    }
+    bool appearanceChanged(){changed=true;return true;}
+    // scrOutofview: instance_destroy outside the rmMain band; the event goes on.
+    bool outOfView(int py,bool& retire){
+        const long top=world.boneViewTopQ8_/256;
+        retire=py<top-160||py>top+3000;
+        if(retire)destroyed=true;
+        return true;
+    }
+    bool outOfView(){bool retire;return outOfView(y,retire);}
+    // scrCurrencySpawn: neither 289 nor 295 is a subparentEnemy child.
+    bool currency(int amount){gem=world.spawnCompactCurrency(amount,x-240,y-176,false);return gem>=0;}
+    bool currency(int amount,int){return currency(amount);}
+    bool attractGem(){return world.attractCompactGem(gem);}
+    bool createDebris(){return world.spawnCompactDebris(Real::fromInteger(x),Real::fromInteger(y),debris);}
+    bool debrisYSpeed(Real value){
+        auto* effect=world.compactDebris_.get(debris);
+        if(!effect)return fail();
+        effect->ysp=value;return true;
+    }
+    bool sprite(int){changed=true;return true;}
+    // Collision with objPlayer_n: objPlayer_n.ysp > 0, then scrFjump/scrSShake.
+    bool playerYSpeed(Real& value){value=Real::fromInteger(int(world.player_.speedYFifths()));return true;}
+    bool playStyle(int& style){style=0;return true;} // Styles are W1.10.
+    bool jump(int,Real){world.player_.stompBounce();return true;}
+    bool shake(int amount,int duration){return world.requestCameraShake(amount,duration);}
+    bool explodingKnees(bool& knees){knees=false;return true;} // Upgrade 0 is W1.9.
+    bool createBlast(){return fail();}
+    // Torch: place_meeting with its own sprite mask.
+    bool solid(int px,int py,bool& hit){return world.solidMeeting(568,Real::fromInteger(px),Real::fromInteger(py),true,hit);}
+    bool wall(int px,int py,bool& hit){return world.solidMeeting(568,Real::fromInteger(px),Real::fromInteger(py),false,hit);}
+    bool destroy(){destroyed=true;return true;}
+    bool createFire(int px,int py){
+        auto* fire=downwell::CompactScenery::append(world.scenery_.fires,world.scenery_.fireEnd);
+        if(!fire)return fail();
+        fire->create(px,py);fire->birth=world.tick_;return true;
+    }
+    bool inView(int px,int py,bool& visible){return world.compactInView(px,py,visible)||fail();}
+    // gemChunk.
+    bool openMask(){return true;} // gemChunkSolidAt reads the opened flag.
+    bool flash(Real px,Real py){return world.run_.emitFlash<3,0,5>(px,py,world.enemyRandom_);}
+    bool burstGem(long xRange,long xLow,long yRange,long yLow,int amount,bool large){
+        gem=world.spawnCompactBurstGem(x-240,y-176,xRange,xLow,yRange,yLow,amount,large);
+        return gem>=0;
+    }
+};
+
+namespace {
+bool repaintGemChunk(GameplayWorld& world,const downwell::CompactGemChunkRecord& r,
+                     bool (GameplayWorld::*publish)(int,int)){
+    return (world.*publish)(r.x-8,r.y-8)&&(world.*publish)(r.x+8,r.y-8)&&
+           (world.*publish)(r.x-8,r.y+8)&&(world.*publish)(r.x+8,r.y+8);
+}
+}
+
+bool GameplayWorld::createCompactScenery(const downwell::DeferredCreateInstance& command){
+    if(!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    auto& sc=scenery_;
+    if(command.objectId==289){
+        auto* r=downwell::CompactScenery::append(sc.scattered,sc.scatteredEnd);
+        if(!r)return run_.effectsSucceeded=false;
+        r->x=command.x;r->y=command.y;r->scaleX=command.integerScaleX<0?-1:1;r->birth=tick_;
+        r->scatterType=command.integerImageIndex;
+        return true;
+    }
+    if(command.objectId==293){
+        auto* r=downwell::CompactScenery::append(sc.gemChunks,sc.gemChunkEnd);
+        if(!r)return run_.effectsSucceeded=false;
+        r->x=command.x;r->y=command.y;r->birth=tick_;
+        r->alarm[1]=command.alarms.get(1);r->alarm[2]=command.alarms.get(2);
+        return true;
+    }
+    if(command.objectId==296){
+        auto* r=downwell::CompactScenery::append(sc.torches,sc.torchEnd);
+        if(!r)return run_.effectsSucceeded=false;
+        r->x=command.x;r->y=command.y;r->birth=tick_;
+        return true;
+    }
+    return true;
+}
+
+bool GameplayWorld::advanceCompactSceneryAlarm(unsigned alarm){
+    if(alarm<3)for(unsigned i=0;i<scenery_.gemChunkEnd;++i){
+        auto& r=scenery_.gemChunks[i];
+        if(!r.live||!downwell::AlarmBank::advanceValue(r.alarm[alarm]))continue;
+        SceneryOps ops{*this,r.x,r.y};
+        const bool ok=alarm==0?r.alarm0(enemyRandom_,ops):alarm==1?r.alarm1(enemyRandom_,ops):r.alarm2(enemyRandom_,ops);
+        if(!ok||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(ops.changed&&!repaintGemChunk(*this,r,&GameplayWorld::publishSceneryRepaint))return false;
+    }
+    if(alarm<3&&compactDebris_.size()&&
+       !compactDebris_.advanceAlarm(compactDebris_.beginPhase(),alarm))return run_.effectsSucceeded=false;
+    return true;
+}
+
+bool GameplayWorld::advanceCompactSceneryAnimation(){
+    if(compactEffects_.size()&&!compactEffects_.advanceAnimation(compactEffects_.beginPhase()))
+        return run_.effectsSucceeded=false;
+    for(unsigned i=0;i<scenery_.gemChunkEnd;++i){
+        auto& r=scenery_.gemChunks[i];
+        if(!r.live||!r.imageSpeed)continue;
+        const unsigned before=r.frame();
+        r.advanceImage();
+        if(r.frame()!=before&&!repaintGemChunk(*this,r,&GameplayWorld::publishSceneryRepaint))return false;
+    }
+    if(compactDebris_.size()&&
+       !compactDebris_.advanceAnimation(compactDebris_.beginPhase()))return run_.effectsSucceeded=false;
+    return true;
+}
+
+// Object order: Scattered16 289, gemChunk 293, TorchFire 295, Torch 296.
+// Births of this Step (builder rows, torch fires) wait for the next one.
+bool GameplayWorld::stepCompactScenery(){
+    auto& sc=scenery_;
+    for(unsigned i=0;i<sc.scatteredEnd;++i){
+        auto& r=sc.scattered[i];
+        if(!r.live||r.birth==tick_)continue;
+        SceneryOps ops{*this,r.x,r.y};
+        if(!downwell::ScatteredEvents::step(r,enemyRandom_,ops)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(ops.destroyed)r.live=false;
+        if(ops.changed&&!publishSceneryRepaint(r.x,r.y))return false;
+    }
+    for(unsigned i=0;i<sc.gemChunkEnd;++i){
+        auto& r=sc.gemChunks[i];
+        if(!r.live||r.birth==tick_)continue;
+        SceneryOps ops{*this,r.x,r.y};
+        if(!r.step(enemyRandom_,ops)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(ops.changed&&!repaintGemChunk(*this,r,&GameplayWorld::publishSceneryRepaint))return false;
+    }
+    for(unsigned i=0;i<sc.fireEnd;++i){
+        auto& r=sc.fires[i];
+        if(!r.live||r.birth==tick_)continue;
+        SceneryOps ops{*this,r.x,r.y};
+        if(!r.step(enemyRandom_,ops)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(ops.destroyed)r.live=false;
+    }
+    const long top=boneViewTopQ8_/256;
+    for(unsigned i=0;i<sc.torchEnd;++i){
+        auto& r=sc.torches[i];
+        if(!r.live||r.birth==tick_)continue;
+        if(r.allSet){
+            // No further events: the record only keeps its art. Release it
+            // once well above every view that could still repaint it.
+            if(r.y<top-320)r.live=false;
+            continue;
+        }
+        SceneryOps ops{*this,r.x,r.y};
+        if(!r.step(ops)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(ops.destroyed)r.placement=-1;
+        if(ops.changed&&!publishSceneryRepaint(r.x,r.y+1))return false;
+    }
+    return true;
+}
+
+// Collision events with objPlayer_n, after the ordinary Step.
+bool GameplayWorld::collideCompactScenery(){
+    if(dead())return true;
+    const auto player=downwell::contactWorldBounds({240L*256+player_.offsetXFixed(),176L*256+player_.offsetYFixed(),1,1,31});
+    auto& sc=scenery_;
+    for(unsigned i=0;i<sc.scatteredEnd;++i){
+        auto& r=sc.scattered[i];
+        if(!r.live||!downwell::contactBoundsOverlap(player,downwell::contactPixelBounds(r.x,r.y,r.scaleX,1,550)))continue;
+        SceneryOps ops{*this,r.x,r.y};
+        if(!downwell::ScatteredEvents::playerContact(r,enemyRandom_,ops)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    }
+    for(unsigned i=0;i<sc.fireEnd;++i){
+        auto& r=sc.fires[i];
+        if(!r.live||!r.masked||!r.active||player_.speedYFifths()<=0||
+           !downwell::contactBoundsOverlap(player,downwell::contactPixelBounds(r.x,r.y,1,1,710)))continue;
+        r.objHp=0;r.stomped=1;
+        player_.stompBounce(); // global.playStyle 0: scrFjump(0,2.5).
+        if(!requestCameraShake(2,4))return false;
+        // pugExplodingKnees (upgrade 0) is W1.9.
+    }
+    return true;
+}
+
+// scrBulCheckSolid's subparentSolidWall line: an unopened gem chunk takes
+// the damage while wallHp > 0 and stops the shot; at 0 the shot passes.
+bool GameplayWorld::hitGemChunk(const downwell::ProjectileSegment& path,int damage,bool& hit,bool& consumed){
+    hit=consumed=false;
+    for(unsigned i=0;i<scenery_.gemChunkEnd;++i){
+        auto& r=scenery_.gemChunks[i];
+        if(!r.live||r.opened)continue;
+        const auto b=downwell::contactPixelBounds(r.x-240,r.y-176,1,1,569);
+        if(!path.intersects(b.left,b.right,b.top,b.bottom))continue;
+        hit=true;
+        if(r.wallHp>0){r.wallHp-=damage;r.hit=1;consumed=true;}
+        return true;
+    }
+    return true;
+}
+
+// Without a wall on the line: place_meeting(x,y,parentShootableThing).
+bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,const BulletState& bullet,bool& consumed){
+    consumed=false;
+    downwell::RunnerImageValue bx,by;std::int32_t px,py;
+    if(!downwell::ProjectilePublication::coordinate(path.x,240,bx)||
+       !downwell::ProjectilePublication::coordinate(path.y,176,by)||
+       !bx.promoted().roundPixel(px)||!by.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+    const auto shot=compactBulletBounds(bullet.gemHigh,px,py);
+    const int damage=downwell::machineGunProfile(bullet.gemHigh).damage;
+    auto& sc=scenery_;
+    for(unsigned i=0;i<sc.scatteredEnd;++i){
+        auto& r=sc.scattered[i];
+        if(!r.live||!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(r.x,r.y,r.scaleX,1,550)))continue;
+        if(r.objHp<=0)return true;
+        r.objHp-=damage;r.hit=1;
+        downwell::RunnerImageValue angle;
+        if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
+           !compactEffects_.spawnNoLoop(bx.promoted(),by.promoted(),605,{0x3fd99999u,0x9999999au},angle.promoted(),{}))
+            return run_.effectsSucceeded=false;
+        consumed=true;return true;
+    }
+    for(unsigned i=0;i<sc.fireEnd;++i){
+        auto& r=sc.fires[i];
+        if(!r.live||!r.masked||!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(r.x,r.y,1,1,710)))continue;
+        if(r.objHp<=0)return true;
+        r.objHp-=damage;r.hit=1; // parentShootableThing's hitEffect stays 0.
+        consumed=true;return true;
+    }
+    return true;
+}
+
+bool GameplayWorld::sceneryAppearance(int objectId,int x,int y,int& sprite,int& frame)const{
+    if(objectId==289){
+        for(unsigned i=0;i<scenery_.scatteredEnd;++i){const auto& r=scenery_.scattered[i];
+            if(r.live&&r.x==x&&r.y==y){sprite=r.spriteId;return true;}
+        }
+    }else if(objectId==293){
+        for(unsigned i=0;i<scenery_.gemChunkEnd;++i){const auto& r=scenery_.gemChunks[i];
+            if(r.live&&r.x==x&&r.y==y){sprite=r.sprite;frame=int(r.frame());return true;}
+        }
+    }else if(objectId==296){
+        for(unsigned i=0;i<scenery_.torchEnd;++i){const auto& r=scenery_.torches[i];
+            if(!r.live||r.x!=x||r.y!=y||!r.allSet)continue;
+            if(r.placement<0)return false;
+            frame=r.placement;return true;
+        }
+    }
+    return true;
+}
+
+bool GameplayWorld::gemChunkSolidAt(int x,int y)const{
+    for(unsigned i=0;i<scenery_.gemChunkEnd;++i){const auto& r=scenery_.gemChunks[i];
+        if(r.live&&r.x==x&&r.y==y)return !r.opened;
+    }
+    return true;
+}
+
+struct GameplayWorld::BoxOps {
+    using Real=downwell::MotionBinary64;
+    using Handle=std::uint32_t;
+    GameplayWorld& world;downwell::InstanceHandle key;
+    bool fail(){return world.run_.effectsSucceeded=false;}
+    bool soundOverlap(int,int,int,int,const char*){return true;} // Audio is W2.
+    bool sound(int,int,int,int){return true;}
+    bool smoke(Real x,Real y,int count,int vary){return count==1&&vary==0&&world.emitBoxSmoke(x,y);}
+    bool flash(Real x,Real y,int count,int vary,int radius){
+        return count==1&&vary==0&&radius==2&&world.emitBoxFlash(x,y);
+    }
+    bool effect(Real x,Real y,int sprite,Real speed,Real angle,int depth){
+        return world.compactEffects_.spawnNoLoop(x,y,sprite,speed,angle,Real::fromInteger(depth))||fail();
+    }
+    // global.ug[5] chain reaction (bulletDrone 266, neighbour alarms) is W1.9.
+    bool chainReaction(){return false;}
+    bool create(int object,Real x,Real y,Handle& child){
+        return object==370&&world.spawnCompactDebris(x,y,child);
+    }
+    bool myBullet(Handle){return fail();}
+    bool bulletDirection(Handle,int){return fail();}
+    bool bulletDamage(Handle,int){return fail();}
+    bool place(int,Real,Real,Handle&,bool&){return fail();}
+    bool target(Handle){return fail();}
+    bool targetAlarm(Handle,int,int){return fail();}
+    bool targetChecked(Handle,bool){return fail();}
+    bool destroySelf(){return world.markBreakableDestroyed(key);}
+    bool lowSpec(){return false;}
+    int area(){return world.run_.stage.area;}
+    // scrCurrencySpawn at the box: objBox_n is not a subparentEnemy child.
+    bool currency(int amount){
+        const auto* box=world.findBreakable(key);
+        return box?world.spawnCompactCurrency(amount,box->x,box->y,false)>=0:fail();
+    }
+    bool alarmStop(int alarm){return alarm==0;} // No pTimeStop in this world.
+};
+
+bool GameplayWorld::stepCompactBox(unsigned index){
+    const downwell::InstanceHandle key{index,breakables_[index].lifetimeId};
+    BoxOps ops{*this,key};
+    bool good=run_.effectsSucceeded;
+    downwell::BoxDestructionScript::runRetained([&](downwell::BoxDestructionScript::Caller& caller){
+        const auto* box=findBreakable(key);
+        if(!box)return false;
+        caller.state=box->state;
+        caller.x=downwell::MotionBinary64::fromInteger(box->x+240);
+        caller.y=downwell::MotionBinary64::fromInteger(box->y+176);
+        return true;
+    },ops,good);
+    return run_.effectsSucceeded=good&&run_.effectsSucceeded;
 }

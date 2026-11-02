@@ -3,8 +3,8 @@
 #include "PlayerMotion.h"
 #include "GameplayLimits.h"
 
-// A value result. Only [0, destroyedBlockCount) is a published destruction
-// payload; copying a result must not read or initialize the unused capacity.
+// A value result. Only [0, destroyedBlockCount) is a published repaint
+// payload (destroyed boxes, then changed scenery cells); copying a result must not read or initialize the unused capacity.
 struct GameplayFrame {
     PlayerMotionDelta playerMotion;
     bool ammoChanged,healthChanged,currencyChanged,streakChanged,bulletChanged,scrolled;
@@ -12,8 +12,8 @@ struct GameplayFrame {
     bool cameraXChanged;
     int cameraXDelta;
     unsigned destroyedBlockCount;
-    int blockX[downwell::gameplayBulletCapacity+1];
-    int blockY[downwell::gameplayBulletCapacity+1];
+    int blockX[downwell::gameplayRepaintCapacity];
+    int blockY[downwell::gameplayRepaintCapacity];
 #ifndef DOWNWELL_REFERENCE_FRAME_WORK
     GameplayFrame():playerMotion{},ammoChanged(false),healthChanged(false),currencyChanged(false),
         streakChanged(false),bulletChanged(false),scrolled(false),scrollDelta(0),

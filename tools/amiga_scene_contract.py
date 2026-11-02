@@ -18,7 +18,8 @@ GAME_IDS = frozenset({
     153, 154, 157, 162, 163, 164, 166, 168, 170, 172, 173, 175, 176,
     177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 206, 207,
     208, 278, 458, 459, 460, 471, 480, 481, 482, 485, 486, 487, 496,
-    497, 550, 551, 568, 569, 602, 603, 605, 702, 703, 707,
+    497, 550, 551, 568, 569, 570, 571, 572, 602, 603, 605, 702, 703, 704, 707,
+    711, 712, 83, 118,
     # Pre-mirrored planar forms.
     62000, 62001, 62003, 62012, 62015, 62027, 62031, 62037, 62096,
     62127, 62139, 62153, 62154, 62157, 62162, 62163, 62164, 62166,
@@ -38,10 +39,12 @@ GAME_IDS = frozenset({
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
-# DMA gameplay currently uses 112970 bytes; its ceiling leaves 1718 bytes
-# growth, not permission to consume all of the measured free Chip RAM.
+# DMA gameplay currently uses 115806 bytes; its ceiling leaves 2754 bytes
+# growth, not permission to consume all of the measured free Chip RAM. Only
+# the full-catalogue reference oracles load it; production gameplay leases
+# the cavern banks below.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 96 * 1024,
-                'game': 240 * 1024, 'game-planes': 112 * 1024}
+                'game': 240 * 1024, 'game-planes': 116 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -55,13 +58,15 @@ CAVERN_ROOTS = frozenset({
     153, 154, 157, 162, 163, 164, 166, 168, 170, 172, 173, 175, 176,
     177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 278, 458, 459,
     471, 480, 481, 482, 485, 486, 487, 496, 497, 550, 551, 568, 569,
-    602, 603, 605, 702, 703, 707,
+    570, 571, 572, 602, 603, 605, 702, 703, 704, 707, 711, 712, 83, 118,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
     {65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
      65108, 65109, 65110}) & GAME_IDS
-BANK_BUDGETS.update({'cavern': 224 * 1024, 'cavern-planes': 105 * 1024})
+# W1.3 room effects (gem chunk, sparkles, flash, red splash turns, fire,
+# small smoke) raised the measured DMA atlas from 106,574 to 109,410 bytes.
+BANK_BUDGETS.update({'cavern': 224 * 1024, 'cavern-planes': 108 * 1024})
 
 
 def require_budget(bank, size):

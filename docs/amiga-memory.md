@@ -505,11 +505,11 @@ registration representation.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Gameplay-leased DMA plane atlas (cavern; full pixel oracle 112,970) | 106,574 |
+| Gameplay-leased DMA plane atlas (cavern; full pixel oracle 115,806) | 109,410 |
 | Effect surface | 20,448 |
 | Offline interleaved smoke/gem stamps | 0 additional (4,932 in cache tail) |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Gameplay total, before allocation alignment** | **482,314** |
+| **Gameplay total, before allocation alignment** | **485,150** |
 | **Front-end total, without gameplay DMA atlas** | **375,740** |
 
 The directory sizes depend on the generated asset set; remeasure actual free
@@ -585,14 +585,14 @@ this lease, so this is not complete scene-local residency.
 `generate-amiga-hud.py --profile game`
 splits its records, unchanged, into the following banks:
 
-- `amiga-game.dwap` (`Downwell.game`), 234,718 bytes of CPU-only reference art,
-  and `amiga-game.planes` (`Downwell.planes`), 112,970 bytes of DMA reference
+- `amiga-game.dwap` (`Downwell.game`), 242,384 bytes of CPU-only reference art,
+  and `amiga-game.planes` (`Downwell.planes`), 115,806 bytes of DMA reference
   art. Only explicit replay/plane pixel oracles may load these catalogues.
   The normal link audit rejects their load paths in production code.
-- `amiga-cavern.dwap` (`Downwell.cavern`), 221,282 CPU bytes, paired with
-  `amiga-cavern.planes` (`Downwell.cavernplanes`), 106,574 DMA bytes, replaces
+- `amiga-cavern.dwap` (`Downwell.cavern`), 228,948 CPU bytes, paired with
+  `amiga-cavern.planes` (`Downwell.cavernplanes`), 109,410 DMA bytes, replaces
   that union during cavern gameplay. `CAVERN_ROOTS` is independent of future
-  union additions. The exporter checks fixed 224 KiB CPU/105 KiB DMA ceilings
+  union additions. The exporter checks fixed 224 KiB CPU/108 KiB DMA ceilings
   and retained payloads against the full pack. Scene retirement drains
   DMA and invalidates every borrowed CPU/DMA view before release;
   upgrade entry releases the lease and next-level entry reacquires it.
@@ -626,11 +626,11 @@ Shops/results retain their stricter planar-only validation; upgrade validates
 the full directory including CPU-only sprite streams.
 
 After retiring all gameplay DMA, upgrade entry invalidates borrowed actor,
-effect, terrain-batch and HUD views and frees the 221,282-byte CPU catalogue
-and 106,574-byte Chip plane allocation. It also releases terrain backing and
+effect, terrain-batch and HUD views and frees the 228,948-byte CPU catalogue
+and 109,410-byte Chip plane allocation. It also releases terrain backing and
 CPU field columns. Selection never reads `activeGamePack`. Next-level entry
 retires selection DMA, releases its source, then reloads/rebinds gameplay.
-Relative to retaining cavern art, this saves 205,682 ordinary bytes and 106,574
+Relative to retaining cavern art, this saves 205,682 ordinary bytes and 109,410
 Chip bytes during selection; gameplay residency is unchanged. Fixed shared
 scene storage and other embedded tables are not included in these savings.
 The native clear fixture requires zero gameplay leases during both selections

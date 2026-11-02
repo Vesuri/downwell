@@ -167,6 +167,13 @@ test-moving-fx: build/moving-fx-test
 build/moving-fx-test: tests/core/MovingFxTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test: test-compact-scenery
+.PHONY: test-compact-scenery
+test-compact-scenery: build/compact-scenery-test
+	./build/compact-scenery-test
+build/compact-scenery-test: tests/core/CompactSceneryTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CompactSceneryTest.cpp src/core/GameMakerRandom.cpp
 test: test-red-ball-step
 test: test-red-ball-events
 test: test-red-ball-draw

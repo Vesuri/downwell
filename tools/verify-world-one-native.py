@@ -58,6 +58,20 @@ def main():
         # source-line breakpoint can stop after those loads in optimized code.
         checked("break *'AmigaInput::sample'")
         checked('break downwellWorldOneComplete')
+        # Optional evidence run: DOWNWELL_CAPTURE_TICK=4494 (with
+        # READY_MARKER=DOWNWELL_WORLD_ONE_CAPTURE_READY) checks the route up to
+        # that simulation tick, saves captures/world-one-<tick>, and stops.
+        shotTick=int(os.environ.get('DOWNWELL_CAPTURE_TICK','-1'))
+        def shot(name):
+            capture=Path(f'../tmp/{name}.bin')
+            profile(g,2,capture)
+            kind,image=screenshot_from_trace(capture)
+            extension='png' if image.startswith(b'\x89PNG') else 'jpg' if image.startswith(b'\xff\xd8') else None
+            if extension is None: raise RuntimeError(f'unknown screenshot encoding {kind}')
+            destination=Path(f'../captures/{name}.{extension}')
+            destination.parent.mkdir(exist_ok=True)
+            destination.write_bytes(image)
+            capture.unlink()
         previous=-1
         sceneFrame=0
         oldScene=-1
@@ -76,15 +90,7 @@ def main():
                         raise RuntimeError('wrong slice destination or route length')
                     checked('delete breakpoints')
                     controls.fields(2)
-                    capture=Path('../tmp/world-one-end.bin')
-                    profile(g,2,capture)
-                    kind,image=screenshot_from_trace(capture)
-                    extension='png' if image.startswith(b'\x89PNG') else 'jpg' if image.startswith(b'\xff\xd8') else None
-                    if extension is None: raise RuntimeError(f'unknown screenshot encoding {kind}')
-                    destination=Path('../captures/world-one-end.'+extension)
-                    destination.parent.mkdir(exist_ok=True)
-                    destination.write_bytes(image)
-                    capture.unlink()
+                    shot('world-one-end')
                     print('DOWNWELL_WORLD_ONE_READY',flush=True)
                     Path('.run/gdb-ready.marker').touch()
                     return
@@ -116,6 +122,14 @@ def main():
                         if actual!=witnesses[tick]:
                             raise RuntimeError(f'first checked divergence tick={tick}: native={actual}, host={witnesses[tick]}')
                     packed=tape[tick]
+                    if tick==shotTick:
+                        # Evidence mode ends here: the capture runs the
+                        # emulator past the following samples.
+                        checked('delete breakpoints')
+                        shot(f'world-one-{tick}')
+                        print('DOWNWELL_WORLD_ONE_CAPTURE_READY',flush=True)
+                        Path('.run/gdb-ready.marker').touch()
+                        return
                 if frame%100==0: print(state,flush=True)
                 log.write(f'{frame} {scene} {tick} {level} {packed}\n');log.flush()
                 for bit,event in ((1,'JOY2_LEFT'),(2,'JOY2_RIGHT'),(4,'JOY2_FIRE_BUTTON')):

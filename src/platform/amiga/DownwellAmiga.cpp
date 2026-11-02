@@ -4014,6 +4014,26 @@ __attribute__((noinline)) static int runDownwell(void) {
                 destroyedBlockY[block] = result.blockY[block];
             }
 #endif
+            if (destroyedBlockCount != 0 && !port.compactScenery().empty()) {
+                // Scenery art changed under a repainted cell: broken plants,
+                // a flashing/opened gem chunk, a placed or removed torch.
+                int first = result.blockY[0], last = first;
+                for (unsigned block = 1; block < destroyedBlockCount; ++block) {
+                    if (result.blockY[block] < first) first = result.blockY[block];
+                    if (result.blockY[block] > last) last = result.blockY[block];
+                }
+                first += 176 - 16; last += 176 + 16;
+                for (unsigned d = 0; d < liveBuilder.decorationCount(); ++d) {
+                    auto& decoration = generatedDecorations[d];
+                    if (decoration.y < first || decoration.y > last ||
+                        (decoration.objectId != 289 && decoration.objectId != 293 && decoration.objectId != 296)) continue;
+                    int sprite = decoration.spriteId < 0 ? (decoration.objectId == 296 ? 568 : -1) : decoration.spriteId;
+                    int frame = decoration.frame;
+                    if (port.sceneryAppearance(decoration.objectId, decoration.x, decoration.y, sprite, frame)) {
+                        decoration.spriteId = sprite; decoration.frame = frame;
+                    } else decoration.spriteId = -1;
+                }
+            }
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset(), &port.ammoGauge(), port.ammoMeterOffset());
             if (result.healthChanged)
@@ -4448,6 +4468,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             const bool compositeEffects=actorList.hasControllerProducers(port)&&((compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
+                port.smokeEffects().size()||port.compactDebris().size()||
                 (port.registeredSmoke()&&port.registeredSmoke()->size())||
                 (port.registeredCorpses()&&port.registeredCorpses()->size())||
                 (port.timeShardInstances()&&port.timeShardInstances()->size())))||
