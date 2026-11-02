@@ -288,6 +288,7 @@ int main(int argc,char** argv){
     // W1.3's box bursts and builder scenery (their debris needs wall and
     // platform contacts).
     GameplayWorld::compactRoomEffectsAdmitted=false;
+    GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
     {
         auto actual=std::make_unique<AmigaTerrainIndex>();
         auto oracle=std::make_unique<AmigaTerrainIndex>();

@@ -17,6 +17,8 @@ static PlayerDamageNumber snapshot(const PlayerDamageNumbers<8>& owner){
     assert(owner.visitNewest([&](auto,const auto& e){result=e;++count;return true;}));assert(count==1);return result;
 }
 int main(){
+    // These machine-gun trajectory fixtures predate W1.4's compact guns.
+    GameplayWorld::compactGunsAdmitted=false;
     {
         // Inject failure at the synchronous generation boundary. Earlier
         // creation is retained, but bullets and later phases must not advance.

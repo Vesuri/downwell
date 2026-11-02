@@ -10,6 +10,9 @@ public:
     // Two particle layers for up to three TorchFires in view.
     static constexpr unsigned compactFireLayerCapacity = 3 * 2 * downwell::CompactTorchFireRecord::parts;
     static constexpr unsigned capacity = 4 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + GameplayWorld::bulletCapacity +
+        downwell::CompactGuns::casingCapacity + downwell::CompactGuns::trailCapacity + 2 * downwell::CompactGuns::moduleCapacity +
+        downwell::CompactGuns::textCapacity * downwell::CompactModuleTextRecord::maximumLength +
+        downwell::CompactGuns::noticeCapacity * 4 +
         GameplayWorld::enemyCapacity + GameplayWorld::gemCapacity + GameplayWorld::boneCapacity + downwell::scriptSpawnEffectCapacity +
         2 * downwell::ShopWorld::capacity + downwell::GameplayScattered::capacity + downwell::GameplayWhiteJellies::capacity +
         downwell::gameplayCompactNoLoopCapacity + downwell::gameplayCompactMovingCapacity + compactFireLayerCapacity;
@@ -74,6 +77,11 @@ public:
         const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
 private:
     template<class Append> bool drawCompactRoomEffects(const GameplayWorld& world,Append& append,int viewX,int viewY);
+    // W1.4: GunModule (-10100) and the depth-0 casings and laser trails.
+    template<class Append> bool drawCompactGuns(const GameplayWorld& world,Append& append,int viewX,int viewY);
+    // moduleText (-1000) and itemNotif (-50000): bordered glyph markers.
+    template<class Append> bool drawCompactGunTexts(const GameplayWorld& world,Append& append,bool notices,int viewX,int viewY);
+    bool glyph(unsigned id,int x,int y,unsigned pen);
     const downwell::FontGlyphMasks* titleGlyphs_=nullptr;
     downwell::LevelNumberTextDrawState* titleText_=nullptr;
     // Admission workspace, never published until the source-ordered pass

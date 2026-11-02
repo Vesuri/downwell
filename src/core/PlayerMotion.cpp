@@ -44,7 +44,12 @@ void PlayerMotion::enterRoom(bool fireHeld, int landingOffset)
 {
     const int capacity = ammoCapacity_;
     const int facing = facing_;
+    const bool rules = gunRules_, delayKill = gunDelayKill_;
+    const int consumption = gunConsumption_, rof = gunRof_, recoil = gunRecoilFifths_;
     *this = PlayerMotion(false, landingOffset);
+    // scrPlayerInit clears nonAuto; the selected gun is global state.
+    gunRules_ = rules; gunDelayKill_ = delayKill;
+    gunConsumption_ = consumption; gunRof_ = rof; gunRecoilFifths_ = recoil;
     ammoCapacity_ = capacity;
     ammo_ = capacity;
     facing_ = facing;
@@ -183,7 +188,9 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ = (int)(halved % 5);
         }
         jumpShootLocked_ = false;
-        shotDelay_ = 0;
+        // global.pBulDelayKill == 1 only; nonAuto always clears.
+        if (!gunRules_ || gunDelayKill_) shotDelay_ = 0;
+        nonAuto_ = false;
     }
 
     const bool wasSpinning = spinJumping_;
@@ -268,7 +275,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     // even if a shot is still delayed or ammunition is empty.
     if (!controlsLocked && input.fire && !jumpShootLocked_) spinJumping_ = false;
     if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
-        !jumpShootLocked_ && ammo_ == 0) {
+        !jumpShootLocked_ && !nonAuto_ && ammo_ == 0) {
         // scrPlayerShootN's empty-charge branch still brakes a fast fall.
         // It consumes no charge and creates no bullet or shooting animation.
         if (speedY_ > 3 * fixedOne ||
@@ -278,16 +285,27 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         }
         shotDelay_ = 16;
     } else if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
-               !jumpShootLocked_ && ammo_ > 0) {
-        if (speedY_ > 0 || (speedY_ == 0 && gravityRemainder_ > 0)) {
-            speedY_ = 0;
-            gravityRemainder_ = 0;
+               !jumpShootLocked_ && !nonAuto_ && ammo_ > 0) {
+        if (gunRules_) {
+            // if (ysp > global.pBulRecoil) ysp = global.pBulRecoil
+            if (speedY_ * 5 + gravityRemainder_ > gunRecoilFifths_)
+                setVerticalSpeedFifths(gunRecoilFifths_);
+            ammo_ -= gunConsumption_;
+            shotDelay_ = static_cast<unsigned>(gunRof_ < 0 ? -gunRof_ : gunRof_);
+            if (gunRof_ < 0) nonAuto_ = true;
+            // stammo <= 0 after the shot: stammo = 0 and nonAuto = 1.
+            if (ammo_ <= 0) { ammo_ = 0; nonAuto_ = true; }
+        } else {
+            if (speedY_ > 0 || (speedY_ == 0 && gravityRemainder_ > 0)) {
+                speedY_ = 0;
+                gravityRemainder_ = 0;
+            }
+            ammo_ -= downwell::machineGunProfile(gemHigh).consumption;
+            shotDelay_ = downwell::machineGunProfile(gemHigh).interval;
         }
-        ammo_ -= downwell::machineGunProfile(gemHigh).consumption;
         ++shots_;
         airborneShot_ = true;
         shotFired = true;
-        shotDelay_ = downwell::machineGunProfile(gemHigh).interval;
     }
 
     // scrPlMovement's grounded branch runs after input/jump decisions.
@@ -449,6 +467,7 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     if (ammoCapacity_ != maximumAmmo) {
         digest.addU32(0x414d4d4f); digest.addI32(ammoCapacity_);
     }
+    if (nonAuto_) digest.addU32(0x4e4f4e41);
     if(!motionSucceeded_)digest.addU32(0x4641494c);
 }
 

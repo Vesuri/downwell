@@ -68,17 +68,14 @@ ammo and gem HUD, damage numbers, six builder-placed enemy families (snake
 level spawner 78 with its white jelly 115 and red ball 118 (normal-mode
 channels, steering motion, stomp and bullet deaths, eye art), box bursts (smoke,
 flash, impact, `breakablesDebris` 370, rewards), `Scattered16` 289, `gemChunk`
-293, torches 295/296, the steering enemies' splash, smoke and flash, compact shops, level exit,
+293, torches 295/296, the steering enemies' splash, smoke and flash,
+`GunModule` 109 (battery and heart pickups, `moduleText` 373 and `itemNotif`
+374) with the seven `bStatInitLevel1` guns, their shots, muzzles, laser
+trails and casings, compact shops, level exit,
 upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 
-4. **Gun modules and guns.** Object 109 is `GunModule` (not a crate; correct
-   `original-behavior-audit.md`). It is only a tile today. Add the pickup, its
-   heart and battery variants, `moduleText` 373 and `itemNotif` 374, and the
-   gun change across the seven `bStatInitLevel1` guns with their shots and
-   casings. References: [projectile motion](projectile-motion.md),
-   [laser sight](laser-sight.md).
 5. **Side rooms and time-stop.** Time-field circles are drawn, but
    `pTimeStop` is not connected. Add entry and exit (`parentTimeField` 82,
    `goalTimeField` 255, `startTimeField` 371), the freeze and resume of the
@@ -93,12 +90,18 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 6. **Enemy and player damage chains.** Complete corpses (`objDeadBody` 263),
    blood, smoke, hit and flash effects, bullet wall hits, jump and dust
    effects, and source knockback and immunity on player damage, including the
-   death flash and `DeathMenu` 49 options.
+   death flash and `DeathMenu` 49 options. The W1.4 shots also lack theirs:
+   `bulletRanged`/`bulletLaser`/`bulletCasing` wall hits (101 and the laser's
+   96/smoke), enemy-hit blood, flash and impact, and the empty-gun smoke and
+   "EMPTY!" text.
    Reference: [effect surfaces](effect-surfaces.md).
 7. **Combo and HUD.** Add the on-screen combo counter, `comboDone` rewards at
    5, 10, 30 and 100, `ComboBreak` 369, `comboRewardText` 383, Gemhigh and the
    remaining controller-HUD rules, and the `levelNumber` 372 title at each
-   level start.
+   level start. The W1.4 texts approximate two source details: overlapping
+   `moduleText` records never push each other down (Collision with
+   `moduleText`), and the letters assume top-left text alignment although
+   `itemNotif` leaves `fa_middle` set.
 8. **Complete shops.** Merchant speech and prompts, keeper behaviour, funded,
    insufficient and sold-out purchases, the criminal route, and the
    source shop-placement rules per style.
@@ -107,7 +110,10 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
    selectable, including the balloon/decoy target that steering enemies
    chase (they now always chase the player), box chain reactions (upgrade
-   5) and exploding knees on scenery and boxes (upgrade 0).
+   5) and exploding knees on scenery and boxes (upgrade 0). W1.4 left Hot
+   Casing (upgrade 8, damaging casings), Reverse Engineering (upgrade 1,
+   `pugEngineer` on gun pickups) and Laser Sight's beam against the new guns'
+   spread (its `bdirRand` and `decTimer` changes are in) to this item.
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Menus, styles, modes and persistence.** The pause menu and its options,
     shader, record and confirm menus (adapted to the Amiga); all five styles
@@ -129,10 +135,24 @@ Paula, with scene-local residency:
   stomps, gems, rock breaks, box, plant, gem-chunk and TorchFire hooks (no-ops), shopkeeper voices, void enter and exit, combo,
   menus and the time-field winds (reuse `AmigaWindAudio` and the prepared
   wind bank);
+- every gun's shot sound (`bStatSound`), the module pickup (105/106) and the
+  `moduleText` letter sound (334);
 - the master gain option and the original voice and priority rules.
 
 Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handling)
 and keep audio out of scenes that do not use it.
+
+Before adding resident samples, free Chip the gameplay scenes do not need.
+Gameplay leaves only about 9 KiB of the measured A500 Chip free after W1.4.
+The garden foreground/background and entry-shaft images (76,800 bytes)
+stay in Chip for the whole run. Release them as soon as the entry shaft has
+scrolled away, keep a copy in Fast RAM, and copy it back into a Chip lease
+when the garden or shaft is shown again (Retry, the surface, style
+select). The copy must finish within the existing scene handoff. Check
+the same pattern for the 66,704-byte splash/style cache and the
+146,818-byte shared scene bank's gameplay use (terrain scratch, time-field
+images). Measure free and largest Chip before and after
+(`verify-amiga-memory`, `verify-amiga-startup` with `VERIFY_CHIP_KB=512`).
 
 ### W3. Performance
 
@@ -144,7 +164,15 @@ before W1 and W2 will be stale. The parked candidates in section 0 (C and D
 selectors) and in 1.01 (the scene collision backend) can be reused here.
 New costs from W1: the spawner step runs every update (quiet-fall rose from
 178 to 181 fields), and each live jelly or red ball calls `portableAtan` and
-binary64 trig every update.
+binary64 trig every update. W1.4: every shot now draws RNG (spread, speed,
+image speed, three casing draws), the compact bullet store holds 32 shots,
+the laser casts its ray every update in 8-pixel steps against enemies,
+walls and shootables, and up to 96 laser trails are BOBs. Gun art adds
+17,762 bytes to the cavern CPU bank (now 246,710) and 8,334 Chip bytes to its
+plane atlas (now 117,744), leaving about 9 KiB of the measured A500 Chip
+headroom for W2; the prepared actor-frame table grew from 512 to 640
+entries. The spread guns' and aimed shots' art uses the nearest offline
+quarter turn without the usual gun's per-angle pixel proof.
 
 ### WR. Restructure for world 1
 

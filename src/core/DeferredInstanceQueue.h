@@ -56,6 +56,10 @@ struct DeferredCreateInstance {
             state.haveGem=static_cast<unsigned char>(static_cast<unsigned>(auxiliaryState)>>16);}
         return state;
     }
+    // Object 109 (GunModule) likewise: moduleType in bit 8, moduleNum below.
+    void setGunModule(std::uint32_t type,std::uint32_t gun){auxiliaryState=static_cast<std::int32_t>((type<<8)|gun);}
+    int gunModuleType()const{return (auxiliaryState>>8)&1;}
+    int gunModuleGun()const{return auxiliaryState&255;}
     // Object 82 owns no motion auxiliary state. Retain its exact Create RNG
     // word in that existing payload slot, avoiding a larger command for every
     // terrain cell. Explicit arithmetic keeps all uint32 values portable.

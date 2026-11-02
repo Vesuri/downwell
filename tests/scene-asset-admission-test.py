@@ -231,7 +231,7 @@ int main() {
         self.assertEqual(keys('game'), [(51, 7), (51, 13), (51, 0), (27, 0), (76, 0), (63027, 0)])
 
     def test_unrelated_exporter_growth_is_rejected(self):
-        for ident in (200, 62002, 63002, 65111):
+        for ident in (200, 62002, 63002, 65119):
             with self.assertRaisesRegex(ValueError, f'asset {ident} frame 0 has no scene owner'):
                 hud.scene_banks([record(51), record(ident)])
         # Merely extending the exporter selection must not declare residency.

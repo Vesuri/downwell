@@ -57,7 +57,9 @@ int decorationSprite(int objectId) {
     if (objectId == 289) return 550;
     if (objectId == 293) return 569;
     if (objectId == 296) return 568;
-    if (objectId == 109) return 139;
+    // W1.4: GunModule is a falling compact record drawn by the draw list;
+    // only fixtures predating it keep the static painted battery.
+    if (objectId == 109) return GameplayWorld::compactGunsAdmitted ? -1 : 139;
     // objLineToResult's sprite supplies a mask, but Visible is false.
     return -1;
 }

@@ -296,6 +296,77 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
     return true;
 }
 
+// W1.4 compact gun owners, all in room coordinates.
+template<class Append> bool AmigaGameplayDrawList::drawCompactGuns(const GameplayWorld& port,
+    Append& append,int viewX,int viewY){
+    const auto& g=port.compactGuns();
+    const auto place=[&](int sprite,unsigned frame,int x,int y,int flip){
+        return append(UWORD(sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,flip);
+    };
+    // GunModule Draw: draw_self (the flashing frame), then sprModText's gun
+    // letter at the same anchor.
+    for(unsigned i=0;i<g.moduleEnd;++i){const auto& m=g.modules[i];
+        if(!m.live)continue;
+        if(!place(m.sprite(),unsigned(m.image),m.x,m.y,0)||!place(141,unsigned(m.letter()),m.x,m.y,0))return false;
+    }
+    // bulletCasing: draw_self while dFlash is positive; never mirrored.
+    for(unsigned i=0;i<g.casingEnd;++i){const auto& c=g.casings[i];
+        if(c.live&&c.visible()&&!place(457,c.frame(),int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16),0))return false;
+    }
+    // fxLaserTrail: image_angle bDir + 90 = 360 for the vertical laser.
+    for(unsigned i=0;i<g.trailEnd;++i){const auto& t=g.trails[i];
+        if(t.live&&!place(t.sprite,t.frame(),t.x,t.y,0))return false;
+    }
+    return true;
+}
+
+bool AmigaGameplayDrawList::glyph(unsigned id,int x,int y,unsigned pen){
+    if(x+5<=downwellPlayfieldX||x-5>=downwellPlayfieldX+downwellPlayfieldWidth||y+11<=0||y-1>=downwellDisplayHeight)return true;
+    if(count==capacity){failedSprite=gameplayGlyphMarker;failedFrame=UWORD(id);return false;}
+    actors[count++]={gameplayGlyphMarker,UWORD(id),x,y,int(pen)};
+    return true;
+}
+
+namespace {
+unsigned borderGlyph(char c){
+    if(c>='0'&&c<='9')return 65100u+unsigned(c-'0');
+    if(c=='+')return 65111u;
+    return 65120u+unsigned(c-'A');
+}
+}
+
+// moduleText Draw (font 2, eight-pixel advance, top-left aligned): letters
+// bounce by their frame before the exit, then fall away by it. itemNotif:
+// centred "+ n" and sprItemNotif frame notifType at the same anchor.
+template<class Append> bool AmigaGameplayDrawList::drawCompactGunTexts(const GameplayWorld& port,Append& append,bool notices,int viewX,int viewY){
+    const auto& g=port.compactGuns();
+    if(!notices){
+        for(unsigned i=0;i<g.textEnd;++i){const auto& t=g.texts[i];
+            if(!t.live||!t.allSet)continue;
+            const int left=t.left(viewX,160),top=t.y-32;
+            for(int k=1;k<=t.length;++k){
+                const int f=t.frames[k];
+                int dy;
+                if(!t.exit){if(k>t.shown)continue;dy=downwell::CompactModuleTextRecord::bounce(f);}
+                else{if(f>3)continue;dy=f;}
+                // Glyph origin (4,0): the anchor is the cell's centre column.
+                if(!glyph(borderGlyph(t.character(k)),downwellPlayfieldX+left+8*(k-1)+4-viewX,top+dy-viewY,1))return false;
+            }
+        }
+        return true;
+    }
+    for(unsigned i=0;i<g.noticeEnd;++i){const auto& n=g.notices[i];
+        if(!n.live||!n.visible())continue;
+        const int x=n.left(viewX,160),y=n.pixelY();
+        const char text[]={'+',' ',char('0'+n.amount),0};
+        // fa_center/fa_middle: three eight-pixel cells around x, ten rows.
+        for(int k=0;k<3;++k)
+            if(text[k]!=' '&&!glyph(borderGlyph(text[k]),downwellPlayfieldX+x-12+8*k+4-viewX,y-5-viewY,1))return false;
+        if(!append(UWORD(713),UWORD(n.type),downwellPlayfieldX+x-viewX,y-viewY,0))return false;
+    }
+    return true;
+}
+
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency,
     const AmigaActorFrames* prepared) {
@@ -374,6 +445,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
 #ifndef DOWNWELL_REPLAY_VERIFY
     // Below the room actors (enemies, player) in both world compositions.
     if(!drawCompactRoomEffects(port,append,worldViewX,worldViewY))ready=false;
+    if(!port.compactGuns().empty()&&!drawCompactGuns(port,append,worldViewX,worldViewY))ready=false;
 #endif
 
     bool foregroundDrawn=false;
@@ -568,8 +640,8 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             }
             if(kind==GameplayWorld::DrawActor::bullet){
                 const auto* bullet=port.resolveBulletLifetime(key);
-                return bullet&&(!bullet->active||append(downwell::machineGunProfile(bullet->gemHigh).sprite,
-                    768+bullet->animation.frame(),downwellPlayfieldX+80+bullet->x-port.cameraOffsetX(),
+                return bullet&&(!bullet->active||append(bullet->sprite,
+                    bullet->drawFrame(),downwellPlayfieldX+80+bullet->x-port.cameraOffsetX(),
                     playerStartY+bullet->y-port.cameraOffsetY(),0));
             }
             if(kind==GameplayWorld::DrawActor::bone||kind==GameplayWorld::DrawActor::skeleton){
@@ -753,14 +825,19 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         // sample over 267..273 degrees for all twelve source frames:
         // the spread-adjusted artwork equals this offline quarter
         // turn. Other angles/guns need separately verified variants.
-        if (bullet.active && !append(
-                downwell::machineGunProfile(bullet.gemHigh).sprite, 768 + bullet.animation.frame(),
+        if (bullet.active && !append(bullet.sprite, bullet.drawFrame(),
                 downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
                 playerStartY + bullet.y - port.cameraOffsetY(), 0))
             ready = false;
     }
+#ifndef DOWNWELL_REPLAY_VERIFY
+    if(port.compactGuns().textEnd&&!drawCompactGunTexts(port,append,false,worldViewX,worldViewY))ready=false;
+#endif
     if(!drawForeground())ready=false;
     if(!port.hasRoomActorDraw()&&!drawPlayer())ready=false;
+#ifndef DOWNWELL_REPLAY_VERIFY
+    if(port.compactGuns().noticeEnd&&!drawCompactGunTexts(port,append,true,worldViewX,worldViewY))ready=false;
+#endif
 
     // Original compatibility depth -200000: ahead of ordinary gameplay,
     // but behind the controller's effect-surface publication (-300000).

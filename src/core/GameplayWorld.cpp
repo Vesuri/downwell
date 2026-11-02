@@ -1184,7 +1184,7 @@ bool GameplayWorld::advanceEnemyRoomAnimation(downwell::InstanceHandle key){
 bool GameplayWorld::advanceBulletRoomAnimation(downwell::InstanceHandle key){
     auto* bullet=const_cast<BulletState*>(resolveBulletLifetime(key));
     if(!run_.effectsSucceeded||!bullet)return run_.effectsSucceeded=false;
-    return run_.effectsSucceeded=bullet->animation.advance()&&bulletLifecycle_.imageIndex(key,*bullet,bullet->animation.index);
+    return run_.effectsSucceeded=advanceBulletAnimation(*bullet);
 }
 
 bool GameplayWorld::boneInView(downwell::InstanceHandle bone,bool& visible){
@@ -1434,97 +1434,18 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
         const bool ok=sourceBulletDispatch_(sourceBulletContext_,{bullet.identitySlot,bullet.lifetimeId},bullet.sourceMotion);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    if(bullet.kind==BulletState::ranged)return stepRangedBullet(bullet,generationCameraY);
+    if(bullet.kind==BulletState::laser)return stepLaserBullet(bullet,generationCameraY);
     const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
     bool alive=false;
     if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
         [this, &bullet](const downwell::ProjectileSegment& path) {
-            DW_PROFILE_SCOPE(profileBulletEnemyQuery);
-            for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
-                EnemyState& enemy = enemies_[enemyIndex];
-                const downwell::ContactActor contact{
-                    enemy.x * 256L, enemy.y * 256L,
-                    enemy.objectId == 117 ? enemy.motionState : enemy.facing,
-                    enemy.imageScaleY(),
-                    downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)};
-                if (!enemy.active || enemy.health <= 0 ||
-                    !path.intersects(contact))
-                    continue;
-                if (enemy.objectId == 115 || enemy.objectId == 118) {
-                    if (!hitSteeringEnemy(enemy, bullet.trajectory.direction,
-                            downwell::machineGunProfile(bullet.gemHigh).damage))
-                        run_.effectsSucceeded = false;
-                    return true;
-                }
-                const auto impact = downwell::applyStandardBulletImpact(
-                    enemy, run_.kills, enemyRandom_,
-                    [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
-                    bullet.gemHigh, bullet.trajectory.direction,
-                    [this](const EnemyState& record){return publishEnemyActivation(record,false);});
-                return impact.kind != downwell::BulletImpactKind::ignored;
-            }
-            return false;
-        }, [this, &bullet]
-           (const downwell::ProjectileSegment& path) {
-            DW_PROFILE_SCOPE(profileBulletSolidQuery);
-            unsigned firstBlock = 0, endBlock = breakableCount_;
-            if (breakableIndexReady_) {
-                int candidate = -1;
-                // An eight-pixel segment can touch at most four
-                // 16-pixel tiles, including a corner-adjacent tile
-                // containing neither endpoint. Test all candidates.
-                const int xs[] = {path.x.pixel, path.endX.pixel};
-                const int ys[] = {path.y.pixel, path.endY.pixel};
-                const unsigned columns = ((xs[0]+8) >> 4) == ((xs[1]+8) >> 4) ? 1 : 2;
-                const unsigned rows = ((ys[0]+8) >> 4) == ((ys[1]+8) >> 4) ? 1 : 2;
-                for (unsigned column = 0; column < columns; ++column)
-                  for (unsigned row = 0; row < rows; ++row) {
-                    const int next = indexedBreakable(xs[column], ys[row]);
-                    if (next < 0) continue;
-                    const auto& block = breakables_[next];
-                    if (block.active && !block.destroyRequested && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
-                            (candidate < 0 || next < candidate)) candidate = next;
-                }
-                firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
-                endBlock = candidate < 0 ? 0 : firstBlock + 1;
-            }
-            for (unsigned blockIndex = firstBlock; blockIndex < endBlock; ++blockIndex) {
-                Breakable& block = breakables_[blockIndex];
-                // Indexed selection already proved this exact hit.
-                if (block.active && !block.destroyRequested && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
-                                                   block.y - 8, block.y + 8))) {
-                    bool applied=false;
-                    if(!block.state.bulletHit(downwell::MotionBinary64::fromInteger(
-                        downwell::machineGunProfile(bullet.gemHigh).damage),applied)){
-                        run_.effectsSucceeded=false;return true;
-                    }
-                    observeBoxHealth(block);
-                    return applied;
-                }
-            }
-            if(scenery_.gemChunkEnd){
-                bool hit=false,consumed=false;
-                if(!hitGemChunk(path,downwell::machineGunProfile(bullet.gemHigh).damage,hit,consumed))return true;
-                if(hit)return consumed;
-            }
-            // An ordinary, non-wave bullet also stops at unbreakable walls.
-            if (solidResolver_ != 0) {
-                if (segmentResolver_) {
-                    if(segmentResolver_(solidResolverContext_, path))return true;
-                    bool consumed=false;
-                    if(!scenery_.empty()&&!hitCompactShootable(path,bullet,consumed))return true;
-                    return consumed;
-                }
-                const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
-                const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
-                const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
-                const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
-                for (int y = top; y <= bottom; ++y)
-                    for (int x = left; x <= right; ++x)
-                        if (solidResolver_(solidResolverContext_, x, y) && path.intersects(x,x+1,y,y+1))
-                            return true;
-            }
             bool consumed=false;
-            if(!scenery_.empty()&&!hitCompactShootable(path,bullet,consumed))return true;
+            if(!bulletEnemyContact(bullet,path,consumed))return true;
+            return consumed;
+        }, [this, &bullet](const downwell::ProjectileSegment& path) {
+            bool consumed=false;
+            if(!bulletSolidContact(bullet,path,consumed))return true;
             return consumed;
         },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096,284,
         [this,&bullet]{
@@ -1582,6 +1503,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceCorpseExpiryAnimation();
     sceneryRepaintCount_=0;
     (void)advanceCompactSceneryAnimation();
+    if(!guns_.empty())(void)advanceCompactGunAnimation();
     }
     if(!run_.effectsSucceeded)return {};
     {
@@ -1590,10 +1512,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!roomAnimation_(roomAnimationContext_)){run_.effectsSucceeded=false;return {};}
     }else{
     for(unsigned i=0;i<bulletSlotEnd_;++i)if(bullets_[i].active){
-        auto& bullet=bullets_[i];
-        if(!bullet.animation.advance()||!bulletLifecycle_.imageIndex({bullet.identitySlot,bullet.lifetimeId},bullet,bullet.animation.index)){
-            run_.effectsSucceeded=false;return {};
-        }
+        if(!advanceBulletAnimation(bullets_[i])){run_.effectsSucceeded=false;return {};}
     }
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
@@ -1684,6 +1603,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
         found=false;return true;
     }, &headBreak);
+    if(gunsActive_()){
+        const auto& gun=currentGun();
+        player_.configureGun(gun.consumption,gun.rof,gun.delayKill,gun.recoilFifths);
+    }
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,
@@ -1703,7 +1626,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
-    if (player_.shots() != oldShots) {
+    if (player_.shots() != oldShots && gunsActive_()) {
+        if(!firePlayerGun(muzzleX,muzzleY-4,muzzleX,muzzleY))return {};
+        bulletChanged=true;
+    } else if (player_.shots() != oldShots) {
         const int muzzleOffset = emitter_.nextOffset();
         // Marked records remain resolvable until Draw cleanup; never compact
         // them away merely because gameplay/rendering has stopped using them.
@@ -1726,6 +1652,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         bullet.x = muzzleX + muzzleOffset;
         bullet.y = muzzleY;
         bullet.gemHigh = run_.gemHigh;
+        bullet.damage = downwell::machineGunProfile(bullet.gemHigh).damage;
+        bullet.sprite = downwell::machineGunProfile(bullet.gemHigh).sprite;
         bullet.animation = {};
         bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
         const downwell::InstanceHandle handle{identity,bullet.lifetimeId};
@@ -1749,6 +1677,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceDamageNumberAlarm(damageNumberAlarmPhase,0);
     if(downwell::AlarmBank::advanceValue(cameraShakeAlarm_))cameraMotion_.stopShake();
     advanceEnemyAlarms();
+    if(run_.effectsSucceeded&&gunsActive_()&&!advanceCompactGunAlarms())return {};
     if(!reconcilePhase(PhaseBoundary::alarm))return {};
     currencyStepOrder_.clear();
     if(currencyInstances_&&currencyInstances_->size()&&(!currencyOrderCapture_||!currencyEventDispatch_||
@@ -1788,6 +1717,18 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(entryStepCount==2&&entryStep[0].generation>entryStep[1].generation){
             const auto first=entryStep[0];entryStep[0]=entryStep[1];entryStep[1]=first;
         }
+    }
+    // objPlayer_n Step (35) runs scrAimControl before camMain (64).
+    if(gunsActive_()){
+        const auto& gun=currentGun();
+        if(input.left){aimAngle_-=gun.aimAcceleration;if(aimAngle_>0)aimAngle_-=gun.aimDeceleration;}
+        if(input.right){aimAngle_+=gun.aimAcceleration;if(aimAngle_<0)aimAngle_+=gun.aimDeceleration;}
+        if(!input.left&&!input.right){
+            if(aimAngle_)aimAngle_-=(aimAngle_>0?1:-1)*gun.aimDeceleration;
+            if(aimAngle_>-2&&aimAngle_<2)aimAngle_=0;
+        }
+        if(aimAngle_>gun.aimLimit)aimAngle_=gun.aimLimit;
+        if(aimAngle_<-gun.aimLimit)aimAngle_=-gun.aimLimit;
     }
     DW_PROFILE_PHASE(profilePlayer);
     int scrollDelta = 0;
@@ -1881,6 +1822,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         ++blocksDestroyed_;
     }
 
+    // GunModule (109) follows the boxes, before the enemies (111-119).
+    if(guns_.moduleEnd&&!stepGunModules())return {};
     // Existing native families follow their source object table order. This
     // does not admit the omitted actor/effect handlers or replace legacy
     // bullet contacts with the original Collision event pass.
@@ -1955,6 +1898,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 !stepBulletEffect(bullets_[bulletIndex],generationCameraY,bulletChanged))return {};
     }
 
+    // bulletCasing (267) follows the bullets (260/261).
+    if(guns_.casingEnd&&!stepCasings())return {};
     DW_PROFILE_PHASE(profileLifecycle);
     // Corpse/bone/blast (263/269/276) follow usual bullets, before debris 370.
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,370)){
@@ -1973,6 +1918,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!record||!record->active||record->destroyRequested)continue;
         if(!debrisStepDispatch_(debrisStepContext_,key)){run_.effectsSucceeded=false;return {};}
     }
+    // moduleText (373) and itemNotif (374) follow debris (370).
+    if((guns_.textEnd||guns_.noticeEnd)&&!stepModuleTexts())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,0x7fffffff)){
         run_.effectsSucceeded=false;return {};
     }
@@ -1994,6 +1941,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         return true;
     });
     if(!run_.effectsSucceeded)return {};
+    // GunModule's Collision with objPlayer_n (object 109 before the enemies).
+    if(guns_.moduleEnd&&!collideGunModules())return {};
     if (!downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
         run_.kills, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },
@@ -2064,6 +2013,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!boxesRetired){run_.effectsSucceeded=false;return {};}
     }
     if(registeredActorEndStep_&&!registeredActorEndStep_(registeredActorEndStepContext_,viewTop)){run_.effectsSucceeded=false;return {};}
+    if(!guns_.empty()&&(!retireCompactGuns(viewTop)||!drawCompactGunTexts()))return {};
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
@@ -2549,16 +2499,26 @@ bool GameplayWorld::collideSteeringEnemies(){
 
 namespace {
 using SceneryReal=downwell::MotionBinary64;
-// Machine-gun shots face 270 degrees (spread stays within 267..273). Their
-// rectangle masks then rotate a quarter turn: local y becomes -x, x becomes y.
-downwell::ContactBounds compactBulletBounds(bool gemHigh,int x,int y){
-    const auto local=downwell::contactSpriteBounds(downwell::machineGunProfile(gemHigh).sprite);
-    return {x-local.bottom+1,x-local.top+1,y+local.left,y+local.right};
+std::uint32_t bulletDirection(const GameplayWorld::BulletState& bullet){
+    return bullet.kind==GameplayWorld::BulletState::legacy?bullet.trajectory.direction:bullet.shot.direction;
+}
+// Shots face their bDir; masks rotate by the nearest quarter turn, as the
+// machine gun's 267..273 always did. Local (x,y) maps to (y,-x) at 270.
+downwell::ContactBounds rotatedShotBounds(int sprite,std::uint32_t direction,int x,int y){
+    const auto l=downwell::contactSpriteBounds(sprite);
+    switch(((direction+0x20000000u)>>30)&3u){
+        case 0:return {x+l.left,x+l.right,y+l.top,y+l.bottom};
+        case 1:return {x+l.top,x+l.bottom,y-l.right+1,y-l.left+1};
+        case 2:return {x-l.right+1,x-l.left+1,y-l.bottom+1,y-l.top+1};
+        default:return {x-l.bottom+1,x-l.top+1,y+l.left,y+l.right};
+    }
 }
 }
 
 bool GameplayWorld::resetCompactScenery(){
     compactEffects_.clear();scenery_.clear();sceneryRepaintCount_=0;
+    // scrPlayerInit: aimAngle = 0, burstCount = 0; room instances are gone.
+    guns_.clear();aimAngle_=0;burstCount_=0;burstAlarm_=-1;
     if(!compactDebris_.clear())return run_.effectsSucceeded=false;
     return true;
 }
@@ -2864,8 +2824,13 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
     if(!downwell::ProjectilePublication::coordinate(path.x,240,bx)||
        !downwell::ProjectilePublication::coordinate(path.y,176,by)||
        !bx.promoted().roundPixel(px)||!by.promoted().roundPixel(py))return run_.effectsSucceeded=false;
-    const auto shot=compactBulletBounds(bullet.gemHigh,px,py);
-    const int damage=downwell::machineGunProfile(bullet.gemHigh).damage;
+    const auto shot=rotatedShotBounds(bullet.sprite,bulletDirection(bullet),px,py);
+    const int damage=bullet.damage;
+    if(guns_.moduleEnd){
+        bool module=false;
+        if(!hitGunModule(shot,damage,module))return false;
+        if(module){consumed=true;return true;}
+    }
     auto& sc=scenery_;
     for(unsigned i=0;i<sc.scatteredEnd;++i){
         auto& r=sc.scattered[i];
@@ -2873,7 +2838,7 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
         if(r.objHp<=0)return true;
         r.objHp-=damage;r.hit=1;
         downwell::RunnerImageValue angle;
-        if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
+        if(!downwell::ProjectilePublication::angle(bulletDirection(bullet),angle)||
            !compactEffects_.spawnNoLoop(bx.promoted(),by.promoted(),605,{0x3fd99999u,0x9999999au},angle.promoted(),{}))
             return run_.effectsSucceeded=false;
         consumed=true;return true;
@@ -2964,4 +2929,567 @@ bool GameplayWorld::stepCompactBox(unsigned index){
         return true;
     },ops,good);
     return run_.effectsSucceeded=good&&run_.effectsSucceeded;
+}
+
+// ---------------------------------------------------------------------------
+// W1.4 compact guns: bStatInitLevel1's seven guns, bulletRanged/bulletLaser
+// shots, bulletCasing, fxLaserTrail, GunModule, moduleText and itemNotif.
+// Room coordinates are offset by (240,176) as for the other compact owners.
+// Audio hooks (shot, pickup, letter sounds) are W2; wall-hit, blood and
+// impact effects are W1.6; upgrades 1 (Reverse Engineering) and 8 (Hot
+// Casing) are W1.9.
+
+namespace {
+using GunReal=downwell::MotionBinary64;
+}
+
+int GameplayWorld::breakableAt(int x,int y)const{
+    if(breakableIndexReady_){
+        const int block=indexedBreakable(x,y);
+        return block>=0&&breakables_[block].active&&!breakables_[block].destroyRequested?block:-1;
+    }
+    for(unsigned i=0;i<breakableCount_;++i){const auto& b=breakables_[i];
+        if(b.active&&!b.destroyRequested&&x>=b.x-8&&x<b.x+8&&y>=b.y-8&&y<b.y+8)return int(i);}
+    return -1;
+}
+
+GameplayWorld::BulletState* GameplayWorld::birthBullet(int x,int y,int sprite){
+    // Marked records remain resolvable until Draw cleanup; never compact
+    // them away merely because gameplay/rendering has stopped using them.
+    unsigned index=0;
+    for(unsigned read=0;read<bulletSlotEnd_;++read)if(bullets_[read].identitySlot<bulletCapacity){
+        if(index!=read)bullets_[index]=bullets_[read];++index;
+    }
+    bulletSlotEnd_=index;
+    if(index>=bulletCapacity||!nextBulletLifetimeId_){run_.effectsSucceeded=false;return nullptr;}
+    BulletState& bullet=bullets_[index];
+    unsigned identity=0;while(identity<bulletCapacity&&bulletIdentitySlots_[identity])++identity;
+    if(identity==bulletCapacity){run_.effectsSucceeded=false;return nullptr;}
+    bullet={};bullet.identitySlot=identity;bulletIdentitySlots_[identity]=true;
+    bullet.lifetimeId=nextBulletLifetimeId_++;
+    bullet.active=true;
+    bulletSlotEnd_=index+1;
+    bullet.x=x;bullet.y=y;bullet.gemHigh=run_.gemHigh;bullet.sprite=sprite;
+    bullet.trajectory.reset(x,y,false);
+    const downwell::InstanceHandle handle{identity,bullet.lifetimeId};
+    if(!bullet.sourceMotion.reset(GunReal::fromInteger(x+240),GunReal::fromInteger(y+176),false)||
+       !bulletLifecycle_.birth(handle,bullet)||!bulletLifecycle_.sprite(handle,bullet,sprite)){
+        run_.effectsSucceeded=false;return nullptr;
+    }
+    return &bullet;
+}
+
+// instance_create(x, y, global.pBulObject); myBullet.bDir = angle.
+bool GameplayWorld::createCompactBullet(int x,int y,int angle,bool laserSight){
+    const auto& gun=currentGun();
+    BulletState* bullet=birthBullet(x,y,gun.sprite);
+    if(!bullet)return false;
+    bullet->damage=gun.damage;
+    if(gun.object==260){
+        // bulletLaser Create: x/y rounded, xxx = x + irandom_range(-2,2).
+        bullet->kind=BulletState::laser;
+        (void)enemyRandom_.irandomSmall(4);
+        bullet->shot={};
+        bullet->shot.x={x,0};bullet->shot.y={y,0};
+        bullet->shot.direction=downwell::RangedShot::degreesToTurns(angle);
+        bullet->shot.imageSpeed={0x3f800000u};bullet->shot.animation=true;
+        if(angle!=270)return run_.effectsSucceeded=false; // aimLimit and accuracy are zero
+        return true;
+    }
+    bullet->kind=BulletState::ranged;
+    if(!bullet->shot.create(enemyRandom_,x,y,angle,gun,laserSight&&run_.upgrades.levels[12]!=0))
+        return run_.effectsSucceeded=false;
+    return true;
+}
+
+// scrPlayerEmitBullet(muzzlex, muzzley, angle): shootLeg flips per call; the
+// muzzle effect sits at the player's y + 12. Laser Sight's bdirRand = 0 is
+// written to scrPlayerShootN's myBullet: the last bullet of its first call.
+bool GameplayWorld::emitPlayerBullets(int muzzleX,int muzzleY,int playerY,int angle,bool lastGetsLaserSight){
+    const auto& gun=currentGun();
+    const int emitX=muzzleX+emitter_.nextOffset();
+    if(!compactEffects_.spawnNoLoop(GunReal::fromInteger(emitX+240),GunReal::fromInteger(playerY+12+176),
+            gun.muzzle,{0x3fe00000u,0},GunReal::fromInteger(angle),GunReal::fromInteger(-60000)))
+        return run_.effectsSucceeded=false;
+    if(!createCompactBullet(emitX,muzzleY,angle,false))return false;
+    for(int i=1;i<=gun.sp1&&gun.spType;++i){
+        if(gun.spType==1){
+            if(!createCompactBullet(emitX,muzzleY,angle+gun.sp2*i,false)||
+               !createCompactBullet(emitX,muzzleY,angle-gun.sp2*i,false))return false;
+        }else if(!createCompactBullet(emitX+gun.sp2*i,muzzleY-2,angle,false)||
+                 !createCompactBullet(emitX-gun.sp2*i,muzzleY-2,angle,false))return false;
+    }
+    if(lastGetsLaserSight&&run_.upgrades.levels[12]!=0){
+        BulletState& last=bullets_[bulletSlotEnd_-1];
+        last.shot.zeroSpread=true;
+        // bulletRanged Create already lengthened decTimer for every bullet.
+    }
+    return true;
+}
+
+// scrPlayerShootN's charged branch after PlayerMotion's recoil and charge:
+// shake, bullets, bulletCasing, then the burst.
+bool GameplayWorld::firePlayerGun(int playerX,int playerY,int muzzleX,int muzzleY){
+    const auto& gun=currentGun();
+    shotAngle_=270+aimAngle_;
+    if(followCamera_&&!requestCameraShake(gun.shake,gun.shakeDuration))return false;
+    if(!emitPlayerBullets(muzzleX,muzzleY,playerY,shotAngle_,true))return false;
+    auto* casing=downwell::CompactGuns::append(guns_.casings,guns_.casingEnd);
+    if(!casing)return run_.effectsSucceeded=false;
+    casing->create(enemyRandom_,playerX+240,playerY+176,player_.facing());casing->birth=tick_;
+    if(gun.burst){
+        if(gun.burstRate>0){
+            if(int(burstCount_)<gun.burstAmount){burstAlarm_=gun.burstRate;++burstCount_;}
+            else burstCount_=0;
+        }else for(int i=0;i<gun.burstAmount;++i)
+            if(!emitPlayerBullets(muzzleX,muzzleY,playerY,shotAngle_,false))return false;
+    }
+    return run_.effectsSucceeded;
+}
+
+// objPlayer_n Alarm 3: scrBurstFire at the published position.
+bool GameplayWorld::burstFire(){
+    const auto& gun=currentGun();
+    const int x=int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
+    const int y=int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
+    if(!emitPlayerBullets(x,y+4,y,shotAngle_,false))return false;
+    if(followCamera_&&!requestCameraShake(gun.shake,gun.shakeDuration))return false;
+    player_.setVerticalSpeedFifths(gun.recoilFifths);
+    auto* casing=downwell::CompactGuns::append(guns_.casings,guns_.casingEnd);
+    if(!casing)return run_.effectsSucceeded=false;
+    casing->create(enemyRandom_,x+240,y+176,player_.facing());casing->birth=tick_;
+    if(int(burstCount_)<gun.burstAmount){burstAlarm_=gun.burstRate;++burstCount_;}
+    else burstCount_=0;
+    return run_.effectsSucceeded;
+}
+
+bool GameplayWorld::advanceBulletAnimation(BulletState& bullet){
+    const downwell::InstanceHandle key{bullet.identitySlot,bullet.lifetimeId};
+    if(bullet.kind==BulletState::legacy)
+        return bullet.animation.advance()&&bulletLifecycle_.imageIndex(key,bullet,bullet.animation.index);
+    bool ended=false;
+    if(!bullet.shot.advanceAnimation(bullet.kind==BulletState::laser?13:6,ended)||
+       !bulletLifecycle_.imageIndex(key,bullet,bullet.shot.imageIndex))return false;
+    // bulletRanged Other 7 (Animation End): action_kill_object.
+    if(ended&&bullet.kind==BulletState::ranged&&!bullet.destroyRequested){
+        if(bulletLifecycle_.hasOwner())return markBulletDestroyed(key);
+        return retireBulletOwnership(bullet);
+    }
+    return true;
+}
+
+bool GameplayWorld::bulletEnemyContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed){
+    DW_PROFILE_SCOPE(profileBulletEnemyQuery);
+    consumed=false;
+    for(unsigned enemyIndex=0;enemyIndex<enemyCount_;++enemyIndex){
+        EnemyState& enemy=enemies_[enemyIndex];
+        const downwell::ContactActor contact{
+            enemy.x*256L,enemy.y*256L,
+            enemy.objectId==117?enemy.motionState:enemy.facing,
+            enemy.imageScaleY(),
+            downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)};
+        if(!enemy.active||enemy.health<=0||!path.intersects(contact))continue;
+        consumed=true;
+        if(enemy.objectId==115||enemy.objectId==118)
+            return hitSteeringEnemy(enemy,bulletDirection(bullet),bullet.damage)||(run_.effectsSucceeded=false);
+        const auto impact=downwell::applyBulletDamage(
+            enemy,run_.kills,enemyRandom_,
+            [this,&enemy]{run_.combo.state.enemyDefeated();spawnReward(enemy,false);return run_.effectsSucceeded;},
+            bullet.damage,bulletDirection(bullet),
+            [this](const EnemyState& record){return publishEnemyActivation(record,false);});
+        if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
+        consumed=impact.kind!=downwell::BulletImpactKind::ignored;
+        return run_.effectsSucceeded;
+    }
+    return true;
+}
+
+bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed){
+    DW_PROFILE_SCOPE(profileBulletSolidQuery);
+    consumed=false;
+    unsigned firstBlock=0,endBlock=breakableCount_;
+    if(breakableIndexReady_){
+        // Every 16-pixel tile the segment's bounding box spans, including
+        // corner-adjacent tiles containing neither endpoint. Faster guns
+        // (shotgun 18) cross more than the usual gun's two.
+        int candidate=-1;
+        const int left=path.x.pixel<path.endX.pixel?path.x.pixel:path.endX.pixel;
+        const int right=path.x.pixel>path.endX.pixel?path.x.pixel:path.endX.pixel;
+        const int top=path.y.pixel<path.endY.pixel?path.y.pixel:path.endY.pixel;
+        const int bottom=path.y.pixel>path.endY.pixel?path.y.pixel:path.endY.pixel;
+        for(int column=(left+8)>>4;column<=((right+8)>>4);++column)
+          for(int row=(top+8)>>4;row<=((bottom+8)>>4);++row){
+            const int next=indexedBreakable(column*16,row*16);
+            if(next<0)continue;
+            const auto& block=breakables_[next];
+            if(block.active&&!block.destroyRequested&&path.intersects(block.x-8,block.x+8,block.y-8,block.y+8)&&
+               (candidate<0||next<candidate))candidate=next;
+        }
+        firstBlock=candidate<0?0:unsigned(candidate);
+        endBlock=candidate<0?0:firstBlock+1;
+    }
+    for(unsigned blockIndex=firstBlock;blockIndex<endBlock;++blockIndex){
+        Breakable& block=breakables_[blockIndex];
+        // Indexed selection already proved this exact hit.
+        if(block.active&&!block.destroyRequested&&(breakableIndexReady_||path.intersects(block.x-8,block.x+8,
+                                                   block.y-8,block.y+8))){
+            bool applied=false;
+            if(!block.state.bulletHit(GunReal::fromInteger(bullet.damage),applied))return run_.effectsSucceeded=false;
+            observeBoxHealth(block);
+            consumed=applied;return true;
+        }
+    }
+    if(scenery_.gemChunkEnd){
+        bool hit=false;
+        if(!hitGemChunk(path,bullet.damage,hit,consumed))return false;
+        if(hit)return true;
+    }
+    // An ordinary, non-wave bullet also stops at unbreakable walls.
+    if(solidResolver_!=0){
+        if(segmentResolver_){
+            if(segmentResolver_(solidResolverContext_,path)){consumed=true;return true;}
+        }else{
+            const int left=path.x.pixel<path.endX.pixel?path.x.pixel:path.endX.pixel;
+            const int right=path.x.pixel>path.endX.pixel?path.x.pixel:path.endX.pixel;
+            const int top=path.y.pixel<path.endY.pixel?path.y.pixel:path.endY.pixel;
+            const int bottom=path.y.pixel>path.endY.pixel?path.y.pixel:path.endY.pixel;
+            for(int y=top;y<=bottom;++y)
+                for(int x=left;x<=right;++x)
+                    if(solidResolver_(solidResolverContext_,x,y)&&path.intersects(x,x+1,y,y+1)){consumed=true;return true;}
+        }
+    }
+    if((!scenery_.empty()||guns_.moduleEnd)&&!hitCompactShootable(path,bullet,consumed))return false;
+    return true;
+}
+
+// bulletRanged Step: first-Step spread, deceleration, lengthdir, then
+// scrBulCheckSolid (here after the retained enemy-first contact) and motion.
+bool GameplayWorld::stepRangedBullet(BulletState& bullet,long generationCameraY){
+    const bool first=!bullet.shot.allSet;
+    bullet.shot.prepareStep(enemyRandom_);
+    const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
+    if(first&&bulletLifecycle_.hasOwner()){
+        downwell::RunnerImageValue angle;
+        if(!downwell::ProjectilePublication::angle(bullet.shot.direction,angle)||!publishBulletAngle(h,angle))
+            return run_.effectsSucceeded=false;
+    }
+    const downwell::ProjectileSegment path(bullet.shot.x,bullet.shot.y,bullet.shot.velocityX,bullet.shot.velocityY);
+    bool consumed=false;
+    if(!bulletEnemyContact(bullet,path,consumed))return false;
+    if(!consumed&&!bulletSolidContact(bullet,path,consumed))return false;
+    bullet.shot.advance();
+    bullet.x=bullet.shot.x.pixel;bullet.y=bullet.shot.y.pixel;
+    if(bulletLifecycle_.hasOwner()){
+        DW_PROFILE_SCOPE(profileBulletPublication);
+        downwell::RunnerImageValue x,y;
+        if(!downwell::ProjectilePublication::coordinate(bullet.shot.x,240,x)||
+           !downwell::ProjectilePublication::coordinate(bullet.shot.y,176,y)||
+           !publishBulletCollisionPosition(h,x,y))return run_.effectsSucceeded=false;
+    }
+    const long cameraCentreQ12=176L*4096+generationCameraY*16;
+    const bool outside=!registeredOrdinaryEndStep_&&
+        downwell::fractionalBulletOutsideView(bullet.shot.y,176,cameraCentreQ12-142L*4096,284);
+    if(!consumed&&!outside)return true;
+    if(bulletLifecycle_.hasOwner())return markBulletDestroyed(h);
+    return retireBulletOwnership(bullet);
+}
+
+// bulletLaser Step: the instant ray. Laser aim and spread are always zero,
+// so the ray is vertical: d2wx stays 0 and xadd's halving is inert.
+bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
+    auto& shot=bullet.shot;
+    if(!shot.allSet){(void)enemyRandom_.nextU32();shot.allSet=true;} // random_range(-0,0)
+    const int x=shot.x.pixel,y=shot.y.pixel;
+    const long top=(34L*256+generationCameraY)/256-176;
+    const long bottom=top+284;
+    const auto enemyAt=[&](const downwell::ContactBounds& box){
+        for(unsigned i=0;i<enemyCount_;++i){const auto& e=enemies_[i];
+            if(!e.active||e.health<=0)continue;
+            const auto b=downwell::contactWorldBounds({e.x*256L,e.y*256L,e.objectId==117?e.motionState:e.facing,
+                e.imageScaleY(),downwell::enemyContactMask(e.objectId,e.spriteId,e.maskId)});
+            if(downwell::contactBoundsOverlap(box,b))return true;
+        }
+        return false;
+    };
+    const auto solidPoint=[&](int px,int py){
+        if(solidResolver_&&solidResolver_(solidResolverContext_,px,py))return true;
+        return breakableAt(px,py)>=0||gemChunkBlocks(px+240,py+176);
+    };
+    const auto shootableAt=[&](const downwell::ContactBounds& box){
+        for(unsigned i=0;i<guns_.moduleEnd;++i){const auto& m=guns_.modules[i];
+            if(m.live&&m.objHp>0&&downwell::contactBoundsOverlap(box,downwell::contactPixelBounds(m.x-240,m.y-176,1,1,m.sprite())))return true;}
+        for(unsigned i=0;i<scenery_.scatteredEnd;++i){const auto& r=scenery_.scattered[i];
+            if(r.live&&r.objHp>0&&downwell::contactBoundsOverlap(box,downwell::contactPixelBounds(r.x-240,r.y-176,r.scaleX,1,550)))return true;}
+        return false;
+    };
+    const auto mask=[&](int py){return downwell::contactPixelBounds(x,py,1,1,585);};
+    const auto lineHits=[&](int to){
+        for(int py=y;py<=to;++py)if(solidPoint(x,py))return true;
+        return false;
+    };
+    int distance=0,add=8;
+    for(unsigned guard=0;guard<512;++guard){
+        const int ahead=distance+add;
+        if(enemyAt({x-8,x+9,y,y+ahead+1})||lineHits(y+ahead)||shootableAt({x,x+1,y,y+ahead+1})){
+            add/=2;if(add<1)add=1;
+        }
+        distance+=add;
+        if(enemyAt(mask(y+distance))||solidPoint(x,y+distance)||shootableAt(mask(y+distance)))break;
+        if(y+distance>bottom||y+distance<top)break;
+    }
+    // Trails every 8 pixels from the start; the first Step's index falls
+    // from round(d/20)+2 (8 beyond 120) by 0.25, later Steps keep 4.
+    int quarterIndex=4*4;
+    if(!bullet.wallMet){
+        if(distance<120){
+            int whole=distance/20;const int remainder=distance%20;
+            if(remainder>10||(remainder==10&&(whole&1)))++whole; // round(): ties to even
+            quarterIndex=(whole+2)*4;
+        }else quarterIndex=8*4;
+    }
+    for(int trail=0;;trail+=8){
+        auto* record=downwell::CompactGuns::append(guns_.trails,guns_.trailEnd);
+        if(record){
+            record->x=x+240;record->y=y+trail+176;record->sprite=bullet.sprite;record->birth=tick_;
+            GunReal value=GunReal::fromInteger(quarterIndex);
+            if(quarterIndex)value.high-=2u<<20; // exact division by four
+            if(!record->index.assign(value))return run_.effectsSucceeded=false;
+        } // A full trail store drops only presentation (no RNG or state).
+        if(!bullet.wallMet&&quarterIndex>0)--quarterIndex;
+        if(trail+8>distance)break;
+    }
+    bullet.wallMet=true;
+    shot.y.pixel+=distance;
+    bullet.x=x;bullet.y=shot.y.pixel;
+    const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
+    bool destroy=false;
+    const int py=shot.y.pixel;
+    // position_meeting(x, y, parentWall): a box or gem chunk takes bdmg each
+    // Step and the piercing laser stays; an ordinary wall ends it.
+    if(solidPoint(x,py)&&!enemyAt({x,x+1,py,py+1})){
+        const int block=breakableAt(x,py);
+        if(block>=0){
+            auto& box=breakables_[block];
+            if(box.state.wallHp.high||box.state.wallHp.low){
+                bool applied=false;
+                if(!box.state.bulletHit(GunReal::fromInteger(bullet.damage),applied))return run_.effectsSucceeded=false;
+                observeBoxHealth(box);
+            }
+        }else if(gemChunkBlocks(x+240,py+176)){
+            bool hit=false,consumed=false;
+            const downwell::ProjectileSegment point(shot.x,shot.y,0,0);
+            if(!hitGemChunk(point,bullet.damage,hit,consumed))return false;
+        }else destroy=true;
+    }else{
+        const auto box=mask(py);
+        for(unsigned i=0;i<guns_.moduleEnd;++i){auto& m=guns_.modules[i];
+            if(m.live&&m.objHp>0&&downwell::contactBoundsOverlap(box,downwell::contactPixelBounds(m.x-240,m.y-176,1,1,m.sprite()))){
+                m.objHp-=bullet.damage;break;}}
+    }
+    // Collision with subparentEnemy, once per enemy (hitIgnoreCheck).
+    if(!destroy)for(unsigned i=0;i<enemyCount_&&!destroy;++i){
+        EnemyState& enemy=enemies_[i];
+        if(!enemy.active||enemy.health<=0)continue;
+        const auto b=downwell::contactWorldBounds({enemy.x*256L,enemy.y*256L,enemy.objectId==117?enemy.motionState:enemy.facing,
+            enemy.imageScaleY(),downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
+        if(!downwell::contactBoundsOverlap(mask(py),b))continue;
+        if(enemy.objectId==112){destroy=true;(void)enemyRandom_.chooseIndexSmall(2);break;} // bulletImmune
+        bool ignored=false;
+        for(unsigned k=0;k<bullet.laserHitCount;++k)if(bullet.laserHits[k]==enemy.lifetimeId)ignored=true;
+        if(ignored)continue;
+        if(bullet.laserHitCount<4)bullet.laserHits[bullet.laserHitCount++]=enemy.lifetimeId;
+        if(enemy.health>bullet.damage)destroy=true;
+        if(enemy.objectId==115||enemy.objectId==118){
+            if(!hitSteeringEnemy(enemy,shot.direction,bullet.damage))return false;
+            continue;
+        }
+        const auto impact=downwell::applyBulletDamage(enemy,run_.kills,enemyRandom_,
+            [this,&enemy]{run_.combo.state.enemyDefeated();spawnReward(enemy,false);return run_.effectsSucceeded;},
+            bullet.damage,shot.direction,[this](const EnemyState& record){return publishEnemyActivation(record,false);});
+        if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
+    }
+    if(bulletLifecycle_.hasOwner()){
+        downwell::RunnerImageValue px,pyv;
+        if(!downwell::ProjectilePublication::coordinate(shot.x,240,px)||
+           !downwell::ProjectilePublication::coordinate(shot.y,176,pyv)||
+           !publishBulletCollisionPosition(h,px,pyv))return run_.effectsSucceeded=false;
+    }
+    const long cameraCentreQ12=176L*4096+generationCameraY*16;
+    if(!destroy&&!registeredOrdinaryEndStep_&&
+       downwell::fractionalBulletOutsideView(shot.y,176,cameraCentreQ12-142L*4096,284))destroy=true;
+    if(!destroy)return true;
+    if(bulletLifecycle_.hasOwner())return markBulletDestroyed(h);
+    return retireBulletOwnership(bullet);
+}
+
+bool GameplayWorld::createGunModule(const downwell::DeferredCreateInstance& command){
+    if(!run_.effectsSucceeded)return false;
+    auto* m=downwell::CompactGuns::append(guns_.modules,guns_.moduleEnd);
+    if(!m)return run_.effectsSucceeded=false;
+    m->x=command.x;m->y=command.y;m->yy=long(command.y)<<16;m->birth=tick_;
+    m->type=command.gunModuleType();m->gun=command.gunModuleGun();
+    // global.area == 5 forces hearts; world one never reaches it.
+    if(!downwell::validGun(m->gun))return run_.effectsSucceeded=false;
+    return true;
+}
+
+// Alarm phase, after the room's own alarms (none of these draw RNG except
+// objPlayer_n Alarm 3, the first object at index 3).
+bool GameplayWorld::advanceCompactGunAlarms(){
+    for(unsigned index=0;index<4;++index){
+        if(index==0)for(unsigned i=0;i<bulletSlotEnd_;++i){auto& b=bullets_[i];
+            if(b.active&&!b.destroyRequested&&b.kind==BulletState::ranged)b.shot.alarm();}
+        if(index==3&&burstAlarm_>0&&--burstAlarm_==0){burstAlarm_=-1;if(!burstFire())return false;}
+        for(unsigned i=0;i<guns_.moduleEnd;++i)if(guns_.modules[i].live)guns_.modules[i].alarmEvent(index);
+        if(index<2)for(unsigned i=0;i<guns_.casingEnd;++i)if(guns_.casings[i].live)(void)guns_.casings[i].alarmEvent(index);
+        for(unsigned i=0;i<guns_.textEnd;++i)if(guns_.texts[i].live)(void)guns_.texts[i].alarmEvent(index);
+        if(index<2)for(unsigned i=0;i<guns_.noticeEnd;++i)if(guns_.notices[i].live)(void)guns_.notices[i].alarmEvent(index);
+    }
+    return run_.effectsSucceeded;
+}
+
+bool GameplayWorld::advanceCompactGunAnimation(){
+    for(unsigned i=0;i<guns_.casingEnd;++i)if(guns_.casings[i].live)guns_.casings[i].advanceAnimation();
+    for(unsigned i=0;i<guns_.trailEnd;++i){auto& t=guns_.trails[i];
+        if(t.live&&t.birth!=tick_+1&&!t.advanceAnimation())return run_.effectsSucceeded=false;}
+    return true;
+}
+
+// GunModule Step: gravity above the view bottom, scrCheckCollisionWith(56)
+// (xsp is always 0 here: only the vertical branch can act), roundPosition.
+bool GameplayWorld::stepGunModules(){
+    const long top=boneViewTopQ8_/256;
+    for(unsigned i=0;i<guns_.moduleEnd;++i){
+        auto& m=guns_.modules[i];
+        if(!m.live||m.birth==tick_)continue;
+        if(m.y<top+284)m.ysp+=13107; // global.grav 0.2
+        const long rounded=(m.yy+(1L<<15))>>16;
+        if(m.ysp){
+            const int sign=m.ysp>0?1:-1;
+            const long step=((m.ysp>0?m.ysp:-m.ysp)+65535)>>16;
+            bool hit=false;
+            if(!solidMeeting(m.sprite(),GunReal::fromInteger(m.x),GunReal::fromInteger(int(rounded+sign*step)),true,hit))return false;
+            if(hit){
+                long move=0;const long limit=m.ysp>0?m.ysp:-m.ysp;
+                for(;;){
+                    bool next=false;
+                    if(!solidMeeting(m.sprite(),GunReal::fromInteger(m.x),GunReal::fromInteger(int(rounded+move+sign)),true,next))return false;
+                    if(next)break;
+                    move+=sign;
+                    if((move<0?-move:move)<<16>=limit){move=0;break;}
+                }
+                m.yy=(rounded+move)<<16;
+                m.ysp=0;
+            }
+        }
+        m.yy+=m.ysp;
+        m.y=int((m.yy+(1L<<15))>>16);
+    }
+    return true;
+}
+
+// bulletCasing Step: flash, gravity, wall bounce, scrBulCheckSolid, motion.
+bool GameplayWorld::stepCasings(){
+    for(unsigned i=0;i<guns_.casingEnd;++i){
+        auto& c=guns_.casings[i];
+        if(!c.live||c.birth==tick_)continue;
+        c.beginStep();
+        bool wall=false;
+        if(!solidMeeting(457,GunReal::fromInteger(int((c.x+c.xsp+(1L<<15))>>16)),
+                         GunReal::fromInteger(int((c.y+(1L<<15))>>16)),false,wall))return false;
+        if(wall)c.xsp=-(c.xsp*7)/10;
+        if(c.xsp>-3277&&c.xsp<3277)c.xsp=c.xsp>0?3277:c.xsp<0?-3277:0; // 0.05
+        // scrBulCheckSolid with bdmg 0: any wall or shootable on the line
+        // ends the casing (its 101 wall effect is W1.6).
+        const auto q20=[](long q16){
+            downwell::RangedShot::Coordinate c{int(q16>>16),std::uint32_t(q16&65535)<<4};return c;};
+        const downwell::ProjectileSegment path(q20(c.x-(240L<<16)),q20(c.y-(176L<<16)),
+            std::int32_t(c.xsp*16),std::int32_t(c.ysp*16));
+        bool hit=false;
+        if(solidResolver_&&segmentResolver_)hit=segmentResolver_(solidResolverContext_,path);
+        if(!hit&&scenery_.gemChunkEnd){bool chunk=false,consumed=false;
+            if(!hitGemChunk(path,0,chunk,consumed))return false;hit=chunk;}
+        if(!hit){
+            const int block=breakableAt(path.endX.pixel,path.endY.pixel);
+            if(block>=0&&path.intersects(breakables_[block].x-8,breakables_[block].x+8,breakables_[block].y-8,breakables_[block].y+8))hit=true;
+        }
+        if(hit){c.live=false;continue;}
+        c.x+=c.xsp;c.y+=c.ysp;
+    }
+    return true;
+}
+
+bool GameplayWorld::stepModuleTexts(){
+    for(unsigned i=0;i<guns_.textEnd;++i){auto& t=guns_.texts[i];
+        if(t.live&&t.birth!=tick_)t.step();}
+    for(unsigned i=0;i<guns_.noticeEnd;++i){auto& n=guns_.notices[i];
+        if(n.live&&n.birth!=tick_)n.step();}
+    return true;
+}
+
+bool GameplayWorld::collideGunModules(){
+    if(dead())return true;
+    const auto player=downwell::contactWorldBounds({240L*256+player_.offsetXFixed(),176L*256+player_.offsetYFixed(),1,1,31});
+    for(unsigned i=0;i<guns_.moduleEnd;++i){
+        auto& m=guns_.modules[i];
+        if(!m.live||!m.obtainable||
+           !downwell::contactBoundsOverlap(player,downwell::contactPixelBounds(m.x,m.y,1,1,m.sprite())))continue;
+        if(!pickupGunModule(m))return false;
+    }
+    return true;
+}
+
+// GunModule Collision with objPlayer_n.
+bool GameplayWorld::pickupGunModule(downwell::CompactGunModuleRecord& m){
+    // scrEffectSpawn(plx, ply, sprFxAmmoCharge, 1, 0, -50500)
+    const int px=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
+    const int py=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
+    if(!compactEffects_.spawnNoLoop(GunReal::fromInteger(px),GunReal::fromInteger(py),111,
+            GunReal::fromInteger(1),{},GunReal::fromInteger(-50500)))return run_.effectsSucceeded=false;
+    run_.gunType=m.gun;
+    int amount=2;
+    if(m.type==0)player_.increaseAmmoCapacity(2);
+    else{
+        // hpGain 1 with the heart-piece overflow of the source.
+        amount=1;
+        (void)run_.combo.healthReserve.gain(health_,1);
+    }
+    auto* text=downwell::CompactGuns::append(guns_.texts,guns_.textEnd);
+    if(!text)return run_.effectsSucceeded=false;
+    text->x=m.x;text->y=m.y;text->gun=m.gun;text->type=m.type;text->amount=amount;text->birth=tick_;
+    m.live=false;
+    return true;
+}
+
+// End Step: scrOutofview for modules, scrOutofview + scrBulletOov for
+// casings. Texts and notices have no End Step.
+bool GameplayWorld::retireCompactGuns(long viewTopQ12){
+    const long top=viewTopQ12/4096;
+    for(unsigned i=0;i<guns_.moduleEnd;++i){auto& m=guns_.modules[i];
+        if(m.live&&(m.y<top-160||m.y>top+3000))m.live=false;}
+    for(unsigned i=0;i<guns_.casingEnd;++i){auto& c=guns_.casings[i];
+        const long y=(c.y+(1L<<15))>>16;
+        if(c.live&&(y<top-160||y>top+3000||y>top+284+32||y<top-100))c.live=false;}
+    return true;
+}
+
+// Draw-time state of moduleText (frame advance on exit, itemNotif birth).
+bool GameplayWorld::drawCompactGunTexts(){
+    for(unsigned i=0;i<guns_.textEnd;++i){auto& t=guns_.texts[i];
+        if(!t.live||!t.drawEvent())continue;
+        auto* n=downwell::CompactGuns::append(guns_.notices,guns_.noticeEnd);
+        if(!n)return run_.effectsSucceeded=false;
+        n->x=t.x;n->y=long(t.y+4)<<16;n->type=t.type;n->amount=t.amount;n->birth=tick_+1;
+    }
+    return true;
+}
+
+bool GameplayWorld::hitGunModule(const downwell::ContactBounds& shot,int damage,bool& consumed){
+    consumed=false;
+    for(unsigned i=0;i<guns_.moduleEnd;++i){auto& m=guns_.modules[i];
+        if(!m.live||!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(m.x,m.y,1,1,m.sprite())))continue;
+        if(m.objHp<=0)return true;
+        m.objHp-=damage;consumed=true;return true;
+    }
+    return true;
 }

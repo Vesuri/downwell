@@ -25,7 +25,7 @@ assert [line for line in field_body.splitlines() if line and not line.startswith
     "pushi.e 0", "pop.v.i self.ehp"]
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 458, 459, 460, 550, 568, 569, 585, 598, 702, 710}
+assert {int(row[0]) for row in records} == {31, 84, 133, 134, 139, 140, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 457, 458, 459, 460, 465, 466, 472, 473, 550, 568, 569, 585, 598, 702, 710}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
@@ -58,7 +58,7 @@ assert manifest["resources"]["objects"][293]["textureMaskId"] == -1
 # W1.3 scenery: Scattered16 sets mask_index=sprite_index at Create, Torch and
 # TorchFire use their sprites, breakablesDebris its explicit mask.
 for object_id, sprite, mask in ((289, 550, -1), (296, 568, -1), (295, 710, -1), (370, 91, 598),
-                                (261, 458, -1)):
+                                (261, 458, -1), (109, 139, 139), (267, 457, -1), (260, 465, 585)):
     assert manifest["resources"]["objects"][object_id]["spriteId"] == sprite
     assert manifest["resources"]["objects"][object_id]["textureMaskId"] == mask
 for object_id in (98, 278, 279):

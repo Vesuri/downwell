@@ -98,11 +98,14 @@
 #include "core/RunnerStepSnapshot.h"
 #include "core/CompactRoomEffects.h"
 #include "core/CompactScenery.h"
+#include "core/CompactGuns.h"
+#include "core/RangedShot.h"
+#include "core/GunTable.h"
 
 #include <cstdint>
 
 enum {
-    gameplayWorldBulletCapacity = downwell::gameplayBulletCapacity,
+    gameplayWorldBulletCapacity = downwell::gameplayCompactBulletCapacity,
     gameplayWorldDestroyedCapacity = downwell::gameplayRepaintCapacity,
     gameplayWorldEnemyCapacity = 64,
     gameplayWorldGemCapacity = downwell::gameplayGemCapacity
@@ -172,6 +175,26 @@ public:
         downwell::MachineGunSourceMotion sourceMotion{};
         bool sourceOwned=false;
         bool hitIgnore=false;
+        // W1.4 compact guns: kind 0 is the retained usual-gun trajectory,
+        // 1 bulletRanged (261), 2 bulletLaser (260). Stats are bulPropertyCheck's
+        // birth copy (bdmg, sprite), not the live gun.
+        enum Kind : unsigned char {legacy=0,ranged=1,laser=2};
+        unsigned char kind=legacy;
+        int damage=9,sprite=459;
+        downwell::RangedShot shot{};
+        // bulletLaser: hitIgnoreCheck memory (enemy lifetimes) and wallMet.
+        std::uint32_t laserHits[4]{};
+        unsigned char laserHitCount=0;
+        bool wallMet=false;
+        // Offline frame ID: the nearest quarter turn of image_angle (bDir)
+        // in the high byte; bulletLaser never sets image_angle. The usual
+        // gun's 267..273 spread is pixel-proven against the 270 page; other
+        // guns' turns are nearest-page approximations (W1.4 note).
+        unsigned drawFrame()const{
+            if(kind==legacy)return 768+animation.frame();
+            if(kind==laser)return shot.frame();
+            return (((shot.direction+0x20000000u)>>30)&3u)*256+shot.frame();
+        }
     };
     using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
     // How the crawler, snail and walker records hold their coordinates. The
@@ -1657,7 +1680,7 @@ public:
             const auto slot=cursor.take();
             auto* bullet=const_cast<BulletState*>(resolveBulletLifetime({slot-first,identity(slot)}));
             if(!bullet||!run_.effectsSucceeded)return false;
-            if(!bullet->animation.advance())return run_.effectsSucceeded=false;
+            if(!advanceBulletAnimation(*bullet))return run_.effectsSucceeded=false;
         }while(cursor.within(first,last));
         return true;
     }
@@ -2210,6 +2233,7 @@ public:
         if ((command.objectId == 289 || command.objectId == 293 || command.objectId == 296) &&
             compactRoomEffectsAdmitted)
             return createCompactScenery(command);
+        if (command.objectId == 109 && compactGunsAdmitted) return createGunModule(command);
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;
@@ -2940,6 +2964,10 @@ private:
     bool breakableIndexReady_ = false;
     std::uint16_t breakableIndex_[64 * 512];
     int indexedBreakable(int x, int y) const;
+    // W1.4 point query: the live, unretired box whose 16x16 cell holds (x,y).
+    // Uses the cell index when ready; the native-box build has none, so it
+    // scans as bulletSolidContact does.
+    int breakableAt(int x, int y) const;
     unsigned blocksDestroyed_;
     std::uint64_t checkpoint_;
     downwell::StateDigest trajectory_;
@@ -2996,6 +3024,36 @@ private:
     unsigned sceneryRepaintCount_=0;
     struct BoxOps;
     struct SceneryOps;
+    // Compact guns (W1.4): the seven bStatInitLevel1 guns, their shots,
+    // casings, laser trails, GunModule pickups and their texts.
+    downwell::CompactGuns guns_;
+    int aimAngle_=0;           // objPlayer_n.aimAngle (scrAimControl)
+    int shotAngle_=270;        // scrPlayerShootN's shotAngle, reused by Alarm 3
+    int burstAlarm_=-1;        // objPlayer_n alarm[3] (scrBurstFire)
+    unsigned burstCount_=0;
+    bool gunsActive_()const{return compactGunsAdmitted;}
+    const downwell::GunStats& currentGun()const{return downwell::gunStats(run_.gunType,run_.gemHigh);}
+    BulletState* birthBullet(int x,int y,int sprite);
+    bool emitPlayerBullets(int muzzleX,int muzzleY,int playerY,int angle,bool lastGetsLaserSight);
+    bool createCompactBullet(int x,int y,int angle,bool laserSight);
+    bool firePlayerGun(int playerX,int playerY,int muzzleX,int muzzleY);
+    bool burstFire();
+    bool advanceBulletAnimation(BulletState& bullet);
+    bool stepRangedBullet(BulletState& bullet,long generationCameraY);
+    bool stepLaserBullet(BulletState& bullet,long generationCameraY);
+    bool bulletEnemyContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed);
+    bool bulletSolidContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed);
+    bool createGunModule(const downwell::DeferredCreateInstance& command);
+    bool advanceCompactGunAlarms();
+    bool advanceCompactGunAnimation();
+    bool stepGunModules();
+    bool stepCasings();
+    bool stepModuleTexts();
+    bool collideGunModules();
+    bool pickupGunModule(downwell::CompactGunModuleRecord& module);
+    bool retireCompactGuns(long viewTopQ12);
+    bool drawCompactGunTexts();
+    bool hitGunModule(const downwell::ContactBounds& shot,int damage,bool& consumed);
     bool resetCompactScenery();
     bool createCompactScenery(const downwell::DeferredCreateInstance& command);
     bool advanceCompactSceneryAlarm(unsigned alarm);
@@ -3016,6 +3074,9 @@ public:
     const CompactEffects& compactEffects()const{return compactEffects_;}
     const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity>& compactDebris()const{return compactDebris_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
+    const downwell::CompactGuns& compactGuns()const{return guns_;}
+    int gunType()const{return run_.gunType;}
+    int aimAngle()const{return aimAngle_;}
     // Current builder art for one generated scenery decoration, by its
     // Create position. False: the instance no longer draws (destroyed).
     bool sceneryAppearance(int objectId,int x,int y,int& sprite,int& frame)const;
@@ -3042,6 +3103,9 @@ public:
     // Likewise for references predating W1.3's box bursts and builder
     // scenery: boxes keep the removal-only subset, 289/293/296 stay inert.
     static inline bool compactRoomEffectsAdmitted=true;
+    // Likewise for references predating W1.4: the retained usual-gun shot
+    // (legacy trajectory, no casing, shake or nonAuto) and an inert 109.
+    static inline bool compactGunsAdmitted=true;
     // objBuilder.endReached, published by the generation frontend.
     void publishGenerationEndReached(bool reached){generationEndReached_=reached;}
     // Red-ball Draw's eye, after the most recent Step. False when absent or

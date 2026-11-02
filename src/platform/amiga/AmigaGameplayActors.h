@@ -14,6 +14,9 @@ static constexpr UWORD gameplayRayMarker = 65535;
 static constexpr UWORD gameplayDamageTextMarker = 65534;
 // Clipped opaque-black rectangle: frame=width, flip=height. Never a sprite.
 static constexpr UWORD gameplayBlackRectMarker = 65533;
+// scrDrawBorderTextBlack glyph: frame=offline glyph ID (origin (4,0)), x/y
+// its anchor, flip the fill pen. Four black neighbours, then the fill.
+static constexpr UWORD gameplayGlyphMarker = 65532;
 static constexpr UWORD gameplayDitherEdge = 65006;
 struct GameplayBob {
     UWORD sprite, frame; int x, y, flip;

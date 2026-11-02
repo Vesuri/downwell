@@ -502,6 +502,9 @@ struct RunSession {
     }
     SideCameraLockers sideCameraLockers;
     bool gemHigh = false;
+    // global.pGunType: styleUpdate selects the machine gun; GunModule
+    // pickups change it for the rest of the run, across levels.
+    int gunType = 0;
     // Begin Step owns this selection; pickups later in the tick must not
     // change it early. Retain the derived profile until its input changes.
     unsigned weaponSelectionStreak = 0;
@@ -813,6 +816,7 @@ struct RunSession {
         effectsSucceeded=true;
         if(!sideCameraLockers.clear()){effectsSucceeded=false;return;}
         gemHigh = false;
+        gunType = 0;
         levelExit = {};
         goalField = {};
         startField = {};startFieldPresent=false;

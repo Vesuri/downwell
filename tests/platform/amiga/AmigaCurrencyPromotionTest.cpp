@@ -72,6 +72,7 @@ int main(int argc,char** argv){
     // spawner and room effects; both would draw RNG only on the native side.
     GameplayWorld::compactSpawnerAdmitted=false;
     GameplayWorld::compactRoomEffectsAdmitted=false;
+    GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
     verifyEnemyWitnessRetirement();
     bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false,enemyWitness=false;
     for(int i=1;i<argc;++i){

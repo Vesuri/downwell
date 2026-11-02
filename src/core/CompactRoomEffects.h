@@ -23,7 +23,10 @@ public:
             case 118:count=8;return true;  // sprSuperFlash (opened gem chunk)
             case 571:count=5;return true;  // sprChunkSparkle1
             case 572:count=4;return true;  // sprChunkSparkle2
-            case 603:count=1;return true;  // sprFxBoingball (box breaks)
+            case 111:count=8;return true;  // sprFxAmmoCharge (GunModule pickup)
+            case 601:count=12;return true; // sprFxExMuzzleSmoke (gem-high laser muzzle)
+            case 602:count=1;return true;  // sprFxBoingRed (gem-high muzzle)
+            case 603:count=1;return true;  // sprFxBoingball (box breaks, usual muzzle)
             case 605:count=3;return true;  // sprFxImpactSplosion (shootable hits)
             case 704:count=6;return true;  // sprFxRedSplash (steering deaths)
             default:count=0;return false;

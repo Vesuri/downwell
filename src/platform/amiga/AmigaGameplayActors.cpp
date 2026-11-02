@@ -60,6 +60,24 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
             rows.damage(origin,bob.y,bob.flip,(UBYTE)(1u<<buffer));
             continue;
         }
+        if(bob.sprite==gameplayGlyphMarker){
+            AmigaHardware::blitterDrain();
+            AmigaRenderer textRenderer=renderer;textRenderer.blitterEnabled=0;
+            static const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+            for(unsigned pass=0;pass<5;++pass){
+                amigaRendererDrawAssetPen(&textRenderer,pack,packEnd,bob.frame,0,bob.x+dx[pass],bob.y+dy[pass],0,
+                    pass==4?unsigned(bob.flip):0u);
+#ifdef DOWNWELL_SCENE_VERIFY
+                amigaRendererDrawAssetPen(&oracle,pack,packEnd,bob.frame,0,bob.x+dx[pass],bob.y+dy[pass],0,
+                    pass==4?unsigned(bob.flip):0u);
+#endif
+            }
+            int top=bob.y-1,bottom=bob.y+11;
+            if(top<0)top=0;
+            if(bottom>downwellDisplayHeight)bottom=downwellDisplayHeight;
+            if(bottom>top)rows.damage(origin,top,bottom-top,(UBYTE)(1u<<buffer));
+            continue;
+        }
         if(bob.sprite==gameplayDamageTextMarker){
             DW_PROFILE_SCOPE(profileDamageNumberDraw);
             AmigaHardware::blitterDrain();

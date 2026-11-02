@@ -1,7 +1,8 @@
 # Usual-gun motion arithmetic
 
-The authority is object 261's `bulletStandard` Step assembly, not host libm
-or the previous fixed-point trajectory. `verify-machine-gun.py` checks both
+The authority is object 261's Step assembly (`bulletRanged`, the object
+`bStatInitLevel1` gives the usual gun; 257 is the separate `bulletStandard`),
+not host libm or the previous fixed-point trajectory. `verify-machine-gun.py` checks both
 usual-gun profiles (speed 8, spread 3), Laser Sight's birth-time override,
 initialization, muzzle Create and solid-query/movement order against the pinned
 UTMT 0.9.2.0 export.
@@ -1310,3 +1311,17 @@ verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,
 unrounded query endpoints, negative and deep coordinates, unsupported inputs,
 and the non-equivalence of rounding at the native local origin.
+
+## Compact world guns (W1.4)
+
+The Amiga's compact `GameplayWorld` fires every `bStatInitLevel1` gun through
+`firePlayerGun`: six guns create `bulletRanged` 261 and the laser
+`bulletLaser` 260 (`RangedShot`, `stepLaserBullet`). `RangedShot` follows
+261's Create/Alarm 0/Step order and RNG draws (imgSp, bSpeed, the first-Step
+spread) but uses its own 32-bit fixed point (Q20 positions and speed, Q32
+turns, Q15 trig products) so the 68000 build links no 64-bit helpers; it is
+not the binary64 path above. The registered `MachineGunSourceMotion` path
+and the SDL `StartupRuntime` keep the retained usual-gun trajectory.
+`GunTable.h` holds both gun levels; `tools/verify-gun-table.py` checks it
+against the pinned export.
+

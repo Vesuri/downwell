@@ -23,7 +23,8 @@ public:
         }
     };
 private:
-    static constexpr unsigned sprites=741,pages=4,capacity=512;
+    // W1.4 gun art: 592 cavern and 622 reference frames (was under 512).
+    static constexpr unsigned sprites=741,pages=4,capacity=640;
     UWORD base_[sprites][pages]{};
     UWORD span_[sprites][pages]{};
     Frame frames_[capacity]{};

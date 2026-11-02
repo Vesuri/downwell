@@ -189,6 +189,8 @@ public:
         positionPublisher_=publish; positionContext_=context;
     }
     void setPlayerHealth(int health) { playerHealth_ = health; }
+    // GunModule Create rejects global.pGunType when choosing its gun.
+    void setPlayerGun(int gun) { playerGun_ = gun; }
     int generationCount() const { return generationCount_; }
     std::uint32_t rowsGenerated() const { return rowsGenerated_; }
     int rightRoom(unsigned index) const {
@@ -275,6 +277,7 @@ private:
     int endPattern_ = -1;
     int chunkOrCrate_ = 0;
     int playerHealth_ = 4;
+    int playerGun_ = 0;
     std::uint32_t specialObjectsGenerated_ = 0;
 };
 

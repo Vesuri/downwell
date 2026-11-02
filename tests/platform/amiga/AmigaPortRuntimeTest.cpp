@@ -762,8 +762,8 @@ int main() {
             }
         }
     }
-    static_assert(AmigaPortRuntime::bulletCapacity == 16,
-                  "bullet simulation capacity matches SDL, not DMA channels");
+    static_assert(AmigaPortRuntime::bulletCapacity == downwell::gameplayCompactBulletCapacity,
+                  "bullet simulation capacity follows the compact guns, not DMA channels");
     static_assert(AmigaPortRuntime::gemCapacity == 64,
                   "gem simulation capacity matches SDL");
     auto crowdedRewardsStorage=std::make_unique<AmigaPortRuntime>(300);

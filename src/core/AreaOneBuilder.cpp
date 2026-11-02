@@ -1,4 +1,5 @@
 #include "AreaOneBuilder.h"
+#include "core/GunTable.h"
 #include "BuilderRewardChoice.h"
 #include "CavernEnemyChoice.h"
 #include "EnemyCreateProfile.h"
@@ -178,13 +179,15 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.imageSpeed = 0.0F;
         command.alarms.set(0, 10);
         command.alarms.set(3, 10);
-        random.chooseIndexSmall(2);
-        // GunModule Create overwrites moduleType at low health, but both
-        // choices still advance the stream before moduleNum is selected.
-        if (playerHealth_ <= 2) random.chooseIndexSmall(7);
-        std::uint32_t module = 2;
-        while (module == 2)
-            module = random.irandomSmall(6);
+        // GunModule Create: moduleType = choose(0,1), overwritten at low
+        // health by choose(0,1,1,1,1,1,1). moduleNum = irandom(bulletMaxNum)
+        // until it differs from the player's current gun (global.pGunType).
+        std::uint32_t type = random.chooseIndexSmall(2);
+        if (playerHealth_ <= 2) type = random.chooseIndexSmall(7) ? 1u : 0u;
+        std::uint32_t module;
+        do module = random.irandomSmall(gunMaximumNumber);
+        while (static_cast<int>(module) == playerGun_);
+        command.setGunModule(type, module);
     }
     break;
     default: break;

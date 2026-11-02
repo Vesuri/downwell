@@ -2407,8 +2407,14 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     require(game.bindEncounterInput(&edges),"slice uses production input edges");
     LiveSceneWorld live(patterns,objects);
     live.bind(game,rooms,room);
-    std::ofstream tape("tmp/world-one-gameplay.inputs",std::ios::binary);
-    std::ofstream states("tmp/world-one-gameplay.states");
+    // The route's fire cadence phase. W1.4's shots draw RNG, so every policy
+    // change reshuffles the whole route; DOWNWELL_SLICE_VARIANT sweeps the
+    // phase (and DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
+    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):2u;
+    const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
+    std::ofstream tape(output+".inputs",std::ios::binary);
+    std::ofstream states(output+".states");
+    unsigned routePickups=0,routeNewGunShots=0;
     require(bool(tape),"open slice input tape");
     unsigned total=0;
     unsigned routeRedBalls=0,routeEyes=0,routeChunks=0;
@@ -2417,8 +2423,12 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         std::uint32_t lastSteering=0;unsigned jellies=0,redBalls=0,steeringKills=0,eyes=0;
         // W1.3: boxes, Scattered16, gem chunks and torches on the same route.
         std::set<std::pair<int,int>> brokenPlants,openedChunks,shotChunks,litTorches,doused,abandoned;
-        int detourX=0,detourY=0;unsigned detourTicks=0,escape=0,jumpHold=0;bool lastFire=false;
+        int detourX=0,detourY=0;unsigned detourTicks=0,escape=0,jumpHold=0;bool lastFire=false;long lastPlayerX=0;
         unsigned peakNoLoop=0,peakMoving=0,peakDebris=0,peakGems=0,peakPlants=0,splashes=0,boxBursts=0;
+        // W1.4: GunModule births/pickups, gun changes and the new shot owners.
+        unsigned modules=0,pickups=0,gunChanges=0,rangedShots=0,laserShots=0,casings=0,trails=0,notices=0;
+        unsigned peakBullets=0,peakCasings=0,peakTrails=0,lastModuleEnd=0,lastTextEnd=0;
+        std::set<std::uint32_t> seenShots;
         const unsigned blocksBefore=game.blocksDestroyed(),currencyBefore=game.currency();
         require(!game.finishWorldOneSlice(),"cannot finish before Result Alarm 1");
         for(;updates<8000&&!game.levelResultRequested()&&!game.dead();++updates){
@@ -2455,26 +2465,36 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             const bool stompable=threatObject==111||threatObject==112||threatObject==113||
                 threatObject==115||threatObject==116;
             int steer=target;
-            if(below&&(stompable||(threatObject==118&&threatY>28)))steer=x+threatX;
+            // W1.4: the semi-automatic guns keep their distance from red balls.
+            const bool chargeRedBall=threatObject==118&&threatY>28&&game.gunType()==0;
+            if(below&&(stompable||chargeRedBall))steer=x+threatX;
             else if(below&&threatY<=40)steer=threatX>0?x-24:x+24;
             else if(beside)steer=threatX>0?x-24:x+24;
             else if(chased&&std::abs(target-x)<24)steer=chaserX>0?x-32:x+32;
             downwell::Input input;
             input.left=x>steer+2;input.right=x<steer-2;
-            input.fire=updates%40==0||updates%40==3;
-            if(stuck>=120)input.fire=updates%40==0||updates%40==3;
+            const unsigned cadence=(updates+variant)%40;
+            input.fire=cadence==0||cadence==3;
             if(chased)input.fire=false;
             if(below&&std::abs(threatX)<=12)input.fire=updates%4<2;
             // W1.3 detour: visit a gem chunk in a side room off the shaft, jump
             // onto it and shoot it open. Bounded per target.
             {
                 const auto& sc=game.compactScenery();
-                int sx=0,sy=0;bool scenery=false;
+                int sx=0,sy=0;bool scenery=false,module=false;
+                // W1.4: collect a resting GunModule in the side rooms first.
+                {const auto& g=game.compactGuns();
+                for(unsigned i=0;!scenery&&i<g.moduleEnd;++i){const auto& m=g.modules[i];
+                    if(m.live&&m.ysp==0&&!abandoned.count({m.x,m.y})&&m.y>=y-64&&m.y<=y+24&&std::abs(m.x-x)<=220)
+                        {scenery=module=true;sx=m.x;sy=m.y;}}}
                 for(unsigned i=0;!scenery&&i<sc.gemChunkEnd;++i){const auto& r=sc.gemChunks[i];
                     if(r.live&&!r.opened&&!abandoned.count({r.x,r.y})&&
                        (detourX==r.x&&detourY==r.y?std::abs(r.y-y)<=48:r.y>=y-16&&r.y<=y+120&&std::abs(r.x-x)<=200))
                         {scenery=true;sx=r.x;sy=r.y;}}
                 if(scenery){
+                    if(std::getenv("DOWNWELL_TRACE_SLICE_DETOUR")&&updates%20==0)std::cerr<<"DETOUR level="<<level<<" update="<<updates
+                        <<" target="<<sx<<','<<sy<<" module="<<module<<" player="<<x<<','<<y<<" grounded="<<game.player().grounded()
+                        <<" ticks="<<detourTicks<<" below="<<below<<" beside="<<beside<<" chased="<<chased<<'\n';
                     if(detourX!=sx||detourY!=sy){detourX=sx;detourY=sy;detourTicks=0;}
                     if(++detourTicks>600){abandoned.insert({sx,sy});escape=240;}
                     // Fight first: the normal threat rules own nearby enemies.
@@ -2483,12 +2503,15 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                         input={};input.left=x>sx+1;input.right=x<sx-1;
                         if(grounded){
                             // Release, then a held press for a full jump onto the chunk.
-                            if(std::abs(x-sx)<=24&&!lastFire){input.fire=true;jumpHold=1;}
+                            if(module){
+                                // Hop the room lip or onto a higher floor.
+                                if((sy<y-8||game.player().offsetXFixed()==lastPlayerX)&&!lastFire){input.fire=true;jumpHold=1;}
+                            }else if(std::abs(x-sx)<=24&&!lastFire){input.fire=true;jumpHold=1;}
                         }else if(jumpHold&&jumpHold<16){input.fire=true;++jumpHold;}
                         else{
                             jumpHold=0;
                             // Above it: stomp-shoot downwards like the threat rule.
-                            if(std::abs(x-sx)<=8&&y<sy)input.fire=updates%4<2;
+                            if(!module&&std::abs(x-sx)<=8&&y<sy)input.fire=updates%4<2;
                         }
                     }
                 }else if(detourX||detourY){detourX=detourY=0;escape=240;}
@@ -2505,7 +2528,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             if(level==1&&updates==0)input={};
             states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
-            lastFire=input.fire;
+            lastFire=input.fire;lastPlayerX=game.player().offsetXFixed();
             const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
             edges.sample(input);
             const int healthBefore=game.health();
@@ -2536,10 +2559,36 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                                 amigaResolveTerrainSolid(&live.collision,rx-240,ry-176)?'#':'.');
                             std::cerr<<'\n';
                         }}
+                {
+                    const auto& g=game.compactGuns();
+                    for(unsigned i=0;i<g.moduleEnd;++i)if(g.modules[i].birth==game.tick()-1||(i>=lastModuleEnd&&g.modules[i].live)){
+                        if(i>=lastModuleEnd){++modules;if(std::getenv("DOWNWELL_TRACE_SLICE_GUNS"))std::cerr<<"MODULE level="<<level
+                            <<" update="<<updates<<" type="<<g.modules[i].type<<" gun="<<g.modules[i].gun<<" at="<<g.modules[i].x<<','<<g.modules[i].y
+                            <<" player="<<x<<','<<y<<'\n';}}
+                    lastModuleEnd=g.moduleEnd;
+                    if(g.textEnd>lastTextEnd){pickups+=g.textEnd-lastTextEnd;
+                        if(std::getenv("DOWNWELL_TRACE_SLICE_GUNS"))std::cerr<<"PICKUP level="<<level<<" tick="<<game.tick()<<" gun="<<game.gunType()<<'\n';}
+                    lastTextEnd=g.textEnd;
+                    unsigned live=0;
+                    for(unsigned i=0;i<game.bulletSlotEnd();++i){const auto& b=game.bulletAt(i);
+                        if(!b.active)continue;++live;
+                        if(seenShots.insert(b.lifetimeId).second){
+                            if(game.gunType()!=0)++routeNewGunShots;
+                            if(b.kind==GameplayWorld::BulletState::ranged)++rangedShots;
+                            else if(b.kind==GameplayWorld::BulletState::laser){++laserShots;
+                                if(std::getenv("DOWNWELL_TRACE_SLICE_GUNS")&&laserShots<=3)std::cerr<<"LASER level="<<level<<" tick="<<game.tick()<<'\n';}}}
+                    unsigned liveCasings=0,liveTrails=0;
+                    for(unsigned i=0;i<g.casingEnd;++i)if(g.casings[i].live){++liveCasings;if(g.casings[i].birth==game.tick()-1)++casings;}
+                    for(unsigned i=0;i<g.trailEnd;++i)if(g.trails[i].live){++liveTrails;if(g.trails[i].birth==game.tick()-1)++trails;}
+                    for(unsigned i=0;i<g.noticeEnd;++i)if(g.notices[i].birth==game.tick())++notices;
+                    peakBullets=std::max(peakBullets,live);peakCasings=std::max(peakCasings,liveCasings);peakTrails=std::max(peakTrails,liveTrails);
+                }
                 for(unsigned i=0;i<fx.movingCount();++i)
                     if(fx.moving(i).effect.spriteId==704&&fx.moving(i).effect.imageIndex.bits==0)++splashes;
-                for(unsigned i=0;i<fx.noLoopCount();++i)
-                    if(fx.noLoop(i).effect.spriteId==603&&fx.noLoop(i).effect.imageIndex.bits==0)++boxBursts;
+                // W1.4: 603 is also the usual gun's muzzle, which faces 270
+                // (+/- aim); box bursts are unrotated.
+                // W1.4: the box burst's 603 (0.5, 270, -60000) is also the usual
+                // gun's muzzle, so count it with the box: one per destruction.
                 for(unsigned i=0;i<sc.scatteredEnd;++i)if(sc.scattered[i].live&&sc.scattered[i].spriteId==551)
                     brokenPlants.insert({sc.scattered[i].x,sc.scattered[i].y});
                 const bool traceEvents=std::getenv("DOWNWELL_TRACE_SLICE_EVENTS")!=nullptr;
@@ -2565,6 +2614,19 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 if(!e.active&&e.health<=0&&std::find(liveSteering.begin(),liveSteering.end(),e.lifetimeId)!=liveSteering.end())
                     ++steeringKills;
             }
+            if(const char* window=std::getenv("DOWNWELL_TRACE_SLICE_TICKS")){
+                const unsigned from=unsigned(std::atoi(window)),to=from+16;
+                if(game.tick()>=from&&game.tick()<=to){
+                    std::cerr<<"TICK "<<game.tick()<<" rng="<<game.randomDrawCount()<<" blocks="<<game.blocksDestroyed()
+                        <<" gems="<<game.gemSlotEnd()<<" player="<<x<<','<<y<<" fire="<<input.fire;
+                    for(unsigned i=0;i<game.bulletSlotEnd();++i){const auto& b=game.bulletAt(i);
+                        if(b.active)std::cerr<<" shot"<<int(b.kind)<<'@'<<b.x+240<<','<<b.y+176;}
+                    for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                        if(e.active&&std::abs(240+e.x-x)<80&&std::abs(176+e.y-y)<200)
+                            std::cerr<<" obj"<<e.objectId<<'@'<<240+e.x<<','<<176+e.y<<"hp"<<e.health;}
+                    std::cerr<<'\n';
+                }
+            }
             if(std::getenv("DOWNWELL_TRACE_SLICE_DAMAGE")&&game.health()<healthBefore){
                 std::cerr<<"DAMAGE level="<<level<<" update="<<updates<<" hp="<<game.health()<<" player="<<x<<','<<y
                     <<" stuck="<<stuck<<" ammo="<<game.player().ammo()<<" below="<<below<<" steer="<<steer;
@@ -2584,11 +2646,15 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 require(false,"slice update succeeds");
             }
         }
-        std::cout<<"Slice level="<<level<<" boxes="<<game.blocksDestroyed()-blocksBefore<<" boxBursts="<<boxBursts
+        (void)boxBursts;
+        std::cout<<"Slice level="<<level<<" boxes="<<game.blocksDestroyed()-blocksBefore
             <<" plants="<<brokenPlants.size()<<" chunksShot="<<shotChunks.size()<<" chunksOpened="<<openedChunks.size()
             <<" torches="<<litTorches.size()<<" doused="<<doused.size()<<" splashes="<<splashes
             <<" currency="<<game.currency()-currencyBefore<<" peak noLoop="<<peakNoLoop<<" moving="<<peakMoving
             <<" debris="<<peakDebris<<" gems="<<peakGems<<" plants="<<peakPlants<<std::endl;
+        std::cout<<"Slice level="<<level<<" modules="<<modules<<" pickups="<<pickups<<" gun="<<game.gunType()
+            <<" ranged="<<rangedShots<<" laser="<<laserShots<<" casings="<<casings<<" trails="<<trails<<" notices="<<notices
+            <<" peak bullets="<<peakBullets<<" casings="<<peakCasings<<" trails="<<peakTrails<<std::endl;
         std::cout<<"Slice level="<<level<<" jellies="<<jellies<<" redBalls="<<redBalls
             <<" steeringKills="<<steeringKills<<" eyeFrames="<<eyes<<std::endl;
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
@@ -2597,8 +2663,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         if(level==1)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
         if(level>=2){routeRedBalls+=redBalls;routeEyes+=eyes;}
         if(level==3)require(routeRedBalls&&routeEyes,"1-2/1-3 spawn red balls with drawn eyes");
-        routeChunks+=openedChunks.size();
+        routeChunks+=openedChunks.size();routePickups+=pickups;
         if(level==3)require(routeChunks,"the route opens a gem chunk");
+        if(level==3)require(routePickups&&routeNewGunShots,"the route collects a GunModule and fires its gun");
         require(!game.dead()&&game.levelResultRequested(),"input-only slice reaches exit alive");
         bool heart=false;require(game.enterLevelClear(0,heart),"slice Result Create");
         unsigned clear=0;

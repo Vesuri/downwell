@@ -4,11 +4,14 @@
 namespace downwell {
 // Simulation storage must not depend on the target's hardware sprite count.
 constexpr unsigned gameplayBulletCapacity = 16;
+// The compact world's seven guns: a gem-high SHOTGUN shot alone is sixteen
+// bulletRanged pellets, alive for about two dozen Steps.
+constexpr unsigned gameplayCompactBulletCapacity = 32;
 constexpr unsigned gameplayGemCapacity = 64;
 // Background cells repainted after one update: a box per bullet, the
 // player's head break, and scenery whose builder art changed.
 constexpr unsigned gameplaySceneryRepaintCapacity = 32;
-constexpr unsigned gameplayRepaintCapacity = gameplayBulletCapacity + 1 + gameplaySceneryRepaintCapacity;
+constexpr unsigned gameplayRepaintCapacity = gameplayCompactBulletCapacity + 1 + gameplaySceneryRepaintCapacity;
 // Compact scrEffectSpawn (219) and emitMovingFx (220) records per room.
 constexpr unsigned gameplayCompactNoLoopCapacity = 16, gameplayCompactMovingCapacity = 48;
 // Compact object-370 debris (two per box, scenery bursts).

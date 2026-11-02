@@ -93,7 +93,10 @@ SELECTIONS = {
         127: None,   # sprTouchWide (generated wide trigger presentation)
         133: None,   # sprGemSmall
         134: None,   # sprGemLarge
+        111: None,   # sprFxAmmoCharge: GunModule pickup effect
         139: None,   # sprModBtry
+        140: None,   # sprModHeart
+        141: None,   # sprModText: GunModule gun letters
         143: [1],    # cased battery
         147: [1],    # cased car battery
         149: [1],    # cased curry
@@ -129,9 +132,14 @@ SELECTIONS = {
         208: None,   # sprEnmSkeletonIdle
         278: None,   # sprCrawler
         369: None,   # bgNightsky
+        457: None,   # sprBulletLeak: bulletCasing
         458: None,   # sprBulScatter2 (six-frame gem-high projectile)
         459: None,   # sprBulScatter1 (six-frame usual gunboot projectile)
         460: None,   # sprSkeletonBone
+        465: None,   # laser projectile and trail, gem-high
+        466: None,   # laser projectile and trail
+        472: None,   # spread-gun projectile
+        473: None,   # spread-gun projectile, gem-high
         471: None,   # sprBlast: fourteen frames, offline mirrored planar art
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
@@ -156,9 +164,11 @@ SELECTIONS = {
         711: None,   # sprFxFireRed (TorchFire particles)
         712: None,   # sprFxFireWhite
         83: None,    # sprFxSmallSmoke (doused TorchFire particles)
+        601: None,   # gem-high laser muzzle
         602: None,   # sprFxBoingRed (gem-high muzzle)
         603: None,   # sprFxBoingball (usual gunboot muzzle)
         605: None,   # sprFxImpactSplosion: blast impact, three frames
+        713: None,   # sprItemNotif: battery/heart notice icon
         631: None,   # sprTree
         635: None,   # sprGrass
         636: None,   # sprGrass2
@@ -234,6 +244,11 @@ CREDIT_TEXT_ANCHOR_X = {
 TEXT_SELECTIONS["game"].update({65100 + value: str(value)
                                 for value in range(10)})
 TEXT_SELECTIONS["game"][65110] = "-"  # Moving damage text uses the same font bank.
+# W1.4 moduleText/itemNotif: the gun-name letters of bStatInitLevel1 and the
+# notice's "+", single font-2 glyphs at 65120 + (letter - 'A') and 65111.
+GUN_TEXT_LETTERS = "ABCEGHILMNOPRSTUY"
+TEXT_SELECTIONS["game"][65111] = "+"
+TEXT_SELECTIONS["game"].update({65120 + ord(letter) - ord("A"): letter for letter in GUN_TEXT_LETTERS})
 
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield
@@ -695,7 +710,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
                     458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605,
-                    83, 118, 571, 572, 704, 711, 712):
+                    83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -703,7 +718,12 @@ def build_records(manifest, extracted, profile, language_path=None):
                 if gun_spread:
                     require(not sprite["smooth"], "spread proof requires nearest-sampled source artwork")
                     verify_projectile_spread_pixels(canvas, sprite["originX"], sprite["originY"])
-                turns = (0, 3) if gun_spread or sprite_id == 605 else range(2 if snail else 4 if sprite_id in (278, 704) else 1)
+                # W1.4 guns: bulletRanged and the muzzle face 270 +/- aim
+                # (at most 25 degrees), so only the 270 page is reachable.
+                # Unlike 458/459 these keep nearest-turn art without a
+                # per-angle pixel proof (docs/open-work.md W3/WR note).
+                w14_turned = sprite_id in (472, 473, 601)
+                turns = (3,) if sprite_id == 601 else (0, 3) if gun_spread or w14_turned or sprite_id == 605 else range(2 if snail else 4 if sprite_id in (278, 704) else 1)
                 for turn in turns:
                     if turn == 0:
                         variant = canvas
@@ -723,12 +743,12 @@ def build_records(manifest, extracted, profile, language_path=None):
                         for _ in range(turn):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
-                    if bounds is None and sprite_id in (83, 118, 571, 572, 704, 711, 712):
+                    if bounds is None and sprite_id in (83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111):
                         # Fading room effects end on blank frames: keep a
                         # one-pixel transparent frame at the anchor.
                         bounds = (ox, oy, ox + 1, oy + 1)
                     require(bounds is not None, "empty oriented actor frame")
-                    if gun_spread or sprite_id in (83, 84, 85, 101, 118, 181, 182, 183, 184, 185, 571, 572, 702, 703, 704, 711, 712):
+                    if gun_spread or w14_turned or sprite_id in (111, 83, 84, 85, 101, 118, 181, 182, 183, 184, 185, 571, 572, 702, 703, 704, 711, 712):
                         # Projectile art and smoke's final single-pixel frame
                         # can sit beyond their origin. Keep that anchor inside
                         # the DMA frame when cropping, without moving pixels.
@@ -755,7 +775,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                     # fxSmoke also leaves image_xscale at its default +1.
                     # Room effects (sparkles, flash, splash, fire, small
                     # smoke) never set image_xscale either.
-                    facings = (False,) if gun_spread or sprite_id in (83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
+                    facings = (False,) if gun_spread or w14_turned or sprite_id in (111, 457, 83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
                                                                        605, 704, 711, 712) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
@@ -922,7 +942,7 @@ def build_records(manifest, extracted, profile, language_path=None):
         glyphs = {glyph["character"]: glyph
                   for glyph in manifest["resources"]["fonts"][2]["glyphs"]}
         require(all(glyphs[ord(digit)]["shift"] == 8 and not glyphs[ord(digit)]["kernings"]
-                    for digit in "-0123456789"),
+                    for digit in "-0123456789+" + GUN_TEXT_LETTERS),
                 "native numeric text requires eight-pixel advances without kerning")
     texts = (shop_texts(language_path) if profile == "shop" else
              clear_texts(language_path) if profile == "clear" else TEXT_SELECTIONS.get(profile, {}))

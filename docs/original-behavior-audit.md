@@ -1287,9 +1287,11 @@ claim hard-mode fidelity.
 ## Side-room reward selection at low health
 
 `gml_GlobalScript_scrBuilder.asm`, blocks 141–152, first chooses/alternates
-resource 293 (gem chunk) and 109 (crate). At `global.playerHp <= 2`, a selected
-non-crate consumes `choose(0,1,1,1,1,1)` and switches to a crate on nonzero.
-Only afterward does style 1 force a crate. The low-health random draw must
+resource 293 (gem chunk) and 109 (`GunModule`; earlier notes called it a
+crate). At `global.playerHp <= 2`, a selected non-module consumes
+`choose(0,1,1,1,1,1)` and switches to a module on nonzero. Only afterward
+does style 1 force a module. (The module's own heart/battery type and gun are
+separate draws at its creation.) The low-health random draw must
 still occur for that style; suppressing it changes all subsequent generation.
 The chosen result, including overrides, remains the next alternation state.
 
@@ -1314,7 +1316,7 @@ startup is restored, both 68000 audits pass, and SDL is rebuilt. Evidence:
 `/tmp/downwell-reward-bias-sdl.log`. These live routes are surrounding
 regressions, not dedicated coverage of every low-health reward branch.
 
-This verifies which reward object is created, not complete crate contents,
+This verifies which reward object is created, not complete module contents,
 pickup effects or original-runner presentation. The discrepancy was found
 while auditing the shared builder ahead of area-two implementation; the
 later-area transition remains deliberately disabled until its own builder,

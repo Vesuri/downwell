@@ -20,6 +20,9 @@ GAME_IDS = frozenset({
     208, 278, 458, 459, 460, 471, 480, 481, 482, 485, 486, 487, 496,
     497, 550, 551, 568, 569, 570, 571, 572, 602, 603, 605, 702, 703, 704, 707,
     711, 712, 83, 118,
+    # W1.4 guns: modules, letters, casing, laser/spread shots, muzzle,
+    # pickup effect and notice icon.
+    111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
     # Pre-mirrored planar forms.
     62000, 62001, 62003, 62012, 62015, 62027, 62031, 62037, 62096,
     62127, 62139, 62153, 62154, 62157, 62162, 62163, 62164, 62166,
@@ -36,6 +39,8 @@ GAME_IDS = frozenset({
     # World dither edge and native text assets.
     65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
     65108, 65109, 65110,
+    # W1.4 bordered gun-name letters and the notice's "+".
+    65111, *(65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'),
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
@@ -44,7 +49,7 @@ GAME_IDS = frozenset({
 # the full-catalogue reference oracles load it; production gameplay leases
 # the cavern banks below.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 96 * 1024,
-                'game': 240 * 1024, 'game-planes': 116 * 1024}
+                'game': 264 * 1024, 'game-planes': 124 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -59,14 +64,20 @@ CAVERN_ROOTS = frozenset({
     177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 278, 458, 459,
     471, 480, 481, 482, 485, 486, 487, 496, 497, 550, 551, 568, 569,
     570, 571, 572, 602, 603, 605, 702, 703, 704, 707, 711, 712, 83, 118,
+    111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
     {65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
-     65108, 65109, 65110}) & GAME_IDS
+     65108, 65109, 65110, 65111} |
+    {65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'}) & GAME_IDS
 # W1.3 room effects (gem chunk, sparkles, flash, red splash turns, fire,
 # small smoke) raised the measured DMA atlas from 106,574 to 109,410 bytes.
-BANK_BUDGETS.update({'cavern': 224 * 1024, 'cavern-planes': 108 * 1024})
+# W1.4 gun art (modules, letters, casing, laser and spread shots, the laser
+# muzzle's 270 page, the cropped pickup effect, notice icon and glyphs) adds
+# 17,762 bytes: 228,948 -> 246,710 CPU, and 8,334 Chip plane bytes:
+# 109,410 -> 117,744. Planar BOBs only, no DMA streams.
+BANK_BUDGETS.update({'cavern': 248 * 1024, 'cavern-planes': 116 * 1024})
 
 
 def require_budget(bank, size):

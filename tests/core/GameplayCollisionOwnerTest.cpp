@@ -1093,6 +1093,7 @@ int main(){
     // W1.3's box bursts and builder scenery (their debris needs wall and
     // platform contacts).
     GameplayWorld::compactRoomEffectsAdmitted=false;
+    GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
 #ifdef DOWNWELL_FRAME_WORK_TEST
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());

@@ -167,7 +167,16 @@ test-moving-fx: build/moving-fx-test
 build/moving-fx-test: tests/core/MovingFxTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
-test: test-compact-scenery
+test: test-compact-scenery test-compact-guns verify-gun-table
+.PHONY: test-compact-guns verify-gun-table
+test-compact-guns: build/compact-guns-test
+	./build/compact-guns-test
+build/compact-guns-test: tests/core/CompactGunsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CompactGunsTest.cpp src/core/GameMakerRandom.cpp
+# GunTable.h against bStatInitLevel1 in the pinned UTMT export.
+verify-gun-table:
+	python3 tools/verify-gun-table.py
 .PHONY: test-compact-scenery
 test-compact-scenery: build/compact-scenery-test
 	./build/compact-scenery-test

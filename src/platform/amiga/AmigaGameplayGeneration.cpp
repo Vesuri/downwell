@@ -239,6 +239,7 @@ bool AmigaGameplayGeneration::step(downwell::GameMakerRandom& random, int viewBo
     dirtyFirst = worldRows; dirtyEnd = 0;
     if (!runtime_) return false;
     builder_.setPlayerHealth(runtime_->health());
+    builder_.setPlayerGun(runtime_->gunType());
     builder_.setPositionPublisher([](void* opaque,int x,int y){
         return static_cast<AmigaPortRuntime*>(opaque)->publishBuilderPosition(x,y);
     },runtime_);

@@ -99,6 +99,19 @@ public:
         return true; // Source emits effects even if rounding produces zero.
     }
     // comboRewardText Create increases global.ammo and refills global.stammo.
+    // Opt-in per-gun rules for scrPlayerShootN/scrUpButtonFunctions (the
+    // compact world's seven guns). Unconfigured motion keeps the usual-gun
+    // adapter: release always clears shotDelay and nonAuto is never set.
+    void configureGun(int consumption, int rof, bool delayKill, int recoilFifths) {
+        gunRules_ = true; gunConsumption_ = consumption; gunRof_ = rof;
+        gunDelayKill_ = delayKill; gunRecoilFifths_ = recoilFifths;
+    }
+    bool nonAuto() const { return nonAuto_; }
+    // scrBurstFire: ysp = global.pBulRecoil, unconditionally.
+    void setVerticalSpeedFifths(long value) {
+        speedY_ = value / 5; gravityRemainder_ = static_cast<int>(value % 5);
+    }
+    // GunModule battery: global.ammo += 2; global.stammo = global.ammo.
     void increaseAmmoCapacity(unsigned amount) {
         ammoCapacity_ += static_cast<int>(amount);
         ammo_ = ammoCapacity_;
@@ -158,6 +171,8 @@ private:
     int pixelY_;
     int ammo_;
     int ammoCapacity_ = 8;
+    bool gunRules_ = false, gunDelayKill_ = true, nonAuto_ = false;
+    int gunConsumption_ = 1, gunRof_ = 7, gunRecoilFifths_ = 0;
     ComboCompletion comboCompletion_ = nullptr;
     void* comboContext_ = nullptr;
     bool comboTimeStopped_ = false;
