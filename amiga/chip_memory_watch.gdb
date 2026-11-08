@@ -2,7 +2,7 @@
 # catches transient AllocMem/FreeMem changes, including inside DOS file I/O.
 # SDK layout assertions live in framework/AmigaMemory.cpp. The normal ELF
 # need not retain a MemHeader debug type. Deliberately limited to one Chip
-# region, as used by the explicit 512 KiB A500 verification configuration.
+# region, as in the 1 MiB (ECS Agnus) and 512 KiB A500 configurations.
 set $chip_exec = (struct ExecBase *) *(unsigned long *)4
 set $chip_node = (unsigned char *) $chip_exec->MemList.lh_Head
 set $chip_header = (unsigned char *)0

@@ -19,7 +19,7 @@ case "$mode" in
     export DETERMINISTIC=1
     export STRIP=1 PROFILE_IDLE=1 PROFILE_FRAMES=600 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
-    export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
+    export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-1024}"
     export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-90}"
     if [[ $mode == quiet-state ]]; then
       # Stops at every update: state equivalence only, never timing evidence.

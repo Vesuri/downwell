@@ -44,9 +44,9 @@ families in the final disassembly. Ordinary 32-bit division currently uses the
 toolchain's 68000 implementation; hot occurrences can be removed later from
 profile evidence without changing the compatibility baseline.
 
-The current launcher gives that model 512 KiB of Chip RAM and an 8 MiB Fast RAM
-expansion so CPU compatibility can be tested independently of the final memory
-budget. `CHIP_MEMORY` and `FAST_MEMORY` can override those values. Reducing the
+The current launcher gives that model 1 MiB of Chip RAM behind the ECS
+8372A Agnus (the target machine) and an 8 MiB Fast RAM expansion, so CPU
+compatibility can be tested independently of the final Fast RAM budget. `CHIP_MEMORY` and `FAST_MEMORY` can override those values. Reducing the
 ordinary-memory footprint to a practical A500 configuration remains a separate
 measured task.
 

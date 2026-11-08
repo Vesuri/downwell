@@ -159,7 +159,7 @@ rejects malformed bank layouts. For the native pixel oracle, build with
 `PLANE_VERIFY=1 SKIP_TO_GAME=1` after `make clean`, then run:
 
 ```sh
-VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=60 \
+VERIFY_TIMEOUT_SECONDS=60 \
 GDB_SOURCE=verify_plane_bank.gdb READY_MARKER=DOWNWELL_PLANE_DMA_READY \
 bash amiga/verify_startup.sh
 ```

@@ -15,7 +15,7 @@ READY_MARKER="${READY_MARKER:-DOWNWELL_MENU_SPRITE_READY}"
 READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-120}"
 VERIFY_STACK_BYTES="${VERIFY_STACK_BYTES:-8192}"
-VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
+VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-1024}"
 VERIFY_PROGRAM="${VERIFY_PROGRAM:-out/Downwell}"
 case "$VERIFY_CHIP_KB" in
   512|1024) ;;
@@ -73,8 +73,12 @@ VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 # Quiet debug run (no sound, window behind the others): fsuae_options in $FSUAE_COMMON.
 KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB="$VERIFY_CHIP_KB" FAST_KB=8192 WARP=1 DEBUG=1
 echo "A500 verification: Chip=${CHIP_KB} KiB Fast=${FAST_KB} KiB"
+# 1 MiB Chip is an A500 with the ECS 8372A Agnus; 512 KiB keeps the OCS one.
+VERIFY_CHIPSET=ocs
+[ "$VERIFY_CHIP_KB" = 1024 ] && VERIFY_CHIPSET=ecs_agnus
 fsuae_options
 FSUAE_LOG="$RUN/fsuae-startup.log" fsuae_launch \
+  --uae_chipset="$VERIFY_CHIPSET" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
   --remote_debugger_trigger=Downwell \

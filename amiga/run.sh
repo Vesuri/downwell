@@ -44,9 +44,13 @@ export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
 # Model, memory, sound and window: fsuae_options in $FSUAE_COMMON.
 KICKSTART="$ROM" AMIGA_MODEL="${AMIGA_MODEL:-A500}"
-CHIP_KB="${CHIP_KB:-${CHIP_MEMORY:-512}}" FAST_KB="${FAST_KB:-${FAST_MEMORY:-8192}}"
+CHIP_KB="${CHIP_KB:-${CHIP_MEMORY:-1024}}" FAST_KB="${FAST_KB:-${FAST_MEMORY:-8192}}"
 fsuae_options
+# Over 512 KiB of Chip needs the ECS 8372A Agnus (the target A500 has 1 MiB).
+RUN_CHIPSET=ocs
+[ "$CHIP_KB" -gt 512 ] && RUN_CHIPSET=ecs_agnus
 fsuae_exec \
+  --uae_chipset="$RUN_CHIPSET" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
   --window_width=760 --window_height=568 \

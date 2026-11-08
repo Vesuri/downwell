@@ -1,9 +1,11 @@
 # Amiga memory budget
 
-The CPU target is an A500/68000. The current emulator has 512 KiB Chip RAM,
-512 KiB slow RAM at `$C00000`, and 8 MiB Fast RAM at `$200000`. Exec labels
-both non-Chip regions `MEMF_FAST`; they do not have the same bus timing.
-This remains a development configuration, not a final memory requirement.
+The CPU target is an A500/68000 with 1 MiB Chip RAM behind the ECS 8372A
+Agnus. The launchers add 8 MiB Fast RAM at `$200000`; that Fast size remains
+a development configuration, not a final memory requirement. Exec labels any
+slow RAM at `$C00000` `MEMF_FAST` as well, although its bus timing differs.
+Measurements below that predate the 1 MiB target were taken with 512 KiB Chip
+(OCS Agnus); `VERIFY_CHIP_KB=512` reproduces that machine.
 
 ## Native terrain identities
 
@@ -517,7 +519,8 @@ muzzle's 270 page, the cropped pickup effect, notice icon and glyphs) added
 8,334 Chip plane bytes and 17,762 cavern CPU bytes; against the 502,592 free
 bytes measured at startup this leaves about 9 KiB of gameplay Chip headroom.
 W1.5's time-shard sprite 91 (six frames) adds 1,170 plane bytes, leaving
-about 8 KiB.
+about 8 KiB on that 512 KiB machine. On the 1 MiB target, normal startup
+leaves 651,128 Chip bytes free, so gameplay keeps about 520 KiB in reserve.
 The directory sizes depend on the generated asset set; remeasure actual free
 and largest Chip blocks when it changes. The original contiguous gameplay
 DWAP stays in ordinary memory for CPU rendering, effects, metadata and sprite

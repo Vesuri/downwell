@@ -28,11 +28,11 @@ have not changed the replay. Presentation time includes display synchronization.
 
 ### Amiga checks
 
-The startup/profile launcher defaults to 512 KiB Chip and 8 MiB Fast RAM.
-`VERIFY_CHIP_KB=1024` is available solely for explicitly reported diagnostic
-comparisons when the normal allocation fails. The launcher prints the selected
-memory configuration. A successful expanded-memory run does not establish the
-512 KiB baseline or justify changing the normal launcher default.
+The target is an A500 with 1 MiB Chip (ECS 8372A Agnus) and the startup,
+replay, profile and run launchers default to 1 MiB Chip and 8 MiB Fast RAM,
+passing `--uae_chipset=ecs_agnus`. `VERIFY_CHIP_KB=512` selects the OCS
+512 KiB machine for comparisons with older measurements. The launcher prints
+the selected memory configuration.
 
 Every measured optimization is part of the normal build. The Amiga Makefile
 options that select an older path (for example `TABLE_CONTACT_ATAN=0`,
@@ -42,7 +42,7 @@ references for paired measurements and pixel/replay oracles; never ship one.
 For the deterministic no-input fall, use `bash amiga/profile.sh quiet-fall`
 for the complete 164-update landing/cadence witness, and
 `bash amiga/profile.sh quiet-window` for instruction-level costs. Both default
-to 512 KiB Chip, cap the emulator run at 90 seconds and restore the normal
+to 1 MiB Chip, cap the emulator run at 90 seconds and restore the normal
 binary. The latter captures 75 PAL fields from mark 56, without debugger stops
 inside the window, in a fresh `tmp/trace/quiet-window.*` directory. It writes
 `quiet.txt` for complete updates 57–121, `generation-122.txt` for the first

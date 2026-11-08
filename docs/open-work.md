@@ -58,7 +58,7 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
   otherwise. Attach any newly discovered prerequisite to an existing item.
 - **Performance during W1/W2:** no 20 ms gate yet, but do not add per-frame
   work for features that are not present (no empty scans), and keep normal
-  512 KiB Chip startup and the `quiet-fall` landing witness passing. Note any
+  1 MiB Chip startup and the `quiet-fall` landing witness passing. Note any
   large new cost in the commit for W3.
 - **Restructuring** steps (WR) must be behaviour-neutral and pass the existing
   gates; do them when they make the next W item easier, not as a separate
@@ -143,17 +143,13 @@ Paula, with scene-local residency:
 Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handling)
 and keep audio out of scenes that do not use it.
 
-Before adding resident samples, free Chip the gameplay scenes do not need.
-Gameplay leaves only about 8 KiB of the measured A500 Chip free after W1.5.
-The garden foreground/background and entry-shaft images (76,800 bytes)
-stay in Chip for the whole run. Release them as soon as the entry shaft has
-scrolled away, keep a copy in Fast RAM, and copy it back into a Chip lease
-when the garden or shaft is shown again (Retry, the surface, style
-select). The copy must finish within the existing scene handoff. Check
-the same pattern for the 66,704-byte splash/style cache and the
-146,818-byte shared scene bank's gameplay use (terrain scratch, time-field
-images). Measure free and largest Chip before and after
-(`verify-amiga-memory`, `verify-amiga-startup` with `VERIFY_CHIP_KB=512`).
+The target A500 has 1 MiB of Chip RAM (ECS 8372A Agnus): normal startup
+leaves 651,128 Chip bytes free and gameplay entry takes the 118,914-byte
+cavern plane atlas, so about 520 KiB remains for samples and later art. Gameplay already recycles
+the garden region (staging ring, HUD bank, on-demand shop or results art);
+the garden art is reloaded from disk when shown again. Keep scene-local
+residency and measure free and largest Chip before and after
+(`verify-amiga-memory`, `verify-amiga-startup`).
 
 ### W3. Performance
 
@@ -170,8 +166,7 @@ image speed, three casing draws), the compact bullet store holds 32 shots,
 the laser casts its ray every update in 8-pixel steps against enemies,
 walls and shootables, and up to 96 laser trails are BOBs. Gun art adds
 17,762 bytes to the cavern CPU bank (now 246,710) and 8,334 Chip bytes to its
-plane atlas (now 117,744), leaving about 9 KiB of the measured A500 Chip
-headroom for W2; the prepared actor-frame table grew from 512 to 640
+plane atlas (now 117,744); the prepared actor-frame table grew from 512 to 640
 entries. The spread guns' and aimed shots' art uses the nearest offline
 quarter turn without the usual gun's per-angle pixel proof. W1.5: every
 update tests the player and every live enemy against a y-sorted field index
@@ -268,7 +263,7 @@ after each item.
     1,371 RNG draws);
   - the 18,000-frame terrain replay;
   - mutation and failure fixtures for whatever the item touches;
-  - normal startup at 512 KiB Chip;
+  - normal startup at 1 MiB Chip;
   - unchanged replay behaviour.
 
   Preserve source event order, RNG order, instance identities, DitherAbove
@@ -633,7 +628,7 @@ small-window averages for the gate.
    `build/native-collision-source-span-test` (execute both binaries).
    These must rebuild when shared headers change; use
    `test-host-check-dependencies` to guard against stale verification binaries.
-4. Re-run final-build native gates: normal 512 KiB Chip startup, shortcuts,
+4. Re-run final-build native gates: normal 1 MiB Chip startup, shortcuts,
    `verify-amiga-encounter-clear`, `verify-amiga-encounter-reentry`,
    `verify-amiga-encounter-update-failure` and `verify-amiga-encounter-failure`.
    Exercise actual production leases and callbacks, not only isolated device
