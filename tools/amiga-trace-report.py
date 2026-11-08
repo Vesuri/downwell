@@ -174,7 +174,12 @@ def records(path, include_registers=False):
 
     fields = word()
     sections = word()
-    offset += 4 * sections  # hunk base addresses; PCs are hunk-0 relative
+    # Current FS-UAE builds record absolute PCs; translate those inside hunk 0
+    # to the ELF's .text addresses. Older hunk-relative captures lie below it.
+    bases = struct.unpack_from(f'<{sections}I', data, offset)
+    offset += 4 * sections
+    text_base = bases[0] if sections else 0
+    text_end = min([b for b in bases[1:] if b > text_base] + [0x1000000])
     offset += 16  # stack bounds
     for _ in range(3):  # ROM, Chip RAM, slow RAM snapshots
         size = word()
@@ -206,7 +211,7 @@ def records(path, include_registers=False):
                 if value >= 0xffff0000:
                     break
                 if pc is None:
-                    pc = value
+                    pc = value - text_base if text_base <= value < text_end else value
             cost = 0xffffffff - value
             if first_cost is None:
                 first_cost = cost
