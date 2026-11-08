@@ -1094,6 +1094,7 @@ int main(){
     // platform contacts).
     GameplayWorld::compactRoomEffectsAdmitted=false;
     GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
+    GameplayWorld::compactTimeStopAdmitted=false; // and W1.5 time-stop
 #ifdef DOWNWELL_FRAME_WORK_TEST
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());

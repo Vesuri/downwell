@@ -4,8 +4,8 @@
 #include <cstdio>
 #include <vector>
 // Event-level checks for the compact world-one scenery owners. The slice
-// route (AmigaSceneRuntimeTest) opens a gem chunk and lights a torch; this
-// covers TorchFire dousing, which the natural route does not reach.
+// route (AmigaSceneRuntimeTest) opens a gem chunk, lights torches and, since
+// W1.5, douses side-room TorchFires; this covers each event in isolation.
 using downwell::MotionBinary64;
 namespace {
 struct Ops {

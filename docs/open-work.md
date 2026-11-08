@@ -48,7 +48,12 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
 - **Visible:** an item is done only when a player sees it work in the normal
   Amiga build on a natural route. Record the route (seed, input, build flags)
   and the native check in the commit. Helper-only or test-only commits do not
-  close an item.
+  close an item. The host route search (`DOWNWELL_VERIFY_WORLD_ONE_SLICE`)
+  binds the shipping collision owner and encounter session: without it,
+  same-object enemies step in activation-slot order instead of registration
+  order and the native replay drifts.
+  `tools/verify-world-one-native.py` replays the tape on the normal build;
+  `DOWNWELL_DENSE_CHECK=from,to` checks every tick in a window.
 - **One item at a time,** in the listed order unless a dependency forces
   otherwise. Attach any newly discovered prerequisite to an existing item.
 - **Performance during W1/W2:** no 20 ms gate yet, but do not add per-frame
@@ -71,29 +76,22 @@ flash, impact, `breakablesDebris` 370, rewards), `Scattered16` 289, `gemChunk`
 293, torches 295/296, the steering enemies' splash, smoke and flash,
 `GunModule` 109 (battery and heart pickups, `moduleText` 373 and `itemNotif`
 374) with the seven `bStatInitLevel1` guns, their shots, muzzles, laser
-trails and casings, compact shops, level exit,
-upgrade selection, level transitions, death, results and Retry all work.
+trails and casings, side rooms with `pTimeStop` (start, ordinary and goal
+fields, `fxTimeChange` 211 room speed, time shards 238, frozen enemies,
+currency, casings, debris, moving effects and TorchFire, field kills), compact
+shops, level exit, upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 
-5. **Side rooms and time-stop.** Time-field circles are drawn, but
-   `pTimeStop` is not connected. Add entry and exit (`parentTimeField` 82,
-   `goalTimeField` 255, `startTimeField` 371), the freeze and resume of the
-   world, time shards and `fxTimeChange` 211, `sideCamLocker` camera, void
-   rooms and their rewards; freeze jellies and red balls too (their steps
-   currently never see time-stop), and the compact room effects, debris and
-   TorchFire particles. The slice route lights a side-room torch but never
-   brings its TorchFire on screen: show its particles and dousing on the
-   side-room route. Wind sound is W2. References:
-   [time-stop identity](time-stop-collision.md),
-   [side cameras](side-camera-lockers.md).
 6. **Enemy and player damage chains.** Complete corpses (`objDeadBody` 263),
    blood, smoke, hit and flash effects, bullet wall hits, jump and dust
    effects, and source knockback and immunity on player damage, including the
    death flash and `DeathMenu` 49 options. The W1.4 shots also lack theirs:
    `bulletRanged`/`bulletLaser`/`bulletCasing` wall hits (101 and the laser's
    96/smoke), enemy-hit blood, flash and impact, and the empty-gun smoke and
-   "EMPTY!" text.
+   "EMPTY!" text. Hit-stop is not modelled: `momentDelay` and its
+   `room_speed` changes (only `fxTimeChange`'s 30..60 ramp and its
+   `sleep(30)` pace the Amiga loop since W1.5).
    Reference: [effect surfaces](effect-surfaces.md).
 7. **Combo and HUD.** Add the on-screen combo counter, `comboDone` rewards at
    5, 10, 30 and 100, `ComboBreak` 369, `comboRewardText` 383, Gemhigh and the
@@ -113,7 +111,9 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
    5) and exploding knees on scenery and boxes (upgrade 0). W1.4 left Hot
    Casing (upgrade 8, damaging casings), Reverse Engineering (upgrade 1,
    `pugEngineer` on gun pickups) and Laser Sight's beam against the new guns'
-   spread (its `bdirRand` and `decTimer` changes are in) to this item.
+   spread (its `bdirRand` and `decTimer` changes are in) to this item, and
+   W1.5 left Time Field Damage (`pugTime`: `scrTypicalDamage` from the time
+   fields).
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Menus, styles, modes and persistence.** The pause menu and its options,
     shader, record and confirm menus (adapted to the Amiga); all five styles
@@ -134,7 +134,8 @@ Paula, with scene-local residency:
   (the jelly and red-ball `sound` hooks are no-ops today),
   stomps, gems, rock breaks, box, plant, gem-chunk and TorchFire hooks (no-ops), shopkeeper voices, void enter and exit, combo,
   menus and the time-field winds (reuse `AmigaWindAudio` and the prepared
-  wind bank);
+  wind bank), the time-stop and resume sounds (184/185), the BGM pause and
+  resume around `pTimeStop`, and `voidAmbience` 376;
 - every gun's shot sound (`bStatSound`), the module pickup (105/106) and the
   `moduleText` letter sound (334);
 - the master gain option and the original voice and priority rules.
@@ -143,7 +144,7 @@ Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handl
 and keep audio out of scenes that do not use it.
 
 Before adding resident samples, free Chip the gameplay scenes do not need.
-Gameplay leaves only about 9 KiB of the measured A500 Chip free after W1.4.
+Gameplay leaves only about 8 KiB of the measured A500 Chip free after W1.5.
 The garden foreground/background and entry-shaft images (76,800 bytes)
 stay in Chip for the whole run. Release them as soon as the entry shaft has
 scrolled away, keep a copy in Fast RAM, and copy it back into a Chip lease
@@ -172,7 +173,17 @@ walls and shootables, and up to 96 laser trails are BOBs. Gun art adds
 plane atlas (now 117,744), leaving about 9 KiB of the measured A500 Chip
 headroom for W2; the prepared actor-frame table grew from 512 to 640
 entries. The spread guns' and aimed shots' art uses the nearest offline
-quarter turn without the usual gun's per-angle pixel proof.
+quarter turn without the usual gun's per-angle pixel proof. W1.5: every
+update tests the player and every live enemy against a y-sorted field index
+(a mask query only within reach of a field), and casings, debris, moving
+effects and TorchFires against `TimeStopBound` while stopped; up to 20 (store 32) binary64
+time shards each run a solid query, and the compact no-loop store doubled to
+32 for gem-high SHOTGUN bursts. Sprite 91 adds 1,170 Chip bytes to the cavern
+plane atlas (now 118,914). `fxTimeChange` slows presentation on purpose (two
+fields per update at room speed 30, plus the 30 ms sleep); judge it as
+transition latency, not as frame cost. The quiet-fall witness went from 190
+to 193 fields: the steady-state Begin Step, the enemy field pass and the
+gem, box and fire gates.
 
 ### WR. Restructure for world 1
 

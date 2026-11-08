@@ -2101,6 +2101,34 @@ the already executed birth/effect prefix and fails the tick before subsequent
 phases; it cannot be retried as a fresh transition. Callers still own the bound
 registrations, effect bank and audio/effect services for this scoped entry point.
 
+## Compact world (W1.5)
+
+The normal Amiga build's compact world has no registered field, shard or
+time-change instances. `GameplayWorld::beginCompactTimeStop` runs the same
+`PlayerTimeStop` Begin Step with integer field queries: start, ordinary
+fields up to the goal's birth boundary, goal, then later ordinary fields
+(creation order). Ordinary fields are found through a y-sorted index rebuilt
+when the builder adds fields; a query keeps the lowest creation index that
+meets, so the order is unchanged. The Begin Step returns early while running
+with neither the side nor a field wanted, and builds the exact pose only on
+transitions. Shards are an
+unbound `TimeShardEffects<32>` (`shardLimit` 20 plus one Begin Step's
+bursts) stepped after smoke with a mask-91 solid query, colliding with the
+player at the published position after the steering enemies. Their alarms
+(and `fxTimeChange`'s room-speed ramp) draw no RNG: with a registered room
+alarm owner, as in the normal Amiga build, they run after the room's alarms
+at each index; unbound worlds run them between the enemies and the scenery. `TimeStopBound`
+is answered per caller mask (457 casing, 598 debris, the effect sprite,
+710 TorchFire). Enemy Step bodies hold their alarm owners (frog 0–2, snail 2,
+crawler `alarmStop(1)`), skip image speed, wake and motion, and still finalize;
+`subparentEnemy`'s Collision with a field zeroes `ehp` (steering families die
+in their next Step, the others retire at once). Currency in the stopped
+branch freezes its alarms and is obtainable at once; the gem-streak timer and
+`comboDone` hold. Audio queries answer false (W2). The Amiga loop paces
+`roomSpeed()` below 60 and `fxTimeChange`'s `sleep(30)` as extra VBlank
+waits; the simulation itself is unchanged. Fixtures that predate this work
+clear `GameplayWorld::compactTimeStopAdmitted`.
+
 The clock's earlier field query and the later time-stop query must not be
 merged merely because both use `parentTimeField`. The existing integer goal
 query is not by itself evidence for fractional transition contacts. Remaining

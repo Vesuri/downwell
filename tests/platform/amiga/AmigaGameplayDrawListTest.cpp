@@ -47,6 +47,7 @@ int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD sprite,UWORD,int x,
 int main() {
     // These pinned draw-list witnesses predate W1.4's compact guns.
     GameplayWorld::compactGunsAdmitted=false;
+    GameplayWorld::compactTimeStopAdmitted=false; // and W1.5 time-stop
     {
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
         auto list=std::make_unique<AmigaGameplayDrawList>();

@@ -53,7 +53,7 @@ BANK_BUDGETS = {'boot': 24 * 1024, 'front': 96 * 1024,
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
-# and wood/default debris art must not become cavern residents. builderCavern
+# and wood debris art must not become cavern residents. builderCavern
 # and spawnerSet1 define its enemy roots; breakablesDebris Create selects 115
 # for area 1 (116 for area 2, 91 for area 4). Keep common effects/companions,
 # merchant art and generated scenery: these are reachable without area change.
@@ -65,6 +65,8 @@ CAVERN_ROOTS = frozenset({
     471, 480, 481, 482, 485, 486, 487, 496, 497, 550, 551, 568, 569,
     570, 571, 572, 602, 603, 605, 702, 703, 704, 707, 711, 712, 83, 118,
     111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
+    # W1.5 fxTimeShard 238 draws sprite 91 (shared with area-four debris).
+    91,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
@@ -77,7 +79,9 @@ CAVERN_IDS = frozenset(
 # muzzle's 270 page, the cropped pickup effect, notice icon and glyphs) adds
 # 17,762 bytes: 228,948 -> 246,710 CPU, and 8,334 Chip plane bytes:
 # 109,410 -> 117,744. Planar BOBs only, no DMA streams.
-BANK_BUDGETS.update({'cavern': 248 * 1024, 'cavern-planes': 116 * 1024})
+# W1.5 time-shard sprite 91 (six frames) adds 1,170 Chip plane bytes:
+# 117,744 -> 118,914.
+BANK_BUDGETS.update({'cavern': 248 * 1024, 'cavern-planes': 117 * 1024})
 
 
 def require_budget(bank, size):

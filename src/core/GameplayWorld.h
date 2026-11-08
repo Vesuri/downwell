@@ -250,6 +250,9 @@ public:
         bool frogLanded;
         bool activationPending;
         bool destroyRequested=false;
+        // Step left image_speed at 0 under pTimeStop: the next animation
+        // phase holds the frame.
+        bool frozen=false;
         int imageScaleY() const { return objectId == 117 ? snail.verticalFlip : 1; }
         unsigned drawFrame() const {
             if (objectId == 119)
@@ -274,6 +277,7 @@ public:
         bool large;
         bool attracted;
         bool active;
+        bool frozen=false; // objCurrency's stopped branch set image_speed 0
     };
 
     using EnemyLifecycleBinding = downwell::RecordLifecycleBinding<EnemyState>;
@@ -3054,6 +3058,36 @@ private:
     bool retireCompactGuns(long viewTopQ12);
     bool drawCompactGunTexts();
     bool hitGunModule(const downwell::ContactBounds& shot,int damage,bool& consumed);
+    // Compact time-stop (W1.5): objPlayer_n's checkStop/pTimeStop block,
+    // scrTimeShard's fxTimeShard 238 and fxTimeChange 211's room-speed ramp.
+    // Field queries use integer contact rectangles against the serialized
+    // 82/255/371 masks instead of the runner's per-pixel sampling.
+    downwell::TimeStopEffects<downwell::gameplayCompactShardCapacity> timeStop_;
+    unsigned pauseMilliseconds_=0;
+    struct FieldHit{bool hit=false;int x=0,y=0;};
+    bool compactTimeStop()const{return compactTimeStopAdmitted&&!playerTimeTransition_;}
+    bool stopped()const{return timeStop_.player.stopped;}
+    FieldHit fieldAt(const downwell::ContactBounds& bounds)const;
+    // Ordinary fields sorted by centre y, rebuilt when the builder adds
+    // fields: a query tests only the 48-pixel y window, then keeps the lowest
+    // creation index so instance_place order is unchanged.
+    struct FieldIndex{std::uint32_t birth=0;unsigned count=~0u;unsigned char order[64];int y[64];};
+    mutable FieldIndex fieldIndex_;
+    bool refreshFieldIndex()const;
+    bool fieldNearY(int y,int reach)const;
+    // TimeStopBound for a rectangle and its published x: true when it runs.
+    bool timeStopBound(const downwell::ContactBounds& bounds,int x)const;
+    bool timeStopBound(int sprite,int x,int y)const;
+    bool beginCompactTimeStop(int publishedX,int publishedY);
+    bool stepTimeShards(downwell::TimeShardEffects<downwell::gameplayCompactShardCapacity>::Phase phase);
+    using TimeChangePhase=decltype(timeStop_.changes.beginPhase());
+    using TimeShardPhase=decltype(timeStop_.shards.beginPhase());
+    bool advanceTimeEffectAlarm(TimeChangePhase changePhase,TimeShardPhase shardPhase,unsigned alarm);
+    bool collideTimeShards();
+    bool collideEnemyTimeFields();
+    bool freezeEnemyStep(EnemyState& enemy);
+    bool holdStoppedBoxAlarms();
+    bool resetCompactTimeStop();
     bool resetCompactScenery();
     bool createCompactScenery(const downwell::DeferredCreateInstance& command);
     bool advanceCompactSceneryAlarm(unsigned alarm);
@@ -3075,6 +3109,12 @@ public:
     const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity>& compactDebris()const{return compactDebris_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}
+    // global.pTimeStop, room_speed and the sleep() milliseconds requested
+    // since the last call (fxTimeChange Create). PAL frontends pace with them.
+    bool timeStopped()const{return stopped();}
+    int roomSpeed()const{return timeStop_.roomSpeed;}
+    unsigned takePauseMilliseconds(){const unsigned ms=pauseMilliseconds_;pauseMilliseconds_=0;return ms;}
+    const downwell::TimeShardEffects<downwell::gameplayCompactShardCapacity>& compactTimeShards()const{return timeStop_.shards;}
     int gunType()const{return run_.gunType;}
     int aimAngle()const{return aimAngle_;}
     // Current builder art for one generated scenery decoration, by its
@@ -3106,6 +3146,8 @@ public:
     // Likewise for references predating W1.4: the retained usual-gun shot
     // (legacy trajectory, no casing, shake or nonAuto) and an inert 109.
     static inline bool compactGunsAdmitted=true;
+    // Likewise for references predating W1.5: pTimeStop never turns on.
+    static inline bool compactTimeStopAdmitted=true;
     // objBuilder.endReached, published by the generation frontend.
     void publishGenerationEndReached(bool reached){generationEndReached_=reached;}
     // Red-ball Draw's eye, after the most recent Step. False when absent or

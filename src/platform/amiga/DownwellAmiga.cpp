@@ -2840,6 +2840,21 @@ __attribute__((noinline)) static int runDownwell(void) {
             if(residentCover==ResidentCover::entry&&gameplayScene.coverDetached())
                 residentCover=ResidentCover::none;
         };
+#ifndef DOWNWELL_REPLAY_VERIFY
+        {
+            // W1.5 fxTimeChange: room_speed 30..55 lengthens each Step to
+            // 60/room_speed fields, and its Create sleep(30) stalls ~1.5
+            // PAL fields. Present-only waits; the simulation is unchanged.
+            static unsigned speedCredit=0,sleepCredit=0;
+            const int speed=port.roomSpeed();
+            if(speed>0&&speed<60){
+                speedCredit+=unsigned(60-speed);
+                while(speedCredit>=unsigned(speed)){speedCredit-=unsigned(speed);platform.waitVblank();}
+            }else speedCredit=0;
+            sleepCredit+=port.takePauseMilliseconds();
+            while(sleepCredit>=20u){sleepCredit-=20u;platform.waitVblank();}
+        }
+#endif
         if (!overlapStep) {
             platform.waitVblank();
             fencedVblank = AmigaPlatform::vblankCount();

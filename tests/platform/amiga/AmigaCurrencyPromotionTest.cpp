@@ -73,6 +73,7 @@ int main(int argc,char** argv){
     GameplayWorld::compactSpawnerAdmitted=false;
     GameplayWorld::compactRoomEffectsAdmitted=false;
     GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
+    GameplayWorld::compactTimeStopAdmitted=false; // and W1.5 time-stop
     verifyEnemyWitnessRetirement();
     bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false,enemyWitness=false;
     for(int i=1;i<argc;++i){

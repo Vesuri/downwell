@@ -10,6 +10,9 @@ static std::vector<std::uint8_t> read(const char* path){
     std::ifstream in(path,std::ios::binary);return {std::istreambuf_iterator<char>(in),{}};
 }
 int main(){
+    // This fixture's world has no follow camera, which every time-stop
+    // transition shakes: it predates W1.5.
+    GameplayWorld::compactTimeStopAdmitted=false;
     {
         DeathResults results;results.active=true;
         results.menu.visible[5]=true;results.menu.sequenceOver=true;

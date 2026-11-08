@@ -49,7 +49,7 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
         c.run.combo.finish(c.player, c.currency, c.health,
                            c.run.upgrades.levels[20] != 0);
         if(c.currency.gameGem!=previousGems)c.run.gemStreakRise.reset();
-    }, &context);
+    }, &context, run.timeStopped); // pTimeStop before this Begin Step's transition
     player.configureMovementBoundary([](void* opaque) {
         auto& c = *static_cast<Context*>(opaque);
         c.run.gems.observeDeathMovement(c.death.movementDead(), c.currency.gameGem);

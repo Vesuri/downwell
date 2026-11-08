@@ -1078,9 +1078,15 @@ void GameplayWorld::advanceEnemyAlarms()
     }
     if(roomAlarms_){
         if(!roomAlarms_(roomAlarmsContext_)){run_.effectsSucceeded=false;return;}
-        // Compact gemChunk 293 and debris 370 follow the room's objects at
-        // every index. Their Alarm 0 events draw no RNG, so dispatching them
-        // after the room's later indices preserves the stream.
+        // Compact fxTimeChange 211, fxTimeShard 238, gemChunk 293 and debris
+        // 370 follow the room's objects at every index. Their alarm events
+        // draw no RNG, so dispatching them after the room's later indices
+        // preserves the stream.
+        if(timeStop_.changes.size()||timeStop_.shards.size()){
+            const auto changePhase=timeStop_.changes.beginPhase();
+            const auto shardPhase=timeStop_.shards.beginPhase();
+            for(unsigned alarm=0;alarm<3;++alarm)if(!advanceTimeEffectAlarm(changePhase,shardPhase,alarm))return;
+        }
         if(scenery_.gemChunkEnd||compactDebris_.size())
             for(unsigned alarm=0;alarm<3;++alarm)if(!advanceCompactSceneryAlarm(alarm))return;
         return;
@@ -1089,8 +1095,12 @@ void GameplayWorld::advanceEnemyAlarms()
     // Match the runner's global alarm-index order. Dispatch each event before
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
     // Object order within each index: boxes 92, enemies 111-119, then the
-    // compact gemChunk 293 and breakablesDebris 370.
-    const unsigned alarms=scenery_.gemChunkEnd||compactDebris_.size()?3:2;
+    // compact gemChunk 293 and breakablesDebris 370, with fxTimeChange 211
+    // and fxTimeShard 238 between the enemies and the scenery.
+    const bool timeEffects=timeStop_.changes.size()||timeStop_.shards.size();
+    const auto changePhase=timeStop_.changes.beginPhase();
+    const auto shardPhase=timeStop_.shards.beginPhase();
+    const unsigned alarms=scenery_.gemChunkEnd||compactDebris_.size()||timeStop_.shards.size()?3:2;
     for (unsigned alarm = 0; alarm < alarms; ++alarm) {
       if(alarm==0)for(unsigned i=0;i<breakableCount_;++i)
         if(breakables_[i].lifetimeId&&!advanceBoxRoomAlarm({i,breakables_[i].lifetimeId},alarm))return;
@@ -1098,8 +1108,16 @@ void GameplayWorld::advanceEnemyAlarms()
         if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
         if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
       }
+      if(timeEffects&&!advanceTimeEffectAlarm(changePhase,shardPhase,alarm))return;
       if(!advanceCompactSceneryAlarm(alarm))return;
     }
+}
+
+bool GameplayWorld::advanceTimeEffectAlarm(TimeChangePhase changePhase,TimeShardPhase shardPhase,unsigned alarm){
+    if(alarm<2)timeStop_.changes.advanceAlarm(changePhase,alarm,timeStop_.roomSpeed);
+    timeStop_.shards.advanceAlarm(shardPhase,alarm);
+    if(!timeStop_.changes.succeeded()||!timeStop_.shards.succeeded())return run_.effectsSucceeded=false;
+    return true;
 }
 
 bool GameplayWorld::advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
@@ -1222,13 +1240,19 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
     // Steering families step whenever active; they have no awake gate.
     if (enemy.objectId == 115 || enemy.objectId == 118)
         return stepSteeringEnemy(enemy);
-    if (enemy.objectId == 113)
+    // Each family's Step body is inside if (!global.pTimeStop); the
+    // presentation after it still runs, on the unchanged motion state.
+    const bool frozen=compactTimeStop()&&stopped();
+    enemy.frozen=frozen;
+    if (frozen && !freezeEnemyStep(enemy)) return false;
+    if (!frozen && enemy.objectId == 113)
         enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
-    if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
+    if (!frozen && !enemy.awake && enemy.y - cameraPixelY_ <= 254)
         enemy.awake = true;
     if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 116) || solidResolver_ == 0)
         return true;
-    if (enemy.objectId == 111 || enemy.objectId == 112) {
+    if (frozen) {
+    } else if (enemy.objectId == 111 || enemy.objectId == 112) {
         const bool turtle = enemy.objectId == 112;
         DW_PROFILE_SCOPE(profileEnemyWalker);
         const long cx = publishedCameraX * 4096L;
@@ -1497,13 +1521,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Currency has no Animation End callback; only gems present at this
     // boundary participate. Rewards born later in this tick must not advance.
     for(unsigned i=0;i<gemSlotEnd_;++i)
-        if(gems_[i].active)gems_[i].motion.animation.advance();
+        if(gems_[i].active&&!gems_[i].frozen)gems_[i].motion.animation.advance();
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
     sceneryRepaintCount_=0;
     (void)advanceCompactSceneryAnimation();
     if(!guns_.empty())(void)advanceCompactGunAnimation();
+    // fxTimeShard 238 has no Animation End event.
+    if(timeStop_.shards.size()&&!timeStop_.shards.advanceAnimation(timeStop_.shards.beginPhase()))
+        run_.effectsSucceeded=false;
     }
     if(!run_.effectsSucceeded)return {};
     {
@@ -1516,7 +1543,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
-    for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active) {
+    for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active&&!enemies_[i].frozen) {
         downwell::advanceEnemyImageQ8(enemies_[i].imagePhase,enemies_[i].imageRemainder,
                                      enemies_[i].imageSpeed);
         if(!publishEnemyImage(enemies_[i],enemies_[i].imagePhase))return {};
@@ -1552,7 +1579,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 #endif
 
     ++tick_;
-    currencyAccount_.beginStep();
+    // objControlerN (37) runs after objPlayer_n (35), so it sees this
+    // update's pTimeStop. Apply the previous value here; the player's
+    // transition below corrects the streak timer on the frames it changes.
+    const auto streakBeforeStep=currencyAccount_.streak;
+    const auto streakTimerBeforeStep=currencyAccount_.timer;
+    const bool stoppedBeforeStep=stopped();
+    currencyAccount_.beginStep(false,stoppedBeforeStep);
     run_.selectWeaponLevel(currencyAccount_);
     run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
     downwell::Input input = downwell::unpackReplayInput(packedInput);
@@ -1621,11 +1654,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 downwell::MotionBinary64::fromInteger(playerInstance_.x),
                 downwell::MotionBinary64::fromInteger(playerInstance_.y),hit);
         },[this](const PlayerMotion& motion,int x,int y){
-            return run_.effectsSucceeded&&(!playerTimeTransition_||
-                playerTimeTransition_(playerTimeContext_,playerInstance_,motion,x,y))&&run_.effectsSucceeded;
+            if(!playerTimeTransition_)return !compactTimeStop()||beginCompactTimeStop(x,y);
+            return run_.effectsSucceeded&&
+                playerTimeTransition_(playerTimeContext_,playerInstance_,motion,x,y)&&run_.effectsSucceeded;
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
+    if(stopped()!=stoppedBeforeStep){
+        currencyAccount_.streak=streakBeforeStep;currencyAccount_.timer=streakTimerBeforeStep;
+        currencyAccount_.beginStep(false,stopped());
+    }
     if (player_.shots() != oldShots && gunsActive_()) {
         if(!firePlayerGun(muzzleX,muzzleY-4,muzzleX,muzzleY))return {};
         bulletChanged=true;
@@ -1693,6 +1731,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const std::uint32_t gemStepLastLifetime=nextGemLifetimeId_-1;
     const auto compactEffectStepPhase=compactEffects_.beginPhase();
     const auto compactDebrisStepPhase=compactDebris_.beginPhase();
+    const auto shardStepPhase=timeStop_.shards.beginPhase();
     if(!captureEnemyStepOrder())return {};
     if(playerChildrenStarted_&&!publishPlayerFallDepth())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,-1)){
@@ -1790,6 +1829,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Step (261). A bound source adapter also runs healthy boxes' alarmStop.
     // The unbound path retains the old destruction boundary until all effect,
     // audio and time-stop owners can be supplied by the gameplay scene.
+    // Healthy boxes' Step is alarmStop(0): it only matters while stopped.
+    if(stopped()&&!boxStepDispatch_.bound()&&!holdStoppedBoxAlarms())return {};
     unsigned boxStepLimit=boxStepEnd;
 #ifndef DOWNWELL_REFERENCE_ENEMY_UPDATES
     // Unbound, the Step only destroys exhausted boxes; none has been yet.
@@ -1814,7 +1855,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!box.state.exhausted())continue;
         if(destroyedBlockCount==destroyedCapacity){run_.effectsSucceeded=false;return {};}
         const int boxX=box.x,boxY=box.y;
-        // Healthy boxes only run alarmStop(0), which is inert without pTimeStop.
+        // Healthy boxes only ran alarmStop(0) above.
         if(compactRoomEffectsAdmitted){if(!stepCompactBox(i))return {};}
         else if(!markBreakableDestroyed({i,box.lifetimeId}))return {};
         destroyedBlockX[destroyedBlockCount]=boxX;
@@ -1835,7 +1876,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
     }
     // parentMovingFx (220) follows the enemies, before damage numbers (221).
-    if(compactEffects_.movingCount()&&!compactEffects_.stepMoving(compactEffectStepPhase)){
+    if(compactEffects_.movingCount()&&!compactEffects_.stepMoving(compactEffectStepPhase,
+        [this](const downwell::MovingFx& fx,bool& moving){
+            if(!stopped()){moving=true;return true;}
+            std::int32_t x,y;
+            if(!fx.x.promoted().roundPixel(x)||!fx.y.promoted().roundPixel(y))return false;
+            moving=timeStopBound(fx.spriteId,x,y);return true;
+        })){
         run_.effectsSucceeded=false;return {};
     }
 
@@ -1851,6 +1898,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
     if(!run_.effectsSucceeded)return {};
+    if(timeStop_.shards.size()&&!stepTimeShards(shardStepPhase))return {};
     // Time shards (238) follow all smoke (225), before currency (248).
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,248)){
         run_.effectsSucceeded=false;return {};
@@ -1872,6 +1920,15 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         GemState& gem = gems_[gemIndex];
         if (!gem.active||gem.lifetimeId>gemStepLastLifetime)
             continue;
+        // objCurrency's stopped branch: image_speed 0, alarms held and
+        // obtainable set; the dflash toggle still runs. Attracted gems home.
+        gem.frozen=!gem.attracted&&!timeStopBound(gem.large?134:133,gem.x+240,gem.y+176);
+        if(gem.frozen){
+            gem.motion.lifetime.freeze();
+            if(run_.collectFrozenCurrency(gem.motion,gem.large,static_cast<unsigned>(gem.amount),player_,currencyAccount_)
+               ==downwell::CurrencyStepResult::collected)gem.active=false;
+            continue;
+        }
         const auto result = run_.collectCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
             player_, currencyAccount_,
             [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
@@ -1908,7 +1965,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Scattered16/gemChunk/TorchFire/Torch (289-296), then compact debris 370.
     if(!scenery_.empty()&&!stepCompactScenery())return {};
     if(compactDebris_.size()&&!compactDebris_.step(compactDebrisStepPhase,enemyRandom_,
-        [](auto,const downwell::DebrisAnimation&,bool& frozen){frozen=false;return true;}, // No pTimeStop yet.
+        [this](auto,const downwell::DebrisAnimation& d,bool& frozen){ // !TimeStopBound, mask 598
+            if(!stopped()){frozen=false;return true;}
+            std::int32_t x,y;
+            if(!d.x.promoted().roundPixel(x)||!d.y.promoted().roundPixel(y))return false;
+            frozen=!timeStopBound(598,x,y);return true;
+        },
         [this](auto,const downwell::DebrisAnimation&,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
             return solidMeeting(598,x,y,true,hit);
         })){run_.effectsSucceeded=false;return {};}
@@ -1960,6 +2022,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 x,y,240,176);
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
     if (steeringPopulation_ && !collideSteeringEnemies()) return {};
+    // subparentEnemy's Collision with parentTimeField, then fxTimeShard 238.
+    if (compactTimeStop() && (run_.timeFields.size() || run_.levelExitPresent || run_.startFieldPresent) &&
+        !collideEnemyTimeFields()) return {};
+    if (timeStop_.shards.size() && !collideTimeShards()) return {};
     if (!scenery_.empty() && !collideCompactScenery()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
@@ -2044,7 +2110,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 #ifdef DOWNWELL_REFERENCE_FRAME_WORK
     GameplayFrame frame = {};
 #endif
-    run_.gameplayPresentationStep(enemyRandom_);
+    // parentTimeField/goalTimeField/startTimeField Draw: no radius draw
+    // while pTimeStop.
+    run_.gameplayPresentationStep(enemyRandom_,stopped());
     if(!reconcilePhase(PhaseBoundary::endStep))return {};
     frame.playerMotion = motion;
     DW_PROFILE_PHASE(profileHudState);
@@ -2384,9 +2452,11 @@ bool GameplayWorld::stepSteeringEnemy(EnemyState& enemy){
     auto* actor=steeringActor(enemy);
     if(!actor)return run_.effectsSucceeded=false;
     SteeringOps ops{*this,&enemy,*actor};
-    // pTimeStop is not admitted by this world yet: Step always runs unstopped.
-    const bool stepped=enemy.objectId==115?steering_[enemy.auxiliaryState].jelly.step(false,enemyRandom_,ops):
-        steering_[enemy.auxiliaryState].ball.step(false,enemyRandom_,ops);
+    // Under pTimeStop their Step only sets image_speed = 0 and checks ehp.
+    const bool frozen=compactTimeStop()&&stopped();
+    enemy.frozen=frozen;
+    const bool stepped=enemy.objectId==115?steering_[enemy.auxiliaryState].jelly.step(frozen,enemyRandom_,ops):
+        steering_[enemy.auxiliaryState].ball.step(frozen,enemyRandom_,ops);
     if(!stepped||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
     enemy.health=actor->health;
     if(!enemy.active){releaseSteering(enemy);enemy.auxiliaryState=-1;return true;}
@@ -2426,7 +2496,7 @@ bool GameplayWorld::advanceSteeringAlarm(EnemyState& enemy,unsigned alarm){
     if(alarm==1){actor->hitStun=false;return true;}
     if(enemy.objectId==115)return run_.effectsSucceeded=false; // Never armed.
     SteeringOps ops{*this,&enemy,*actor};
-    return run_.effectsSucceeded=steering_[enemy.auxiliaryState].ball.effectAlarm(false,enemyRandom_,ops)&&
+    return run_.effectsSucceeded=steering_[enemy.auxiliaryState].ball.effectAlarm(stopped(),enemyRandom_,ops)&&
         run_.effectsSucceeded;
 }
 
@@ -2520,7 +2590,8 @@ bool GameplayWorld::resetCompactScenery(){
     // scrPlayerInit: aimAngle = 0, burstCount = 0; room instances are gone.
     guns_.clear();aimAngle_=0;burstCount_=0;burstAlarm_=-1;
     if(!compactDebris_.clear())return run_.effectsSucceeded=false;
-    return true;
+    // Result Create clears pTimeStop; the next room's player is new.
+    return resetCompactTimeStop();
 }
 
 bool GameplayWorld::publishSceneryRepaint(int x,int y){
@@ -2756,6 +2827,7 @@ bool GameplayWorld::stepCompactScenery(){
     for(unsigned i=0;i<sc.fireEnd;++i){
         auto& r=sc.fires[i];
         if(!r.live||r.birth==tick_)continue;
+        if(!timeStopBound(710,r.x,r.y))continue; // The whole Step is TimeStopBound.
         SceneryOps ops{*this,r.x,r.y};
         if(!r.step(enemyRandom_,ops)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
         if(ops.destroyed)r.live=false;
@@ -3414,7 +3486,7 @@ bool GameplayWorld::stepCasings(){
             if(block>=0&&path.intersects(breakables_[block].x-8,breakables_[block].x+8,breakables_[block].y-8,breakables_[block].y+8))hit=true;
         }
         if(hit){c.live=false;continue;}
-        c.x+=c.xsp;c.y+=c.ysp;
+        if(timeStopBound(457,int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16))){c.x+=c.xsp;c.y+=c.ysp;}
     }
     return true;
 }
@@ -3492,4 +3564,227 @@ bool GameplayWorld::hitGunModule(const downwell::ContactBounds& shot,int damage,
         m.objHp-=damage;consumed=true;return true;
     }
     return true;
+}
+
+// ---- Compact time-stop (W1.5) ------------------------------------------
+
+GameplayWorld::FieldHit GameplayWorld::fieldAt(const downwell::ContactBounds& b)const{
+    const auto relative=[&](int x,int y){return downwell::ContactBounds{b.left-x,b.right-x,b.top-y,b.bottom-y};};
+    FieldHit hit;
+    const auto goal=[&](const downwell::GoalTimeField& f){
+        if(!downwell::GoalTimeField::meetsRelativeBounds(relative(f.x,f.y)))return false;
+        hit={true,f.x,f.y};return true;
+    };
+    const auto ordinary=[&](unsigned i){
+        const auto* f=run_.timeFields.at(i);
+        if(!f||!downwell::OrdinaryTimeField::meetsRelativeBounds(relative(f->x,f->y)))return false;
+        hit={true,f->x,f->y};return true;
+    };
+    // instance_place order: the room's placed startTimeField, then the
+    // builder's fields with the exit's goalTimeField at its birth boundary.
+    if(run_.startFieldPresent&&goal(run_.startField))return hit;
+    const unsigned count=run_.timeFields.size();
+    const unsigned boundary=run_.levelExitPresent&&run_.goalFieldBirthBoundary<count?run_.goalFieldBirthBoundary:count;
+    unsigned first=count; // Lowest creation index whose mask meets the bounds.
+    if(refreshFieldIndex()){
+        const auto& index=fieldIndex_;
+        unsigned lo=0,hi=count; // First centre with y > top-24.
+        while(lo<hi){const unsigned mid=(lo+hi)/2;if(index.y[mid]>b.top-24)hi=mid;else lo=mid+1;}
+        for(unsigned k=lo;k<count&&index.y[k]<b.bottom+24;++k){
+            const unsigned i=index.order[k];
+            if(i<first){const auto* f=run_.timeFields.at(i);
+                if(f&&downwell::OrdinaryTimeField::meetsRelativeBounds(relative(f->x,f->y)))first=i;}
+        }
+    }else{
+        for(unsigned i=0;i<count;++i){const auto* f=run_.timeFields.at(i);
+            if(f&&downwell::OrdinaryTimeField::meetsRelativeBounds(relative(f->x,f->y))){first=i;break;}}
+    }
+    if(first<boundary){ordinary(first);return hit;}
+    if(run_.levelExitPresent&&goal(run_.goalField))return hit;
+    if(first<count)ordinary(first);
+    return hit;
+}
+
+// Conservative: false only when no field mask can meet a rectangle whose
+// rows lie within reach of y.
+bool GameplayWorld::fieldNearY(int y,int reach)const{
+    const auto near=[&](int fy,int radius){const int d=fy-y;return d<radius+reach&&-d<radius+reach;};
+    if(run_.startFieldPresent&&near(run_.startField.y,128))return true;
+    if(run_.levelExitPresent&&near(run_.goalField.y,128))return true;
+    const unsigned count=run_.timeFields.size();
+    if(!count)return false;
+    if(!refreshFieldIndex())return true;
+    unsigned lo=0,hi=count;
+    while(lo<hi){const unsigned mid=(lo+hi)/2;if(fieldIndex_.y[mid]>y-reach-24)hi=mid;else lo=mid+1;}
+    return lo<count&&fieldIndex_.y[lo]<y+reach+24;
+}
+
+bool GameplayWorld::refreshFieldIndex()const{
+    auto& index=fieldIndex_;
+    const unsigned count=run_.timeFields.size();
+    const std::uint32_t birth=run_.timeFields.birthSequence().next;
+    if(index.count==count&&index.birth==birth)return true;
+    if(count>sizeof index.order){index.count=~0u;return false;}
+    for(unsigned i=0;i<count;++i){ // Stable insertion sort; births are nearly y-ordered.
+        const auto* f=run_.timeFields.at(i);
+        if(!f){index.count=~0u;return false;}
+        unsigned k=i;
+        while(k&&index.y[k-1]>f->y){index.y[k]=index.y[k-1];index.order[k]=index.order[k-1];--k;}
+        index.y[k]=f->y;index.order[k]=static_cast<unsigned char>(i);
+    }
+    index.count=count;index.birth=birth;return true;
+}
+
+bool GameplayWorld::timeStopBound(const downwell::ContactBounds& bounds,int x)const{
+    // TimeStopBound: unstopped, inside any field, or strictly beside the shaft.
+    if(!stopped()||fieldAt(bounds).hit)return true;
+    return x<160||x>480-160;
+}
+
+bool GameplayWorld::timeStopBound(int sprite,int x,int y)const{
+    if(!stopped())return true;
+    const auto l=downwell::contactSpriteBounds(sprite);
+    return timeStopBound({x+l.left,x+l.right,y+l.top,y+l.bottom},x);
+}
+
+// objPlayer_n Begin Step blocks 46..79 at private xx/yy, after the published
+// x/y. The burst's instance_place uses those published builtins.
+bool GameplayWorld::beginCompactTimeStop(int publishedX,int publishedY){
+    using Stop=decltype(timeStop_);
+    const long xxQ8=240L*256+player_.offsetXFixed(),yyQ8=176L*256+player_.offsetYFixed();
+    const int facing=player_.facing();
+    const bool outside=xxQ8<160L*256||xxQ8>320L*256;
+    // Mask 31 spans a dozen rows; the coarse test spares most updates' query.
+    const bool inField=fieldNearY(int(yyQ8>>8),32)&&
+        fieldAt(downwell::contactWorldBounds({xxQ8,yyQ8,facing,1,31})).hit;
+    // Running, unchecked and still wanting neither: the block emits nothing.
+    if(!inField&&!outside&&!timeStop_.player.checkStop&&!timeStop_.player.stopped){
+        run_.timeStopped=false;return true;
+    }
+    typename Stop::PlayerPose pose{};
+    const bool wanted=inField||outside;
+    if(wanted!=timeStop_.player.checkStop||wanted!=timeStop_.player.stopped){
+        // Only transitions emit shards: build the exact pose just for them.
+        pose.xx=exactQ8(xxQ8);pose.yy=exactQ8(yyQ8);pose.xsp=exactQ8(player_.speedXFixed());
+        if(!pose.x.assign(downwell::MotionBinary64::fromInteger(publishedX))||
+           !pose.y.assign(downwell::MotionBinary64::fromInteger(publishedY))||
+           !downwell::divideBinary64(downwell::MotionBinary64::fromInteger(player_.speedYFifths()),
+               downwell::MotionBinary64::fromInteger(1280),pose.ysp))return run_.effectsSucceeded=false;
+    }
+    const bool ok=timeStop_.beginStepWithAudioChecked(true,[&](bool& o){o=outside;return true;},pose,false,
+        enemyRandom_,[&](bool& hit){hit=inField;return true;},
+        [&](downwell::RunnerImageValue,downwell::RunnerImageValue,std::int32_t& id,
+            downwell::MotionBinary64& fx,downwell::MotionBinary64& fy){
+            const auto field=fieldAt(downwell::contactWorldBounds({publishedX*256L,publishedY*256L,facing,1,31}));
+            id=field.hit?1:-4;fx=downwell::MotionBinary64::fromInteger(field.x);
+            fy=downwell::MotionBinary64::fromInteger(field.y);return true;
+        },[](downwell::PlayerTimeStop::AudioQuery,bool& value){value=false;return true;}, // Audio is W2.
+        [&](downwell::PlayerTimeStop::Effect effect){
+            using Effect=downwell::PlayerTimeStop::Effect;
+            if(effect==Effect::shake)return requestTimeStopCameraShake();
+            if(effect==Effect::oxygenFloor)return run_.floorTimeStopOxygen();
+            if(effect==Effect::change)pauseMilliseconds_+=30; // fxTimeChange Create: sleep(30)
+            return true;
+        });
+    if(!ok||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    run_.timeStopped=stopped();
+    return true;
+}
+
+bool GameplayWorld::stepTimeShards(downwell::TimeShardEffects<downwell::gameplayCompactShardCapacity>::Phase phase){
+    const bool ok=timeStop_.shards.step(phase,stopped(),enemyRandom_,
+        [this](auto,const downwell::TimeShardAnimation&,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+            return solidMeeting(91,x,y,true,hit);
+        },[this](auto,const auto& effect,bool& retire){return timeShardOutsideView(effect.y,retire);});
+    return (ok&&run_.effectsSucceeded)||(run_.effectsSucceeded=false);
+}
+
+// fxTimeShard's Collision with objPlayer_n, at both published positions.
+bool GameplayWorld::collideTimeShards(){
+    const int px=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
+    const int py=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
+    const auto player=downwell::contactWorldBounds({px*256L,py*256L,player_.facing(),1,31});
+    const auto l=downwell::contactSpriteBounds(91);
+    std::uint32_t touched[downwell::gameplayCompactShardCapacity];unsigned count=0;
+    bool valid=true;
+    timeStop_.shards.visitNewest([&](std::uint32_t handle,const downwell::TimeShardAnimation& shard){
+        std::int32_t sx,sy;
+        if(!shard.x.promoted().roundPixel(sx)||!shard.y.promoted().roundPixel(sy)){valid=false;return;}
+        if(!shard.noTouch&&downwell::contactBoundsOverlap(player,{sx+l.left,sx+l.right,sy+l.top,sy+l.bottom}))
+            touched[count++]=handle;
+    });
+    if(!valid)return run_.effectsSucceeded=false;
+    const auto xsp=exactQ8(player_.speedXFixed());
+    const auto ysp=downwell::MotionBinary64::fromInteger(player_.speedYFifths()); // Only its sign is read.
+    for(unsigned i=0;i<count;++i)
+        if(!timeStop_.shards.playerContact(touched[i],xsp,ysp,enemyRandom_))return run_.effectsSucceeded=false;
+    return true;
+}
+
+// subparentEnemy's Collision with parentTimeField: ehp = 0 (no world-one
+// enemy is timefieldImmune). Steering families die in their next Step;
+// the other compact families retire at once, as their bullet deaths do.
+bool GameplayWorld::collideEnemyTimeFields(){
+    for(unsigned i=0;i<enemyCount_;++i){
+        auto& enemy=enemies_[i];
+        if(!enemy.active||enemy.destroyRequested||enemy.health<=0)continue;
+        if(!fieldNearY(enemy.y+176,128))continue; // World-one masks reach far less.
+        const auto bounds=downwell::contactWorldBounds({(enemy.x+240L)*256,(enemy.y+176L)*256,
+            enemy.objectId==117?enemy.motionState:enemy.facing,enemy.imageScaleY(),
+            downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
+        if(!fieldAt(bounds).hit)continue;
+        if(steeringObject(enemy.objectId)){
+            auto* actor=steeringActor(enemy);
+            if(!actor)return run_.effectsSucceeded=false;
+            actor->health=0;enemy.health=0;continue;
+        }
+        enemy.health=0;
+        run_.combo.state.enemyDefeated();spawnReward(enemy,false);
+        if(!run_.effectsSucceeded||!publishEnemyActivation(enemy,false))return run_.effectsSucceeded=false;
+        enemy.active=false;++run_.kills;
+    }
+    return true;
+}
+
+// The stopped branches of the compact families' Steps: image_speed = 0
+// (EnemyState::frozen), the frog's and snail's alarm holds, the crawler's
+// alarmStop(1), and the pending hits their skipped blocks would consume.
+bool GameplayWorld::freezeEnemyStep(EnemyState& enemy){
+    const auto hold=[](int& alarm){if(alarm>0)++alarm;};
+    switch(enemy.objectId){
+    case 113:
+        hold(enemy.alarm0);hold(enemy.alarm1);
+        if(enemy.frogHit.remaining)++enemy.frogHit.remaining;
+        if(enemy.frogHit.ready)enemy.frogHit.pending=true;
+        break;
+    case 117:
+        hold(enemy.snailHit.alarm2);
+        if(enemy.snailHit.ready)enemy.snailHit.pending=true;
+        break;
+    case 116:
+        if(enemy.batHit.ready){
+            enemy.batHit.pending=true;enemy.batHit.pendingDirection=enemy.batHit.direction;
+            enemy.batHit.pendingFraction=enemy.batHit.fraction;
+        }
+        break;
+    case 119:
+        if(!timeStopBound(downwell::contactWorldBounds({(enemy.x+240L)*256,(enemy.y+176L)*256,enemy.facing,1,278}),
+            enemy.x+240)){hold(enemy.alarm0);hold(enemy.alarm1);}
+        break;
+    default:break;
+    }
+    return true;
+}
+
+// objBox_n Step's alarmStop(0) for every live box, not only exhausted ones.
+bool GameplayWorld::holdStoppedBoxAlarms(){
+    for(unsigned i=0;i<breakableCount_;++i){auto& box=breakables_[i];
+        if(box.active&&!box.destroyRequested&&box.alarm0>0&&!timeStopBound(585,box.x+240,box.y+176))++box.alarm0;
+    }
+    return true;
+}
+
+bool GameplayWorld::resetCompactTimeStop(){
+    pauseMilliseconds_=0;run_.timeStopped=false;
+    return timeStop_.reset()||(run_.effectsSucceeded=false);
 }

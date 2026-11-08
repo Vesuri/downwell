@@ -177,6 +177,13 @@ build/compact-guns-test: tests/core/CompactGunsTest.cpp $(wildcard src/core/*.h)
 # GunTable.h against bStatInitLevel1 in the pinned UTMT export.
 verify-gun-table:
 	python3 tools/verify-gun-table.py
+.PHONY: test-compact-time-stop
+test: test-compact-time-stop
+test-compact-time-stop: build/compact-time-stop-test
+	./build/compact-time-stop-test
+build/compact-time-stop-test: tests/core/CompactTimeStopTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CompactTimeStopTest.cpp src/core/GameMakerRandom.cpp
 .PHONY: test-compact-scenery
 test-compact-scenery: build/compact-scenery-test
 	./build/compact-scenery-test

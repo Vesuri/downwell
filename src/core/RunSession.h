@@ -536,6 +536,16 @@ struct RunSession {
         }
         return result;
     }
+    // objCurrency's stopped branch (pTimeStop outside fields) skips motion
+    // and alarms; collection by the player still sees the gem.
+    CurrencyStepResult collectFrozenCurrency(const GemMotion& motion,bool large,unsigned amount,
+        PlayerMotion& player,CurrencyAccount& currency){
+        if(!motion.collectible(player.offsetXFixed(),player.offsetYFixed(),large))return CurrencyStepResult::alive;
+        currency.collect(amount,300,upgrades.levels[20]!=0);
+        gemStreakRise.reset();
+        if(upgrades.levels[4])player.rechargeFromGem(amount);
+        return CurrencyStepResult::collected;
+    }
     // Shop Create snapshots prices from run ownership; acquiring a card later
     // does not reprice already-created stock. Other style/difficulty modes
     // remain separate from the current usual-style, normal run adapter.
@@ -633,6 +643,9 @@ struct RunSession {
         return true;
     }
     bool goalStopped = false, exitControlsLocked = false;
+    // global.pTimeStop as published by a compact world's player Begin Step.
+    // The registered SDL owner keeps its own TimeStopEffects and leaves it false.
+    bool timeStopped = false;
     bool exitDitherRequested = false, levelResultRequested = false;
     ExitDither exitDither;
     LevelClearController levelClear;

@@ -77,9 +77,9 @@ def main():
         oldScene=-1
         oldLevel=-1
         levelStart=-1
-        deadline=time.monotonic()+600
+        deadline=time.monotonic()+1200
         with Input(g,log=lambda r: log.write(str(r)+'\n')) as controls:
-            for frame in range(10000):
+            for frame in range(14000):
                 if time.monotonic()>deadline:
                     raise TimeoutError('bounded world-one route')
                 stop=checked('continue')
@@ -115,7 +115,16 @@ def main():
                     # The host witness for a level's first tick is recorded
                     # after next-level creation; native samples input before
                     # scenes.step builds it. Later checks cover those draws.
-                    if tick and tick%16==0 and not resultPending and tick!=levelStart:
+                    # Diagnostic: DOWNWELL_DENSE_CHECK=from,to checks every tick
+                    # in that window and prints the compact time-stop state.
+                    dense=os.environ.get('DOWNWELL_DENSE_CHECK')
+                    inDense=False
+                    if dense:
+                        lo,hi=map(int,dense.split(','))
+                        inDense=lo<=tick<=hi
+                        if inDense:
+                            print(checked('printf "DENSE %u shards=%u speed=%d rng=%u\\n", $w->tick_,$w->timeStop_.shards.count_,$w->timeStop_.roomSpeed,(unsigned)$w->enemyRandom_.drawCount_'),flush=True)
+                    if tick and (tick%16==0 or inDense) and not resultPending and tick!=levelStart:
                         observed=checked('printf "CHECK %d %ld %ld %d %u\\n", $w->run_.stage.level,$w->player_.x_,$w->player_.y_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
                         match=re.search(r'CHECK ([\d -]+)',observed)
                         actual=list(map(int,match[1].split())) if match else []

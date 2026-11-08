@@ -505,17 +505,19 @@ registration representation.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Gameplay-leased DMA plane atlas (cavern; full pixel oracle 124,146) | 117,744 |
+| Gameplay-leased DMA plane atlas (cavern; full pixel oracle 124,146) | 118,914 |
 | Effect surface | 20,448 |
 | Offline interleaved smoke/gem stamps | 0 additional (4,932 in cache tail) |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Gameplay total, before allocation alignment** | **493,484** |
+| **Gameplay total, before allocation alignment** | **494,654** |
 | **Front-end total, without gameplay DMA atlas** | **375,740** |
 
 W1.4's gun art (modules, letters, casing, laser and spread shots, the laser
 muzzle's 270 page, the cropped pickup effect, notice icon and glyphs) added
 8,334 Chip plane bytes and 17,762 cavern CPU bytes; against the 502,592 free
 bytes measured at startup this leaves about 9 KiB of gameplay Chip headroom.
+W1.5's time-shard sprite 91 (six frames) adds 1,170 plane bytes, leaving
+about 8 KiB.
 The directory sizes depend on the generated asset set; remeasure actual free
 and largest Chip blocks when it changes. The original contiguous gameplay
 DWAP stays in ordinary memory for CPU rendering, effects, metadata and sprite
@@ -594,9 +596,9 @@ splits its records, unchanged, into the following banks:
   art. Only explicit replay/plane pixel oracles may load these catalogues.
   The normal link audit rejects their load paths in production code.
 - `amiga-cavern.dwap` (`Downwell.cavern`), 246,710 CPU bytes, paired with
-  `amiga-cavern.planes` (`Downwell.cavernplanes`), 117,744 DMA bytes, replaces
+  `amiga-cavern.planes` (`Downwell.cavernplanes`), 118,914 DMA bytes, replaces
   that union during cavern gameplay. `CAVERN_ROOTS` is independent of future
-  union additions. The exporter checks fixed 248 KiB CPU/116 KiB DMA ceilings
+  union additions. The exporter checks fixed 248 KiB CPU/117 KiB DMA ceilings
   and retained payloads against the full pack. Scene retirement drains
   DMA and invalidates every borrowed CPU/DMA view before release;
   upgrade entry releases the lease and next-level entry reacquires it.

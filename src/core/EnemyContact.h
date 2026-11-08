@@ -12,6 +12,7 @@ inline ContactBounds contactSpriteBounds(int sprite) {
     switch (sprite) {
         case 31: return {-4, 4, -4, 8};
         case 84: return {-2, 2, -1, 2};
+        case 91: return {-4, 4, -2, 1};
         case 133: return {-4, 4, -4, 4};
         case 134: return {-6, 6, -6, 6};
         case 139: return {-8, 8, -7, 9};

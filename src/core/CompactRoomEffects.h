@@ -79,18 +79,23 @@ public:
         }
         retire();return true;
     }
-    // parentMovingFx Step. This world admits no pTimeStop, so it never pauses.
-    bool stepMoving(Phase phase){
+    // parentMovingFx Step. bound(effect,moving) answers TimeStopBound.
+    template<class Bound> bool stepMoving(Phase phase,Bound bound){
         if(!good_)return false;
         struct Ops {
-            bool timeStopBound(bool& moving){moving=true;return true;}
+            Bound& bound;const MovingFx* effect;
+            bool timeStopBound(bool& moving){return bound(*effect,moving);}
             bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){accepted=value;return true;}
             bool position(bool,RunnerImageValue value,RunnerImageValue& accepted){accepted=value;return true;}
-        } ops;
+        } ops{bound,nullptr};
         for(unsigned i=0;i<movingCount_;++i){auto& r=moving_[i];
+            ops.effect=&r.effect;
             if(r.handle<=phase.newest&&!r.effect.destroyRequested&&!r.effect.step(ops))return fail();
         }
         return true;
+    }
+    bool stepMoving(Phase phase){
+        return stepMoving(phase,[](const MovingFx&,bool& moving){moving=true;return true;});
     }
 private:
     bool fail(){good_=false;return false;}

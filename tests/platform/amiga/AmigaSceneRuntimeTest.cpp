@@ -13,6 +13,8 @@
 #include "core/StartupRuntime.h"
 #include "core/GameMakerRounding.h"
 #include "core/GameplayContactProfileInput.h"
+#include "core/GameplayEncounterSession.h"
+#include "../../core/CollisionOwnerFixture.h"
 #include "GameplayEncounterCoverage.h"
 #include <cmath>
 #include <cstdlib>
@@ -2401,16 +2403,36 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     downwell::ObjectPack objects(ob.data(),ob.size());
     downwell::BuilderPatternPack patterns(pb.data(),pb.size());
     downwell::PackedRoom room;require(rooms.findRoom(11,room),"slice room");
-    static AmigaPortRuntime game(300,false,1201-176,true);
+    // The normal Amiga build's ownership: the resource-backed owner registers
+    // builder instances at generation and re-registers on activation, which
+    // sets same-object Step and alarm order. An unbound world would step
+    // by activation slot and is not an oracle for the native route.
+    auto sb=readFile("generated/downwell-sprites.dwsc");
+    static std::unique_ptr<downwell::SpriteCollisionPack> sprites;
+    sprites.reset(new downwell::SpriteCollisionPack(sb.data(),sb.size()));
+    static auto owner=downwell::makeCollisionOwner(objects,*sprites,{},{},&rooms,
+        downwell::GameplayCollisionOwner::Ownership::nativeScenery,true,true,false);
+    // The shipping build's DOWNWELL_EXTERNAL_COLLISION_BACKEND fixes native
+    // scenery layers and boxes; nativeScenery selects the same on the host.
+    // Host spatial journals are inline (no Amiga leases to bind).
+    require(owner->valid(),"slice native collision owner is valid");
+    require(owner->declareExternalCollisionBackend(),"slice owner declares the external collision backend");
+    static std::unique_ptr<AmigaPortRuntime> gamePointer(new AmigaPortRuntime(300,false,1201-176,true,
+        owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms,
+        GameplayWorld::PlayerBirthTiming::authoredRoom));
+    auto& game=*gamePointer;
+    require(game.effectsSucceeded()&&owner->attach(game),"slice owner attaches");
     game.initializeEntryInput(false); // normal room-entry scrPlayerInit alarm[2]
-    downwell::EncounterInput edges;
-    require(game.bindEncounterInput(&edges),"slice uses production input edges");
+    downwell::GameplayEncounterSession session(game,*owner);
+    require(session.start(),"slice uses the production encounter session and input edges");
     LiveSceneWorld live(patterns,objects);
     live.bind(game,rooms,room);
-    // The route's fire cadence phase. W1.4's shots draw RNG, so every policy
-    // change reshuffles the whole route; DOWNWELL_SLICE_VARIANT sweeps the
-    // phase (and DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
-    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):2u;
+    // The route's fire cadence phase (variant%40) and W1.5 hover phase and
+    // period (variant/40). Shots draw RNG, so every policy change reshuffles
+    // the whole route; DOWNWELL_SLICE_VARIANT sweeps them (and
+    // DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
+    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):401u;
+    const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
     const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
     std::ofstream tape(output+".inputs",std::ios::binary);
     std::ofstream states(output+".states");
@@ -2418,6 +2440,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     require(bool(tape),"open slice input tape");
     unsigned total=0;
     unsigned routeRedBalls=0,routeEyes=0,routeChunks=0;
+    // W1.5: side-room time-stops, shards, frozen enemies and doused fires.
+    unsigned routeSideStops=0,routeFrozen=0,routeDoused=0,routeShards=0,routeFireViews=0;
     for(unsigned level=1;level<=3;++level){
         int target=240,deepest=176+game.player().offsetY();unsigned stuck=0,updates=0,shopTick=0;
         std::uint32_t lastSteering=0;unsigned jellies=0,redBalls=0,steeringKills=0,eyes=0;
@@ -2429,6 +2453,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         unsigned modules=0,pickups=0,gunChanges=0,rangedShots=0,laserShots=0,casings=0,trails=0,notices=0;
         unsigned peakBullets=0,peakCasings=0,peakTrails=0,lastModuleEnd=0,lastTextEnd=0;
         std::set<std::uint32_t> seenShots;
+        unsigned stopBegan=0,sideStops=0,frozenFrames=0,fieldKills=0,peakShards=0,stoppedUpdates=0,fireViews=0;
         const unsigned blocksBefore=game.blocksDestroyed(),currencyBefore=game.currency();
         require(!game.finishWorldOneSlice(),"cannot finish before Result Alarm 1");
         for(;updates<8000&&!game.levelResultRequested()&&!game.dead();++updates){
@@ -2491,6 +2516,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     if(r.live&&!r.opened&&!abandoned.count({r.x,r.y})&&
                        (detourX==r.x&&detourY==r.y?std::abs(r.y-y)<=48:r.y>=y-16&&r.y<=y+120&&std::abs(r.x-x)<=200))
                         {scenery=true;sx=r.x;sy=r.y;}}
+                // W1.5: douse a TorchFire on the route.
+                for(unsigned i=0;!scenery&&i<sc.fireEnd;++i){const auto& f=sc.fires[i];
+                    if(f.live&&f.active&&!abandoned.count({f.x,f.y})&&
+                       (detourX==f.x&&detourY==f.y?std::abs(f.y-y)<=48:f.y>=y-16&&f.y<=y+120&&std::abs(f.x-x)<=200))
+                        {scenery=true;sx=f.x;sy=f.y;}}
                 if(scenery){
                     if(std::getenv("DOWNWELL_TRACE_SLICE_DETOUR")&&updates%20==0)std::cerr<<"DETOUR level="<<level<<" update="<<updates
                         <<" target="<<sx<<','<<sy<<" module="<<module<<" player="<<x<<','<<y<<" grounded="<<game.player().grounded()
@@ -2512,6 +2542,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                             jumpHold=0;
                             // Above it: stomp-shoot downwards like the threat rule.
                             if(!module&&std::abs(x-sx)<=8&&y<sy)input.fire=updates%4<2;
+                            // W1.5: hover across on gunboot shots towards a
+                            // target in a side room before falling past it.
+                            else if(hover&&std::abs(x-sx)>8&&y<sy+8&&game.player().ammo()>1)
+                                input.fire=(updates+variant/40)%(6+variant/240)<2;
                         }
                     }
                 }else if(detourX||detourY){detourX=detourY=0;escape=240;}
@@ -2530,12 +2564,52 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
             lastFire=input.fire;lastPlayerX=game.player().offsetXFixed();
             const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
-            edges.sample(input);
+            downwell::GameplayEncounterSession::Frame frame(session);
+            require(frame.valid()&&frame.sampleInput(input),"slice encounter frame samples input");
             const int healthBefore=game.health();
             std::vector<std::uint32_t> liveSteering;
             for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
                 if((e.objectId==115||e.objectId==118)&&e.active)liveSteering.push_back(e.lifetimeId);}
+            if(const char* dump=std::getenv("DOWNWELL_TRACE_SLICE_ENEMIES")){
+                // N: four ticks from N; -N: every N ticks (no rng column).
+                const int arg=std::atoi(dump);const unsigned from=unsigned(arg<0?0:arg);
+                if(arg<0?game.tick()%unsigned(-arg)==0&&updates>0:game.tick()>=from&&game.tick()<=from+3){
+                    std::cerr<<"DENSE "<<game.tick();if(arg>=0)std::cerr<<" rng="<<game.randomDrawCount();std::cerr<<'\n';
+                    for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                        std::cerr<<"E"<<i<<" obj="<<e.objectId<<" act="<<e.active<<" x="<<e.x<<" y="<<e.y<<" hp="<<e.health
+                            <<" ms="<<e.motionState<<" a0="<<e.alarm0<<" a1="<<e.alarm1<<" fz="<<e.frozen<<" sid="<<e.sourceId<<" life="<<e.lifetimeId<<" slot="<<e.identitySlot<<'\n';}
+                }
+            }
+            const bool stoppedBefore=game.timeStopped();
+            std::vector<std::uint32_t> liveEnemies;
+            for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                if(e.active&&e.health>0)liveEnemies.push_back(e.lifetimeId);}
             game.step(packed);
+            require(frame.beginDraw(true)&&frame.finish(),"slice encounter frame completes");
+            {
+                const int px=240+game.player().offsetX();
+                // A side-room stop begins after the start field's and
+                // resumes before the exit (the goal field never resumes).
+                if(game.timeStopped()&&!stoppedBefore)stopBegan=updates;
+                if(!game.timeStopped()&&stoppedBefore&&stopBegan>0)++sideStops;
+                (void)px;
+                if(game.timeStopped())++stoppedUpdates;
+                peakShards=std::max(peakShards,game.compactTimeShards().size());
+                for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                    if(e.active&&e.frozen&&e.health>0)++frozenFrames;}
+                // Enemies killed inside a time field (ordinary 82 rooms).
+                if(game.timeStopped())for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                    if(e.health<=0&&std::find(liveEnemies.begin(),liveEnemies.end(),e.lifetimeId)!=liveEnemies.end()&&
+                       (240+e.x<160||240+e.x>320))++fieldKills;}
+                const auto& sc=game.compactScenery();
+                const int vy=176+game.player().offsetY();
+                for(unsigned i=0;i<sc.fireEnd;++i)if(sc.fires[i].live&&sc.fires[i].active&&
+                    std::abs(sc.fires[i].y-vy)<100)++fireViews;
+            }
+            if(game.timeStopped()!=stoppedBefore&&std::getenv("DOWNWELL_TRACE_SLICE_TIME"))
+                std::cerr<<"TIME level="<<level<<" update="<<updates<<" stopped="<<game.timeStopped()
+                    <<" player="<<240+game.player().offsetX()<<','<<176+game.player().offsetY()
+                    <<" shards="<<game.compactTimeShards().size()<<" speed="<<game.roomSpeed()<<'\n';
             {
                 const auto& fx=game.compactEffects();const auto& sc=game.compactScenery();
                 peakNoLoop=std::max(peakNoLoop,fx.noLoopCount());peakMoving=std::max(peakMoving,fx.movingCount());
@@ -2604,7 +2678,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     std::cerr<<"EVENT superFlash tick="<<game.tick()<<'\n';
                 for(unsigned i=0;i<sc.torchEnd;++i)if(sc.torches[i].live&&sc.torches[i].allSet&&sc.torches[i].placement>=0)
                     litTorches.insert({sc.torches[i].x,sc.torches[i].y});
-                for(unsigned i=0;i<sc.fireEnd;++i)if(sc.fires[i].live&&!sc.fires[i].active)doused.insert({sc.fires[i].x,sc.fires[i].y});
+                for(unsigned i=0;i<sc.fireEnd;++i)if(sc.fires[i].live&&!sc.fires[i].active&&
+                    doused.insert({sc.fires[i].x,sc.fires[i].y}).second&&traceEvents)
+                    std::cerr<<"EVENT fireDoused tick="<<game.tick()<<" level="<<level<<" fire="<<sc.fires[i].x<<','<<sc.fires[i].y
+                        <<" stopped="<<game.timeStopped()<<" player="<<240+game.player().offsetX()<<','<<176+game.player().offsetY()<<'\n';
             }
             for(unsigned i=0;i<game.enemyCount();++i){
                 const auto& e=game.enemyAt(i);
@@ -2618,7 +2695,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 const unsigned from=unsigned(std::atoi(window)),to=from+16;
                 if(game.tick()>=from&&game.tick()<=to){
                     std::cerr<<"TICK "<<game.tick()<<" rng="<<game.randomDrawCount()<<" blocks="<<game.blocksDestroyed()
-                        <<" gems="<<game.gemSlotEnd()<<" player="<<x<<','<<y<<" fire="<<input.fire;
+                        <<" gems="<<game.gemSlotEnd()<<" player="<<x<<','<<y<<" fire="<<input.fire
+                        <<" noLoop="<<game.compactEffects().noLoopCount()<<" stopped="<<game.timeStopped()<<" shards="<<game.compactTimeShards().size()<<" speed="<<game.roomSpeed();
+                    for(unsigned i=0;i<game.compactEffects().noLoopCount();++i){const auto& e=game.compactEffects().noLoop(i).effect;
+                        std::cerr<<" fx"<<e.spriteId<<'#'<<std::hex<<e.imageIndex.bits<<std::dec;}
                     for(unsigned i=0;i<game.bulletSlotEnd();++i){const auto& b=game.bulletAt(i);
                         if(b.active)std::cerr<<" shot"<<int(b.kind)<<'@'<<b.x+240<<','<<b.y+176;}
                     for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
@@ -2655,6 +2735,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         std::cout<<"Slice level="<<level<<" modules="<<modules<<" pickups="<<pickups<<" gun="<<game.gunType()
             <<" ranged="<<rangedShots<<" laser="<<laserShots<<" casings="<<casings<<" trails="<<trails<<" notices="<<notices
             <<" peak bullets="<<peakBullets<<" casings="<<peakCasings<<" trails="<<peakTrails<<std::endl;
+        std::cout<<"Slice level="<<level<<" sideStops="<<sideStops<<" stoppedUpdates="<<stoppedUpdates
+            <<" peak shards="<<peakShards<<" frozenFrames="<<frozenFrames<<" fieldKills="<<fieldKills
+            <<" fireViews="<<fireViews<<std::endl;
         std::cout<<"Slice level="<<level<<" jellies="<<jellies<<" redBalls="<<redBalls
             <<" steeringKills="<<steeringKills<<" eyeFrames="<<eyes<<std::endl;
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
@@ -2666,6 +2749,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         routeChunks+=openedChunks.size();routePickups+=pickups;
         if(level==3)require(routeChunks,"the route opens a gem chunk");
         if(level==3)require(routePickups&&routeNewGunShots,"the route collects a GunModule and fires its gun");
+        routeSideStops+=sideStops;routeFrozen+=frozenFrames+fieldKills;routeDoused+=doused.size();
+        routeShards=std::max(routeShards,peakShards);routeFireViews+=fireViews;
+        if(level==3)require(routeSideStops&&routeShards,"the route stops time in a side room with shards");
+        if(level==3)require(routeFrozen,"the route freezes or field-kills an enemy");
+        if(level==3)require(routeFireViews&&routeDoused,"the route shows and douses a TorchFire");
         require(!game.dead()&&game.levelResultRequested(),"input-only slice reaches exit alive");
         bool heart=false;require(game.enterLevelClear(0,heart),"slice Result Create");
         unsigned clear=0;
@@ -2673,8 +2761,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
             bool fire=clear%4==2;downwell::Input input;input.fire=fire;tape.put(char(downwell::packReplayInput(input)));++total;
-            edges.sample(input);
+            downwell::GameplayEncounterSession::Frame frame(session);
+            require(frame.valid()&&frame.sampleInput(input),"slice Result frame samples input");
             require(game.stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"slice Result Step");
+            require(frame.beginDraw(true)&&frame.finish(),"slice Result frame completes");
         }
         require(game.nextLevelRequested(),"slice Result Alarm 1");
         std::cout<<"Slice clear="<<clear<<" rng="<<game.randomDrawCount()<<std::endl;

@@ -293,7 +293,16 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
                 if(!append(UWORD(sprite),UWORD(life&7),downwellPlayfieldX+x-viewX,y-viewY,0))return false;
             }
     }
-    return true;
+    // Compact fxTimeShard 238 (W1.5): Draw is sprite 91 while dflash<=0.
+    bool shardsOk=true;
+    port.compactTimeShards().visitNewest([&](auto,const auto& e){
+        if(!shardsOk||e.dflash>0)return;
+        std::int32_t x,y;unsigned frame;
+        if(!e.x.promoted().roundPixel(x)||!e.y.promoted().roundPixel(y)||
+           !downwell::DebrisDraw::frame(91,e.imageIndex,frame)){failedSprite=91;shardsOk=false;return;}
+        if(!append(UWORD(91),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0))shardsOk=false;
+    });
+    return shardsOk;
 }
 
 // W1.4 compact gun owners, all in room coordinates.

@@ -289,6 +289,7 @@ int main(int argc,char** argv){
     // platform contacts).
     GameplayWorld::compactRoomEffectsAdmitted=false;
     GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
+    GameplayWorld::compactTimeStopAdmitted=false; // and W1.5 time-stop
     {
         auto actual=std::make_unique<AmigaTerrainIndex>();
         auto oracle=std::make_unique<AmigaTerrainIndex>();

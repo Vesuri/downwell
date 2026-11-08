@@ -177,10 +177,13 @@ int main() {
             self.assertEqual(audit.violations(cavern + path), [path[:-1].decode('ascii')])
 
     def test_cavern_admission_is_not_the_gameplay_union(self):
-        for ident in (91, 116, 205, 206, 207, 208, 460):
+        for ident in (116, 205, 206, 207, 208, 460):
             for offset in (0, 62000, 63000):
                 self.assertNotIn(ident + offset, CAVERN_IDS)
-        for ident in (31, 115, 133, 153, 702, 63031, 63153, 63702, 65110):
+        # Area-four debris shares sprite 91 with the W1.5 time shards.
+        for offset in (62000, 63000):
+            self.assertNotIn(91 + offset, CAVERN_IDS)
+        for ident in (31, 91, 115, 133, 153, 702, 63031, 63153, 63702, 65110):
             self.assertIn(ident, CAVERN_IDS)
         self.assertTrue(CAVERN_IDS < GAME_IDS)
         self.assertNotIn(200, CAVERN_ROOTS)

@@ -12,10 +12,13 @@ constexpr unsigned gameplayGemCapacity = 64;
 // player's head break, and scenery whose builder art changed.
 constexpr unsigned gameplaySceneryRepaintCapacity = 32;
 constexpr unsigned gameplayRepaintCapacity = gameplayCompactBulletCapacity + 1 + gameplaySceneryRepaintCapacity;
-// Compact scrEffectSpawn (219) and emitMovingFx (220) records per room.
-constexpr unsigned gameplayCompactNoLoopCapacity = 16, gameplayCompactMovingCapacity = 48;
+// Compact scrEffectSpawn (219) and emitMovingFx (220) records per room. A
+// gem-high SHOTGUN burst alone spawns one 602 per pellet (sixteen).
+constexpr unsigned gameplayCompactNoLoopCapacity = 32, gameplayCompactMovingCapacity = 48;
 // Compact object-370 debris (two per box, scenery bursts).
 constexpr unsigned gameplayCompactDebrisCapacity = 24;
+// Compact fxTimeShard 238: shardLimit 20 plus one Begin Step's two bursts.
+constexpr unsigned gameplayCompactShardCapacity = 32;
 // Beyond rmMain's serialized 300000-pixel height, but safe when multiplied
 // by Q8 on a 32-bit 68000. Absence of terrain must not create a local floor.
 constexpr int gameplayNoLanding = 1000000;
