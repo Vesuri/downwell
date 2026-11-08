@@ -164,6 +164,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     const bool fireReleased = !input.fire && priorFire_;
     bool shotFired = false;
     bool horizontalCollision = false;
+    dustCount_ = 0;
 
     if (shotDelay_ > 0)
         --shotDelay_;
@@ -208,6 +209,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ = static_cast<int>(halved % 5);
         }
     } else {
+        // scrPlMovement: a grounded press from rest or against the current
+        // motion, without wall contact, kicks dust behind the new direction.
+        if (!controlsLocked && grounded_ && !wallColliding_ && input.left != input.right &&
+            (input.left ? speedX_ >= 0 : speedX_ <= 0))
+            addDust(false, x_, y_, input.left ? -1 : 1);
         if(!downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
             speedX_, facing_, grounded_, input.left, input.right, controlsLocked,!spinJumping_,
             [this](int value){return !facingPublication_||facingPublication_(facingPublicationContext_,value);})){
@@ -267,6 +273,8 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         speedY_ = jumpSpeed;
         gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
         jumpShootLocked_ = true;
+        // scrJump's dry, rocketless branch: objJumpFx at the instance x/y.
+        addDust(true, long(oldPixelX) * fixedOne, long(oldPixelY) * fixedOne, 0);
         if (input.left || input.right) spinJumping_ = true;
         spinPhaseTwentieths_ = 0; // scrJump explicitly resets image_index
         ++jumps_;
@@ -283,6 +291,8 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             speedY_ = 3 * fixedOne;
             gravityRemainder_ = 0;
         }
+        ++emptyShots_;
+        if (!noChargeMessage_) { noChargeMessage_ = true; ++emptyMessages_; }
         shotDelay_ = 16;
     } else if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
                !jumpShootLocked_ && !nonAuto_ && ammo_ > 0) {
@@ -365,8 +375,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             // before scrRecharge. A simultaneous wall hit defers completion.
             if (!horizontalCollision && comboCompletion_ && !comboTimeStopped_)
                 comboCompletion_(comboContext_);
+            // Landing dust at the corrected position, emitTo = sign(xsp).
+            addDust(false, x_, y_, speedX_ > 0 ? 1 : speedX_ < 0 ? -1 : 0);
             recharge();
             airborneShot_ = false;
+            noChargeMessage_ = false;
             spinJumping_ = false;
         }
     }
@@ -433,6 +446,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     if (spinJumping_ && wasSpinning)
         spinPhaseTwentieths_ = (spinPhaseTwentieths_ + 6) % 160;
     if (!spinJumping_) spinPhaseTwentieths_ = 0;
+    wallColliding_ = horizontalCollision;
     priorFire_ = input.fire;
     PlayerMotionDelta motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
     return motion;

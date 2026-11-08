@@ -736,6 +736,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     enemy.imageFrame = 0;
     enemy.active = active;
     enemy.destroyRequested = false;
+    enemy.takenImpactDamage = 0;
     enemy.awake = awake;
     enemy.grounded = grounded;
     enemy.frogLanded = true;
@@ -1076,6 +1077,8 @@ void GameplayWorld::advanceEnemyAlarms()
         if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
         if (enemy.objectId == 116) enemy.batHit.advanceFrame();
     }
+    // objControlerN 37 is the first object at alarm index 0.
+    advanceCompactControllerAlarm();
     if(roomAlarms_){
         if(!roomAlarms_(roomAlarmsContext_)){run_.effectsSucceeded=false;return;}
         // Compact fxTimeChange 211, fxTimeShard 238, gemChunk 293 and debris
@@ -1087,6 +1090,9 @@ void GameplayWorld::advanceEnemyAlarms()
             const auto shardPhase=timeStop_.shards.beginPhase();
             for(unsigned alarm=0;alarm<3;++alarm)if(!advanceTimeEffectAlarm(changePhase,shardPhase,alarm))return;
         }
+        // Compact objDeadBody 263 (Alarms 0-3) likewise draws no RNG.
+        if(compactCorpses_.size())
+            for(unsigned alarm=0;alarm<4;++alarm)if(!advanceCompactCorpseAlarm(alarm))return;
         if(scenery_.gemChunkEnd||compactDebris_.size())
             for(unsigned alarm=0;alarm<3;++alarm)if(!advanceCompactSceneryAlarm(alarm))return;
         return;
@@ -1096,11 +1102,12 @@ void GameplayWorld::advanceEnemyAlarms()
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
     // Object order within each index: boxes 92, enemies 111-119, then the
     // compact gemChunk 293 and breakablesDebris 370, with fxTimeChange 211
-    // and fxTimeShard 238 between the enemies and the scenery.
+    // and fxTimeShard 238 then objDeadBody 263 between the enemies and the
+    // scenery. Only corpses have an Alarm 3.
     const bool timeEffects=timeStop_.changes.size()||timeStop_.shards.size();
     const auto changePhase=timeStop_.changes.beginPhase();
     const auto shardPhase=timeStop_.shards.beginPhase();
-    const unsigned alarms=scenery_.gemChunkEnd||compactDebris_.size()||timeStop_.shards.size()?3:2;
+    const unsigned alarms=compactCorpses_.size()?4:scenery_.gemChunkEnd||compactDebris_.size()||timeStop_.shards.size()?3:2;
     for (unsigned alarm = 0; alarm < alarms; ++alarm) {
       if(alarm==0)for(unsigned i=0;i<breakableCount_;++i)
         if(breakables_[i].lifetimeId&&!advanceBoxRoomAlarm({i,breakables_[i].lifetimeId},alarm))return;
@@ -1108,7 +1115,8 @@ void GameplayWorld::advanceEnemyAlarms()
         if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
         if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
       }
-      if(timeEffects&&!advanceTimeEffectAlarm(changePhase,shardPhase,alarm))return;
+      if(timeEffects&&alarm<3&&!advanceTimeEffectAlarm(changePhase,shardPhase,alarm))return;
+      if(compactCorpses_.size()&&!advanceCompactCorpseAlarm(alarm))return;
       if(!advanceCompactSceneryAlarm(alarm))return;
     }
 }
@@ -1531,6 +1539,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // fxTimeShard 238 has no Animation End event.
     if(timeStop_.shards.size()&&!timeStop_.shards.advanceAnimation(timeStop_.shards.beginPhase()))
         run_.effectsSucceeded=false;
+    // Nor does objDeadBody 263 (its one-frame sprites only wrap).
+    if(compactCorpses_.size()){struct Hooks{} hooks;
+        if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),
+            [](auto,downwell::CorpseAnimation& corpse){return corpse.advanceImage();},hooks))run_.effectsSucceeded=false;}
     }
     if(!run_.effectsSucceeded)return {};
     {
@@ -1640,6 +1652,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         const auto& gun=currentGun();
         player_.configureGun(gun.consumption,gun.rof,gun.delayKill,gun.recoilFifths);
     }
+    // scrPlayerShootN's emitSmoke reads global.plx/ply from before this Step.
+    const unsigned emptyShotsBefore=player_.emptyShots(),emptyMessagesBefore=player_.emptyMessages();
+    const int emptyX=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
+    const int emptyY=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,
@@ -1660,6 +1676,35 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
+    if(run_.combo.completion.momentDelay)compactMomentDelay(); // comboDone
+    // objJumpFx 95 and objJumpSmallerFx 94: image_speed 0.5, destroyed at
+    // Animation End, no RNG. The smaller puff draws itself and a mirrored
+    // copy (62094) unless emitTo selects one side.
+    for(unsigned i=0;i<player_.dustCount();++i){
+        using Real=downwell::MotionBinary64;
+        const auto& d=player_.dust(i);
+        const Real x=Real::fromInteger(240+int(downwell::roundGameMakerQ8(d.x)));
+        const Real y=Real::fromInteger(176+int(downwell::roundGameMakerQ8(d.y)));
+        if(d.jump){if(!compactCosmeticEffect(x,y,95,{0x3fe00000u,0},0))return {};continue;}
+        if(d.emitTo!=1&&!compactCosmeticEffect(x,y,94,{0x3fe00000u,0},0))return {};
+        if(d.emitTo!=-1&&!compactCosmeticEffect(x,y,62094,{0x3fe00000u,0},0))return {};
+    }
+    // The first empty shot since landing: scrRisingText(plx, ply, "EMPTY!").
+    // A full notice pool drops the cosmetic text.
+    if(player_.emptyMessages()!=emptyMessagesBefore)
+        if(auto* n=downwell::CompactGuns::append(guns_.notices,guns_.noticeEnd)){
+            *n={};n->live=true;n->empty=true;n->x=emptyX;n->y=long(emptyY)<<16;n->birth=tick_;
+        }
+    // Empty charge: emitSmoke(plx, ply+4, 315, 4) and (225, 4). The puffs
+    // follow the whole player Step here; the shot is its last RNG user.
+    if(player_.emptyShots()!=emptyShotsBefore&&compactDamageEffectsAdmitted){
+        using Real=downwell::MotionBinary64;
+        const Real x=Real::fromInteger(emptyX),y=Real::fromInteger(emptyY+4);
+        static const int directions[]={315,225};
+        for(int direction:directions)
+            if(!run_.smokeEffects.emitDirected(x,y,Real::fromInteger(direction),Real::fromInteger(4),enemyRandom_))
+                {run_.effectsSucceeded=false;return {};}
+    }
     if(stopped()!=stoppedBeforeStep){
         currencyAccount_.streak=streakBeforeStep;currencyAccount_.timer=streakTimerBeforeStep;
         currencyAccount_.beginStep(false,stopped());
@@ -1732,6 +1777,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const auto compactEffectStepPhase=compactEffects_.beginPhase();
     const auto compactDebrisStepPhase=compactDebris_.beginPhase();
     const auto shardStepPhase=timeStop_.shards.beginPhase();
+    const auto corpseStepPhase=compactCorpses_.beginPhase();
     if(!captureEnemyStepOrder())return {};
     if(playerChildrenStarted_&&!publishPlayerFallDepth())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,-1)){
@@ -1962,7 +2008,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,370)){
         run_.effectsSucceeded=false;return {};
     }
-    // Scattered16/gemChunk/TorchFire/Torch (289-296), then compact debris 370.
+    // Compact objDeadBody 263, then Scattered16/gemChunk/TorchFire/Torch
+    // (289-296), then compact debris 370.
+    if(compactCorpses_.size()&&!stepCompactCorpses(corpseStepPhase))return {};
     if(!scenery_.empty()&&!stepCompactScenery())return {};
     if(compactDebris_.size()&&!compactDebris_.step(compactDebrisStepPhase,enemyRandom_,
         [this](auto,const downwell::DebrisAnimation& d,bool& frozen){ // !TimeStopBound, mask 598
@@ -2015,9 +2063,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.imageScaleY(),
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)}, enemy.x, enemy.y};
         },
-        [this](EnemyState& enemy) { spawnReward(enemy, true); return run_.effectsSucceeded; },
+        [this](EnemyState& enemy) { return compactEnemyDeath(enemy, true); },
         [](downwell::EnemyContact) {},
         [this](int x,int y) {
+            compactDamageSlowdown();
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
                 x,y,240,176);
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
@@ -2080,6 +2129,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     if(registeredActorEndStep_&&!registeredActorEndStep_(registeredActorEndStepContext_,viewTop)){run_.effectsSucceeded=false;return {};}
     if(!guns_.empty()&&(!retireCompactGuns(viewTop)||!drawCompactGunTexts()))return {};
+    if(compactCorpses_.size()&&!endStepCompactCorpses(viewTop))return {};
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
@@ -2507,6 +2557,7 @@ bool GameplayWorld::hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTu
     if(!actor||!turnsDegrees(directionTurns,actor->hitDirection))return run_.effectsSucceeded=false;
     actor->hit=true;actor->hitDamage+=damage;actor->health-=damage;
     enemy.health=actor->health;
+    compactMomentDelay(); // scrDamageEnemy
     return true;
 }
 
@@ -2526,6 +2577,7 @@ bool GameplayWorld::collideSteeringEnemies(){
         const auto result=downwell::applyEnemyContact(enemy.objectId,contact,enemy.x,enemy.y,active,health,
             player_,health_,invulnerability_,defeated,[]{return true;},run_.upgrades.levels[7]!=0,
             [&](int x,int y){
+                compactDamageSlowdown();
                 return succeeded=run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
                     x,y,240,176);
             },downwell::NoContactRetirement{},stompY);
@@ -2590,6 +2642,8 @@ bool GameplayWorld::resetCompactScenery(){
     // scrPlayerInit: aimAngle = 0, burstCount = 0; room instances are gone.
     guns_.clear();aimAngle_=0;burstCount_=0;burstAlarm_=-1;
     if(!compactDebris_.clear())return run_.effectsSucceeded=false;
+    {struct Hooks{bool retire(std::uint32_t,const downwell::CorpseAnimation&){return true;}} hooks;
+        if(!compactCorpses_.clear(hooks))return run_.effectsSucceeded=false;}
     // Result Create clears pTimeStop; the next room's player is new.
     return resetCompactTimeStop();
 }
@@ -3164,12 +3218,20 @@ bool GameplayWorld::bulletEnemyContact(BulletState& bullet,const downwell::Proje
         consumed=true;
         if(enemy.objectId==115||enemy.objectId==118)
             return hitSteeringEnemy(enemy,bulletDirection(bullet),bullet.damage)||(run_.effectsSucceeded=false);
+        downwell::RunnerImageValue bx,by;
+        if(!downwell::ProjectilePublication::coordinate(path.x,240,bx)||
+           !downwell::ProjectilePublication::coordinate(path.y,176,by))return run_.effectsSucceeded=false;
+        // scrBulletImpact precedes the (here immediate) death's scrDeadBody.
+        if(enemy.objectId!=112)enemy.takenImpactDamage=bullet.damage;
         const auto impact=downwell::applyBulletDamage(
             enemy,run_.kills,enemyRandom_,
-            [this,&enemy]{run_.combo.state.enemyDefeated();spawnReward(enemy,false);return run_.effectsSucceeded;},
+            [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
             bullet.damage,bulletDirection(bullet),
             [this](const EnemyState& record){return publishEnemyActivation(record,false);});
         if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
+        if(impact.kind==downwell::BulletImpactKind::immune&&!compactImmuneSpark(bx.promoted(),by.promoted()))return false;
+        if((impact.kind==downwell::BulletImpactKind::damaged||impact.kind==downwell::BulletImpactKind::defeated)&&
+           !compactBulletImpact(enemy,bx.promoted(),by.promoted(),bulletDirection(bullet),bullet.damage,false))return false;
         consumed=impact.kind!=downwell::BulletImpactKind::ignored;
         return run_.effectsSucceeded;
     }
@@ -3219,7 +3281,7 @@ bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::Proje
     // An ordinary, non-wave bullet also stops at unbreakable walls.
     if(solidResolver_!=0){
         if(segmentResolver_){
-            if(segmentResolver_(solidResolverContext_,path)){consumed=true;return true;}
+            if(segmentResolver_(solidResolverContext_,path)){consumed=true;return compactBulletWallHit(path);}
         }else{
             const int left=path.x.pixel<path.endX.pixel?path.x.pixel:path.endX.pixel;
             const int right=path.x.pixel>path.endX.pixel?path.x.pixel:path.endX.pixel;
@@ -3227,7 +3289,7 @@ bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::Proje
             const int bottom=path.y.pixel>path.endY.pixel?path.y.pixel:path.endY.pixel;
             for(int y=top;y<=bottom;++y)
                 for(int x=left;x<=right;++x)
-                    if(solidResolver_(solidResolverContext_,x,y)&&path.intersects(x,x+1,y,y+1)){consumed=true;return true;}
+                    if(solidResolver_(solidResolverContext_,x,y)&&path.intersects(x,x+1,y,y+1)){consumed=true;return compactBulletWallHit(path);}
         }
     }
     if((!scenery_.empty()||guns_.moduleEnd)&&!hitCompactShootable(path,bullet,consumed))return false;
@@ -3351,7 +3413,12 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
             bool hit=false,consumed=false;
             const downwell::ProjectileSegment point(shot.x,shot.y,0,0);
             if(!hitGemChunk(point,bullet.damage,hit,consumed))return false;
-        }else destroy=true;
+        }else{
+            // scrEffectSpawn(x, y, hitWallFx 96, 0.5, 0, -10000).
+            destroy=true;
+            if(!compactWallEffect(downwell::MotionBinary64::fromInteger(x+240),
+                   downwell::MotionBinary64::fromInteger(py+176),96,-10000))return false;
+        }
     }else{
         const auto box=mask(py);
         for(unsigned i=0;i<guns_.moduleEnd;++i){auto& m=guns_.modules[i];
@@ -3365,7 +3432,13 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         const auto b=downwell::contactWorldBounds({enemy.x*256L,enemy.y*256L,enemy.objectId==117?enemy.motionState:enemy.facing,
             enemy.imageScaleY(),downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
         if(!downwell::contactBoundsOverlap(mask(py),b))continue;
-        if(enemy.objectId==112){destroy=true;(void)enemyRandom_.chooseIndexSmall(2);break;} // bulletImmune
+        downwell::RunnerImageValue lx,ly;
+        if(!downwell::ProjectilePublication::coordinate(shot.x,240,lx)||
+           !downwell::ProjectilePublication::coordinate(shot.y,176,ly))return run_.effectsSucceeded=false;
+        if(enemy.objectId==112){ // bulletImmune: the 112 spark, then choose(30,31).
+            destroy=true;if(!compactImmuneSpark(lx.promoted(),ly.promoted()))return false;
+            (void)enemyRandom_.chooseIndexSmall(2);break;
+        }
         bool ignored=false;
         for(unsigned k=0;k<bullet.laserHitCount;++k)if(bullet.laserHits[k]==enemy.lifetimeId)ignored=true;
         if(ignored)continue;
@@ -3375,8 +3448,11 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
             if(!hitSteeringEnemy(enemy,shot.direction,bullet.damage))return false;
             continue;
         }
+        // scrBloodfx, scrDamageEnemy, scrFlashballfx(x,y,1,0,2), scrBulletImpact:
+        // the hit's blood and flash precede the (here immediate) death.
+        if(!compactBulletImpact(enemy,lx.promoted(),ly.promoted(),shot.direction,bullet.damage,true))return false;
         const auto impact=downwell::applyBulletDamage(enemy,run_.kills,enemyRandom_,
-            [this,&enemy]{run_.combo.state.enemyDefeated();spawnReward(enemy,false);return run_.effectsSucceeded;},
+            [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
             bullet.damage,shot.direction,[this](const EnemyState& record){return publishEnemyActivation(record,false);});
         if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
     }
@@ -3472,13 +3548,14 @@ bool GameplayWorld::stepCasings(){
         if(wall)c.xsp=-(c.xsp*7)/10;
         if(c.xsp>-3277&&c.xsp<3277)c.xsp=c.xsp>0?3277:c.xsp<0?-3277:0; // 0.05
         // scrBulCheckSolid with bdmg 0: any wall or shootable on the line
-        // ends the casing (its 101 wall effect is W1.6).
+        // ends the casing; a wall shows the parentPBullet hitWallFx 101.
         const auto q20=[](long q16){
             downwell::RangedShot::Coordinate c{int(q16>>16),std::uint32_t(q16&65535)<<4};return c;};
         const downwell::ProjectileSegment path(q20(c.x-(240L<<16)),q20(c.y-(176L<<16)),
             std::int32_t(c.xsp*16),std::int32_t(c.ysp*16));
         bool hit=false;
         if(solidResolver_&&segmentResolver_)hit=segmentResolver_(solidResolverContext_,path);
+        if(hit&&!compactBulletWallHit(path))return false;
         if(!hit&&scenery_.gemChunkEnd){bool chunk=false,consumed=false;
             if(!hitGemChunk(path,0,chunk,consumed))return false;hit=chunk;}
         if(!hit){
@@ -3739,7 +3816,8 @@ bool GameplayWorld::collideEnemyTimeFields(){
             actor->health=0;enemy.health=0;continue;
         }
         enemy.health=0;
-        run_.combo.state.enemyDefeated();spawnReward(enemy,false);
+        run_.combo.state.enemyDefeated();
+        if(!compactEnemyDeath(enemy,false))return false;
         if(!run_.effectsSucceeded||!publishEnemyActivation(enemy,false))return run_.effectsSucceeded=false;
         enemy.active=false;++run_.kills;
     }
@@ -3787,4 +3865,203 @@ bool GameplayWorld::holdStoppedBoxAlarms(){
 bool GameplayWorld::resetCompactTimeStop(){
     pauseMilliseconds_=0;run_.timeStopped=false;
     return timeStop_.reset()||(run_.effectsSucceeded=false);
+}
+
+// ---- Compact enemy deaths and corpses (W1.6) ----------------------------
+
+// scrBloodfx (arguments unused): emitMovingFx(x,y,84,0.5,0+random(20),2) and
+// emitMovingFx(x,y,84,0.5,180-random(20),2). parentMovingFx Create draws none.
+bool GameplayWorld::compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+    using Real=downwell::MotionBinary64;
+    for(unsigned side=0;side<2;++side){
+        Real offset,angle=Real::fromInteger(side?180:0);
+        if(!downwell::randomBinary64(enemyRandom_.nextU32(),Real::fromInteger(20),offset))
+            return run_.effectsSucceeded=false;
+        if(side&&!offset.zero())offset.high^=0x80000000u;
+        if(!angle.add(offset)||
+           !compactEffects_.spawnMoving(x,y,84,{0x3fe00000u,0},angle,Real::fromInteger(2)))
+            return run_.effectsSucceeded=false;
+    }
+    return true;
+}
+
+// The bullet-immune branch: scrEffectSpawn(x,y,112,0.3,0,10000).
+bool GameplayWorld::compactImmuneSpark(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+    return compactEffects_.spawnNoLoop(x,y,112,{0x3fd33333u,0x33333333u},{},
+        downwell::MotionBinary64::fromInteger(10000))||(run_.effectsSucceeded=false);
+}
+
+// scrTypicalBulletDamage (usual and spread shots) or bulletLaser's Collision
+// with subparentEnemy, after the damage itself: the impact for scrDeadBody,
+// then the 605 splash (usual) or blood and a flash (laser). Their sounds are W2.
+bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+    std::uint32_t direction,int damage,bool laser){
+    enemy.takenImpactDamage=damage;
+    compactMomentDelay(); // scrDamageEnemy
+    if(!compactDamageEffectsAdmitted)return true;
+    if(laser)return compactBloodfx(x,y)&&run_.emitFlash<1,0,2>(x,y,enemyRandom_);
+    downwell::RunnerImageValue angle;
+    if(!downwell::ProjectilePublication::angle(direction,angle)||
+       !compactEffects_.spawnNoLoop(x,y,605,{0x3fd99999u,0x9999999au},angle.promoted(),{}))
+        return run_.effectsSucceeded=false;
+    return true;
+}
+
+// The !alive block shared by snake 111, turtle 112, frog 113, bat 116, snail
+// 117 and crawler 119: scrBloodfx, scrSmokefx(1), scrFlashballfx(1),
+// scrCurrencySpawn, then scrDeadBody(dead sprite, takenImpact, 102). A stomp
+// first runs scrEnemyStomped's scrBloodfx. The compact families die at the
+// contact rather than in their next Step, so the chain runs there.
+bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
+    using Real=downwell::MotionBinary64;
+    int sprite;
+    switch(enemy.objectId){
+        case 111:sprite=165;break;case 112:sprite=337;break;case 113:sprite=172;break;
+        case 116:sprite=158;break;case 117:sprite=179;break;case 119:sprite=281;break;
+        default:return run_.effectsSucceeded=false;
+    }
+    compactMomentDelay(); // scrEnemyDeath
+    const Real x=Real::fromInteger(enemy.x+240),y=Real::fromInteger(enemy.y+176);
+    if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
+    if(stomped&&!compactBloodfx(x,y))return false;
+    if(!compactBloodfx(x,y)||!emitBoxSmoke(x,y)||!run_.emitFlash<1,0,0>(x,y,enemyRandom_))return false;
+    spawnReward(enemy,stomped);
+    if(!run_.effectsSucceeded)return false;
+    downwell::DeadBodySource source;
+    source.x=x;source.y=y;source.xsp=exactQ8(enemy.speedX);
+    source.imageXscale=Real::fromInteger(enemy.objectId==117?enemy.motionState:enemy.facing);
+    Real impact;
+    if(!downwell::divideBinary64(Real::fromInteger(enemy.takenImpactDamage),Real::fromInteger(5),impact))
+        return run_.effectsSucceeded=false;
+    struct Queries {
+        GameplayWorld& world;
+        // place_meeting(parentWall) with maskDead 599 at the birth position.
+        bool wall(Real px,Real py,bool& blocked){return world.compactCorpseMeeting(px,py,false,blocked);}
+        // Compact walls are never replaced by depth-100 tiles (see the
+        // spawner's tile query): where the original finds a tile, this world
+        // still has the wall.
+        bool tile(Real,Real,bool& hit){hit=false;return true;}
+        bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+    };
+    struct Hooks {
+        GameplayWorld& world;
+        bool birth(std::uint32_t,const downwell::CorpseAnimation&){return true;}
+        Queries queries(std::uint32_t,const downwell::CorpseAnimation&){return {world};}
+        bool sprite(std::uint32_t,const downwell::CorpseAnimation&){return true;}
+        bool facing(std::uint32_t,const downwell::CorpseAnimation&){return true;}
+    } hooks{*this};
+    // Rest in Pieces (pugRip) and its exploding corpses belong to W1.9.
+    return compactCorpses_.createFromDeath(source,sprite,impact,102,false,enemyRandom_,hooks)||
+        (run_.effectsSucceeded=false);
+}
+
+// maskDead 599 against walls (and, for sParentSolid, platforms). The mask
+// is symmetric about the origin, so image_xscale does not move its edges.
+bool GameplayWorld::compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
+    if(wallContactResolver_&&(!platforms||platformContactResolver_))return solidMeeting(599,x,y,platforms,hit);
+    // Worlds with only a point resolver (host fixtures) scan the mask's
+    // pixel box; without any resolver nothing is solid.
+    hit=false;
+    downwell::ContactBounds bounds;
+    if(!downwell::CurrencyCollisionBounds::calculateMask(599,x,y,bounds))return run_.effectsSucceeded=false;
+    if(!solidResolver_)return true;
+    for(int py=bounds.top;py<bounds.bottom&&!hit;++py)
+        for(int px=bounds.left;px<bounds.right&&!hit;++px)
+            hit=solidResolver_(solidResolverContext_,px-240,py-176);
+    return true;
+}
+
+// objDeadBody Step: TimeStopBound motion against sParentSolid, or the held
+// alarms; dflash in both. Rest in Pieces never applies here (W1.9).
+bool GameplayWorld::stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase){
+    using Real=downwell::MotionBinary64;
+    struct Events {
+        GameplayWorld& world;
+        bool meeting(Real x,Real y,bool& hit){return world.compactCorpseMeeting(x,y,true,hit);}
+        bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+        int area(){return world.run_.stage.area;}
+        int restInPieces(){return 0;}
+        bool create(int,Real,Real){return false;}
+        void destroy(){}
+    } events{*this};
+    struct Hooks{} hooks;
+    return compactCorpses_.dispatch(phase,[&](auto,downwell::CorpseAnimation& corpse){
+        bool frozen=false;
+        if(compactTimeStop()&&stopped()){
+            std::int32_t px,py;
+            if(!corpse.x.promoted().roundPixel(px)||!corpse.y.promoted().roundPixel(py))return false;
+            frozen=!timeStopBound(599,px,py);
+        }
+        return corpse.step(frozen,events);
+    },hooks)||(run_.effectsSucceeded=false);
+}
+
+// Alarm 0 creates fxJobutsu 242 with explosionFx (102) and destroys the
+// corpse; 1 starts the flashing, 2 clears hit, 3 activates. None draws RNG.
+bool GameplayWorld::advanceCompactCorpseAlarm(unsigned alarm){
+    struct Hooks{} hooks;
+    return compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
+        return run_.advanceCorpseAlarm(corpse,alarm,[](int id){return id==102?12u:0u;},[]{});
+    },hooks)||(run_.effectsSucceeded=false);
+}
+
+// End Step scrOutofview, then release every corpse destroyed this update.
+bool GameplayWorld::endStepCompactCorpses(long viewTop){
+    struct Events{void destroy(){}} events;
+    struct Hooks{bool retire(std::uint32_t,const downwell::CorpseAnimation&){return true;}} hooks;
+    const auto top=exactQ8(viewTop/16);
+    return (compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
+        return corpse.endStep(true,top,events);
+    },hooks)&&compactCorpses_.retireRequested(hooks))||(run_.effectsSucceeded=false);
+}
+
+// objControlerN 37 room_speed writers (momentDelay and scrPDamage's WITH
+// body) and its Alarm 0, which restores 60. The registered build owns these
+// through RunControllers; the compact world keeps the controller's alarm.
+// room_speed is the time-stop global, which the Amiga pacing presents.
+void GameplayWorld::compactMomentDelay(){
+    if(runControllers_||timeStop_.roomSpeed!=60)return;
+    timeStop_.roomSpeed=30;compactControllerAlarm0_=1;
+}
+void GameplayWorld::compactDamageSlowdown(){
+    if(runControllers_)return;
+    timeStop_.roomSpeed=40;compactControllerAlarm0_=40;
+}
+void GameplayWorld::advanceCompactControllerAlarm(){
+    if(compactControllerAlarm0_>0&&--compactControllerAlarm0_==0)timeStop_.roomSpeed=60;
+}
+
+// scrBulCheckSolid's unbreakable-wall branch: step by a tenth of the velocity
+// (at most 101 times) until collision_point meets the wall, then
+// scrEffectSpawn(hitWallFx 101, 0.5, 0, 0). The bullet is destroyed either
+// way, so the effect's position never feeds back into the simulation. The
+// tenth truncates toward zero in Q20 (GameMaker divides the double).
+bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path){
+    auto x=path.x,y=path.y;
+    const std::int32_t vx=path.dx/10,vy=path.dy/10;
+    if(!solidResolver_)return true;
+    for(unsigned step=0;!solidResolver_(solidResolverContext_,x.pixel,y.pixel);){
+        y.advance(vy);x.advance(vx);
+        if(++step>100)break;
+    }
+    const auto real=[](const downwell::ProjectileSegment::Coordinate& c,int origin){
+        downwell::MotionBinary64 value=downwell::MotionBinary64::fromInteger(c.pixel+origin),fraction;
+        if(c.fraction&&(!downwell::divideBinary64(downwell::MotionBinary64::fromInteger(int(c.fraction)),
+               downwell::MotionBinary64::fromInteger(downwell::MachineGunTrajectory::unit),fraction)||
+           !value.add(fraction)))return downwell::MotionBinary64::fromInteger(c.pixel+origin);
+        return value;
+    };
+    return compactWallEffect(real(x,240),real(y,176),101,0);
+}
+
+// A full no-loop pool drops the cosmetic puff rather than latching failure.
+bool GameplayWorld::compactWallEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,int depth){
+    return compactCosmeticEffect(x,y,sprite,{0x3fe00000u,0},depth);
+}
+bool GameplayWorld::compactCosmeticEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,
+    downwell::MotionBinary64 speed,int depth){
+    if(compactEffects_.noLoopFull())return true;
+    if(!compactEffects_.spawnNoLoop(x,y,sprite,speed,{},downwell::MotionBinary64::fromInteger(depth)))
+        return run_.effectsSucceeded=false;
+    return true;
 }

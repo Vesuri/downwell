@@ -13,6 +13,7 @@ public:
     using Handle=std::uint32_t;
     struct Phase{Handle newest;};
     bool valid()const{return good_;}
+    unsigned size()const{return count_;}
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
     // Lifetime lookup is separate from event eligibility: marked corpses and
     // partial failures remain owned until explicit room cleanup succeeds.

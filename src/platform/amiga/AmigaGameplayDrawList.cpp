@@ -254,7 +254,10 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
     const auto place=[&](const downwell::RunnerImageValue& rx,const downwell::RunnerImageValue& ry,int sprite,unsigned frame){
         std::int32_t x,y;
         if(!rx.promoted().roundPixel(x)||!ry.promoted().roundPixel(y)){failedSprite=UWORD(sprite);failedFrame=UWORD(frame);return false;}
-        return append(UWORD(sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0);
+        // A 62000+id record (the landing dust's mirrored half) is the
+        // prepared frame's flipped side, not a separate prepared sprite.
+        const bool mirrored=sprite>=62000&&sprite<63000;
+        return append(UWORD(mirrored?sprite-62000:sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,mirrored?1:0);
     };
     for(unsigned i=0;i<fx.noLoopCount();++i){
         const auto& e=fx.noLoop(i).effect;unsigned turn;
@@ -340,6 +343,7 @@ namespace {
 unsigned borderGlyph(char c){
     if(c>='0'&&c<='9')return 65100u+unsigned(c-'0');
     if(c=='+')return 65111u;
+    if(c=='!')return 65112u;
     return 65120u+unsigned(c-'A');
 }
 }
@@ -367,6 +371,13 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactGunTexts(const Gam
     for(unsigned i=0;i<g.noticeEnd;++i){const auto& n=g.notices[i];
         if(!n.live||!n.visible())continue;
         const int x=n.left(viewX,160),y=n.pixelY();
+        if(n.empty){
+            // fxRisingText "EMPTY!": six centred cells, no icon.
+            static const char word[]="EMPTY!";
+            for(int k=0;k<6;++k)
+                if(!glyph(borderGlyph(word[k]),downwellPlayfieldX+x-24+8*k+4-viewX,y-5-viewY,1))return false;
+            continue;
+        }
         const char text[]={'+',' ',char('0'+n.amount),0};
         // fa_center/fa_middle: three eight-pixel cells around x, ten rows.
         for(int k=0;k<3;++k)

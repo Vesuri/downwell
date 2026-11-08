@@ -78,28 +78,24 @@ flash, impact, `breakablesDebris` 370, rewards), `Scattered16` 289, `gemChunk`
 374) with the seven `bStatInitLevel1` guns, their shots, muzzles, laser
 trails and casings, side rooms with `pTimeStop` (start, ordinary and goal
 fields, `fxTimeChange` 211 room speed, time shards 238, frozen enemies,
-currency, casings, debris, moving effects and TorchFire, field kills), compact
+currency, casings, debris, moving effects and TorchFire, field kills), the
+damage chains (`objDeadBody` 263 corpses, blood, death smoke and flash, bullet
+impacts and the immune spark, bullet, casing and laser wall hits, jump,
+turn and landing dust, the empty-gun smoke and "EMPTY!", and the
+`momentDelay` and player-damage `room_speed` changes), compact
 shops, level exit, upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 
-6. **Enemy and player damage chains.** Complete corpses (`objDeadBody` 263),
-   blood, smoke, hit and flash effects, bullet wall hits, jump and dust
-   effects, and source knockback and immunity on player damage, including the
-   death flash and `DeathMenu` 49 options. The W1.4 shots also lack theirs:
-   `bulletRanged`/`bulletLaser`/`bulletCasing` wall hits (101 and the laser's
-   96/smoke), enemy-hit blood, flash and impact, and the empty-gun smoke and
-   "EMPTY!" text. Hit-stop is not modelled: `momentDelay` and its
-   `room_speed` changes (only `fxTimeChange`'s 30..60 ramp and its
-   `sleep(30)` pace the Amiga loop since W1.5).
-   Reference: [effect surfaces](effect-surfaces.md).
 7. **Combo and HUD.** Add the on-screen combo counter, `comboDone` rewards at
    5, 10, 30 and 100, `ComboBreak` 369, `comboRewardText` 383, Gemhigh and the
    remaining controller-HUD rules, and the `levelNumber` 372 title at each
    level start. The W1.4 texts approximate two source details: overlapping
    `moduleText` records never push each other down (Collision with
    `moduleText`), and the letters assume top-left text alignment although
-   `itemNotif` leaves `fa_middle` set.
+   `itemNotif` leaves `fa_middle` set. W1.6's "EMPTY!" reuses the `itemNotif`
+   record for `fxRisingText` and likewise skips its Collision with
+   `fxRisingText`; it is born after the whole player Step.
 8. **Complete shops.** Merchant speech and prompts, keeper behaviour, funded,
    insufficient and sold-out purchases, the criminal route, and the
    source shop-placement rules per style.
@@ -113,7 +109,7 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
    `pugEngineer` on gun pickups) and Laser Sight's beam against the new guns'
    spread (its `bdirRand` and `decTimer` changes are in) to this item, and
    W1.5 left Time Field Damage (`pugTime`: `scrTypicalDamage` from the time
-   fields).
+   fields), and W1.6 left Rest in Pieces (`pugRip`: corpses that explode).
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Menus, styles, modes and persistence.** The pause menu and its options,
     shader, record and confirm menus (adapted to the Amiga); all five styles
@@ -144,7 +140,7 @@ Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handl
 and keep audio out of scenes that do not use it.
 
 The target A500 has 1 MiB of Chip RAM (ECS 8372A Agnus): normal startup
-leaves 651,128 Chip bytes free and gameplay entry takes the 118,914-byte
+leaves 651,128 Chip bytes free and gameplay entry takes the 121,374-byte
 cavern plane atlas, so about 520 KiB remains for samples and later art. Gameplay already recycles
 the garden region (staging ring, HUD bank, on-demand shop or results art);
 the garden art is reloaded from disk when shown again. Keep scene-local
@@ -178,7 +174,16 @@ plane atlas (now 118,914). `fxTimeChange` slows presentation on purpose (two
 fields per update at room speed 30, plus the 30 ms sleep); judge it as
 transition latency, not as frame cost. The quiet-fall witness went from 190
 to 193 fields: the steady-state Begin Step, the enemy field pass and the
-gem, box and fire gates.
+gem, box and fire gates. W1.6: each death now runs blood, smoke, flash and an
+`objDeadBody` (up to 16 corpses, each a TimeStopBound and two mask-599 wall
+queries per update, drawn on the controller effect surface), every damaging
+hit spawns an impact, a bullet or casing at a wall steps up to 101 tenths
+of its velocity to place its puff, and the player's dust and the empty-gun
+smoke add no-loop and smoke records. `momentDelay` (30 for one update) and
+player damage (40 for 40 updates) slow presentation on purpose; judge them
+like `fxTimeChange`. The corpse art, spark, dust and "!" add 2,460 Chip bytes
+to the cavern plane atlas (now 121,374). The quiet-fall witness went from
+193 to 195 fields.
 
 ### WR. Restructure for world 1
 

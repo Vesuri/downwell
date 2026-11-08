@@ -122,6 +122,16 @@ public:
     int spriteId(bool dead = false) const;
     unsigned spriteFrame(bool dead = false, int deathAnimation = 1) const;
     unsigned jumps() const { return jumps_; }
+    // scrPlayerShootN's empty-charge branch: each call emits two smoke puffs;
+    // the first since the last landing also raises "EMPTY!" (noChargeMsg).
+    unsigned emptyShots() const { return emptyShots_; }
+    // Cosmetic dust created during the last step, in creation order:
+    // objJumpFx 95 at scrJump, objJumpSmallerFx 94 at a grounded turn start
+    // and at landing. x/y are Q8 offsets; emitTo selects the drawn halves.
+    struct Dust { bool jump; long x, y; int emitTo; };
+    unsigned dustCount() const { return dustCount_; }
+    const Dust& dust(unsigned index) const { return dust_[index]; }
+    unsigned emptyMessages() const { return emptyMessages_; }
     unsigned shots() const { return shots_; }
     unsigned recharges() const { return recharges_; }
     void stompBounce(int playStyle = 0);
@@ -196,6 +206,14 @@ private:
     unsigned shotDelay_;
     int facing_;
     unsigned jumps_;
+    unsigned emptyShots_ = 0, emptyMessages_ = 0;
+    Dust dust_[3] = {};
+    unsigned dustCount_ = 0;
+    bool wallColliding_ = false; // scrWallCol's previous-Step xcollision
+    void addDust(bool jump, long x, long y, int emitTo) {
+        if (dustCount_ < 3) dust_[dustCount_++] = {jump, x, y, emitTo};
+    }
+    bool noChargeMessage_ = false;
     unsigned shots_;
 };
 

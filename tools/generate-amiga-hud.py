@@ -113,6 +113,14 @@ SELECTIONS = {
         168: None,   # sprFrogAir
         170: None,   # sprFrogPrepare
         172: None,   # sprFrogDead: initial corpse artwork, planar only
+        112: None,   # sprFxImmuneSpark: bullet-immune turtle hit
+        94: None,    # sprJumpSmallerFx: landing and turn dust (both halves)
+        95: None,    # sprJumpFx: jump dust
+        158: None,   # sprBatDead (W1.6 corpses, planar only)
+        165: None,   # sprSnakeDead
+        179: None,   # sprSnailDead
+        281: None,   # sprCrawlerDead
+        337: None,   # sprGroundedTurtleDead
         173: None,   # sprFrogDamage
         175: None,   # sprEnmJellyHit
         176: None,   # sprEnmWhiteJelly
@@ -248,6 +256,7 @@ TEXT_SELECTIONS["game"][65110] = "-"  # Moving damage text uses the same font ba
 # notice's "+", single font-2 glyphs at 65120 + (letter - 'A') and 65111.
 GUN_TEXT_LETTERS = "ABCEGHILMNOPRSTUY"
 TEXT_SELECTIONS["game"][65111] = "+"
+TEXT_SELECTIONS["game"][65112] = "!"  # W1.6 fxRisingText "EMPTY!"
 TEXT_SELECTIONS["game"].update({65120 + ord(letter) - ord("A"): letter for letter in GUN_TEXT_LETTERS})
 
 # The original 320x800 style-transition sprites are almost entirely opaque
@@ -710,7 +719,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
                     458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605,
-                    83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457):
+                    83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457, 112, 94, 95):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -743,7 +752,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                         for _ in range(turn):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
-                    if bounds is None and sprite_id in (83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111):
+                    if bounds is None and sprite_id in (83, 94, 95, 112, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111):
                         # Fading room effects end on blank frames: keep a
                         # one-pixel transparent frame at the anchor.
                         bounds = (ox, oy, ox + 1, oy + 1)
@@ -775,7 +784,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                     # fxSmoke also leaves image_xscale at its default +1.
                     # Room effects (sparkles, flash, splash, fire, small
                     # smoke) never set image_xscale either.
-                    facings = (False,) if gun_spread or w14_turned or sprite_id in (111, 457, 83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
+                    facings = (False,) if gun_spread or w14_turned or sprite_id in (111, 112, 95, 457, 83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
                                                                        605, 704, 711, 712) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
@@ -807,7 +816,8 @@ def build_records(manifest, extracted, profile, language_path=None):
                 encoded.append((metadata, 768 + frame_index, stride, data))
             if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 551, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
-                    153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278)):
+                    153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278,
+                    158, 165, 179, 281, 337)):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)

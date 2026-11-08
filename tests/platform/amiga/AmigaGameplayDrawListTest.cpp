@@ -840,6 +840,19 @@ int main() {
                 190+g.x-world.cameraOffsetX(),142+g.y-world.cameraOffsetY());
         }
 #endif
+#ifndef DOWNWELL_REPLAY_VERIFY
+        // Compact no-loop and moving effects (W1.6 dust and wall hits from
+        // this walk), upright, at their rounded anchors.
+        {
+            const auto& fx=world.compactEffects();
+            const auto at=[&](const auto& e){std::int32_t x,y;
+                assert(e.x.promoted().roundPixel(x)&&e.y.promoted().roundPixel(y));
+                const bool mirrored=e.spriteId>=62000&&e.spriteId<63000;
+                emit(mirrored?e.spriteId-62000:e.spriteId,e.drawFrame(),110+x-vx,y-vy,mirrored?1:0);};
+            for(unsigned i=0;i<fx.noLoopCount();++i)at(fx.noLoop(i).effect);
+            for(unsigned i=0;i<fx.movingCount();++i)at(fx.moving(i).effect);
+        }
+#endif
         for(unsigned i=0;i<world.bulletSlotEnd();++i) {
             const auto& b=world.bulletAt(i);
             if(b.active) emit(downwell::machineGunProfile(b.gemHigh).sprite,768+b.animation.frame(),

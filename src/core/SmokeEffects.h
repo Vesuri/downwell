@@ -43,6 +43,15 @@ public:
         }
         return 0;
     }
+    // emitSmoke: Create (with its random direction/speed draws), then the
+    // caller's direction and speed overwrite those fields.
+    template<class Random> bool emitDirected(MotionBinary64 x,MotionBinary64 y,MotionBinary64 direction,
+                                             MotionBinary64 speed,Random& random){
+        const Handle h=create(x,y,random);
+        SmokeEffect* e=h?get(h):nullptr;
+        if(!e)return false;
+        e->direction=direction;e->speed=speed;return true;
+    }
     template<class Random> bool skeletonBurst(MotionBinary64 x,MotionBinary64 y,Random& random){
         return skeletonSmokeBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
             return object==225 && create(px,py,random)!=0;

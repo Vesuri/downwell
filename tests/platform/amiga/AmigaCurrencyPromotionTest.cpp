@@ -74,6 +74,7 @@ int main(int argc,char** argv){
     GameplayWorld::compactRoomEffectsAdmitted=false;
     GameplayWorld::compactGunsAdmitted=false; // and W1.4's guns
     GameplayWorld::compactTimeStopAdmitted=false; // and W1.5 time-stop
+    GameplayWorld::compactDamageEffectsAdmitted=false; // and W1.6 RNG-drawing damage effects
     verifyEnemyWitnessRetirement();
     bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false,enemyWitness=false;
     for(int i=1;i<argc;++i){

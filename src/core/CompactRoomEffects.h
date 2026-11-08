@@ -24,6 +24,11 @@ public:
             case 571:count=5;return true;  // sprChunkSparkle1
             case 572:count=4;return true;  // sprChunkSparkle2
             case 111:count=8;return true;  // sprFxAmmoCharge (GunModule pickup)
+            case 112:count=5;return true;  // sprFxImmuneSpark (bullet-immune hits)
+            case 96:count=3;return true;   // sprFlashBall (laser hitWallFx)
+            case 101:count=8;return true;  // sprFxBulletHitWall (parentPBullet hitWallFx)
+            case 94:case 62094:count=4;return true; // sprJumpSmallerFx (landing/turn dust, both halves)
+            case 95:count=4;return true;   // sprJumpFx (scrJump dust)
             case 601:count=12;return true; // sprFxExMuzzleSmoke (gem-high laser muzzle)
             case 602:count=1;return true;  // sprFxBoingRed (gem-high muzzle)
             case 603:count=1;return true;  // sprFxBoingball (box breaks, usual muzzle)
@@ -36,6 +41,7 @@ public:
     Phase beginPhase()const{return {next_-1};}
     unsigned size()const{return noLoopCount_+movingCount_;}
     unsigned noLoopCount()const{return noLoopCount_;}
+    bool noLoopFull()const{return noLoopCount_==NoLoopCapacity;}
     unsigned movingCount()const{return movingCount_;}
     const NoLoop& noLoop(unsigned index)const{return noLoop_[index];}
     const Moving& moving(unsigned index)const{return moving_[index];}

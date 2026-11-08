@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_EFFECT_MASK_ASSETS_H
 #include "BinaryEffectSurface.h"
 #include "EntryDitherMask.h"
+#include "CorpseSprites.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -46,7 +47,7 @@ public:
         return ready_ && frame<frames && resolve(pack_,size_,count_,sprite,frame,out);
     }
     bool corpse(unsigned sprite,bool mirrored,Asset& out)const{
-        return ready_&&(sprite==172||sprite==206)&&
+        return ready_&&corpseSpriteAdmitted(int(sprite))&&
             resolve(pack_,size_,count_,sprite+(mirrored?62000:0),0,out);
     }
     bool corpseExpiry(unsigned frame,Asset& out)const{

@@ -23,12 +23,18 @@ GAME_IDS = frozenset({
     # W1.4 guns: modules, letters, casing, laser/spread shots, muzzle,
     # pickup effect and notice icon.
     111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
+    # W1.6 corpses (bat, snake, snail, crawler, turtle; frog 172 above) and
+    # the bullet-immune spark.
+    112, 158, 165, 179, 281, 337,
+    # W1.6 jump and landing dust.
+    94, 95,
     # Pre-mirrored planar forms.
     62000, 62001, 62003, 62012, 62015, 62027, 62031, 62037, 62096,
     62127, 62139, 62153, 62154, 62157, 62162, 62163, 62164, 62166,
     62168, 62170, 62172, 62173, 62175, 62176, 62177, 62178, 62181, 62182, 62183,
     62184, 62185, 62186, 62187, 62188, 62205, 62206, 62207, 62208,
     62278, 62460, 62471, 62550, 62551, 62568, 62569, 62702, 62703,
+    62158, 62165, 62179, 62281, 62337, 62094,
     # DMA sprite streams, including admitted effect/projectile variants.
     63000, 63001, 63003, 63012, 63015, 63027, 63031, 63037, 63084,
     63085, 63096, 63101, 63133, 63134, 63153, 63154, 63157, 63162,
@@ -41,6 +47,8 @@ GAME_IDS = frozenset({
     65108, 65109, 65110,
     # W1.4 bordered gun-name letters and the notice's "+".
     65111, *(65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'),
+    # W1.6 "EMPTY!" (E, M, P, T and Y are gun-name letters above).
+    65112,
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
@@ -67,11 +75,14 @@ CAVERN_ROOTS = frozenset({
     111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
     # W1.5 fxTimeShard 238 draws sprite 91 (shared with area-four debris).
     91,
+    # W1.6 objDeadBody 263 sprites, the bullet-immune spark 112 and the
+    # player's jump/landing dust 94/95.
+    112, 158, 165, 179, 281, 337, 94, 95,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
     {65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
-     65108, 65109, 65110, 65111} |
+     65108, 65109, 65110, 65111, 65112} |
     {65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'}) & GAME_IDS
 # W1.3 room effects (gem chunk, sparkles, flash, red splash turns, fire,
 # small smoke) raised the measured DMA atlas from 106,574 to 109,410 bytes.
@@ -81,7 +92,9 @@ CAVERN_IDS = frozenset(
 # 109,410 -> 117,744. Planar BOBs only, no DMA streams.
 # W1.5 time-shard sprite 91 (six frames) adds 1,170 Chip plane bytes:
 # 117,744 -> 118,914.
-BANK_BUDGETS.update({'cavern': 248 * 1024, 'cavern-planes': 117 * 1024})
+# W1.6 corpses (five mirrored pairs), the immune spark, jump/landing dust and
+# the "!" glyph add 2,460 Chip plane bytes: 118,914 -> 121,374 (1 MiB Chip target).
+BANK_BUDGETS.update({'cavern': 248 * 1024, 'cavern-planes': 120 * 1024})
 
 
 def require_budget(bank, size):

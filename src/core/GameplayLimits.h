@@ -17,6 +17,9 @@ constexpr unsigned gameplayRepaintCapacity = gameplayCompactBulletCapacity + 1 +
 constexpr unsigned gameplayCompactNoLoopCapacity = 32, gameplayCompactMovingCapacity = 48;
 // Compact object-370 debris (two per box, scenery bursts).
 constexpr unsigned gameplayCompactDebrisCapacity = 24;
+// Compact objDeadBody 263 (W1.6): world-one enemy corpses live 180 updates
+// unless they leave the view first.
+constexpr unsigned gameplayCompactCorpseCapacity = 16;
 // Compact fxTimeShard 238: shardLimit 20 plus one Begin Step's two bursts.
 constexpr unsigned gameplayCompactShardCapacity = 32;
 // Beyond rmMain's serialized 300000-pixel height, but safe when multiplied

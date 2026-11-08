@@ -3,9 +3,10 @@
 #include "CorpseMotion.h"
 #include "RunnerSpriteChange.h"
 #include "UnitSequenceFrames.h"
+#include "CorpseSprites.h"
 namespace downwell {
-// Initial frog-dead sprite and skeleton-dead override: both are verified
-// one-key, unit-rate tracks. Other corpse sprite families require admission.
+// Create starts on the frog-dead sprite; scrDeadBody then assigns one of the
+// admitted one-key, unit-rate dead sprites (CorpseSprites.h).
 struct CorpseAnimation : CorpseMotion {
     int spriteId=172;
     RunnerImageValue imageIndex{},timeline{},imageXscale{0x3f800000u};
@@ -18,7 +19,7 @@ struct CorpseAnimation : CorpseMotion {
     // assignment is a no-op, not a dirty bound or timeline reset.
     template<class Publish> bool setSprite(int next,Publish publish){
         if(!valid)return false;
-        if(next!=172&&next!=206){valid=false;return false;}
+        if(!corpseSpriteAdmitted(next)){valid=false;return false;}
         RunnerSpriteChange::Result change;
         if(!RunnerSpriteChange::plan(spriteId,next,imageIndex,1,change)){valid=false;return false;}
         if(!change.changed)return true;

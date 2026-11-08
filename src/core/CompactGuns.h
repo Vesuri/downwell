@@ -166,8 +166,10 @@ struct CompactModuleTextRecord {
 
 // itemNotif: rises with ysp *= 0.85, flashes after Alarm 1 (60), Alarm 0
 // (90) destroys it. Draws "+ n" centred and sprItemNotif frame notifType.
+// fxRisingText has the same motion, alarms and view clamp; `empty` selects
+// scrPlayerShootN's centred "EMPTY!" without an icon.
 struct CompactItemNoticeRecord {
-    bool live = false;
+    bool live = false, empty = false;
     int x = 0, type = 0, amount = 0;
     long y = 0, ysp = -(3L << 16); // Q16
     int alarm[2] = {90, 60};
@@ -189,7 +191,7 @@ struct CompactItemNoticeRecord {
     }
     // text width "+ n": eight pixels per character.
     int left(int viewLeft, int viewWidth) const {
-        const int width = amount >= 10 ? 32 : 24;
+        const int width = empty ? 48 : amount >= 10 ? 32 : 24;
         int xxx = x;
         const int over = x + width / 2 - (viewLeft + viewWidth);
         const int under = x - width / 2 - viewLeft;

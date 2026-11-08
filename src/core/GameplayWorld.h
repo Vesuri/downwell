@@ -60,6 +60,7 @@
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
 #include "core/CorpseInstances.h"
+#include "core/CorpseEffects.h"
 #include "core/ConsumptionBloodInstances.h"
 #include "core/CorpseDraw.h"
 #include "core/SmokeInstances.h"
@@ -253,6 +254,9 @@ public:
         // Step left image_speed at 0 under pTimeStop: the next animation
         // phase holds the frame.
         bool frozen=false;
+        // Latest scrBulletImpact bdmg; takenImpact is bdmg/5 (subparentEnemy
+        // Create clears it), read by scrDeadBody.
+        int takenImpactDamage=0;
         int imageScaleY() const { return objectId == 117 ? snail.verticalFlip : 1; }
         unsigned drawFrame() const {
             if (objectId == 119)
@@ -1541,7 +1545,11 @@ public:
         bool ok;
         if constexpr(RetainOrder)ok=visitRoomActorsReadOnly(visitor);
         else ok=visitRoomActors(visitor);
-        // Compact object-370 debris has no room actors: draw it after them.
+        // Compact objDeadBody 263 and object-370 debris have no room actors:
+        // draw them after them, in object order.
+        if(ok&&compactCorpses_.size()&&!compactCorpses_.visitNewest([&](auto,const downwell::CorpseAnimation& corpse){
+            if(ok&&!downwell::CorpseDraw::surface(corpse,assets,view,emit))ok=false;
+        }))return false;
         if(ok&&compactDebris_.size()&&!compactDebris_.visitNewest([&](auto,const downwell::DebrisAnimation& effect){
             if(ok&&!downwell::DebrisDraw::surface(effect,assets,view,emit))ok=false;
         }))return false;
@@ -3022,6 +3030,25 @@ private:
     // Object 370 born by compact boxes and scenery, apart from the registered
     // debris owner's storage.
     downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity> compactDebris_;
+    // Compact objDeadBody 263 (W1.6): the world-one families' scrDeadBody
+    // corpses, apart from the registered skeleton corpse owner.
+    downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity> compactCorpses_;
+    bool compactEnemyDeath(EnemyState& enemy,bool stomped);
+    bool compactBulletImpact(EnemyState& enemy,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+        std::uint32_t direction,int damage,bool laser);
+    bool compactImmuneSpark(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    bool compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    void compactMomentDelay();
+    bool compactBulletWallHit(const downwell::ProjectileSegment& path);
+    bool compactWallEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,int depth);
+    bool compactCosmeticEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,int depth);
+    void compactDamageSlowdown();
+    void advanceCompactControllerAlarm();
+    int compactControllerAlarm0_=0;
+    bool compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase);
+    bool advanceCompactCorpseAlarm(unsigned alarm);
+    bool endStepCompactCorpses(long viewTop);
     downwell::CompactScenery scenery_;
     int sceneryRepaintX_[downwell::gameplaySceneryRepaintCapacity]{};
     int sceneryRepaintY_[downwell::gameplaySceneryRepaintCapacity]{};
@@ -3107,6 +3134,7 @@ private:
 public:
     const CompactEffects& compactEffects()const{return compactEffects_;}
     const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity>& compactDebris()const{return compactDebris_;}
+    const downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity>& compactCorpses()const{return compactCorpses_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}
     // global.pTimeStop, room_speed and the sleep() milliseconds requested
@@ -3148,6 +3176,10 @@ public:
     static inline bool compactGunsAdmitted=true;
     // Likewise for references predating W1.5: pTimeStop never turns on.
     static inline bool compactTimeStopAdmitted=true;
+    // W1.6 effects that draw RNG (death blood, smoke, flash and corpse, bullet
+    // impacts, empty-charge smoke). Comparisons against references without
+    // those chains turn this off; hit-stop, dust and wall hits stay.
+    static inline bool compactDamageEffectsAdmitted=true;
     // objBuilder.endReached, published by the generation frontend.
     void publishGenerationEndReached(bool reached){generationEndReached_=reached;}
     // Red-ball Draw's eye, after the most recent Step. False when absent or

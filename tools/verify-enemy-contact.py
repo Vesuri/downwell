@@ -25,7 +25,7 @@ assert [line for line in field_body.splitlines() if line and not line.startswith
     "pushi.e 0", "pop.v.i self.ehp"]
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 84, 91, 133, 134, 139, 140, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 457, 458, 459, 460, 465, 466, 472, 473, 550, 568, 569, 585, 598, 702, 710}
+assert {int(row[0]) for row in records} == {31, 84, 91, 133, 134, 139, 140, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 457, 458, 459, 460, 465, 466, 472, 473, 550, 568, 569, 585, 598, 599, 702, 710}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
