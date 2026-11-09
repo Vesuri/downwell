@@ -233,8 +233,10 @@ the normal build. User decisions (2026-11-09):
      - peak normalisation, with the asset volume moved into the Paula volume
        for 8-bit headroom.
    - **Previews:** Paula-like preview WAVs (zero-order hold, the A500's
-     fixed filter, the LED filter optional) for listening, plus a FS-UAE
-     check of the chosen set.
+     fixed output filter) for listening, plus a FS-UAE check of the chosen
+     set. The switchable LED filter is off, both in the previews and at run
+     time, where the mixer clears it while it owns audio and restores the
+     previous state on exit.
    - **Per-scene Chip totals:** the manifest records them. There is no fixed
      budget: fit as many sounds as the measured reserve allows, and leave
      room for W3 and later world-1 art.
