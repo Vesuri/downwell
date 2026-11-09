@@ -4,7 +4,8 @@
 
 // Immutable render ownership, prepared before the first gameplay frame. This
 // bank remains in ordinary memory: only the existing channel buffers use DMA.
-// Frame numbers have sparse 256-frame variant pages (0, 256 and 768 today).
+// Frame numbers have sparse 256-frame variant pages (0, 256 and 768, and
+// W1.7's afterimage pages 1024..2047).
 class AmigaActorFrames {
 public:
     struct Frame {
@@ -24,7 +25,9 @@ public:
     };
 private:
     // W1.4 gun art: 592 cavern and 622 reference frames (was under 512).
-    static constexpr unsigned sprites=741,pages=4,capacity=640;
+    // W1.7 combo art, afterimages and upgrade icons: 936 cavern and 960
+    // reference frames.
+    static constexpr unsigned sprites=741,pages=8,capacity=1024;
     UWORD base_[sprites][pages]{};
     UWORD span_[sprites][pages]{};
     Frame frames_[capacity]{};

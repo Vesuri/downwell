@@ -9,10 +9,12 @@ struct RunCombo {
     ComboState::Reward reward;
     ComboState::Completion completion;
     ComboGrantEffects grants;
+    long rewardXQ8 = 0; // comboDone's caller xx (player offset, Q8) at the reward
     void beginStep() { reward = {}; completion = {}; grants = {}; }
     void finish(PlayerMotion& player, CurrencyAccount& currency, int& health, bool lessResist = false) {
         const auto result = state.finish({}, [&](const ComboState::Reward& value) {
             reward = value;
+            rewardXQ8 = player.offsetXFixed();
             grants = applyComboGrants(value, currency, player, health, healthReserve, 300, lessResist);
         });
         // A second empty grounded call must not discard this update's effects.

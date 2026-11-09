@@ -16,6 +16,7 @@
 #include "core/GameplayEncounterSession.h"
 #include "../../core/CollisionOwnerFixture.h"
 #include "GameplayEncounterCoverage.h"
+#include "../../../generated/downwell-area-titles.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
@@ -2422,6 +2423,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         GameplayWorld::PlayerBirthTiming::authoredRoom));
     auto& game=*gamePointer;
     require(game.effectsSucceeded()&&owner->attach(game),"slice owner attaches");
+    game.configureCompactAreaTitles(downwell::area_titles::entries,downwell::area_titles::count,"english");
     game.initializeEntryInput(false); // normal room-entry scrPlayerInit alarm[2]
     downwell::GameplayEncounterSession session(game,*owner);
     require(session.start(),"slice uses the production encounter session and input edges");
@@ -2443,6 +2445,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // W1.5: side-room time-stops, shards, frozen enemies and doused fires.
     unsigned routeSideStops=0,routeFrozen=0,routeDoused=0,routeShards=0,routeFireViews=0;
     unsigned routeCorpses=0,routeWallHits=0,routeDust=0;
+    unsigned routeTitles=0,routeRewards=0,routeGemHigh=0;
     for(unsigned level=1;level<=3;++level){
         int target=240,deepest=176+game.player().offsetY();unsigned stuck=0,updates=0,shopTick=0;
         std::uint32_t lastSteering=0;unsigned jellies=0,redBalls=0,steeringKills=0,eyes=0;
@@ -2452,6 +2455,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         unsigned peakNoLoop=0,peakMoving=0,peakDebris=0,peakGems=0,peakPlants=0,splashes=0,boxBursts=0;
         // W1.6: corpses, wall hits (101 bullet/casing, 96 laser), dust, empty charge.
         unsigned peakCorpses=0,wallHitFrames=0,dustFrames=0,emptyTextFrames=0,emptyShots=0;
+        // W1.7: level title, combo counter and rewards, streak bar, gem high.
+        unsigned titleFrames=0,comboFrames=0,rewardFrames=0,peakCombo=0,barFrames=0,gemHighFrames=0,afterImageFrames=0;
         // W1.4: GunModule births/pickups, gun changes and the new shot owners.
         unsigned modules=0,pickups=0,gunChanges=0,rangedShots=0,laserShots=0,casings=0,trails=0,notices=0;
         unsigned peakBullets=0,peakCasings=0,peakTrails=0,lastModuleEnd=0,lastTextEnd=0;
@@ -2625,6 +2630,18 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 for(unsigned i=0;i<game.compactGuns().noticeEnd;++i)
                     emptyText|=game.compactGuns().notices[i].live&&game.compactGuns().notices[i].empty;
                 wallHitFrames+=wallHit;dustFrames+=dust;emptyTextFrames+=emptyText;
+                titleFrames+=game.compactLevelTitle().live;
+                comboFrames+=game.comboCount()>=5;peakCombo=std::max(peakCombo,game.comboCount());
+                for(unsigned i=0;i<GameplayWorld::compactComboRewardCapacity;++i)
+                    if(game.compactComboRewards()[i].live){++rewardFrames;break;}
+                if(game.drawGemStreakHud()&&game.gemStreakHud().show){
+                    ++barFrames;gemHighFrames+=game.gemStreak()>=100;
+                }
+                afterImageFrames+=game.afterImagesDrawn()!=0;
+                if(std::getenv("DOWNWELL_TRACE_SLICE_HUD"))
+                    std::cerr<<"HUD tick="<<game.tick()<<" level="<<level<<" title="<<game.compactLevelTitle().live
+                        <<" combo="<<game.comboCount()<<" reward="<<(rewardFrames!=0)<<" streak="<<game.gemStreak()
+                        <<" after="<<game.afterImagesDrawn()<<'\n';
                 emptyShots=std::max(emptyShots,game.player().emptyShots());
                 if(std::getenv("DOWNWELL_TRACE_SLICE_SCENERY"))for(unsigned i=0;i<sc.gemChunkEnd;++i)
                     if(sc.gemChunks[i].birth==game.tick()){std::cerr<<"CHUNK level="<<level<<" update="<<updates
@@ -2751,6 +2768,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             <<" fireViews="<<fireViews<<std::endl;
         std::cout<<"Slice level="<<level<<" peak corpses="<<peakCorpses<<" wallHitFrames="<<wallHitFrames
             <<" dustFrames="<<dustFrames<<" emptyShots="<<emptyShots<<" emptyTextFrames="<<emptyTextFrames<<std::endl;
+        std::cout<<"Slice level="<<level<<" titleFrames="<<titleFrames<<" comboFrames="<<comboFrames
+            <<" peak combo="<<peakCombo<<" rewardFrames="<<rewardFrames<<" barFrames="<<barFrames
+            <<" gemHighFrames="<<gemHighFrames<<" afterImageFrames="<<afterImageFrames<<std::endl;
+        routeTitles+=titleFrames!=0;routeRewards+=rewardFrames;routeGemHigh+=afterImageFrames;
+        if(level==3)require(routeTitles==3&&routeRewards,"every level shows its title and the route earns a combo reward");
         routeCorpses=std::max(routeCorpses,peakCorpses);routeWallHits+=wallHitFrames;routeDust+=dustFrames;
         if(level==3)require(routeCorpses&&routeWallHits&&routeDust,"the route leaves corpses, wall hits and dust");
         std::cout<<"Slice level="<<level<<" jellies="<<jellies<<" redBalls="<<redBalls

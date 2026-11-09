@@ -110,7 +110,7 @@ int main() {
         contract = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(contract)
         self.assertEqual(contract.BANKS['patterns'], 72 * 1024)
-        self.assertEqual(contract.BANKS['hud'], 16 * 1024)
+        self.assertEqual(contract.BANKS['hud'], 14976)
         self.assertEqual(contract.BANKS['entrymask'], 31104)
         self.assertEqual(contract.BANKS['terrain'], 384 * 1024)
         with tempfile.TemporaryDirectory(prefix='downwell-pattern-budget-') as directory:

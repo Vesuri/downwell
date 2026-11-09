@@ -28,6 +28,12 @@ GAME_IDS = frozenset({
     112, 158, 165, 179, 281, 337,
     # W1.6 jump and landing dust.
     94, 95,
+    # W1.7 gem bar caps, GEM HIGH / gem-sick motion, combo digits and icons,
+    # COMBO REWARD! and COMBO!.
+    393, 394, 395, 397, 400, 404, 405, 406,
+    # W1.7 upgrade icons (frame 1), drawn on the HUD layer.
+    506, 507, 508, 509, 510, 511, 512, 516, 518, 520, 521, 522, 523, 524,
+    525, 528, 529, 530, 531, 532, 533, 534, 535,
     # Pre-mirrored planar forms.
     62000, 62001, 62003, 62012, 62015, 62027, 62031, 62037, 62096,
     62127, 62139, 62153, 62154, 62157, 62162, 62163, 62164, 62166,
@@ -49,6 +55,8 @@ GAME_IDS = frozenset({
     65111, *(65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'),
     # W1.6 "EMPTY!" (E, M, P, T and Y are gun-name letters above).
     65112,
+    # W1.7 levelNumber's V (CAVERN).
+    65141,
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
@@ -57,7 +65,7 @@ GAME_IDS = frozenset({
 # the full-catalogue reference oracles load it; production gameplay leases
 # the cavern banks below.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 96 * 1024,
-                'game': 264 * 1024, 'game-planes': 124 * 1024}
+                'game': 296 * 1024, 'game-planes': 148 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -78,11 +86,16 @@ CAVERN_ROOTS = frozenset({
     # W1.6 objDeadBody 263 sprites, the bullet-immune spark 112 and the
     # player's jump/landing dust 94/95.
     112, 158, 165, 179, 281, 337, 94, 95,
+    # W1.7 combo and streak HUD art.
+    393, 394, 395, 397, 400, 404, 405, 406,
+    # W1.7 upgrade icons (frame 1), drawn on the HUD layer.
+    506, 507, 508, 509, 510, 511, 512, 516, 518, 520, 521, 522, 523, 524,
+    525, 528, 529, 530, 531, 532, 533, 534, 535,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
     {65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
-     65108, 65109, 65110, 65111, 65112} |
+     65108, 65109, 65110, 65111, 65112, 65141} |
     {65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'}) & GAME_IDS
 # W1.3 room effects (gem chunk, sparkles, flash, red splash turns, fire,
 # small smoke) raised the measured DMA atlas from 106,574 to 109,410 bytes.
@@ -94,7 +107,14 @@ CAVERN_IDS = frozenset(
 # 117,744 -> 118,914.
 # W1.6 corpses (five mirrored pairs), the immune spark, jump/landing dust and
 # the "!" glyph add 2,460 Chip plane bytes: 118,914 -> 121,374 (1 MiB Chip target).
-BANK_BUDGETS.update({'cavern': 248 * 1024, 'cavern-planes': 120 * 1024})
+# W1.7 combo digits and icons, COMBO REWARD!/COMBO!, the gem bar caps,
+# GEM HIGH and gem-sick motion, the V glyph and the gem-high afterimage pages
+# (red striped player poses, frames 1024..2047, both parities and facings)
+# add 28,396 CPU bytes: 253,090 -> 281,486, and 16,640 Chip plane bytes:
+# 121,374 -> 138,014; the 23 upgrade icons (moved out of the HUD bank) add
+# 6,572 and 5,320 more: 288,058 and 143,334. The full reference catalogue:
+# 299,882 and 148,562.
+BANK_BUDGETS.update({'cavern': 284 * 1024, 'cavern-planes': 144 * 1024})
 
 
 def require_budget(bank, size):

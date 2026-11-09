@@ -10,9 +10,12 @@ VERSION = 'generate-amiga-transient-banks/v6'
 # reviewed against scene peak residency, not silently enlarge an allocation.
 # Upgrade owns the living player's DMA poses (16 KiB allowance), allowing the
 # entire 221282-byte cavern CPU pack and 106574-byte DMA pack to retire.
+# The HUD bank sits at the top of the recycled garden region (76,800 bytes
+# less the 30,720-byte staging ring); the 31,104-byte cover masks need the
+# middle, so the HUD bank may not exceed 14,976 bytes.
 BANKS = {'results': 24576, 'shop': 16384, 'clear': 188416,
          'patterns': 72 * 1024, 'exitmask': 31104, 'selectionmask': 14256,
-         'hud': 16 * 1024, 'entrymask': 31104, 'terrain': 384 * 1024}
+         'hud': 14976, 'entrymask': 31104, 'terrain': 384 * 1024}
 
 
 def bank_path(name):

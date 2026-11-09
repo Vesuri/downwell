@@ -68,6 +68,12 @@ SELECTIONS = {
         421: None,   # sprPcHudStammoDivide (also first filled row)
     },
     "game": {
+        # W1.7 scrDrawHud4x3's owned-upgrade icons: global.ug[n][2], frame 1.
+        # They live here, not in the HUD bank, which must leave the garden
+        # region room for a 31,104-byte cover mask.
+        **{ident: [1] for ident in (524, 528, 512, 520, 518, 521, 522,
+            506, 507, 508, 509, 510, 511, 516, 523, 525, 529, 530,
+            531, 532, 533, 534, 535)},
         0: None,     # sprPlDead
         1: None,     # sprPlayerSpin
         3: None,     # sprPlayerShoot
@@ -192,8 +198,21 @@ SELECTIONS = {
         702: None,   # sprRedBall
         703: None,   # sprRedballStun
         733: None,   # sprDitherFade
+        # W1.7 combo and streak HUD. The bar's 1-pixel columns (393 frames
+        # 1 and 4) are native fills; only its caps are art.
+        393: [0, 2],  # sprGemBar end caps
+        394: None,   # sprGemBarSr
+        395: None,   # sprGemBarSl
+        397: None,   # sprGemhighMotion
+        400: None,   # sprGemsickMotion (pugLessResist)
+        404: None,   # sprComboNumber: digits, "+", gem, battery, heart
+        405: [0],    # sprComboReward ("COMBO REWARD!")
+        406: None,   # sprComboExc ("COMBO!")
     },
 }
+
+# Living player poses (PlayerMotion::spriteId(false)) with afterimages.
+AFTERIMAGE_PLAYER_IDS = (1, 3, 12, 15, 27, 31, 37)
 
 TEXT_SELECTIONS = {
     # English DeathMenu labels from language.ini. Uncoloured font masks allow
@@ -258,6 +277,8 @@ GUN_TEXT_LETTERS = "ABCEGHILMNOPRSTUY"
 TEXT_SELECTIONS["game"][65111] = "+"
 TEXT_SELECTIONS["game"][65112] = "!"  # W1.6 fxRisingText "EMPTY!"
 TEXT_SELECTIONS["game"].update({65120 + ord(letter) - ord("A"): letter for letter in GUN_TEXT_LETTERS})
+# W1.7 levelNumber "CAVERN-n": V is the only letter the gun names lack.
+TEXT_SELECTIONS["game"][65120 + ord("V") - ord("A")] = "V"
 
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield
@@ -315,6 +336,9 @@ def scene_banks(encoded):
     for item in encoded:
         ident, frame = item[0]["id"], item[1]
         if ident in DROPPED_IDS:
+            continue
+        if ident in AFTERIMAGE_PLAYER_IDS and frame >= 1024:
+            banks["game"].append(item)  # W1.7 afterimages: gameplay only
             continue
         if ident in BOOT_BANK_IDS:
             banks["boot"].append(item)
@@ -836,6 +860,37 @@ def build_records(manifest, extracted, profile, language_path=None):
                             "HUD border DMA padding must be transparent")
                     metadata["width"] = stride
                 encoded.append((metadata, frame_index, stride, data))
+            if profile == "game" and sprite_id in AFTERIMAGE_PLAYER_IDS:
+                # W1.7 playerDraw gem-high afterimages (shaderAfterImage1):
+                # white texels become red on odd room columns, all else is
+                # transparent. Frame 1024 + 512 * mirrored + 256 * q keeps
+                # canvas columns of parity q, cropped to the remaining pixels
+                # with the same anchor; every variant is drawn unflipped.
+                for flipped in (False, True):
+                    source = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flipped else canvas
+                    origin_x = sprite["width"] - sprite["originX"] if flipped else sprite["originX"]
+                    for parity in (0, 1):
+                        striped = Image.new("RGBA", source.size, (0, 0, 0, 0))
+                        for y in range(source.height):
+                            for x in range(parity, source.width, 2):
+                                if pixel_to_pen(source.getpixel((x, y))) == 1:
+                                    striped.putpixel((x, y), (255, 0, 0, 255))
+                        bounds = striped.getbbox()
+                        if bounds is None:
+                            bounds = (0, 0, 1, 1)
+                        left = bounds[0] - (bounds[0] - parity) % 2  # keep column parity
+                        bounds = (left, bounds[1], bounds[2], bounds[3])
+                        cropped = striped.crop(bounds)
+                        pens = [pixel_to_pen(pixel) for pixel in cropped.get_flattened_data()]
+                        cropped_width, cropped_data = encode_planar(pens, cropped.width, cropped.height)
+                        require(decode_planar(cropped_data, cropped.width, cropped.height,
+                                              cropped_width) == pens, "afterimage round trip failed")
+                        variant = dict(sprite, id=sprite_id,
+                                       width=cropped.width, height=cropped.height,
+                                       originX=origin_x - bounds[0],
+                                       originY=sprite["originY"] - bounds[1])
+                        encoded.append((variant, 1024 + 512 * flipped + 256 * parity + frame_index,
+                                        cropped_width, cropped_data))
             if profile == "game" and sprite_id in (27, 43, 44):
                 # Style bobs contain large transparent margins. Trim offline
                 # while retaining exactly the same world-space anchor.
@@ -1091,8 +1146,8 @@ def build_records(manifest, extracted, profile, language_path=None):
         if profile == "clear":
             actors = UPGRADE_PLAYER_IDS
         for sprite, frame_index, dma_width, planar in encoded:
-            if sprite["id"] not in actors:
-                continue
+            if sprite["id"] not in actors or frame_index >= 1024:
+                continue  # afterimage pages are planar BOBs only
             width, height = sprite["width"], sprite["height"]
             require(width <= 64 and height <= 64 and
                     0 <= sprite["originX"] <= width and 0 <= sprite["originY"] <= height,
@@ -1164,8 +1219,8 @@ def build_records(manifest, extracted, profile, language_path=None):
     if profile == "game":
         hardware = []
         for sprite, frame_index, dma_width, planar in encoded:
-            if sprite["id"] not in (12, 27, 31, 37):
-                continue
+            if sprite["id"] not in (12, 27, 31, 37) or frame_index >= 1024:
+                continue  # afterimage pages stay gameplay BOBs
             width, height = sprite["width"], sprite["height"]
             stride = dma_width // 8
             plane_size = stride * height

@@ -340,12 +340,7 @@ bool AmigaGameplayDrawList::glyph(unsigned id,int x,int y,unsigned pen){
 }
 
 namespace {
-unsigned borderGlyph(char c){
-    if(c>='0'&&c<='9')return 65100u+unsigned(c-'0');
-    if(c=='+')return 65111u;
-    if(c=='!')return 65112u;
-    return 65120u+unsigned(c-'A');
-}
+unsigned borderGlyph(char c){return amigaBorderGlyph(c);}
 }
 
 // moduleText Draw (font 2, eight-pixel advance, top-left aligned): letters
@@ -495,16 +490,38 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         });
     };
     const auto drawPlayer=[&](){
+#ifndef DOWNWELL_REPLAY_VERIFY
+        // playerDraw's gem-high afterimages, oldest first, behind the player
+        // and drawn through the hit blink. Each pose has two red striped
+        // pages; the one starting on an odd room column matches
+        // shaderAfterImage1's mod(x, 2) test.
+        for (unsigned i = port.afterImagesDrawn(); i-- > 0;) {
+            const auto& a = port.afterImage(i);
+            const int x = downwellPlayfieldX + 240 + int(downwell::roundGameMakerQ8(a.xFixed)) + port.afterImageDx(i) - worldViewX;
+            const int y = 176 + int(downwell::roundGameMakerQ8(a.yFixed)) + port.afterImageDy(i) - worldViewY;
+            const unsigned page = 1024u + (a.facing < 0 ? 512u : 0u) + a.frame;
+            int left, top, width, height;
+            if (const auto* frame = prepared ? prepared->find(UWORD(a.sprite), UWORD(page)) : nullptr)
+                frame->bounds(x, y, 0, left, top, width, height);
+            else if (prepared || !amigaRendererAssetBounds(pack, packEnd, UWORD(a.sprite), UWORD(page),
+                         x, y, 0, &left, &top, &width, &height)) {
+                failedSprite = UWORD(a.sprite); failedFrame = UWORD(page); return false;
+            }
+            const bool odd = ((left - downwellPlayfieldX + worldViewX) & 1) != 0;
+            if (!append(UWORD(a.sprite), UWORD(page + (odd ? 0u : 256u)), x, y, 0)) return false;
+        }
+#endif
+        // The pose the world evaluated at this update's Draw boundary.
+        const auto& pose = port.presentedPlayerPose();
         if (port.playerVisible() && !append(
-                (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
-                (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),
-                downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(port.player().offsetXFixed()) - port.cameraOffsetX(),
+                (UWORD)pose.sprite, (UWORD)pose.frame,
+                downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
                 replayGroundY + port.player().offsetY(),
 #else
-                playerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
+                playerStartY + downwell::roundGameMakerQ8(pose.yFixed) - port.cameraOffsetY(),
 #endif
-                port.player().facing() < 0)) return false;
+                pose.facing < 0)) return false;
         rayVisible = port.upgrades().levels[12] && !port.goalStopped();
         if (rayVisible) {
             DW_PROFILE_SCOPE(profileLaserTrace);
@@ -856,6 +873,14 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
     if(!drawForeground())ready=false;
     if(!port.hasRoomActorDraw()&&!drawPlayer())ready=false;
 #ifndef DOWNWELL_REPLAY_VERIFY
+    // playerDraw ends with drawComboNumber(x, y - 11, comboCount).
+    if(!port.hasRoomActorDraw()&&port.comboCount()>=5&&!port.goalStopped()&&
+       !downwell::drawComboNumber(
+            downwellPlayfieldX+80+downwell::roundGameMakerQ8(port.player().offsetXFixed())-port.cameraOffsetX(),
+            playerStartY+downwell::roundGameMakerQ8(port.player().offsetYFixed())-port.cameraOffsetY()-11,
+            port.comboCount(),[&](unsigned sprite,unsigned frame,int x,int y){
+                return append(UWORD(sprite),UWORD(frame),x,y,0);
+            }))ready=false;
     if(port.compactGuns().noticeEnd&&!drawCompactGunTexts(port,append,true,worldViewX,worldViewY))ready=false;
 #endif
 
@@ -866,6 +891,24 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         if(!append(96,effect.drawFrame(),downwellPlayfieldX+effect.pixelX()-worldViewX,
                    effect.pixelY()-worldViewY,0)) ready=false;
     });
+    if(!drawCompactHudTexts(port,append,worldViewY))ready=false;
 #endif
     return ready;
+}
+
+// Effect-surface texts in view coordinates: levelNumber 372 (scrDraw-
+// BorderTextBlack, font 2, top-left aligned like moduleText) and
+// comboRewardText 383.
+template<class Append> bool AmigaGameplayDrawList::drawCompactHudTexts(const GameplayWorld& port,Append& append,int viewY){
+    // levelNumber is drawn on the fixed HUD layer (AmigaLevelTitleHud).
+    if(!port.compactComboRewardsLive())return true;
+    const auto* rewards=port.compactComboRewards();
+    for(unsigned i=0;i<GameplayWorld::compactComboRewardCapacity;++i){
+        const auto& r=rewards[i];
+        if(!r.live)continue;
+        if(!downwell::drawComboReward(r,r.drawX(),r.drawY(long(viewY)<<16),[&](unsigned sprite,unsigned frame,int x,int y){
+                return append(UWORD(sprite),UWORD(frame),downwellPlayfieldX+x,y,0);
+            }))return false;
+    }
+    return true;
 }

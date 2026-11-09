@@ -105,7 +105,7 @@ int amigaRendererPrepareHudGlyph(AmigaHudGlyph*, const UBYTE*, const UBYTE*, UWO
 /* HUD text staging: compose a fixed HUD region's layers in source order in
    ordinary memory, then publish the result to the HUD layer in one pass.
    Art references point into the resident pack; nothing is converted. */
-enum { amigaHudStageWords = 6, amigaHudStageRows = 30 };
+enum { amigaHudStageWords = 14, amigaHudStageRows = 30 }; /* W1.7 gem bar at timer 480: 14 words */
 typedef struct AmigaHudArt {
     const UBYTE* data;
     int left, top;

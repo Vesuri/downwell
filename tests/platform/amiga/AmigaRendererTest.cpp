@@ -1662,7 +1662,7 @@ int main(int argc, char** argv) {
                 ++checked;
             }
         }
-        require(!prepared.find(741,0)&&!prepared.find(1,1024)&&!prepared.find(143,0),
+        require(!prepared.find(741,0)&&!prepared.find(1,4096)&&!prepared.find(143,0), // W1.7 afterimages use 1024..2047
             "missing sprite, page and sparse frame remain absent");
         require(!prepared.prepare(pack,pack+19)&&!prepared.find(1,0),"failed preparation invalidates old bindings");
         require(prepared.prepare(pack,end),"bindings can be prepared again at ownership boundary");
@@ -1671,9 +1671,9 @@ int main(int argc, char** argv) {
     std::cout << "Amiga renderer pixel comparisons passed\n";
     // The old per-asset upload sum is not the shipping Chip allocation: the
     // offline atlas shares planes. Enforce the actual banks' fixed ceilings.
-    require(gamePack.size()==DOWNWELL_GAME_BANK_BYTES&&gamePack.size()<=264u*1024u,
+    require(gamePack.size()==DOWNWELL_GAME_BANK_BYTES&&gamePack.size()<=296u*1024u, // tools/amiga_scene_contract.py
             "CPU gameplay art stays within its fixed scene lease budget");
-    require(DOWNWELL_GAME_PLANE_BYTES<=124u*1024u, // tools/amiga_scene_contract.py
+    require(DOWNWELL_GAME_PLANE_BYTES<=148u*1024u, // tools/amiga_scene_contract.py
             "DMA gameplay atlas stays within its fixed Chip lease budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;

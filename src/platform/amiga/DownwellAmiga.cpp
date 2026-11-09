@@ -31,6 +31,7 @@ extern "C" { volatile unsigned gDownwellSceneAdmissionFailure; }
 #include "../../../generated/amiga-game-planes.h"
 #endif
 #include "../../../generated/amiga-cavern-planes.h"
+#include "../../../generated/downwell-area-titles.h"
 extern "C" int amigaBlitterBindGamePlanes(const UBYTE*,unsigned,const UBYTE*,unsigned,const UBYTE*);
 extern "C" void amigaBlitterReleaseGamePlanes();
 extern "C" {
@@ -216,6 +217,8 @@ struct PreparedFieldOps {
 #include "AmigaPublisherScene.h"
 #include "AmigaCreditsScene.h"
 #include "AmigaSliceEndScene.h"
+#include "AmigaGemStreakHud.h"
+#include "AmigaLevelTitleHud.h"
 #include "AmigaControlsScene.h"
 #include "AmigaShopMenu.h"
 #ifdef DOWNWELL_SHOP_VERIFY
@@ -518,6 +521,12 @@ static UBYTE* overlayAssetStorage;
 static unsigned overlayAssetCapacity;
 enum class ResidentCover {none,exit,entry};
 static ResidentCover residentCover;
+// Gameplay-loop RETURN_FAIL exits record their source line for the native
+// verifiers (break on downwellGameplayFailed).
+volatile ULONG gDownwellGameplayFailLine;
+__attribute__((noinline, used)) int downwellGameplayFailed(unsigned line) {
+    gDownwellGameplayFailLine = line; __asm__ volatile("" ::: "memory"); return 20;
+}
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
 volatile ULONG gDownwellEntryWipeFrames,gDownwellEntryWipeFailures,gDownwellEntryWipeReuses,gDownwellEntryLifetimeChecks;
 __attribute__((noinline, used)) void downwellEntryWipeReady(){__asm__ volatile("" ::: "memory");}
@@ -1066,24 +1075,67 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
     AmigaHudText::currencyReference(renderer, activeHudPack, activeHudPackEnd, currency);
 }
 
+// scrDrawHud4x3's owned upgrades: global.ug[ugOrder[i]][2] frame 1 at
+// (-98 + 16 * (i - 1), g_cameraHeight - 12) from the playfield's left edge,
+// the seventh onwards 178 pixels further right. Later icons cover earlier.
+static unsigned shownUpgradeCount=0;
+static void redrawUpgradeIcons(AmigaRenderer* renderer, const downwell::UpgradeInventory& upgrades) {
+    static const UWORD icons[23]={524,528,512,520,518,521,522,506,507,508,509,510,511,
+                                  516,523,525,529,530,531,532,533,534,535};
+    amigaRendererClearClipRect(renderer);
+    amigaRendererFillRect(renderer, 0, 260, downwellPlayfieldX, 24, 0);
+    amigaRendererFillRect(renderer, downwellPlayfieldX + downwellPlayfieldWidth, 260,
+                          downwellDmaWidth - downwellPlayfieldX - downwellPlayfieldWidth, 24, 0);
+    for (unsigned i = 1; i <= upgrades.count && i < sizeof(upgrades.order); ++i) {
+        const unsigned id = upgrades.order[i];
+        if (id >= sizeof(icons) / sizeof(icons[0])) continue;
+        int x = downwellPlayfieldX - 98 + 16 * int(i - 1);
+        if (i > 6) x += 178;
+        if (x - 12 >= downwellDmaWidth) continue;
+        drawGameAsset(renderer, icons[id], 1, x, downwellDisplayHeight - 12, 0);
+    }
+    shownUpgradeCount = upgrades.count;
+}
 static int streakYOffset=0;
-static void composeStreak(AmigaRenderer* renderer, unsigned streak) {
+// W1.7: the whole scrDrawHud4x3Top streak block (bar, text, gem high).
+static AmigaGemStreakHud gemStreakHud;
+static AmigaGemStreakHud::View streakView;
+// W1.7: levelNumber on the fixed HUD layer.
+static AmigaLevelTitleHud titleHud;
+static AmigaLevelTitleHud::View titleView;
+static void invalidateTitle() { titleHud.invalidate(); titleView = {}; }
+static unsigned shownCurrencyText=0;
+// A fixed ordinary streak (no bar line) at the current offset, for scene
+// setup and the shop fixture.
+static AmigaGemStreakHud::View plainStreakView(unsigned streak) {
+    AmigaGemStreakHud::View v;
+    v.visible=streak!=0;v.streak=streak;v.drawY=50+streakYOffset;
+    return v;
+}
+static void composeStreak(AmigaRenderer* renderer, const AmigaGemStreakHud::View& view) {
     invalidateHudText();
-    AmigaHudText::composeStreakReference(renderer, activeGamePack, activeGamePackEnd, streak,streakYOffset);
+    if(gemStreakHud.bind(activeGamePack, activeGamePackEnd))(void)gemStreakHud.compose(renderer,view);
+}
+extern "C" { volatile ULONG gDownwellStreakFailure; volatile LONG gDownwellStreakFailureView[6]; } // 1 bind, 2 draw; +16 renderer->hud null
+static bool redrawStreak(AmigaRenderer* renderer, const AmigaGemStreakHud::View& view) {
+    if(!gemStreakHud.bind(activeGamePack, activeGamePackEnd)){gDownwellStreakFailure=1;return false;}
+    if(!gemStreakHud.draw(renderer,view)){
+        gDownwellStreakFailure=2+(renderer&&renderer->hud?0:16);
+        gDownwellStreakFailureView[0]=view.high;gDownwellStreakFailureView[1]=LONG(view.streak);
+        gDownwellStreakFailureView[2]=view.line;gDownwellStreakFailureView[3]=view.cap;
+        gDownwellStreakFailureView[4]=view.motion;gDownwellStreakFailureView[5]=view.drawY;
+        return false;
+    }
+    return true;
 }
 static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
-#ifndef DOWNWELL_REFERENCE_HUD_TEXT
-    if (hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd) &&
-        hudText.streak(renderer, streak,streakYOffset)) return;
-#if defined(DOWNWELL_FRAME_DUMP) && !defined(DOWNWELL_REFERENCE_HUD_WORDS)
-    ++gDownwellHudWordFallbacks;
-#endif
-#endif
-    AmigaHudText::streakReference(renderer, activeGamePack, activeGamePackEnd, streak,streakYOffset);
+    (void)redrawStreak(renderer,plainStreakView(streak));
 }
 
 static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
     invalidateHudText();
+    gemStreakHud.invalidate();
+    invalidateTitle();
     amigaRendererClearClipRect(renderer); // selects the non-scrolling HUD layer
     amigaRendererFillRect(renderer, downwellPlayfieldX, 0, 160, 284, visible ? 1 : 0);
 }
@@ -1092,6 +1144,7 @@ static void composeResultsBackdrop(AmigaRenderer* renderer,
                                     int offset, int viewX, int viewY,
                                     int top = 0, int bottom = 284) {
     invalidateHudText();
+    invalidateTitle();
     UBYTE* saved = renderer->target;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, top, 160, bottom - top);
     renderer->target = renderer->hud;
@@ -1697,6 +1750,7 @@ static void buildReferencePicture(
 
     DW_PROFILE_PHASE(profilePictureHealth);
     redrawHealth(renderer, 4, 4);
+    shownUpgradeCount=0;
 
     DW_PROFILE_PHASE(profilePictureAmmoArt);
     drawAsset(renderer, 416, 0, 284, 43, 0);
@@ -1707,6 +1761,9 @@ static void buildReferencePicture(
     // Establish the publisher's ownership with the initial picture. Leaving
     // these on the generic path makes the first pickup redraw static art.
     redrawCurrency(renderer, 0);
+    shownCurrencyText=0;
+    gemStreakHud.invalidate();streakView={};
+    invalidateTitle();
     redrawStreak(renderer, 0);
 #else
     drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
@@ -2203,6 +2260,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     const int emptyBlock = 0;
     port.configureBreakables(&emptyBlock, &emptyBlock, 0);
 #endif
+    // levelNumber's langString("area" + n), English as the shipped default.
+    port.configureCompactAreaTitles(downwell::area_titles::entries,downwell::area_titles::count,"english");
     if (!rooms.valid() || !objects.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
         !verificationReplay.valid() || verificationReplay.frameCount()>downwell::ReplayFrameTrace::capacity ||
@@ -2417,6 +2476,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         effectAssets.release();
         AmigaGameplayActors::releaseDamageText();
         hudText.release();
+        gemStreakHud.release();
+        titleHud.release();titleView={};
         activeGamePack=activeGamePackEnd=activeEntryMask=nullptr;
         gDownwellEntryMaskResidentBytes=0;
         releaseTerrainRaster();
@@ -2860,7 +2921,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             fencedVblank = AmigaPlatform::vblankCount();
             fenceDisplay();
         }
-        if(!collisionOwner.valid()){exitCode=20;break;}
+        if(!collisionOwner.valid()){exitCode=downwellGameplayFailed(__LINE__);break;}
         DW_PROFILE_PHASE(profileInput);
 #ifdef DOWNWELL_SCENE_VERIFY
         // Check AFTER the preceding iteration completed, not at its first
@@ -3161,10 +3222,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.waitVblank();
                     DW_PROFILE_PHASE(profileEntryFields);
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
-                    if(!encounterResources.acquire(platform)||!encounterResources.bind(encounterFrame)){exitCode=20;break;}
+                    if(!encounterResources.acquire(platform)||!encounterResources.bind(encounterFrame)){exitCode=downwellGameplayFailed(__LINE__);break;}
 #endif
-                    if(!prepareInitialGameplay()){exitCode=20;break;}
-                    if (!acquireGameplayPlanes()) { exitCode=20; break; }
+                    if(!prepareInitialGameplay()){exitCode=downwellGameplayFailed(__LINE__);break;}
+                    if (!acquireGameplayPlanes()) { exitCode=downwellGameplayFailed(__LINE__); break; }
 #ifdef DOWNWELL_PREPARED_FIELDS
                     // Terrain batching owns the prefix. Rebind after every
                     // front-bank reload, only after retiring its DMA.
@@ -3180,7 +3241,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if(fieldBandOffset<downwellTerrainBatchBytes || !gameplayFields.bind(
                         sceneBank+downwellTerrainBatchBytes,fieldBandOffset-downwellTerrainBatchBytes,
                         amiga_field_images,amiga_field_images_end-amiga_field_images,memory.game())){
-                        exitCode=20;break;
+                        exitCode=downwellGameplayFailed(__LINE__);break;
                     }
 #ifdef DOWNWELL_PROFILE_ENTRY
                     gDownwellEntryFields=sceneBank+downwellTerrainBatchBytes;
@@ -3192,14 +3253,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                             [](void* p,UBYTE* target,unsigned bytes){
                                 return static_cast<AmigaPlatform*>(p)->loadFile(
                                     "PROGDIR:Downwell.fields",target,bytes)==LONG(bytes);
-                            },&platform)){exitCode=20;break;}
+                            },&platform)){exitCode=downwellGameplayFailed(__LINE__);break;}
                         ++gDownwellFieldBankUploads;
                     }else ++gDownwellFieldBankReuses;
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
                     if(!amigaFieldVerifyTerrainFixture(memory.game(),(UBYTE*)gameDisplay[0].data,
                         sceneBank+sceneBankBytes-448)||
                         !verifyFieldComposites(memory.game(),(UBYTE*)gameDisplay[0].data)){
-                        exitCode=20;break;
+                        exitCode=downwellGameplayFailed(__LINE__);break;
                     }
 #endif
 #endif
@@ -3248,10 +3309,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                         downwellGameRingBytes, hudBytes);
+                    // The level-exit and entry cover masks load into the same middle.
                     if (!storage.valid || DOWNWELL_RESULTS_BANK_BYTES > storage.resultsCapacity ||
-                        DOWNWELL_SHOP_BANK_BYTES > storage.resultsCapacity) {
+                        DOWNWELL_SHOP_BANK_BYTES > storage.resultsCapacity ||
+                        DOWNWELL_EXITMASK_BANK_BYTES > storage.resultsCapacity ||
+                        DOWNWELL_ENTRYMASK_BANK_BYTES > storage.resultsCapacity) {
                         ++gDownwellResultsAssetFailures;
-                        exitCode = 20;
+                        exitCode=downwellGameplayFailed(__LINE__);
                         break;
                     }
                     UBYTE* hudStorage = memory.menuForeground() + storage.hudOffset;
@@ -3263,7 +3327,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (!entryHudReady) {
                         if (platform.loadFile("PROGDIR:Downwell.hud",hudStorage,hudBytes)!=LONG(hudBytes) ||
                             !validateTransientBank(hudStorage,hudBytes)) {
-                            exitCode=20;
+                            exitCode=downwellGameplayFailed(__LINE__);
                             break;
                         }
                         ++gDownwellHudLoads;
@@ -3275,7 +3339,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     bool hudMatches=hudBytes==unsigned(amiga_hud_pack_end-amiga_hud_pack);
                     for(unsigned byte=0;hudMatches&&byte<hudBytes;++byte)
                         hudMatches=hudStorage[byte]==amiga_hud_pack[byte];
-                    if(!hudMatches){exitCode=20;break;}
+                    if(!hudMatches){exitCode=downwellGameplayFailed(__LINE__);break;}
 #endif
                     // Gameplay and upgrade banks reserve this same high-end
                     // region. Keep residency across level handoffs; garden
@@ -3308,6 +3372,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // Bind HUD text backgrounds here, not on the first gem.
                     hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd);
 #endif
+                    if(!gemStreakHud.bind(activeGamePack, activeGamePackEnd)){exitCode=downwellGameplayFailed(__LINE__);break;}
+                    if(!titleHud.bind(activeGamePack, activeGamePackEnd)){exitCode=downwellGameplayFailed(__LINE__);break;}
                     overlayAssetStorage = memory.menuForeground() + storage.resultsOffset;
                     overlayAssetCapacity = storage.resultsCapacity;
                     residentCover = ResidentCover::none;
@@ -3682,14 +3748,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     releaseGameplayArt();
 #ifdef DOWNWELL_CLEAR_VERIFY
-                    if(!clearOracle.acquire()){exitCode=20;break;}
+                    if(!clearOracle.acquire()){exitCode=downwellGameplayFailed(__LINE__);break;}
                     gDownwellClearOracleBytes=AmigaClearOracleBuffers::bytes;
 #endif
-                    if (!upgradeSource.acquire()) { exitCode = 20; break; }
+                    if (!upgradeSource.acquire()) { exitCode=downwellGameplayFailed(__LINE__); break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                             DOWNWELL_HUD_BANK_BYTES, upgradeSource.view().data, upgradeSource.view().bytes,
-                            upgradeSource.mask(), DOWNWELL_SELECTIONMASK_BANK_BYTES)) { exitCode = 20; break; }
+                            upgradeSource.mask(), DOWNWELL_SELECTIONMASK_BANK_BYTES)) { exitCode=downwellGameplayFailed(__LINE__); break; }
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 2;
 #endif
@@ -3699,7 +3765,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                 } else if (!port.nextLevelRequested()) {
                     DW_PROFILE_SCOPE(profileClearStep);
-                    if (!clear.step(port, liveInput)) { exitCode = 20; break; }
+                    if (!clear.step(port, liveInput)) { exitCode=downwellGameplayFailed(__LINE__); break; }
                 }
                 if (port.nextLevelRequested() && port.runStage().area == 1 && port.runStage().level == 3) {
                     // Finish Result's original Alarm 1 before stopping at the
@@ -3712,7 +3778,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     const UBYTE* bank=memory.menuForeground()+clear.assets.layout.resultsOffset;
                     if (!port.finishWorldOneSlice() ||
                         !sliceEnd.prepare(memory.game(),memory.hud(),gameBitmap,bank,clear.assets.bankBytes,nullSprite,palette)) {
-                        exitCode=20;break;
+                        exitCode=downwellGameplayFailed(__LINE__);break;
                     }
                     if (!encounterFrame.beginDraw() || !encounterFrame.publishable()) break;
                     platform.publish(sliceEnd.presentation());
@@ -3735,7 +3801,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
                     {
                         DW_PROFILE_SCOPE(profileEntryWorld);
-                        if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode = 20; break; }
+                        if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode=downwellGameplayFailed(__LINE__); break; }
                     }
                     clear.presented = false;
                     newRunWorldPending = true; sceneResetRequested = true;
@@ -3754,7 +3820,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     DW_PROFILE_SCOPE(profileClearBank);
                     AmigaHardware::blitterDrain();
                     if (!clear.refreshArtwork(port, memory.menuForeground(), upgradeSource.view().data, upgradeSource.view().bytes)) {
-                        exitCode = 20; break;
+                        exitCode=downwellGameplayFailed(__LINE__); break;
                     }
                 }
                 const unsigned back = front ^ 1u;
@@ -3767,7 +3833,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 const UBYTE* bank = memory.menuForeground() + clear.assets.layout.resultsOffset;
                 AmigaUpgradeScene::Frame frame;
                 if (!clear.render(back, memory.hud(), memory.game(), target.hud, bank,
-                        bank + clear.assets.bankBytes, port, frame)) { exitCode = 20; break; }
+                        bank + clear.assets.bankBytes, port, frame)) { exitCode=downwellGameplayFailed(__LINE__); break; }
                 DW_PROFILE_PHASE(profileClearSprites);
                 for (unsigned channel = 0; channel < 8; ++channel) {
                     Sprite& sprite = channel == 0 ? playerSprites[back] :
@@ -3790,7 +3856,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaExitMask::stride * AmigaExitMask::selectionStride : nullptr;
                 if (!ready || !clear.updateDisplay(back, frame, mask, playerSprites[back],
                         bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette)) {
-                    exitCode = 20; break;
+                    exitCode=downwellGameplayFailed(__LINE__); break;
                 }
                 DW_PROFILE_PHASE(profileClearDrain);
                 AmigaHardware::blitterDrain();
@@ -3900,7 +3966,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
                     activeGamePack!=nullptr, memory.gameAssets()!=nullptr,
                     activeEntryMask!=nullptr, terrainRaster.hasStorage())){
-                gDownwellSceneAdmissionFailure=2;exitCode=20;break;
+                gDownwellSceneAdmissionFailure=2;exitCode=downwellGameplayFailed(__LINE__);break;
             }
 #ifdef DOWNWELL_REFERENCE_FRAME_WORK
             const AmigaPortFrame result = port.step(packedInput);
@@ -3919,7 +3985,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         gDownwellOverflowFailureFrame=frame;gDownwellOverflowFailureGroup=group;
                         gDownwellOverflowActual[0]=unsigned(actual[group]>>32);
                         gDownwellOverflowActual[1]=unsigned(actual[group]);
-                        downwellOverflowMismatch();matched=false;exitCode=20;break;
+                        downwellOverflowMismatch();matched=false;exitCode=downwellGameplayFailed(__LINE__);break;
                     }
                 }
                 if(!matched)break;
@@ -3977,8 +4043,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             }
 #endif
-            if (!port.effectsSucceeded()) { exitCode=20; break; }
-            if (!port.generationSucceeded()) { exitCode=20; break; }
+            if (!port.effectsSucceeded()) { exitCode=downwellGameplayFailed(__LINE__); break; }
+            if (!port.generationSucceeded()) { exitCode=downwellGameplayFailed(__LINE__); break; }
 #ifndef DOWNWELL_REPLAY_VERIFY
             // Invalidate before selecting a precomposed side-room ring.
             invalidateShopRaster(port.shops());
@@ -4008,7 +4074,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             DW_PROFILE_PHASE(profileTitle);
             // The runner sweeps marked instances at Draw entry. Inter-phase
             // reconciliation deliberately keeps those identities alive.
-            if (!encounterFrame.beginDraw(true)) { exitCode=20; break; }
+            if (!encounterFrame.beginDraw(true)) { exitCode=downwellGameplayFailed(__LINE__); break; }
 #ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
             ++gDownwellEncounterUpdateDraws;
 #endif
@@ -4051,25 +4117,45 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset(), &port.ammoGauge(), port.ammoMeterOffset());
+            if (port.upgrades().count != shownUpgradeCount && activeGamePack)
+                redrawUpgradeIcons(&renderer, port.upgrades());
             if (result.healthChanged)
                 redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum(),
                              port.healthReserve().pieces, port.healthReserve().piecesPerHeart);
-            if (result.currencyChanged)
-                redrawCurrency(&renderer, port.currency());
             std::int32_t streakWorldY=0;
             const int streakViewY=mainInitialViewY+port.cameraOffsetY();
-            if(!port.drawGemStreakRise(streakViewY,streakWorldY)){exitCode=20;break;}
-            const int nextStreakOffset=port.gemStreak()&&!port.dead()?streakWorldY-streakViewY-50:streakYOffset;
-            const bool streakMoved=nextStreakOffset!=streakYOffset;
-            const int previousStreakOffset=streakYOffset;
-            if(streakMoved){
-                // Restore the previous footprint only on a position change.
-                redrawStreak(&renderer,0);
-                streakYOffset=nextStreakOffset;
-                invalidateHudText();
+            if(!port.drawGemStreakRise(streakViewY,streakWorldY)){exitCode=downwellGameplayFailed(__LINE__);break;}
+            // scrDrawHud4x3 counts currencyText towards the currency; Top
+            // then advances the streak block's Draw state.
+            const bool streakDrawn=port.drawGemStreakHud();
+            if (port.currencyText() != shownCurrencyText) {
+                shownCurrencyText = port.currencyText();
+                redrawCurrency(&renderer, shownCurrencyText);
             }
-            if ((result.streakChanged || streakMoved || wasDead != port.dead()) && !port.deathResults().active)
-                redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
+            const int nextStreakOffset=port.gemStreak()&&!port.dead()?streakWorldY-streakViewY-50:streakYOffset;
+            const int previousStreakOffset=streakYOffset;
+            streakYOffset=nextStreakOffset;
+            const auto nextStreakView=AmigaGemStreakHud::view(port.gemStreakHud(),streakDrawn,port.gemStreak(),
+                port.upgrades().levels[20]!=0,50+streakYOffset);
+            const bool streakViewChanged=nextStreakView!=streakView;
+            (void)wasDead;
+            // The level-clear handoff releases the game art before its last
+            // Draw-only iteration; the clear scene repaints the HUD itself.
+            if (streakViewChanged && !port.deathResults().active && activeGamePack) {
+                streakView=nextStreakView;
+                if(!redrawStreak(&renderer,streakView)){exitCode=downwellGameplayFailed(__LINE__);break;}
+            }
+            // The death flash covers the playfield; the title returns after it.
+            if ((port.compactLevelTitle().live || titleView.length) && activeGamePack &&
+                !port.deathSequence().flashVisible() && !port.deathResults().active) {
+                const auto nextTitleView = AmigaLevelTitleHud::view(port.compactLevelTitle());
+                if (nextTitleView != titleView) {
+                    titleView = nextTitleView;
+                    if (!titleHud.bind(activeGamePack, activeGamePackEnd) || !titleHud.draw(&renderer, titleView)) {
+                        exitCode=downwellGameplayFailed(__LINE__);break;
+                    }
+                }
+            }
             if (wasDeathFlash != port.deathSequence().flashVisible()) {
                 // PF2 is above the world AND hardware sprites. Only touch this
                 // overlay on the two visibility edges; preserve the terrain
@@ -4083,19 +4169,18 @@ __attribute__((noinline)) static int runDownwell(void) {
             for (const auto& shop : port.shops().instances)
                 if (shop.present && shop.menu.active) { activeShop = &shop; break; }
             if (activeShop && !port.exitDither().active && !port.deathResults().active && !selectOverlayAssetBank(true)) {
-                exitCode = 20;
+                exitCode=downwellGameplayFailed(__LINE__);
                 break;
             }
             if (!port.deathResults().active && !port.deathSequence().flashVisible() && gDownwellShopPack) {
-                if (result.streakChanged || streakMoved || wasDead != port.dead())
+                if (streakViewChanged)
                     shopMenuOverlay.invalidateStreak(previousStreakOffset,streakYOffset);
-                unsigned streak = port.dead() ? 0 : port.gemStreak();
                 if (!shopMenuOverlay.draw(&renderer, gDownwellShopPack,
                         gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
                         mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
                         port.currency(), [](AmigaRenderer* target, void* context) {
-                            composeStreak(target, *static_cast<unsigned*>(context));
-                        }, &streak)) { exitCode = 20; break; }
+                            composeStreak(target, *static_cast<const AmigaGemStreakHud::View*>(context));
+                        }, &streakView)) { exitCode=downwellGameplayFailed(__LINE__); break; }
             } else shopMenuOverlay.reset();
 #if defined(DOWNWELL_SHOP_VERIFY) || defined(DOWNWELL_NATURAL_VERIFY)
             if (port.shops().allocatedCount && gDownwellShopPack) {
@@ -4113,7 +4198,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
                         mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
                         port.currency())) ++gDownwellShopLiveFailures;
-                composeStreak(&oracle, port.dead() ? 0 : port.gemStreak());
+                composeStreak(&oracle, streakView);
                 for (unsigned i = 0; i < downwellLayerBytes; ++i)
                     if (expected[i] != renderer.hud[i]) ++gDownwellShopLivePixelFailures;
                 ++gDownwellShopLiveFrames;
@@ -4129,7 +4214,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_PROFILE_ENTRY
                 ++gDownwellEntryResultsFrames;
 #endif
-                if (!selectOverlayAssetBank(false)) { exitCode = 20; break; }
+                if (!selectOverlayAssetBank(false)) { exitCode=downwellGameplayFailed(__LINE__); break; }
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
 #ifndef DOWNWELL_REPLAY_VERIFY
                     !resultsWasActive
@@ -4446,14 +4531,14 @@ __attribute__((noinline)) static int runDownwell(void) {
             // Presentation sweep through real registered Draw records. This
             // deliberately supplies fixture positions, not natural Step timing.
             auto& entryFixture=collisionOwner.entryDithers();
-            if(!entryFixture.clear()){exitCode=20;break;}
+            if(!entryFixture.clear()){exitCode=downwellGameplayFailed(__LINE__);break;}
             if(gDownwellEntryWipeFrames<25){
                 downwell::InstanceHandle key;
                 const int screenY=gDownwellEntryWipeFrames?320+int(gDownwellEntryWipeFrames-1)*16:-116;
                 if(!entryFixture.create(400100+gDownwellEntryWipeFrames,
                     [&](downwell::MotionBinary64& value){value=downwell::MotionBinary64::fromInteger(worldViewX+80);return true;},
                     [&](downwell::MotionBinary64& value){value=downwell::MotionBinary64::fromInteger(worldViewY+screenY);return true;},key)){
-                    exitCode=20;break;
+                    exitCode=downwellGameplayFailed(__LINE__);break;
                 }
             }
 #endif
@@ -4473,7 +4558,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             bool hardwareEntryCover=false;
             // Immutable cover DMA cannot reproduce shade-subtracted alpha.
             if(!actorList.entryCoverHardwareEligible(port,worldViewX,worldViewY,hardwareEntryCover)){
-                exitCode=20;break;
+                exitCode=downwellGameplayFailed(__LINE__);break;
             }
             bool hardwareCurrency=false;
 #if !defined(DOWNWELL_REFERENCE_EFFECT_COMPOSITION) && !defined(DOWNWELL_BOB_VERIFY) && !defined(DOWNWELL_REPLAY_VERIFY) && !defined(DOWNWELL_REFERENCE_ACTOR_PREFIX)
@@ -4526,10 +4611,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                     shadesSucceeded=port.visitRegisteredEnemyShades([&](Real x,Real y){emit(x,y);return true;});
                 },[](Real n,std::int32_t& out){return n.roundPixel(out);})||!shadesSucceeded){
-                    exitCode=20;break;
+                    exitCode=downwellGameplayFailed(__LINE__);break;
                 }
             }
-            if(compositeEffects&&!AmigaEffectSurface::verify(controllerEffects.surface())){exitCode=20;break;}
+            if(compositeEffects&&!AmigaEffectSurface::verify(controllerEffects.surface())){exitCode=downwellGameplayFailed(__LINE__);break;}
             GameplayBob* actors = actorList.actors;
             const unsigned actorCount = actorList.count;
             const auto& rayLine = actorList.rayLine;
@@ -4603,7 +4688,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         , !gameplayRays[back].retainsPixels()
 #endif
                         )) {
-                    exitCode = 20; break;
+                    exitCode=downwellGameplayFailed(__LINE__); break;
                 }
             }
             syncGameRows(gameDisplay[back], gameBitmap, back);
@@ -4611,7 +4696,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 DW_PROFILE_SCOPE(profileGoalFieldDraw);
                 AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_PREPARED_FIELDS
-                if(!gameplayFields[back].draw()){exitCode=20;break;}
+                if(!gameplayFields[back].draw()){exitCode=downwellGameplayFailed(__LINE__);break;}
 #else
                 gameplayFields[back].draw();
 #endif
@@ -4637,26 +4722,26 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gameplayRegularSpriteCount,
                     enemySprites[back], palette, port.ringOrigin()))
                 frameReady = false;
-            if(!terrainPaintSucceeded){exitCode=20;break;}
+            if(!terrainPaintSucceeded){exitCode=downwellGameplayFailed(__LINE__);break;}
             if (!frameReady) {
                 downwellGameplayRenderFailure();
                 break;
             }
             const UBYTE* exitMask = nullptr;
-            if(actorList.entryCoverVisible&&port.exitDither().active){exitCode=20;break;}
+            if(actorList.entryCoverVisible&&port.exitDither().active){exitCode=downwellGameplayFailed(__LINE__);break;}
             if(hardwareEntryCover){
                 // Two different cover lifetimes cannot share one DMA bank.
                 if(port.exitDither().active||!selectEntryMaskBank()||
                    !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,actorList.entryCover.y)){
-                    exitCode=20;break;
+                    exitCode=downwellGameplayFailed(__LINE__);break;
                 }
             }else{
                 if(port.exitDither().active){
-                    if(!selectExitMaskBank()){exitCode=20;break;}
+                    if(!selectExitMaskBank()){exitCode=downwellGameplayFailed(__LINE__);break;}
                     exitMask=overlayAssetStorage+AmigaExitMask::offset(
                         port.exitDither().y-(mainInitialViewY+port.cameraOffsetY()));
                 }
-                if(!gameplayScene.mask(back,exitMask)){exitCode=20;break;}
+                if(!gameplayScene.mask(back,exitMask)){exitCode=downwellGameplayFailed(__LINE__);break;}
             }
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
             const bool entryAttached=gDownwellEntryWipeFrames<25;
@@ -4665,7 +4750,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             if(actorList.entryCoverVisible!=entryAttached||
                 (entryAttached&&(!AmigaEntryMask::offset(entryY,entryOffset)||
                     actorList.entryCover.y!=entryY||actorList.entryCover.offset!=entryOffset))){
-                exitCode=20;break;
+                exitCode=downwellGameplayFailed(__LINE__);break;
             }
             const auto& entryList=gameplayScene.copper(back);
             const UWORD* entryWords=entryList.data();
@@ -4722,7 +4807,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             DW_PROFILE_PHASE(profilePublish);
-            if(!encounterFrame.publishable()){exitCode=20;break;}
+            if(!encounterFrame.publishable()){exitCode=downwellGameplayFailed(__LINE__);break;}
 #ifdef DOWNWELL_ENCOUNTER_UPDATE_FAILURE_VERIFY
             ++gDownwellEncounterUpdatePublications;
 #endif
@@ -4746,9 +4831,9 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
             if(gDownwellEntryWipeFrames==27){
                 platform.waitVblank(); // Final detached list is now published.
-                if(!gameplayScene.coverDetached()){exitCode=20;break;}
+                if(!gameplayScene.coverDetached()){exitCode=downwellGameplayFailed(__LINE__);break;}
                 residentCover=ResidentCover::none;
-                if(!selectOverlayAssetBank(true)){exitCode=20;break;}
+                if(!selectOverlayAssetBank(true)){exitCode=downwellGameplayFailed(__LINE__);break;}
                 for(unsigned i=0;i<gDownwellShopAssetBytes;++i)
                     if(overlayAssetStorage[i]!=amiga_shop_pack[i])++gDownwellEntryWipeFailures;
                 ++gDownwellEntryWipeReuses;
@@ -4892,7 +4977,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         shopOracle.reset();
                         shopOracle.invalidateStreak(streakYOffset,streakYOffset);
                         const auto foreground = [](AmigaRenderer* target, void* context) {
-                            composeStreak(target, *static_cast<unsigned*>(context));
+                            composeStreak(target, plainStreakView(*static_cast<unsigned*>(context)));
                         };
                         if (!shopActual.draw(&renderer, gDownwellShopPack,
                                 gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200, foreground, &streak) ||
@@ -5045,7 +5130,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
         }
-        if(!encounterFrame.finish()){exitCode=20;break;}
+        if(!encounterFrame.finish()){exitCode=downwellGameplayFailed(__LINE__);break;}
         lastPortCheckpoint = port.trajectoryDigest();
 #ifdef DOWNWELL_REPLAY_VERIFY
 #ifdef DOWNWELL_REPLAY_FRAME_TRACE
@@ -5119,7 +5204,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     }
 
-    if(!encounterSession.retire())exitCode=20;
+    if(!encounterSession.retire())exitCode=downwellGameplayFailed(__LINE__);
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
     encounterResources.releaseScene();
 #endif

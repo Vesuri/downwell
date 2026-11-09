@@ -100,6 +100,7 @@
 #include "core/CompactRoomEffects.h"
 #include "core/CompactScenery.h"
 #include "core/CompactGuns.h"
+#include "core/CompactHud.h"
 #include "core/RangedShot.h"
 #include "core/GunTable.h"
 
@@ -3045,6 +3046,32 @@ private:
     void compactDamageSlowdown();
     void advanceCompactControllerAlarm();
     int compactControllerAlarm0_=0;
+public:
+    // Pose in the player's Q8 offset space; room x/y = 240/176 + round(offset).
+    struct CompactAfterImage{int sprite;unsigned frame;int facing;long xFixed,yFixed;};
+    static constexpr unsigned afterImageCount=9;
+private:
+    void resetCompactAfterImages(int x,int y);
+    void drawCompactAfterImages();
+    // A ring, newest at afterImageHead_: Alarm 7 copies the pose the last
+    // Draw showed (evaluated once per update, shared with the backends)
+    // instead of re-evaluating the player and shifting nine records.
+    CompactAfterImage afterImages_[afterImageCount];
+    CompactAfterImage presentedPose_{31,0,1,0,0};
+    unsigned liveRewards_=0;
+    unsigned afterImageHead_=0;
+    int afterImageDx_[afterImageCount]={},afterImageDy_[afterImageCount]={};
+    unsigned afterImagesDrawn_=0;
+    void compactLevelBeginCue();
+    bool createCompactComboReward();
+    void advanceCompactHudAlarms();
+    void advanceCompactHudDraw();
+    downwell::CompactLevelTitle compactTitle_;
+    downwell::CompactComboRewardRecord compactRewards_[4]; // compactComboRewardCapacity
+    downwell::CompactGemStreakHud gemHud_;
+    const downwell::AreaTitle* compactAreaTitles_=nullptr;
+    unsigned compactAreaTitleCount_=0;
+    const char* compactLanguage_="english";
     bool compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
     bool stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase);
     bool advanceCompactCorpseAlarm(unsigned alarm);
@@ -3137,6 +3164,38 @@ public:
     const downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity>& compactCorpses()const{return compactCorpses_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}
+    // W1.7 compact combo and controller HUD. The platform supplies the
+    // language's area titles (langString("area" + n)); without them the
+    // title draws nothing, as the stored levelNumber owner is absent too.
+    void configureCompactAreaTitles(const downwell::AreaTitle* titles,unsigned count,const char* language){
+        compactAreaTitles_=titles;compactAreaTitleCount_=count;compactLanguage_=language;
+    }
+    const downwell::CompactLevelTitle& compactLevelTitle()const{return compactTitle_;}
+    static constexpr unsigned compactComboRewardCapacity=4;
+    const downwell::CompactComboRewardRecord* compactComboRewards()const{return compactRewards_;}
+    unsigned compactComboRewardsLive()const{return liveRewards_;}
+    unsigned comboCount()const{return run_.combo.state.count;}
+    // scrDrawHud4x3Top's streak block and scrDrawHud4x3's currencyText, once
+    // per Draw; returns whether the block draws.
+    bool drawGemStreakHud(){
+        gemHud_.countCurrency(currencyAccount_.currency);
+        return gemHud_.draw(currencyAccount_.streak,currencyAccount_.timer,dead(),stopped());
+    }
+    const downwell::CompactGemStreakHud& gemStreakHud()const{return gemHud_;}
+    unsigned currencyText()const{return gemHud_.currencyText;}
+    // playerDraw's gem-high afterimages (shaderAfterImage1: white texels
+    // become red on odd room columns), oldest first: draw index i from
+    // count-1 down to 0 at (x + dx, y + dy).
+    unsigned afterImagesDrawn()const{return afterImagesDrawn_;}
+    // i = 0 is the newest record.
+    const CompactAfterImage& afterImage(unsigned i)const{
+        unsigned at=afterImageHead_+i;if(at>=afterImageCount)at-=afterImageCount;return afterImages_[at];
+    }
+    // The player's sprite, subimage, xscale and room position as this
+    // update's Draw shows them (set at the Draw boundary).
+    const CompactAfterImage& presentedPlayerPose()const{return presentedPose_;}
+    int afterImageDx(unsigned i)const{return afterImageDx_[i];}
+    int afterImageDy(unsigned i)const{return afterImageDy_[i];}
     // global.pTimeStop, room_speed and the sleep() milliseconds requested
     // since the last call (fxTimeChange Create). PAL frontends pace with them.
     bool timeStopped()const{return stopped();}

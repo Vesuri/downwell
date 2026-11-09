@@ -132,6 +132,9 @@ public:
     unsigned dustCount() const { return dustCount_; }
     const Dust& dust(unsigned index) const { return dust_[index]; }
     unsigned emptyMessages() const { return emptyMessages_; }
+    // scrPlMovement's airborne landings (each calls levelBeginCue outside
+    // ground rooms, before its landing dust).
+    unsigned landings() const { return landings_; }
     unsigned shots() const { return shots_; }
     unsigned recharges() const { return recharges_; }
     void stompBounce(int playStyle = 0);
@@ -206,7 +209,7 @@ private:
     unsigned shotDelay_;
     int facing_;
     unsigned jumps_;
-    unsigned emptyShots_ = 0, emptyMessages_ = 0;
+    unsigned emptyShots_ = 0, emptyMessages_ = 0, landings_ = 0;
     Dust dust_[3] = {};
     unsigned dustCount_ = 0;
     bool wallColliding_ = false; // scrWallCol's previous-Step xcollision

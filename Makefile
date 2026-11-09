@@ -174,6 +174,14 @@ test-compact-guns: build/compact-guns-test
 build/compact-guns-test: tests/core/CompactGunsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CompactGunsTest.cpp src/core/GameMakerRandom.cpp
+# W1.7 gem streak block: every view's art stays inside its HUD stage.
+test: test-amiga-gem-streak-hud
+.PHONY: test-amiga-gem-streak-hud
+test-amiga-gem-streak-hud: build/amiga-gem-streak-hud-test generated/amiga-game.dwap generated/amiga-cavern.dwap
+	./build/amiga-gem-streak-hud-test generated/amiga-game.dwap generated/amiga-cavern.dwap
+build/amiga-gem-streak-hud-test: tests/platform/amiga/AmigaGemStreakHudTest.cpp src/platform/amiga/AmigaRenderer.c src/platform/amiga/AmigaGemStreakHud.h src/platform/amiga/AmigaLevelTitleHud.h src/platform/amiga/AmigaHudMaskedOwner.h src/platform/amiga/AmigaGameplayActors.h src/platform/amiga/AmigaRenderer.h src/core/CompactHud.h
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaGemStreakHudTest.cpp src/platform/amiga/AmigaRenderer.c
 # GunTable.h against bStatInitLevel1 in the pinned UTMT export.
 verify-gun-table:
 	python3 tools/verify-gun-table.py
@@ -2637,7 +2645,7 @@ $(AMIGA_PORT_TEST_TARGET): $(AMIGA_PORT_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_PORT_TEST_SOURCES)
 
-$(AMIGA_SCENE_TEST_TARGET): $(AMIGA_SCENE_TEST_SOURCES) tests/platform/amiga/GameplayEncounterCoverage.h
+$(AMIGA_SCENE_TEST_TARGET): $(AMIGA_SCENE_TEST_SOURCES) tests/platform/amiga/GameplayEncounterCoverage.h generated/downwell-area-titles.h
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_SCENE_TEST_SOURCES)
 

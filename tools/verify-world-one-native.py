@@ -58,6 +58,7 @@ def main():
         # source-line breakpoint can stop after those loads in optimized code.
         checked("break *'AmigaInput::sample'")
         checked('break downwellWorldOneComplete')
+        checked('break downwellGameplayFailed')
         # Optional evidence run: DOWNWELL_CAPTURE_TICK=4494 (with
         # READY_MARKER=DOWNWELL_WORLD_ONE_CAPTURE_READY) checks the route up to
         # that simulation tick, saves captures/world-one-<tick>, and stops.
@@ -77,7 +78,7 @@ def main():
         oldScene=-1
         oldLevel=-1
         levelStart=-1
-        deadline=time.monotonic()+1200
+        deadline=time.monotonic()+int(os.environ.get('DOWNWELL_ROUTE_SECONDS','1200'))
         with Input(g,log=lambda r: log.write(str(r)+'\n')) as controls:
             for frame in range(14000):
                 if time.monotonic()>deadline:
@@ -94,6 +95,10 @@ def main():
                     print('DOWNWELL_WORLD_ONE_READY',flush=True)
                     Path('.run/gdb-ready.marker').touch()
                     return
+                if 'downwellGameplayFailed' in stop:
+                    for probe in ('print gDownwellStreakFailure','print gDownwellStreakFailureView','print $w->gemHud_','print $w->currencyAccount_','print streakYOffset'):
+                        print(checked(probe),flush=True)
+                    raise RuntimeError(checked('printf "GAMEPLAY FAIL line=%u tick=%u actor=%u/%u\\n", line,$w->tick_,gDownwellActorFailureSprite,gDownwellActorFailureFrame'))
                 if 'AmigaInput::sample' not in stop:
                     raise RuntimeError('unexpected native stop: '+stop)
                 state=checked('printf "STATE %d %u %d %d %d %d %d\\n", $s->scene_,$w->tick_,$w->run_.stage.area,$w->run_.stage.level,$w->health_,$w->generationSucceeded_,$w->run_.levelResultRequested&&!$w->run_.levelClearActive')

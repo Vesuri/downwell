@@ -375,6 +375,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             // before scrRecharge. A simultaneous wall hit defers completion.
             if (!horizontalCollision && comboCompletion_ && !comboTimeStopped_)
                 comboCompletion_(comboContext_);
+            ++landings_;
             // Landing dust at the corrected position, emitTo = sign(xsp).
             addDust(false, x_, y_, speedX_ > 0 ? 1 : speedX_ < 0 ? -1 : 0);
             recharge();

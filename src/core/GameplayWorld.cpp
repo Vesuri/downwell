@@ -106,6 +106,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto resultInstance=resultInstance_;
     const auto levelNumbers=levelNumbers_;
     const auto limboShards=limboShards_;
+    const auto areaTitles=compactAreaTitles_;const auto areaTitleCount=compactAreaTitleCount_;
+    const auto language=compactLanguage_;
     const auto registeredFlash=registeredFlash_;
     const auto controllerRoomSpeed=controllerRoomSpeed_;
     const auto droneBullets=droneBullets_;
@@ -196,6 +198,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     resultInstance_=resultInstance;
     levelNumbers_=levelNumbers;
     limboShards_=limboShards;
+    configureCompactAreaTitles(areaTitles,areaTitleCount,language);
     registeredFlash_=registeredFlash;
     controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
@@ -319,6 +322,7 @@ bool GameplayWorld::retireGameplayRoom() {
     // This also handles explicit test/adaptor births made before the next
     // room load; an already retired lifetime must not receive a second callback.
     if(levelNumbers_&&!levelNumbers_->clear())return run_.effectsSucceeded=false;
+    compactTitle_={};for(auto& r:compactRewards_)r={};liveRewards_=0;
     if(limboShards_&&!limboShards_->clear())return run_.effectsSucceeded=false;
     if(registeredFlash_&&!registeredFlash_->clear())return run_.effectsSucceeded=false;
     if(resultInstance_&&!resultInstance_->clear())return run_.effectsSucceeded=false;
@@ -540,6 +544,7 @@ bool GameplayWorld::birthPlayerOwnership() {
         run_.effectsSucceeded=false;return false;
     }
     run_.playerCreated();
+    resetCompactAfterImages(playerInstance_.x,playerInstance_.y);
     return true;
 }
 
@@ -1079,6 +1084,7 @@ void GameplayWorld::advanceEnemyAlarms()
     }
     // objControlerN 37 is the first object at alarm index 0.
     advanceCompactControllerAlarm();
+    advanceCompactHudAlarms();
     if(roomAlarms_){
         if(!roomAlarms_(roomAlarmsContext_)){run_.effectsSucceeded=false;return;}
         // Compact fxTimeChange 211, fxTimeShard 238, gemChunk 293 and debris
@@ -1516,6 +1522,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(playerBirthPending_){run_.effectsSucceeded=false;return {};}
     if(collisionPassExecuting_){run_.effectsSucceeded=false;return {};}
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
+    advanceCompactHudDraw();
     boneViewLeft_=160+cameraPixelX_;
     boneViewTopQ8_=34L*256+viewCameraYQ8();
     downwell::GameMakerRandom::FrameRefill refill{enemyRandom_};
@@ -1654,6 +1661,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     // scrPlayerShootN's emitSmoke reads global.plx/ply from before this Step.
     const unsigned emptyShotsBefore=player_.emptyShots(),emptyMessagesBefore=player_.emptyMessages();
+    const unsigned landingsBefore=player_.landings();
     const int emptyX=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
     const int emptyY=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
@@ -1676,6 +1684,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
+    // levelBeginCue at an airborne landing precedes comboDone (scrWallCol).
+    if(player_.landings()!=landingsBefore)compactLevelBeginCue();
+    if(run_.combo.completion.rewardCreated&&!createCompactComboReward())return {};
     if(run_.combo.completion.momentDelay)compactMomentDelay(); // comboDone
     // objJumpFx 95 and objJumpSmallerFx 94: image_speed 0.5, destroyed at
     // Animation End, no RNG. The smaller puff draws itself and a mirrored
@@ -2163,6 +2174,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // parentTimeField/goalTimeField/startTimeField Draw: no radius draw
     // while pTimeStop.
     run_.gameplayPresentationStep(enemyRandom_,stopped());
+    drawCompactAfterImages();
     if(!reconcilePhase(PhaseBoundary::endStep))return {};
     frame.playerMotion = motion;
     DW_PROFILE_PHASE(profileHudState);
@@ -2282,7 +2294,7 @@ struct GameplayWorld::SteeringOps {
             downwell::enemyContactMask(enemy->objectId,enemy->spriteId),x,y,hit);
     }
     bool enemyDeath(){ // scrEnemyDeath
-        world.run_.combo.state.enemyDefeated();++world.run_.kills;return true;
+        world.run_.combo.state.enemyDefeated();++world.run_.kills;world.compactLevelBeginCue();return true;
     }
     // scrSmoke(x,y,1,0) and scrFlashballfx(x,y,1,0,0) create objects with
     // Create RNG; emitMovingFx 704 has none.
@@ -3921,6 +3933,7 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         default:return run_.effectsSucceeded=false;
     }
     compactMomentDelay(); // scrEnemyDeath
+    compactLevelBeginCue();
     const Real x=Real::fromInteger(enemy.x+240),y=Real::fromInteger(enemy.y+176);
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
     if(stomped&&!compactBloodfx(x,y))return false;
@@ -4064,4 +4077,93 @@ bool GameplayWorld::compactCosmeticEffect(downwell::MotionBinary64 x,downwell::M
     if(!compactEffects_.spawnNoLoop(x,y,sprite,speed,{},downwell::MotionBinary64::fromInteger(depth)))
         return run_.effectsSucceeded=false;
     return true;
+}
+
+// levelBeginCue (scrPlMovement's landing, scrEnemyDeath): outside pTimeStop,
+// the first call of a level creates levelNumber 372 and sets firstLand. Area
+// 5 only sets firstLand. BGM and sfxFalling are W2. A stored-owner cue
+// (beginLevelCueWithTitle) sets firstLand first, so neither creates twice.
+void GameplayWorld::compactLevelBeginCue(){
+    if(run_.firstLand||stopped())return;
+    run_.firstLand=true;
+    if(run_.stage.area==5||!compactAreaTitles_)return;
+    const downwell::AreaTitle* title=nullptr;
+    for(unsigned i=0;i<compactAreaTitleCount_&&!title;++i){
+        const auto& t=compactAreaTitles_[i];
+        if(t.area!=run_.stage.area||!t.language)continue;
+        const char *a=t.language,*b=compactLanguage_;
+        while(*a&&*a==*b){++a;++b;}
+        if(*a==*b)title=&t;
+    }
+    if(!compactTitle_.create(title?title->characters:nullptr,title?title->length:0,run_.stage.level))
+        compactTitle_={};
+}
+
+// comboDone's instance_create(xx, view y + 64 + 64, comboRewardText); Create
+// destroys it at once while global.death. A full store drops the text.
+bool GameplayWorld::createCompactComboReward(){
+    if(dead())return true;
+    for(auto& r:compactRewards_)if(!r.live){
+        const long viewX=long(160+cameraPixelX_)<<16,viewY=long(34+cameraPixelY_)<<16;
+        r.create((240L<<16)+(run_.combo.rewardXQ8<<8),viewX,viewY,viewY+(142L<<16),
+            run_.combo.reward.combo,int(run_.combo.reward.showBonusMax));
+        ++liveRewards_;
+        return true;
+    }
+    return true;
+}
+
+// Alarms, then Step (relativey against the camera, the flash toggle).
+void GameplayWorld::advanceCompactHudAlarms(){
+    // objPlayer_n Alarm 7 (afterImageInterval 1): shift the history, then
+    // record the previous Step's sprite, subimage, xscale and position, which
+    // are what that update's Draw showed.
+    if(playerInstance_.lifetimeId){
+        afterImageHead_=afterImageHead_?afterImageHead_-1:afterImageCount-1;
+        afterImages_[afterImageHead_]=presentedPose_;
+    }
+    compactTitle_.advanceAlarms();
+    if(!liveRewards_)return;
+    const long camera=long(34+142+cameraPixelY_)<<16;
+    for(auto& r:compactRewards_)if(r.live){
+        r.advanceAlarms();
+        if(r.live)r.step(camera);else --liveRewards_;
+    }
+}
+
+// The previous update's Draw mutations (letter offsets, slide-ins, flash).
+void GameplayWorld::advanceCompactHudDraw(){
+    compactTitle_.advanceDraw();
+    if(liveRewards_)for(auto& r:compactRewards_)if(r.live)r.advanceDraw();
+}
+
+// scrPlayerInit: nine records of sprite 31, subimage 0, xscale 1 at x/y.
+void GameplayWorld::resetCompactAfterImages(int x,int y){
+    const long xFixed=long(x-240)<<8,yFixed=long(y-176)<<8;
+    for(auto& a:afterImages_)a={31,0,1,xFixed,yFixed};
+    presentedPose_={31,0,1,xFixed,yFixed};
+    afterImageHead_=0;
+    afterImagesDrawn_=0;
+}
+
+// playerDraw while gemStreak >= gemStreakThreshold and !global.death:
+// round(min(8, 8 * timer / 300)) + 1 images, newest last, each jittered by
+// irandom_range(-1,1) and irandom_range(-2,1) from the world RNG in Draw.
+void GameplayWorld::drawCompactAfterImages(){
+    afterImagesDrawn_=0;
+    if(playerInstance_.lifetimeId){
+        const bool deadPose=death_.movementDead();
+        presentedPose_={player_.spriteId(deadPose),player_.spriteFrame(deadPose,death_.animation),
+            player_.facing(),player_.offsetXFixed(),player_.offsetYFixed()};
+    }
+    if(currencyAccount_.streak<downwell::CompactGemStreakHud::threshold||
+       !playerInstance_.lifetimeId||run_.goalStopped||dead())return;
+    const unsigned timer=currencyAccount_.timer;
+    unsigned amount=timer>=300?8:unsigned(downwell::CompactGemStreakHud::roundRatio(8UL*timer,300));
+    if(amount>8)amount=8;
+    for(int i=int(amount);i>=0;--i){
+        afterImageDx_[i]=int(enemyRandom_.irandomSmall(2))-1;
+        afterImageDy_[i]=int(enemyRandom_.irandomSmall(3))-2;
+    }
+    afterImagesDrawn_=amount+1;
 }

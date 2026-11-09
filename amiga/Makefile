@@ -709,6 +709,11 @@ $(REPO)/generated/amiga-cavern-planes.h: $(REPO)/generated/amiga-cavern.planes
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-cavern-planes.h
 
+$(REPO)/generated/downwell-area-titles.h: $(REPO)/tools/generate-area-titles.py $(REPO)/data/language.ini
+	python3 $(REPO)/tools/generate-area-titles.py --output $@
+
+obj/DownwellAmiga.o: $(REPO)/generated/downwell-area-titles.h
+
 $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@

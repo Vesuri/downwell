@@ -82,20 +82,23 @@ currency, casings, debris, moving effects and TorchFire, field kills), the
 damage chains (`objDeadBody` 263 corpses, blood, death smoke and flash, bullet
 impacts and the immune spark, bullet, casing and laser wall hits, jump,
 turn and landing dust, the empty-gun smoke and "EMPTY!", and the
-`momentDelay` and player-damage `room_speed` changes), compact
+`momentDelay` and player-damage `room_speed` changes), the combo and
+controller HUD (the combo counter over the player, `comboRewardText` 383, the
+`levelNumber` 372 title at first landing or kill, the streak bar with " N"
+and its icon, GEM HIGH with the gem-high afterimages, the counting gem total
+and the owned-upgrade icons), compact
 shops, level exit, upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
+Known approximations: overlapping `moduleText` records never push each other
+down (Collision with `moduleText`), and `moduleText`, `itemNotif`, "EMPTY!" and
+the `levelNumber` letters assume top-left text alignment although the HUD
+leaves `fa_middle` set; "EMPTY!" reuses the `itemNotif` record for
+`fxRisingText`, skips its Collision with `fxRisingText` and is born after the
+whole player Step. `levelNumber` has no hard-mode "-H" yet (item 10), and
+it is drawn on the fixed HUD layer: above the world and the hardware sprites,
+and hidden while the death flash covers the playfield.
 
-7. **Combo and HUD.** Add the on-screen combo counter, `comboDone` rewards at
-   5, 10, 30 and 100, `ComboBreak` 369, `comboRewardText` 383, Gemhigh and the
-   remaining controller-HUD rules, and the `levelNumber` 372 title at each
-   level start. The W1.4 texts approximate two source details: overlapping
-   `moduleText` records never push each other down (Collision with
-   `moduleText`), and the letters assume top-left text alignment although
-   `itemNotif` leaves `fa_middle` set. W1.6's "EMPTY!" reuses the `itemNotif`
-   record for `fxRisingText` and likewise skips its Collision with
-   `fxRisingText`; it is born after the whole player Step.
 8. **Complete shops.** Merchant speech and prompts, keeper behaviour, funded,
    insufficient and sold-out purchases, the criminal route, and the
    source shop-placement rules per style.
@@ -118,6 +121,11 @@ CATACOMB-1 without loading area 2. Items keep their numbers as they close.
     hard spawner sets (only the normal sets are wired); and saving
     style, options, records and unlock progress to disk. Scope chosen by
     default from the original; the user may trim it.
+11. **Low-health flicker.** At 1 HP `playerDraw` replaces the player, on 7 of
+    every 52 Draws, by two `shaderPlayerRed` copies (white and red texels red,
+    black transparent) jittered by `irandom_range(-2,2)` and
+    `irandom_range(-1,1)`. The draws feed the world RNG, so adding it reshuffles
+    the route.
 
 ### W2. Audio
 
@@ -140,9 +148,11 @@ Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handl
 and keep audio out of scenes that do not use it.
 
 The target A500 has 1 MiB of Chip RAM (ECS 8372A Agnus): normal startup
-leaves 651,128 Chip bytes free and gameplay entry takes the 121,374-byte
-cavern plane atlas, so about 520 KiB remains for samples and later art. Gameplay already recycles
+leaves 651,128 Chip bytes free and gameplay entry takes the 143,334-byte
+cavern plane atlas, so about 495 KiB remains for samples and later art. Gameplay already recycles
 the garden region (staging ring, HUD bank, on-demand shop or results art);
+the HUD bank may not exceed 14,976 bytes there, or the 31,104-byte exit and
+entry cover masks no longer fit beside it;
 the garden art is reloaded from disk when shown again. Keep scene-local
 residency and measure free and largest Chip before and after
 (`verify-amiga-memory`, `verify-amiga-startup`).
@@ -183,7 +193,21 @@ smoke add no-loop and smoke records. `momentDelay` (30 for one update) and
 player damage (40 for 40 updates) slow presentation on purpose; judge them
 like `fxTimeChange`. The corpse art, spark, dust and "!" add 2,460 Chip bytes
 to the cavern plane atlas (now 121,374). The quiet-fall witness went from
-193 to 195 fields.
+193 to 195 fields. W1.7: the player's pose is evaluated once per update at
+the Draw boundary and shared by the draw list and Alarm 7's nine-record
+afterimage ring; while gem high, up to nine extra BOBs are drawn, each with
+two world RNG draws; the streak block (a 14-word, 22-row HUD stage that also erases
+its previous pixels by mask) is recomposed and published on every update
+that changes it, which is every update while gem
+high (cap and motion frames) or while the bar line moves; `currencyText`
+redraws the currency while it counts. Combo, reward and title art, the
+afterimage pages and the upgrade icons add 34,968 bytes to the cavern CPU
+bank (now 288,058) and 21,960 Chip bytes to its plane atlas (now 143,334);
+the prepared actor-frame table grew from 640 to 1,024 entries. The
+`levelNumber` title publishes to the HUD layer only when a letter appears or
+moves (a third of its updates; its baked letters cost one per reveal step).
+The quiet-fall witness went from 195 to 197 fields (the per-update HUD state
+and pose sharing; the title starts at the landing).
 
 ### WR. Restructure for world 1
 

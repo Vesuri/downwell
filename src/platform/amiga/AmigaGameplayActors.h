@@ -17,6 +17,14 @@ static constexpr UWORD gameplayBlackRectMarker = 65533;
 // scrDrawBorderTextBlack glyph: frame=offline glyph ID (origin (4,0)), x/y
 // its anchor, flip the fill pen. Four black neighbours, then the fill.
 static constexpr UWORD gameplayGlyphMarker = 65532;
+// Offline font-2 border glyph IDs (origin (4,0)).
+inline unsigned amigaBorderGlyph(char c){
+    if(c>='0'&&c<='9')return 65100u+unsigned(c-'0');
+    if(c=='+')return 65111u;
+    if(c=='!')return 65112u;
+    if(c=='-')return 65110u;
+    return 65120u+unsigned(c-'A');
+}
 static constexpr UWORD gameplayDitherEdge = 65006;
 struct GameplayBob {
     UWORD sprite, frame; int x, y, flip;
