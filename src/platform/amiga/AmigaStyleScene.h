@@ -47,7 +47,9 @@ private:
     AmigaStyleDrawList drawList_;
     DownwellStyleCopperList lists_[2];
     bool built_[2] = {false, false};
-    struct Icon { UWORD* data[2]{}; int x=0,y=0,height=0; } icons_[14];
+    // Five styles' eight run frames, four locked copies and the two arrows.
+    static constexpr unsigned iconCount = 46, lockedIcon = 40, rightIcon = 44, leftIcon = 45;
+    struct Icon { UWORD* data[2]{}; int x=0,y=0,height=0; } icons_[iconCount];
     bool bindIcons();
     bool prepareIcons(unsigned slot,int top,Frame& frame);
 };

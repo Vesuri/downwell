@@ -26,8 +26,9 @@ public:
 private:
     // W1.4 gun art: 592 cavern and 622 reference frames (was under 512).
     // W1.7 combo art, afterimages and upgrade icons: 936 cavern and 960
-    // reference frames.
-    static constexpr unsigned sprites=741,pages=8,capacity=1024;
+    // reference frames. W1.10 per-style player art (styles 1-4, with
+    // afterimages): 1,274 cavern and 1,298 reference frames.
+    static constexpr unsigned sprites=741,pages=8,capacity=1408;
     UWORD base_[sprites][pages]{};
     UWORD span_[sprites][pages]{};
     Frame frames_[capacity]{};

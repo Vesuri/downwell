@@ -200,8 +200,9 @@ void AmigaSceneRuntime::enterStyleSelect()
     styleTileY_ = 0;
     styleDitherY_ = 80 * fixedOne;
     styleRunFrame_ = 0;
+    // PlayMenu Create: cursorAt = global.playStyle, smoothx = 0.
     styleSmoothX_ = 0;
-    styleCursor_ = 0;
+    styleCursor_ = int(playStyle_);
     styleSelected_ = false;
     stylePlayerDescent_ = stylePlayerSpeedY_ = 0;
     styleVerticalDitherY_ = -320 * fixedOne;
@@ -411,11 +412,26 @@ void AmigaSceneRuntime::stepStyleSelect(const downwell::Input& input,
         styleTileY_ += 16 * fixedOne;
     styleDitherY_ += 16 * fixedOne;
 
+    // PlayMenu Step: past either end the carousel nudges by 4; left at the
+    // first style toggles hard mode once it is unlocked. Locked styles
+    // ignore confirmation.
     if (styleYOffset_ == 0 && !styleSelected_) {
-        if (rightPressed && styleCursor_ < 4) ++styleCursor_;
-        if (leftPressed && styleCursor_ > 0) --styleCursor_;
-        if (firePressed && styleCursor_ == 0)
+        if (rightPressed) {
+            if (styleCursor_ < 4) ++styleCursor_;
+            else styleSmoothX_ += 4 * fixedOne;
+        }
+        if (leftPressed) {
+            if (styleCursor_ > 0) --styleCursor_;
+            else {
+                styleSmoothX_ -= 4 * fixedOne;
+                if (hardUnlocked_) hardMode_ = !hardMode_;
+            }
+        }
+        if (firePressed && unsigned(styleCursor_) <= styleUnlock_) {
+            playStyle_ = unsigned(styleCursor_);
             styleSelected_ = true;
+            styleConfirmed_ = true;
+        }
     }
     const long targetX = styleCursor_ * 48 * fixedOne;
     styleSmoothX_ += (targetX - styleSmoothX_) / 5;

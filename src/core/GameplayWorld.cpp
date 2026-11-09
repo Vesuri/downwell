@@ -2379,7 +2379,8 @@ bool GameplayWorld::redBallEye(const EnemyState& enemy,int& sprite,int& mirror)c
 }
 
 bool GameplayWorld::createCompactSpawner(int y){
-    // scrBuilder's spawner: normal area-one channels only (no hard mode yet).
+    // scrBuilder's spawner: spawnerSet1. Hard mode's sets need enmEyefish
+    // 114 and neonRedBall 173, which this world does not have yet.
     if(compactSpawnerLive_||run_.stage.area!=1||
        !compactSpawner_.createCaverns(run_.stage.level,false))return run_.effectsSucceeded=false;
     compactSpawnerY_=downwell::MotionBinary64::fromInteger(y);
@@ -2791,7 +2792,7 @@ struct GameplayWorld::SceneryOps {
     bool sprite(int){changed=true;return true;}
     // Collision with objPlayer_n: objPlayer_n.ysp > 0, then scrFjump/scrSShake.
     bool playerYSpeed(Real& value){value=Real::fromInteger(int(world.player_.speedYFifths()));return true;}
-    bool playStyle(int& style){style=0;return true;} // Styles are W1.10.
+    bool playStyle(int& style){style=int(world.run_.playStyle);return true;}
     bool jump(int,Real){world.player_.stompBounce();return true;}
     bool shake(int amount,int duration){return world.requestCameraShake(amount,duration);}
     bool explodingKnees(bool& knees){knees=false;return true;} // Upgrade 0 is W1.9.
@@ -2939,7 +2940,7 @@ bool GameplayWorld::collideCompactScenery(){
         if(!r.live||!r.masked||!r.active||player_.speedYFifths()<=0||
            !downwell::contactBoundsOverlap(player,downwell::contactPixelBounds(r.x,r.y,1,1,710)))continue;
         r.objHp=0;r.stomped=1;
-        player_.stompBounce(); // global.playStyle 0: scrFjump(0,2.5).
+        player_.stompBounce(); // scrFjump(0,2.5), or 1.5 for style 2.
         if(!requestCameraShake(2,4))return false;
         // pugExplodingKnees (upgrade 0) is W1.9.
     }
@@ -4117,7 +4118,7 @@ void GameplayWorld::compactLevelBeginCue(){
         while(*a&&*a==*b){++a;++b;}
         if(*a==*b)title=&t;
     }
-    if(!compactTitle_.create(title?title->characters:nullptr,title?title->length:0,run_.stage.level))
+    if(!compactTitle_.create(title?title->characters:nullptr,title?title->length:0,run_.stage.level,run_.hardMode))
         compactTitle_={};
 }
 

@@ -23,6 +23,9 @@ public:
     bool setPalette(const Palette& palette, UWORD colorIndex = 0,
                     int fromIndex = 0, int toIndex = -1);
     bool finish();
+    // Rewrite every colour-register move from the palette (index by
+    // register). For lists whose colours all come from setPalette.
+    void repaintColours(const Palette& palette);
     unsigned moveOffset(UWORD reg) const;
     bool patchMove(unsigned offset, UWORD value);
     bool patchPointer(unsigned offset, const void* value);

@@ -8,7 +8,7 @@
 // This covers transient presentation art, not gameplay's resource catalogue.
 class AmigaTransientBank {
 public:
-    enum class Owner { none, shop, results, upgrade };
+    enum class Owner { none, shop, results, upgrade, pause };
     struct Contract {
         Owner owner;
         const char* file;
@@ -20,7 +20,7 @@ public:
     bool load(Owner owner, const Contract& contract, std::uint8_t* target,
               unsigned capacity, Read read, Validate validate) {
         // Closed admission: extending Owner does not implicitly enable loading.
-        if ((owner != Owner::shop && owner != Owner::results && owner != Owner::upgrade) ||
+        if ((owner != Owner::shop && owner != Owner::results && owner != Owner::upgrade && owner != Owner::pause) ||
             owner != contract.owner || !contract.file ||
             !target || !contract.bytes || contract.bytes > contract.budget ||
             contract.bytes > capacity) return false;

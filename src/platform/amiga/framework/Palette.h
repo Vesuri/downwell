@@ -11,6 +11,8 @@ public:
     ~Palette();
 
     void setPalette(const uint16_t* palette, uint16_t colorCount);
+    // Replace the colours in place (same count, no allocation).
+    void assign(const uint16_t* palette);
     uint16_t colorCount() const;
     uint16_t fade() const;
     void setFade(uint16_t fade);

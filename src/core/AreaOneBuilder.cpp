@@ -34,6 +34,7 @@ void AreaOneBuilder::reset(int x, int y, GameMakerRandom& random, const Setup& s
     levelLength_ = 15 + setup.level;
     style_ = setup.style;
     member_ = setup.member;
+    hard_ = setup.hard;
     endReached_ = false;
     endPattern_ = -1;
     chunkOrCrate_ = 0;
@@ -248,7 +249,7 @@ bool AreaOneBuilder::emitEventCell(char symbol,int buildX,int rowY,bool reversed
     if((symbol=='I'||symbol=='J')&&!emitObject(296,buildX,rowY,random,emit,context))return false;
     if(symbol=='^'&&random.chooseIndexSmall(5)!=0&&
        !emitObject(289,buildX,rowY,random,emit,context))return false;
-    const int enemyId=cavernEnemyChoice(symbol,levelLength_-15,random);
+    const int enemyId=cavernEnemyChoice(symbol,levelLength_-15,random,hard_);
     if(enemyId>=0&&!emitObject(enemyId,buildX,rowY,random,emit,context))return false;
     int objectId=-1;
     switch(symbol){
@@ -347,7 +348,7 @@ template<bool Runs> bool AreaOneBuilder::emitPatternMode(
                 !emitObject(289, buildX, rowY, random, emit, context))
                 return false;
             {
-                const int enemyId = cavernEnemyChoice(symbol, levelLength_ - 15, random);
+                const int enemyId = cavernEnemyChoice(symbol, levelLength_ - 15, random, hard_);
                 if (enemyId >= 0 &&
                     !emitObject(enemyId, buildX, rowY, random, emit, context))
                     return false;

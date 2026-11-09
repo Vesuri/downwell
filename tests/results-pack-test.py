@@ -42,7 +42,9 @@ for index in range(count):
         assert (ox, oy) == (sprite["originX"], sprite["originY"])
     else:
         source = pack.render_text(manifest, pages, pack.TEXT_SELECTIONS["results"][ident])
-        assert frame == 0 and (ox, oy) == (source.width // 2, 0)
+        # W1.10: the unlock notice's name glyphs (64800 + char) are left-aligned.
+        originX = 0 if 64800 <= ident < 64928 else source.width // 2
+        assert frame == 0 and (ox, oy) == (originX, 0)
     assert (width, height) == source.size
     decoded = pack.decode_planar(data[offset:offset + length], width, height, dma_width)
     expected = [pack.pixel_to_pen(pixel) for pixel in source.get_flattened_data()]

@@ -21,7 +21,8 @@ struct CompactLevelTitle {
     int alarm[3] = {-1, -1, -1};
     // title[] holds the area name (ASCII, no '#'); levels below 10 only need
     // two more cells, but any non-negative level is formatted.
-    bool create(const unsigned* title, unsigned titleLength, int level) {
+    // levelNumber Create: "-H" before the level in hard mode.
+    bool create(const unsigned* title, unsigned titleLength, int level, bool hard = false) {
         unsigned n = 0;
         unsigned char cells[capacity];
         for (unsigned i = 0; i < titleLength; ++i) {
@@ -31,6 +32,7 @@ struct CompactLevelTitle {
         if (!titleLength) { if (n == capacity) return false; cells[n++] = ' '; }
         if (n == capacity) return false;
         cells[n++] = '-';
+        if (hard) { if (n == capacity) return false; cells[n++] = 'H'; }
         unsigned magnitude = level < 0 ? 0u : unsigned(level), digits[10], count = 0;
         do { digits[count++] = magnitude % 10; magnitude /= 10; } while (magnitude);
         if (n + count > capacity) return false;

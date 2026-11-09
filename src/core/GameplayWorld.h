@@ -2469,6 +2469,31 @@ public:
     const downwell::RunGemStatistics& runGemStatistics() const { return run_.gems; }
     std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
     const downwell::RunCombo& runCombo() const { return run_.combo; }
+    // W1.10 persistence: the save file's records enter the run once at
+    // startup (scrLoadSave) and survive Retry; the backend writes them back.
+    // global.playStyle and global.hardMode for a new run, before its first
+    // room loads. objPlayer_n Create at 1-1 calls styleUpdate: style 2 starts
+    // (and stays capped) at 6 HP, the others at 4.
+    bool beginRun(unsigned style, bool hard) {
+        if (style > 4 || run_.stage.area != 1 || run_.stage.level != 1) return false;
+        run_.playStyle = style; run_.hardMode = hard;
+        player_.setPlayStyle(int(style));
+        const int hp = style == 2 ? 6 : 4;
+        health_ = hp; run_.combo.healthReserve.maximum = hp;
+        return true;
+    }
+    bool hardMode() const { return run_.hardMode; }
+    unsigned playStyle() const { return run_.playStyle; }
+    downwell::RunRecords runRecords() const { return run_.records(); }
+    void restoreRunRecords(const downwell::RunRecords& r) {
+        run_.gems.lifetime = r.lifetimeGems; run_.gems.record = r.bestRunGems;
+        run_.combo.state.record = r.bestCombo;
+    }
+    // saveStats' gem subset ran for this run (first death movement).
+    bool runGemsRecorded() const { return run_.gems.recorded; }
+    // The slice endpoint ends the run without a death: record as EndMenu's
+    // saveStats does. Returns false if this run was already recorded.
+    bool recordRunEnd() { return run_.gems.observeDeathMovement(true, currencyAccount_.gameGem); }
     bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
     bool grantUpgrade(unsigned id) {
         return run_.upgrades.grant(id, run_.consumables, currencyAccount_,
@@ -2711,7 +2736,9 @@ public:
         downwell::AreaOneBuilder::Setup setup;
         setup.level = unsigned(run_.stage.level);
         setup.style = style;
+        setup.hard = run_.hardMode;
         run_.playStyle = style;
+        player_.setPlayStyle(int(style));
         setup.member = run_.upgrades.levels[14] != 0;
         builder.resetRoom(x, y, enemyRandom_, setup);
         return true;

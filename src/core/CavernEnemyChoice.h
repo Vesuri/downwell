@@ -6,14 +6,16 @@
 
 namespace downwell {
 
-// builderCavern blocks 12–38, normal mode. random(level + 2) <= level
-// consumes a word for EVERY cell, including non-enemy cells. Integer cutoffs
-// exactly match the runner's word / 2^32 scaled double for cavern levels 1–3.
+// builderCavern blocks 12–38. random(level + 2) <= level consumes a word
+// for EVERY cell, including non-enemy cells. Integer cutoffs exactly match
+// the runner's word / 2^32 scaled double for cavern levels 1–3. Hard mode
+// short-circuits into a second word: || (global.hardMode && random(5) > 1),
+// true for words above 2^32 / 5.
 template<class Random>
-int cavernEnemyChoice(char symbol, unsigned level, Random& random) {
+int cavernEnemyChoice(char symbol, unsigned level, Random& random, bool hard = false) {
     assert(level >= 1 && level <= 3);
     const std::uint32_t cutoffs[] = {0x55555555U, 0x80000000U, 0x99999999U};
-    if (random.nextU32() > cutoffs[level - 1]) return -1;
+    if (random.nextU32() > cutoffs[level - 1] && (!hard || random.nextU32() <= 0x33333333U)) return -1;
     switch (symbol) {
     case 'a': return 111;
     case 'b': return 116;

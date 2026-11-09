@@ -73,5 +73,8 @@ public:
         return ready_[0]&&ready_[1]&&!coverReferenced_[0]&&!coverReferenced_[1];
     }
     const DownwellGameplayCopperList& copper(unsigned slot) const { return lists_[slot]; }
+    // W1.10 PALETTE: rewrite both programs' colour moves in place (the
+    // paused world publishes no new list).
+    void repaint(const Palette& palette) { lists_[0].repaintColours(palette); lists_[1].repaintColours(palette); }
 };
 #endif

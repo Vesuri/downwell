@@ -720,6 +720,18 @@ test-shop-text: build/shop-text-test
 	python3 tests/test_generate_shop_text.py
 	./build/shop-text-test
 test: test-shop-text
+# W1.10: pause menu strings and the PALETTE menu's colour sets.
+generated/downwell-menu-text.h: tools/generate-menu-text.py data/language.ini
+	python3 tools/generate-menu-text.py
+generated/downwell-palettes.h: tools/generate-palettes.py data/data.win
+	python3 tools/generate-palettes.py
+build/pause-menu-test: tests/core/PauseMenuTest.cpp $(wildcard src/core/*.h) generated/downwell-menu-text.h generated/downwell-palettes.h
+	@mkdir -p build
+	$(CXX) -Isrc -Igenerated $(CXXFLAGS) -o $@ $<
+.PHONY: test-pause-menu
+test-pause-menu: build/pause-menu-test
+	./build/pause-menu-test
+test: test-pause-menu
 build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp generated/downwell-area-titles.h generated/downwell-title-glyphs.h generated/downwell-fonts.dwfn $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< src/core/FontPack.cpp
@@ -2907,6 +2919,9 @@ verify-factored-ammo-hud: build/factored-ammo-renderer-test
 	./build/factored-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
 
 .PHONY: generate-amiga-results verify-amiga-results
+.PHONY: generate-amiga-pause
+generate-amiga-pause:
+	tools/generate-amiga-hud.py --profile pause
 .PHONY: generate-amiga-shop verify-amiga-shop
 generate-amiga-shop:
 	tools/generate-amiga-hud.py --profile shop

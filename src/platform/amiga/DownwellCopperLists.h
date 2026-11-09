@@ -73,6 +73,8 @@ private:
     unsigned scrollOffset_, foregroundOffset_, backgroundOffset_, playerOffset_;
     unsigned foregroundModuloOffset_;
     unsigned skyWaitOffset_, skyColorOffset_, skyLateWaitOffset_;
+    // The sky split's white and black, through the selected palette.
+    UWORD skyLight_ = 0xfff, skyDark_ = 0;
 };
 
 // Narrow dual-playfield selection display, using retained world-space planes.

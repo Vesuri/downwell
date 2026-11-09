@@ -55,6 +55,12 @@ SELECTIONS = {
         489: None,  # sprShopDesc
         733: None,  # sprDitherFade
     },
+    # W1.10 pause menu and its sub-menus: sprDitherFade bands and
+    # sprProgress. The runner and gem of the PALETTE screen are game-bank art.
+    "pause": {
+        402: None,  # sprProgress
+        733: None,  # sprDitherFade
+    },
     "hud": {
         378: [2],    # sprHudHpGaugeBar heart-piece dividers
         376: None,   # sprHudCurrency
@@ -82,6 +88,11 @@ SELECTIONS = {
         27: None,    # sprPlayerRunExg
         31: None,    # sprPlayerIdle
         37: None,    # sprPlayerAir
+        # W1.10 styleSet's idle, run and air art for styles 1-4.
+        25: None, 26: None, 28: None, 29: None,
+        32: None, 33: None, 34: None, 35: None,
+        38: None, 40: None, 42: None,
+        409: None,   # sprHardSkull (style select)
         43: None,    # sprLocked
         44: None,    # sprSelectArrow
         51: None,    # sprTile1
@@ -208,11 +219,13 @@ SELECTIONS = {
         404: None,   # sprComboNumber: digits, "+", gem, battery, heart
         405: [0],    # sprComboReward ("COMBO REWARD!")
         406: None,   # sprComboExc ("COMBO!")
+        # W1.10 timerNumber (pause Options > Timer): digits and the colon.
+        403: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11],  # sprNumbers
     },
 }
 
 # Living player poses (PlayerMotion::spriteId(false)) with afterimages.
-AFTERIMAGE_PLAYER_IDS = (1, 3, 12, 15, 27, 31, 37)
+AFTERIMAGE_PLAYER_IDS = (1, 3, 12, 15, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42)
 
 TEXT_SELECTIONS = {
     # English DeathMenu labels from language.ini. Uncoloured font masks allow
@@ -227,7 +240,15 @@ TEXT_SELECTIONS = {
         65306: "PALETTE UNLOCKED",
         **{65320 + digit: str(digit) for digit in range(10)},
         65330: "/",
+        # W1.10 unlockNotice names (styleName1-4 and the shaderAr palette
+        # names) composed from top-left glyphs at 64800 + code, as in pause.
+        **{64800 + ord(c): c for c in "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
     },
+    # W1.10: one uncoloured font-2 mask per printable ASCII character at
+    # 64800 + code, left-aligned with eight-pixel advances, so the pause
+    # menus compose arbitrary text (palette names, records, option values)
+    # with the red, white and black-outlined layers of draw_text.
+    "pause": {64800 + code: chr(code) for code in range(33, 127)},
     "game": {
         65000: "STYLE SELECT",
         65001: "USUAL STYLE",
@@ -320,8 +341,12 @@ FRONT_BANK_FRAMES = {
     369: {0}, 631: {1}, 635: {0, 3}, 636: {2, 3}, 637: {0, 1}, 638: {0},
     640: {0}, 642: {0}, 646: {1}, 729: {0},
 }
-FRONT_BANK_IDS = {43, 44, 65401, 65410, 65411, *range(65000, 65006), *range(65510, 65514),
-                  *range(65500, 65504), MENU_TITLE_ALIGNED_ID,
+# W1.10: style select's other styles (run bobs 65504-65507 and their DMA
+# icons 65514-65517), names, descriptions, HARD MODE and the skull.
+STYLE_RUN_IDS = {27: 65500, 25: 65504, 26: 65505, 28: 65506, 29: 65507}
+STYLE_TEXT_IDS = {*range(65021, 65025), *range(65026, 65031)}
+FRONT_BANK_IDS = {43, 44, 409, 65401, *range(65000, 65006), *range(65510, 65518),
+                  *range(65500, 65508), *STYLE_TEXT_IDS, MENU_TITLE_ALIGNED_ID,
                   *(64000 + ident for ident in (12, 27, 31, 37))}
 # Copied into front because its scenes read them from the same bank: the
 # garden's well-surface tile, the style border tiles, and the player run
@@ -329,8 +354,8 @@ FRONT_BANK_IDS = {43, 44, 65401, 65410, 65411, *range(65000, 65006), *range(6551
 FRONT_SHARED = lambda ident, frame: (ident, frame) in ((76, 0), (51, 7), (51, 13)) or ident == 27
 # Includes the scalar style oracle as well as the retained renderer. Garden
 # title/scenery and its writable hardware sprites retire before this subset.
-FRONT_STYLE_IDS = {27, 43, 44, 51, 65401, 65410, 65411,
-                   *range(65000, 65006), *range(65500, 65504), *range(65510, 65514)}
+FRONT_STYLE_IDS = {27, 43, 44, 51, 409, 65401, *STYLE_TEXT_IDS,
+                   *range(65000, 65006), *range(65500, 65508), *range(65510, 65518)}
 # The uncropped title fade is a host oracle only; targets use the aligned form.
 DROPPED_IDS = {654}
 
@@ -557,6 +582,19 @@ def shop_texts(language_path):
     result.update({65440 + i: str(i) for i in range(10)})
     result[65450] = "G"
     return result
+
+
+def style_texts(language_path):
+    # PlayMenu: styleName/styleDesc (scrDrawBorderTextBlack, centred lines)
+    # and menuHardMode, English. '*' is langString's newline.
+    ini = configparser.ConfigParser(interpolation=None)
+    ini.read_string((language_path or Path(__file__).resolve().parents[1] / "data/language.ini").read_text(encoding="utf-8-sig"))
+    english = ini["english"]
+    # Style 0 keeps USUAL STYLE/standard at 65001/65002.
+    texts = {65020 + i: english[f"styleName{i}"] for i in range(1, 5)}
+    texts.update({65025 + i: english[f"styleDesc{i}"].replace("*", "\n") for i in range(1, 5)})
+    texts[65030] = english["menuHardMode"]
+    return texts
 
 
 def clear_texts(language_path):
@@ -843,7 +881,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                                 originY=sprite["originX"])
                 encoded.append((metadata, 768 + frame_index, stride, data))
             if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 551, 568, 569,
-                    0, 1, 3, 12, 15, 27, 31, 37,
+                    0, 1, 3, 12, 15, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
                     153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278,
                     158, 165, 179, 281, 337)):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
@@ -895,7 +933,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                                        originY=sprite["originY"] - bounds[1])
                         encoded.append((variant, 1024 + 512 * flipped + 256 * parity + frame_index,
                                         cropped_width, cropped_data))
-            if profile == "game" and sprite_id in (27, 43, 44):
+            if profile == "game" and sprite_id in (27, 43, 44, 25, 26, 28, 29):
                 # Style bobs contain large transparent margins. Trim offline
                 # while retaining exactly the same world-space anchor.
                 bounds = canvas.getbbox()
@@ -903,7 +941,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                 cropped = canvas.crop(bounds)
                 pens = [pixel_to_pen(pixel) for pixel in cropped.get_flattened_data()]
                 cropped_width, cropped_data = encode_planar(pens, cropped.width, cropped.height)
-                cropped_sprite = dict(sprite, id={27: 65500, 43: 65501, 44: 65502}[sprite_id],
+                cropped_sprite = dict(sprite, id={**STYLE_RUN_IDS, 43: 65501, 44: 65502}[sprite_id],
                                       width=cropped.width, height=cropped.height,
                                       originX=sprite["originX"] - bounds[0],
                                       originY=sprite["originY"] - bounds[1])
@@ -1014,10 +1052,13 @@ def build_records(manifest, extracted, profile, language_path=None):
                     for digit in "-0123456789+" + GUN_TEXT_LETTERS),
                 "native numeric text requires eight-pixel advances without kerning")
     texts = (shop_texts(language_path) if profile == "shop" else
-             clear_texts(language_path) if profile == "clear" else TEXT_SELECTIONS.get(profile, {}))
+             clear_texts(language_path) if profile == "clear" else
+             {**TEXT_SELECTIONS["game"], **style_texts(language_path)} if profile == "game" else
+             TEXT_SELECTIONS.get(profile, {}))
     for text_id, text in texts.items():
-        canvas = render_text(manifest, pages, text, centered=profile in ("shop", "clear"))
-        if text_id in (65000, 65001, 65003):
+        canvas = render_text(manifest, pages, text,
+                             centered=profile in ("shop", "clear") or 65025 <= text_id < 65030)
+        if text_id in (65000, 65001, 65003, *range(65021, 65025), 65030):
             # Same two draws as Game::renderStyleSelect: red at y+1,
             # followed by white at y. Keep the original anchor unchanged.
             foreground = canvas
@@ -1031,7 +1072,7 @@ def build_records(manifest, extracted, profile, language_path=None):
         dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
         sprite = {
             "id": text_id,
-            "originX": canvas.width // 2,
+            "originX": 0 if profile == "pause" or 64800 <= text_id < 64928 else canvas.width // 2,
             "originY": canvas.height // 2 if profile == "shop" else 0,
             "width": canvas.width,
             "height": canvas.height,
@@ -1064,24 +1105,6 @@ def build_records(manifest, extracted, profile, language_path=None):
             outlined = dict(sprite, width=bordered.width, height=bordered.height,
                             originX=sprite["originX"] + 1, originY=1)
             encoded.append((outlined, 1, dma_width, planar))
-
-    if profile == "game":
-        # Static style text panels, relative to centerY-80. They also serve
-        # as clean backing pixels when restoring the moving carousel band.
-        for locked in (0, 1):
-            panel = Image.new("RGBA", (160, 128), (0, 0, 0, 0))
-            for ident, y in ((65000, 10), (65003 if locked else 65001, 90)):
-                text = style_text[ident]
-                panel.alpha_composite(text, (80 - text.width // 2, y))
-            if not locked:
-                text = style_text[65002]
-                white = Image.new("RGBA", text.size, (255, 255, 255, 255))
-                white.putalpha(text.getchannel("A"))
-                panel.alpha_composite(white, (80 - text.width // 2, 112))
-            pens = [pixel_to_pen(pixel) for pixel in panel.get_flattened_data()]
-            dma_width, planar = encode_planar(pens, 160, 128)
-            encoded.append((dict(id=65410 + locked, originX=0, originY=0,
-                                 width=160, height=128), 0, dma_width, planar))
 
     for text_id, (text, color) in CREDIT_TEXT_SELECTIONS.get(profile, {}).items():
         canvas = render_bordered_text(manifest, pages, text, color)
@@ -1144,7 +1167,7 @@ def build_records(manifest, extracted, profile, language_path=None):
     # Gameplay and upgrade player DMA words share the identical offline encoder.
     if profile in ("game", "clear"):
         hardware = []
-        actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
+        actors = (0, 1, 3, 12, 15, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
                   485, 486, 487, 496, 497, 602, 603, 707)
         if profile == "clear":
@@ -1194,7 +1217,7 @@ def build_records(manifest, extracted, profile, language_path=None):
         hardware = []
         for sprite, frame_index, dma_width, planar in encoded:
             ident = sprite["id"]
-            if ident not in range(65500, 65504):
+            if ident not in range(65500, 65508):
                 continue
             width, height = sprite["width"], sprite["height"]
             require(width <= 16 and height <= 32, "style icon exceeds one DMA channel")

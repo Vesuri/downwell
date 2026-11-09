@@ -40,9 +40,16 @@ class Debugger(Gdb):
 def main():
     script=Path(sys.argv[sys.argv.index('-x')+1]).read_text()
     port=int(re.search(r'target remote 127\.0\.0\.1:(\d+)',script)[1])
-    tape=Path('../tmp/world-one-gameplay.inputs').read_bytes()
+    # DOWNWELL_ROUTE_TAPE selects another host tape (base path without the
+    # .inputs/.states suffix). DOWNWELL_ROUTE_DEATH=1 expects that route to
+    # die: after the death it waits for the results' unlock notice (seed the
+    # lifetime gems with VERIFY_SAVE) and captures captures/world-one-unlock.
+    base=os.environ.get('DOWNWELL_ROUTE_TAPE','../tmp/world-one-gameplay')
+    deathRoute=os.environ.get('DOWNWELL_ROUTE_DEATH')=='1'
+    tape=Path(base+'.inputs').read_bytes()
     witnesses={row[0]:row[1:] for row in
-        (list(map(int,line.split())) for line in Path('../tmp/world-one-gameplay.states').read_text().splitlines())}
+        (list(map(int,line.split())) for line in Path(base+'.states').read_text().splitlines())}
+    deathSamples=0
     g=Debugger(port,sys.argv[-1])
     log=Path('../tmp/world-one-native-inputs.log').open('w')
     try:
@@ -111,6 +118,22 @@ def main():
                 if scene==0: packed=4 if sceneFrame%60==0 else 0
                 elif scene==1: packed=2 if sceneFrame>40 else 0
                 elif scene==2: packed=4 if sceneFrame==120 else 0
+                elif deathRoute and hp<=0:
+                    # Hands off: the results sequence fills the progress bar.
+                    packed=0
+                    deathSamples+=1
+                    notice=checked('printf "NOTICE %d %u\\n", $w->run_.results.menu.goalNotice,$w->run_.results.progress.goal')
+                    if deathSamples%50==0: print(notice,flush=True)
+                    stage=int(re.search(r'NOTICE (-?\d+)',notice)[1])
+                    if stage>=3:
+                        for _ in range(20): checked('continue')
+                        checked('delete breakpoints')
+                        shot('world-one-unlock')
+                        print(notice,flush=True)
+                        print('DOWNWELL_WORLD_ONE_UNLOCK_READY',flush=True)
+                        Path('.run/gdb-ready.marker').touch()
+                        return
+                    if deathSamples>3000: raise RuntimeError('no unlock notice: '+notice)
                 else:
                     if hp<=0 or not good or tick>=len(tape): raise RuntimeError(state)
                     # The normal renderer retires gameplay before Result Create

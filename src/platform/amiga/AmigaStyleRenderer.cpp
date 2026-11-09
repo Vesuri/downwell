@@ -237,9 +237,8 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
     }
     if (actorsChanged || !hardwareBorder) state.dirtyCount = 0;
     if (!scenes.styleSelected() && !reference) {
-        const UBYTE* record = find(pack, packEnd, 65410 + textPanel, 0);
-        if (!record) return false;
-        Bitmap panel((void*)(pack + longword(record + 16)), 160, 128, 2, false);
+        // The text panel's clean backing: clear its rows, then draw the
+        // title and the label (which do not overlap) as the panel held them.
         int top = centerY - 80;
         int sourceY = top < 0 ? -top : 0;
         int height = (full || state.textPanel != textPanel ? 128 : 88) - sourceY;
@@ -249,8 +248,13 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
             height = state.textPanel != textPanel ? 38 : 0;
         }
         if (top + height > amigaStyleHeight) height = amigaStyleHeight - top;
-        if (height > 0)
-            output.copy(panel, 0, top, 0, sourceY, 160, height);
+        if (height > 0) {
+            output.clear(0, (UWORD)top, 160, (UWORD)height);
+            if ((sourceY < 90 && !draw(output, pack, packEnd, 65000, 0, 80, centerY - 70)) ||
+                !draw(output, pack, packEnd, textPanel ? 65003 : 65001, 0, 80, centerY + 10) ||
+                (!textPanel && !draw(output, pack, packEnd, 65002, 0, 80, centerY + 32, 1)))
+                return false;
+        }
         // Only the side strips scroll. The panel restore leaves the settled
         // lower text intact and removes all previous actors/arrows in this
         // back buffer, including partially clipped icons at either edge.

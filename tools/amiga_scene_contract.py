@@ -30,7 +30,7 @@ GAME_IDS = frozenset({
     94, 95,
     # W1.7 gem bar caps, GEM HIGH / gem-sick motion, combo digits and icons,
     # COMBO REWARD! and COMBO!.
-    393, 394, 395, 397, 400, 404, 405, 406,
+    393, 394, 395, 397, 400, 403, 404, 405, 406,
     # W1.7 upgrade icons (frame 1), drawn on the HUD layer.
     506, 507, 508, 509, 510, 511, 512, 516, 518, 520, 521, 522, 523, 524,
     525, 528, 529, 530, 531, 532, 533, 534, 535,
@@ -59,6 +59,10 @@ GAME_IDS = frozenset({
     65141,
     # W1.8 merchant speech: "?", D, K and W.
     65113, 65123, 65130, 65142,
+    # W1.10 styleSet's idle, run and air art for styles 1-4, with their
+    # mirrored planar and DMA forms.
+    *(base + ident for base in (0, 62000, 63000)
+      for ident in (25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42)),
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
@@ -66,8 +70,8 @@ GAME_IDS = frozenset({
 # growth, not permission to consume all of the measured free Chip RAM. Only
 # the full-catalogue reference oracles load it; production gameplay leases
 # the cavern banks below.
-BANK_BUDGETS = {'boot': 24 * 1024, 'front': 96 * 1024,
-                'game': 296 * 1024, 'game-planes': 148 * 1024}
+BANK_BUDGETS = {'boot': 24 * 1024, 'front': 102 * 1024,
+                'game': 372 * 1024, 'game-planes': 176 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -89,10 +93,12 @@ CAVERN_ROOTS = frozenset({
     # player's jump/landing dust 94/95.
     112, 158, 165, 179, 281, 337, 94, 95,
     # W1.7 combo and streak HUD art.
-    393, 394, 395, 397, 400, 404, 405, 406,
+    393, 394, 395, 397, 400, 403, 404, 405, 406,
     # W1.7 upgrade icons (frame 1), drawn on the HUD layer.
     506, 507, 508, 509, 510, 511, 512, 516, 518, 520, 521, 522, 523, 524,
     525, 528, 529, 530, 531, 532, 533, 534, 535,
+    # W1.10 per-style player art.
+    25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
@@ -116,8 +122,10 @@ CAVERN_IDS = frozenset(
 # 121,374 -> 138,014; the 23 upgrade icons (moved out of the HUD bank) add
 # 6,572 and 5,320 more: 288,058 and 143,334. W1.8's merchant-speech glyphs
 # ("?", D, K, W) add 310 and 160: 288,368 and 143,494. The full reference
-# catalogue: 300,192 and 148,722.
-BANK_BUDGETS.update({'cavern': 284 * 1024, 'cavern-planes': 144 * 1024})
+# catalogue: 300,192 and 148,722. W1.10's per-style idle, run and air art
+# (styles 1-4, with mirrored, DMA and afterimage forms) adds 78,466 and
+# 30,510: 366,834 and 174,004 (full catalogue 378,658 and 179,232).
+BANK_BUDGETS.update({'cavern': 360 * 1024, 'cavern-planes': 172 * 1024})
 
 
 def require_budget(bank, size):

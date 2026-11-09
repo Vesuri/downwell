@@ -82,6 +82,16 @@ bool CopperList::setPalette(const Palette& palette, UWORD colorIndex,
     return true;
 }
 
+void CopperList::repaintColours(const Palette& palette)
+{
+    for (unsigned i = 0; i + 1 < count_; i += 2) {
+        const UWORD reg = words_[i];
+        if ((reg & 1) || reg < color00 || reg > color00 + 62) continue;
+        const unsigned index = (unsigned)(reg - color00) >> 1;
+        if (index < palette.colorCount()) words_[i + 1] = palette[index];
+    }
+}
+
 bool CopperList::finish()
 {
     if (!valid_ || count_ + 2 > capacity_) {

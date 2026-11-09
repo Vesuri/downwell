@@ -55,6 +55,18 @@ public:
         return roundedPixel(styleVerticalDitherY_);
     }
     unsigned styleRunFrame() const { return (styleRunFrame_ >> 8) & 7U; }
+    // W1.10 PlayMenu: global.styleUnlock, hardUnlocked, playStyle and
+    // hardMode from the save. Style select starts at the saved style.
+    void configureStyles(unsigned styleUnlock, bool hardUnlocked, unsigned style, bool hard) {
+        styleUnlock_ = styleUnlock > 4 ? 4 : styleUnlock; hardUnlocked_ = hardUnlocked;
+        playStyle_ = style > styleUnlock_ ? 0 : style; hardMode_ = hard && hardUnlocked;
+    }
+    bool styleUnlocked(int style) const { return style >= 0 && unsigned(style) <= styleUnlock_; }
+    bool hardUnlocked() const { return hardUnlocked_; }
+    bool hardMode() const { return hardMode_; }
+    unsigned playStyle() const { return playStyle_; }
+    // One-shot: PlayMenu confirmed (ini_write_real style and hardMode).
+    bool takeStyleConfirmed() { const bool value = styleConfirmed_; styleConfirmed_ = false; return value; }
 
 private:
     static int roundedPixel(long value);
@@ -118,6 +130,8 @@ private:
     long stylePlayerDescent_;
     long stylePlayerSpeedY_;
     long styleVerticalDitherY_;
+    unsigned styleUnlock_ = 0, playStyle_ = 0;
+    bool hardUnlocked_ = false, hardMode_ = false, styleConfirmed_ = false;
 };
 
 #endif

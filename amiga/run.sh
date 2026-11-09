@@ -29,9 +29,11 @@ cp -f "${EXE%.exe}.planes" "$DH1/Downwell.planes"
 cp -f "${EXE%.exe}.game" "$DH1/Downwell.game"
 cp -f "${EXE%.exe}.cavern" "$DH1/Downwell.cavern"
 cp -f "${EXE%.exe}.cavernplanes" "$DH1/Downwell.cavernplanes"
-for bank in results shop clear fields columns patterns exitmask selectionmask hud entrymask terrain wind encountermasks; do
+for bank in results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain wind encountermasks; do
   cp -f "${EXE%.exe}.$bank" "$DH1/Downwell.$bank"
 done
+# W1.10: save.ini persists in dh1 between runs; DOWNWELL_SAVE replaces it.
+if [ -n "${DOWNWELL_SAVE:-}" ]; then cp -f "$DOWNWELL_SAVE" "$DH1/save.ini"; fi
 echo "running $EXE"
 rm -f "$RUN"/state/*.uss
 

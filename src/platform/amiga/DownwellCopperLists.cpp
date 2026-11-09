@@ -282,9 +282,12 @@ bool DownwellMenuCopperList::buildScroll(
         !showSprite(0, playerSprite) ||
         !hideSprites(*this, nullSprite, 1) ||
         !setPalette(palette) ||
-        !move(color02, 0xfff) ||
-        !move(color03, 0xfff))
+        !move(color02, palette[1]) ||
+        !move(color03, palette[1]))
         return false;
+    // Palette index 1 is the build's white, index 0 its black.
+    skyLight_ = palette[1];
+    skyDark_ = palette[0];
     scrollOffset_ = moveOffset(bplcon1);
     foregroundModuloOffset_ = moveOffset(bpl1mod);
     foregroundOffset_ = moveOffset(bpl1pth);
@@ -299,10 +302,10 @@ bool DownwellMenuCopperList::buildScroll(
     // before the separate $ffdf rollover barrier on line 255.
     if (!wait((UWORD)(cut < 255 ? cut : 255), 0xc0)) return false;
     skyColorOffset_ = size();
-    if (!move(color02, cut <= 255 ? 0 : 0xfff) || !wait(255, 0xdf))
+    if (!move(color02, cut <= 255 ? skyDark_ : skyLight_) || !wait(255, 0xdf))
         return false;
     skyLateWaitOffset_ = size();
-    if (!wait((UWORD)(cut > 255 ? cut : 256), 0xdf) || !move(color02, 0))
+    if (!wait((UWORD)(cut > 255 ? cut : 256), 0xdf) || !move(color02, skyDark_))
         return false;
     return finish();
 }
@@ -315,7 +318,7 @@ bool DownwellMenuCopperList::updateScroll(
                          scroll.backgroundVisibleLines - 1;
     return patchMove(scrollOffset_, scroll.scrollControl) &&
            patchWait(skyWaitOffset_, (UWORD)(cut < 255 ? cut : 255), 0xc0) &&
-           patchMove(skyColorOffset_, cut <= 255 ? 0 : 0xfff) &&
+           patchMove(skyColorOffset_, cut <= 255 ? skyDark_ : skyLight_) &&
            patchWait(skyLateWaitOffset_, (UWORD)(cut > 255 ? cut : 256), 0xdf) &&
            patchMove(foregroundModuloOffset_,
                      entry ? amigaMenuEntryBytesPerRow - amigaMenuFetchBytes

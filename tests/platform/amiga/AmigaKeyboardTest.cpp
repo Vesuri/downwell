@@ -46,5 +46,8 @@ int main(){
     keys.receive(serial(0x19));assert(!keys.sampleCancel()&&!keys.quit); // P
     keys.receive(serial(0xc5));assert(!keys.quit);
     keys.receive(serial(0x45));assert(keys.quit&&!keys.sampleCancel());
-    std::puts("CIA keyboard ownership, rollback, restoration, X taps/holds and Escape passed");
+    assert(keys.samplePause()==3&&!keys.quit&&!keys.samplePause()); // P earlier, then Escape
+    keys.receive(serial(0x19));assert(keys.samplePause()==2&&!keys.samplePause());
+    keys.receive(serial(0x99));assert(!keys.samplePause()); // P release
+    std::puts("CIA keyboard ownership, rollback, restoration, X taps/holds, Escape and pause edges passed");
 }

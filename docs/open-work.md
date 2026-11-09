@@ -90,7 +90,11 @@ and the owned-upgrade icons), shops (stock and prices by
 area, style and membership, the prompt sign, the merchant's animation and
 thankful, confused and goodbye reactions, funded, too-poor and sold-out
 purchases, Leave with the farewell, and the merchant's speech), level exit,
-upgrade selection, level transitions, death, results and Retry all work.
+upgrade selection, level transitions, death, results and Retry all work, as
+do the pause menu (Escape or P) with its confirm, PALETTE, STATS and OPTIONS
+screens, all five styles with their rules, unlocks and the results' unlock
+notice, hard mode's toggle, builder, prices and titles, the Timer option and
+`save.ini` (style, hard mode, palette, timer, records and lifetime gems).
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 Known approximations: overlapping `moduleText` records never push each other
@@ -98,8 +102,7 @@ down (Collision with `moduleText`), and `moduleText`, `itemNotif`, "EMPTY!" and
 the `levelNumber` letters assume top-left text alignment although the HUD
 leaves `fa_middle` set; "EMPTY!" reuses the `itemNotif` record for
 `fxRisingText`, skips its Collision with `fxRisingText` and is born after the
-whole player Step. `levelNumber` has no hard-mode "-H" yet (item 10), and
-it is drawn on the fixed HUD layer: above the world and the hardware sprites,
+whole player Step. `levelNumber` is drawn on the fixed HUD layer: above the world and the hardware sprites,
 and hidden while the death flash covers the playfield. The merchant's speech
 (`fxRisingText` from `scrRisingTextShop`) uses the same alignment as "EMPTY!"
 and rises in Q16 like `itemNotif` rather than binary64. The Shop Step's
@@ -107,6 +110,14 @@ messages, sounds and BGM gain are produced but silent until W2, and its
 `shopInView` and `keeperAngry` flags drive only sounds. The criminal route
 cannot happen in the pinned build: only a shop case's `destroyed` flag sets
 `global.criminal`, and nothing writes it (`original-behavior-audit.md`).
+The pause menus drop the PC-only DISPLAY, LANGUAGE, Quick Start and key
+binding screens, and the BGM and volume options are stored but silent until
+W2. PlayMenu's HARD MODE label is static (no whomp). The save is written at
+static moments (results opening, pause close and its actions, style confirm,
+slice end and quit), not on every `ini_write_real`; the slice end counts as a
+run end for the records. The clear screen shows the style-0 poses for every
+style, and the first run after boot keeps the builder checkpoint taken before
+style select, patched with the chosen style and hard mode.
 
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
@@ -119,13 +130,20 @@ cannot happen in the pinned build: only a shop case's `destroyed` flag sets
    W1.5 left Time Field Damage (`pugTime`: `scrTypicalDamage` from the time
    fields), and W1.6 left Rest in Pieces (`pugRip`: corpses that explode).
    Reference: [upgrade coverage](upgrade-coverage.md).
-10. **Menus, styles, modes and persistence.** The pause menu and its options,
-    shader, record and confirm menus (adapted to the Amiga); all five styles
-    with their original rules and unlocks (style 2's 6 HP, style 1's shop
-    chance, style 4's forced shop and no upgrades); hard mode, including the
-    hard spawner sets (only the normal sets are wired); and saving
-    style, options, records and unlock progress to disk. Scope chosen by
-    default from the original; the user may trim it.
+10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
+    cavern builder's extra enemies, doubled shop prices, "-H" titles, the
+    records' +100), but its area-1 spawner sets (`hardSet1`, already in
+    `SpawnerStep::createCaverns`) need two enemies the port lacks, so
+    `GameplayWorld` still creates the normal sets: `enmEyefish` 114 (sprites
+    289/290/291, ehp 15, bullet-immune, stompable, a horizontal patrol at
+    `movesp` 0.5 that turns at walls; its Create never arms Alarm 1, so it
+    never fires `pooferBullet`) and `neonRedBall` 173 (the red ball's steering
+    with ehp 40, maxsp 1.5, knock-back on hit, `sprNeonRedBall` and the
+    `emitMovingFx` 704 trail, from above). Pass `run_.hardMode` to
+    `createCaverns` once both exist. Also still unseen natively: the results'
+    unlock notice (implemented; route variant 445 dies in 1-3 on the host but
+    is still alive in 1-2 natively at its last input, so a dying route that
+    crosses a goal still has to be found and captured).
 11. **Low-health flicker.** At 1 HP `playerDraw` replaces the player, on 7 of
     every 52 Draws, by two `shaderPlayerRed` copies (white and red texels red,
     black transparent) jittered by `irandom_range(-2,2)` and
@@ -217,7 +235,16 @@ is a rising-text record (stepped with the notices, gated by a live count), up
 to ten glyph BOBs; the four new glyphs add 310 bytes to the cavern CPU bank
 (now 288,368) and 160 Chip bytes to its plane atlas (now 143,494). A full
 no-loop or moving effect store now drops the new effect instead of failing
-the game; the store sizes (32 and 48) are unchanged.
+the game; the store sizes (32 and 48) are unchanged. W1.10: the per-style
+player art adds 78,466 bytes to the cavern CPU bank (now 366,834) and 30,510
+Chip bytes to its plane atlas (now 174,004), and the actor-frame table grew
+from 1,024 to 1,408 entries (cavern 1,274, reference game 1,298). The pause
+menus compose in a 27,264-byte scratch copy of the HUD layer (any memory,
+allocated only while paused) with the CPU renderer and copy the changed rows,
+so animating screens never show a cleared well; the pause bank is 8,818
+bytes and the results bank grew to 28,672 for the unlock notice's glyphs.
+The Timer publishes its 16 HUD rows on every update while shown and costs
+nothing while off.
 
 ### WR. Restructure for world 1
 

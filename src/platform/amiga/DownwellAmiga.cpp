@@ -82,6 +82,10 @@ void downwellTerrainBatchMismatch();
 #include "core/ShopFixtures.h"
 #include "AmigaRenderer.h"
 #include "AmigaAmmoHud.h"
+#include "AmigaPauseOverlay.h"
+#include "core/PauseMenu.h"
+#include "../../../generated/downwell-menu-text.h"
+#include "../../../generated/downwell-palettes.h"
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaPreparedTimeFields.h"
 #include "AmigaFieldColumns.h"
@@ -219,6 +223,7 @@ struct PreparedFieldOps {
 #include "AmigaCreditsScene.h"
 #include "AmigaSliceEndScene.h"
 #include "AmigaGemStreakHud.h"
+#include "AmigaTimerHud.h"
 #include "AmigaLevelTitleHud.h"
 #include "AmigaControlsScene.h"
 #include "AmigaShopMenu.h"
@@ -498,6 +503,13 @@ static const uint16_t downwellPaletteData[32] = {
     0x000, 0xfff, 0xf00, 0x000
 };
 
+// A palette remaps the build's black, white and red (scrShaderListInit).
+static uint16_t selectedPaletteData[32];
+static void selectPaletteData(unsigned shader) {
+    const auto& entry = downwell::palettes::entries[shader < downwell::palettes::count ? shader : 0];
+    for (unsigned i = 0; i < 32; ++i) selectedPaletteData[i] = entry.remap(downwellPaletteData[i]);
+}
+
 static_assert(
     downwellCopperWords >=
         6u + 16u + 32u +
@@ -610,6 +622,66 @@ static bool selectOverlayAssetBank(bool shop) {
     gDownwellResultsAssetBytes = shop ? 0 : contract.bytes;
     return true;
 }
+} // extern "C": the W1.10 helpers below have C++ linkage.
+// W1.10 objPauseMenu and its sub-menus: the pause bank (font-2 glyph masks,
+// sprDitherFade, sprProgress) borrows the same retired-garden gap. A living,
+// controllable player owns neither shop nor results art there.
+static constexpr AmigaTransientBank::Contract pauseBankContract{
+    TransientOwner::pause, "PROGDIR:Downwell.pause", DOWNWELL_PAUSE_BANK_BYTES, DOWNWELL_PAUSE_BANK_BUDGET};
+static AmigaTransientBank::View selectPauseBank() {
+    if (residentCover != ResidentCover::none || !overlayAssetStorage) return {nullptr, 0};
+    const auto held = overlayBank.view(TransientOwner::pause);
+    if (held.data == overlayAssetStorage) return held;
+    AmigaHardware::blitterDrain();
+    gDownwellShopPack = gDownwellResultsPack = nullptr;
+    gDownwellShopAssetBytes = gDownwellResultsAssetBytes = 0;
+    if (!overlayBank.load(TransientOwner::pause, pauseBankContract, overlayAssetStorage,
+            overlayAssetCapacity, readTransientBank, validateTransientBank)) return {nullptr, 0};
+    return overlayBank.view(TransientOwner::pause);
+}
+
+// W1.10 save.ini: scrLoadSave at startup; the original's ini_write_real
+// moments are batched into whole-file writes at the same boundaries (results,
+// pause-menu changes, style confirmation, the slice end and quitting).
+static downwell::SaveFile saveState, savedState;
+static bool saveOnDisk = false;
+static downwell::PauseMenu pauseMenu;
+static downwell::PauseMenuText pauseText;
+// Scratch HUD layer for the pause menus, held only while paused.
+static UBYTE* pauseScratch = nullptr;
+static bool pauseTextReady = false;
+static AmigaPauseOverlay::Key pauseKey;
+static unsigned pauseRunQuarters = ~0u;
+static void loadSave(AmigaPlatform& platform) {
+    char text[downwell::SaveFile::formatCapacity * 2];
+    const LONG read = platform.loadFile("PROGDIR:save.ini", (UBYTE*)text, sizeof text);
+    saveOnDisk = read > 0;
+    saveState = saveOnDisk ? downwell::SaveFile::parse(text, unsigned(read)) : downwell::SaveFile{};
+    savedState = saveState;
+}
+static void flushSave(AmigaPlatform& platform) {
+    if (saveOnDisk && saveState == savedState) return;
+    char text[downwell::SaveFile::formatCapacity];
+    const unsigned bytes = saveState.format(text, sizeof text);
+    if (bytes && platform.saveFile("PROGDIR:save.ini", (const UBYTE*)text, bytes)) {
+        savedState = saveState; saveOnDisk = true;
+    }
+}
+// saveStats / comboDone: lifetime gems, best run gems and best combo live in
+// the run; checkAreaLevel's furthest stage is recorded at the end of a run.
+// checkAreaLevel records the furthest level as each level starts, so a quit
+// mid-level keeps it too.
+template<class Port> static void syncRunRecords(const Port& port) {
+    const auto records = port.runRecords();
+    saveState.totalGems = records.lifetimeGems;
+    saveState.bestRunGems = records.bestRunGems;
+    saveState.bestCombo = records.bestCombo;
+    const unsigned reached = unsigned(port.runStage().area * 10 + port.runStage().level) +
+        (port.hardMode() ? 100u : 0u);
+    if (reached > saveState.furthestReached) saveState.furthestReached = reached;
+}
+
+extern "C" {
 static bool selectExitMaskBank() {
     if (residentCover==ResidentCover::exit) return true;
     if (residentCover!=ResidentCover::none) return false;
@@ -1105,6 +1177,8 @@ static AmigaGemStreakHud::View streakView;
 static AmigaLevelTitleHud titleHud;
 static AmigaLevelTitleHud::View titleView;
 static void invalidateTitle() { titleHud.invalidate(); titleView = {}; }
+// W1.10: Options > Timer in the left HUD column.
+static AmigaTimerHud timerHud;
 static unsigned shownCurrencyText=0;
 // A fixed ordinary streak (no bar line) at the current offset, for scene
 // setup and the shop fixture.
@@ -1205,7 +1279,7 @@ static void composeResultsRows(AmigaRenderer* renderer,
     renderer->target = saved;
 }
 
-static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force) {
+static bool redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force) {
     static unsigned lastGems = ~0u, lastKills = ~0u, lastPhase = ~0u;
     static unsigned lastTime = ~0u;
     static unsigned lastCombo = ~0u;
@@ -1220,12 +1294,13 @@ static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& p
     const unsigned ticks = port.runTimeTicks();
     const unsigned bestCombo = port.runCombo().state.best;
     if (!force && lastGems == gems && lastKills == kills && lastPhase == phase && lastTime == ticks &&
-        lastCombo == bestCombo && lastArea == port.runStage().area && lastLevel == port.runStage().level) return;
+        lastCombo == bestCombo && lastArea == port.runStage().area && lastLevel == port.runStage().level) return false;
     lastGems = gems; lastKills = kills; lastPhase = phase;
     lastTime = ticks;
     lastCombo = bestCombo;
     lastArea = port.runStage().area; lastLevel = port.runStage().level;
     composeResultsRows(renderer, menu, gems, kills, ticks, bestCombo, port.runStage());
+    return true;
 }
 
 static void composeResultsProgress(AmigaRenderer* renderer,
@@ -1256,16 +1331,85 @@ static void composeResultsProgress(AmigaRenderer* renderer,
     renderer->target = saved;
 }
 
-static void redrawResultsProgress(AmigaRenderer* renderer,
+static bool redrawResultsProgress(AmigaRenderer* renderer,
         const downwell::DeathResults& results, bool force) {
     static downwell::DeathResultsProgressBar previous;
     static std::uint64_t previousTotal = 0, previousGoal = 0;
     const auto bar = downwell::DeathResultsProgressBar::from(results);
     if (!force && bar == previous && results.frame.displayedTotal == previousTotal &&
-        results.frame.nextGoal == previousGoal) return;
+        results.frame.nextGoal == previousGoal) return false;
     previous = bar;
     previousTotal = results.frame.displayedTotal; previousGoal = results.frame.nextGoal;
     composeResultsProgress(renderer, bar, results);
+    return true;
+}
+
+// W1.10 DeathMenu Draw's unlock notice: at goalNotif >= 2 sprShopDesc 489
+// slides up from view y + 84 to + 80, at >= 3 the STYLE/PALETTE UNLOCKED
+// header (scrGemmyText) and the name (scrDrawBorderTextBlack, from the
+// 64800 + code glyphs) slide up four pixels, with the style's run sprite
+// (25, 26, 28, 29) between them. It is drawn over the rows and the progress
+// bar; unlockNotice(gr) names step gr + 1: styles at steps 3, 7, 11 and 13,
+// otherwise the next palette. The notice sound waits for W2.
+struct ResultsNotice {
+    int stage = 0, desc = 4, text = 4;
+    unsigned frameTenths = 0; // styleUnlockSpriteFrame, never reset by Create
+    bool operator==(const ResultsNotice& o) const {
+        return stage == o.stage && desc == o.desc && text == o.text &&
+            (stage < 3 || frameTenths / 10 == o.frameTenths / 10);
+    }
+};
+static ResultsNotice resultsNotice, shownResultsNotice;
+static void composeResultsNotice(AmigaRenderer* renderer, const ResultsNotice& notice, unsigned goal) {
+    if (notice.stage < 2) return;
+    UBYTE* saved = renderer->target;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    renderer->target = renderer->hud;
+    const UBYTE* pack = gDownwellResultsPack;
+    const UBYTE* end = gDownwellResultsPack + gDownwellResultsAssetBytes;
+    const int uny = 80;
+    amigaRendererDrawAsset(renderer, pack, end, 489, 0, downwellPlayfieldX, uny + notice.desc, 0);
+    if (notice.stage >= 3) {
+        const unsigned step = goal + 1;
+        const bool style = downwell::UnlockProgress::styleStep(step);
+        const int top = uny + (style ? 20 : 16) + notice.text - 4;
+        // scrGemmyText: red (-1,0), (0,-1); black (1,0), (0,1); white.
+        static const signed char dx[5] = {-1, 0, 1, 0, 0}, dy[5] = {0, -1, 0, 1, 0};
+        static const unsigned char pen[5] = {2, 2, 3, 3, 1};
+        for (unsigned layer = 0; layer < 5; ++layer)
+            amigaRendererDrawAssetPen(renderer, pack, end, style ? 65305 : 65306, 0,
+                downwellPlayfieldX + 80 + dx[layer], top + dy[layer], 0, pen[layer]);
+        const char* name = nullptr;
+        if (style) {
+            const unsigned index = step == 3 ? 0 : step == 7 ? 1 : step == 11 ? 2 : 3;
+            static const unsigned sprites[4] = {25, 26, 28, 29};
+            amigaRendererDrawAsset(renderer, pack, end, sprites[index], (notice.frameTenths / 10) % 8,
+                downwellPlayfieldX + 80, top + 32, 0);
+            name = pauseTextReady ? pauseText.styleName[index + 1] : nullptr;
+        } else {
+            const unsigned palette = downwell::UnlockProgress::from(
+                downwell::DeathMenuProgress::goals[goal]).paletteUnlock;
+            if (palette < sizeof(downwell::palettes::entries) / sizeof(downwell::palettes::entries[0]))
+                name = downwell::palettes::entries[palette].name;
+        }
+        if (name) {
+            unsigned length = 0;
+            while (name[length]) ++length;
+            const int left = 80 - 4 * int(length);
+            const int y = top + (style ? 48 : 34);
+            static const signed char bx[5] = {1, -1, 0, 0, 0}, by[5] = {0, 0, 1, -1, 0};
+            for (unsigned layer = 0; layer < 5; ++layer)
+                for (unsigned i = 0; i < length; ++i) {
+                    const unsigned char c = (unsigned char)name[i];
+                    if (c <= ' ' || c >= 127) continue;
+                    amigaRendererDrawAssetPen(renderer, pack, end, UWORD(64800 + c), 0,
+                        downwellPlayfieldX + left + 8 * int(i) + bx[layer], y + by[layer], 0,
+                        layer == 4 ? 1 : 3);
+                }
+        }
+    }
+    amigaRendererClearClipRect(renderer);
+    renderer->target = saved;
 }
 
 static void composeResultsChoices(AmigaRenderer* renderer,
@@ -1750,7 +1894,9 @@ static void buildReferencePicture(
     drawAsset(renderer, 408, 0, 272, 0, 1);
 
     DW_PROFILE_PHASE(profilePictureHealth);
-    redrawHealth(renderer, 4, 4);
+    if (runtime) redrawHealth(renderer, unsigned(runtime->health()), unsigned(runtime->healthMaximum()),
+                              runtime->healthReserve().pieces, runtime->healthReserve().piecesPerHeart);
+    else redrawHealth(renderer, 4, 4);
     shownUpgradeCount=0;
 
     DW_PROFILE_PHASE(profilePictureAmmoArt);
@@ -1765,6 +1911,7 @@ static void buildReferencePicture(
     shownCurrencyText=0;
     gemStreakHud.invalidate();streakView={};
     invalidateTitle();
+    timerHud.invalidate();
     redrawStreak(renderer, 0);
 #else
     drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
@@ -2111,6 +2258,14 @@ __attribute__((noinline)) static int runDownwell(void) {
     // Construct at entry (not before the framework startup), as for port.
     alignas(AmigaSceneRuntime) static UBYTE sceneStorage[sizeof(AmigaSceneRuntime)];
     AmigaSceneRuntime& scenes = *new (sceneStorage) AmigaSceneRuntime;
+    loadSave(platform);
+    {
+        const auto unlock = downwell::UnlockProgress::from(saveState.totalGems);
+        if (saveState.shader > unlock.paletteUnlock) saveState.shader = 0;
+        scenes.configureStyles(unlock.styleUnlock, saveState.hardUnlocked, saveState.style, saveState.hardMode);
+        port.restoreRunRecords({saveState.totalGems, saveState.bestRunGems, saveState.bestCombo});
+        pauseTextReady = pauseText.configure(downwell::menu_text::entries, downwell::menu_text::count, "english");
+    }
     alignas(AmigaUpgradeScene) static UBYTE clearStorage[sizeof(AmigaUpgradeScene)];
     auto& clear = *new (clearStorage) AmigaUpgradeScene;
 #ifdef DOWNWELL_CLEAR_VERIFY
@@ -2480,6 +2635,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         AmigaGameplayActors::releaseDamageText();
         hudText.release();
         gemStreakHud.release();
+        timerHud.release();
         titleHud.release();titleView={};
         activeGamePack=activeGamePackEnd=activeEntryMask=nullptr;
         gDownwellEntryMaskResidentBytes=0;
@@ -2685,8 +2841,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                      downwellDisplayHeight, 2, false, false,
                      downwellDmaWidth);
     Palette::initialize();
-    Palette palette(downwellPaletteData,
-                    sizeof(downwellPaletteData) / sizeof(downwellPaletteData[0]));
+    selectPaletteData(saveState.shader);
+    Palette palette(selectedPaletteData,
+                    sizeof(selectedPaletteData) / sizeof(selectedPaletteData[0]));
 
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
@@ -2841,12 +2998,28 @@ __attribute__((noinline)) static int runDownwell(void) {
     // memory, so it runs while that frame's list waits for its VBlank.
     bool overlapNextStep = false;
     UWORD fencedVblank = AmigaPlatform::vblankCount();
+    bool pauseFireLatch = false; // afterPause: a held confirm is not a jump
+    downwell::Input pausePrior;
     for (;;) {
         if(!keyboardReady)break;
+#ifndef DOWNWELL_REPLAY_VERIFY
+        // W1.10: in gameplay Escape and P are objControlerN's pause input;
+        // elsewhere (and at the slice end) Escape still leaves the game.
+        unsigned pauseKeys = 0;
+        if (scenes.scene() == AmigaScene::gameplay && !sliceEnd.presented) pauseKeys = keyboard.pause();
+        if ((*ciaaPra & 0x40u) == 0 || keyboard.quit()) {
+            syncRunRecords(port);
+            flushSave(platform);
+            exitCode = 0;
+            break;
+        }
+        if (scenes.scene() != AmigaScene::gameplay) (void)keyboard.pause();
+#else
         if ((*ciaaPra & 0x40u) == 0 || keyboard.quit()) {
             exitCode = 0;
             break;
         }
+#endif
         if (sliceEnd.presented) { platform.waitVblank(); continue; }
         downwell::GameplayEncounterSession::Frame encounterFrame(encounterSession);
         if(!encounterFrame.valid())break;
@@ -3071,6 +3244,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
 #endif
+            // afterPause: the confirmation that closed the menu is not a jump.
+            if (pauseFireLatch) { if (liveInput.fire) liveInput.fire = false; else pauseFireLatch = false; }
             packedInput = downwell::packReplayInput(liveInput);
             if(!encounterFrame.sampleInput(liveInput))break;
 #ifdef DOWNWELL_PROFILE_IDLE
@@ -3081,6 +3256,13 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             DW_PROFILE_PHASE(profileSimulation);
             if (!sceneResetRequested) scenes.step(liveInput,encounterSession.inputPublication());
+#ifndef DOWNWELL_REPLAY_VERIFY
+            if (scenes.takeStyleConfirmed()) {
+                // PlayMenu: ini_write_real style, then hardMode.
+                saveState.style = scenes.playStyle(); saveState.hardMode = scenes.hardMode();
+                flushSave(platform);
+            }
+#endif
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
             if(scenes.scene()!=AmigaScene::gameplay)encounterResources.releaseScene();
             else if(encounterResources.ready()&&!encounterResources.bind(encounterFrame))break;
@@ -3271,13 +3453,22 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // Simulation ticks span levels; freshness is the load
                     // boundary, not a zero tick on every room entry.
                     const bool freshlyLoadedRoom=newRunWorldPending||port.tick()==0;
+                    // W1.10: a new run takes style select's style and mode
+                    // (objPlayer_n Create's styleUpdate at 1-1). The first
+                    // boot's builder checkpoint was taken before the choice.
+                    if (freshlyLoadedRoom && port.runStage().level <= 1) {
+                        if (!port.beginRun(scenes.playStyle(), scenes.hardMode())) {
+                            exitCode=downwellGameplayFailed(__LINE__);break;
+                        }
+                        if (!newRunWorldPending) liveBuilder.applyRunStyle(scenes.playStyle(), scenes.hardMode());
+                    }
                     if (newRunWorldPending) {
                         AmigaHardware::blitterDrain();
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
                         port.confirmFirstStage();
-                        unsigned style=scenes.styleCursor();
+                        unsigned style=scenes.playStyle();
                         if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend,
                             [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,
                                const downwell::PackedRoomInstance& instance,void* context){
@@ -3316,7 +3507,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (!storage.valid || DOWNWELL_RESULTS_BANK_BYTES > storage.resultsCapacity ||
                         DOWNWELL_SHOP_BANK_BYTES > storage.resultsCapacity ||
                         DOWNWELL_EXITMASK_BANK_BYTES > storage.resultsCapacity ||
-                        DOWNWELL_ENTRYMASK_BANK_BYTES > storage.resultsCapacity) {
+                        DOWNWELL_ENTRYMASK_BANK_BYTES > storage.resultsCapacity ||
+                        DOWNWELL_PAUSE_BANK_BYTES > storage.resultsCapacity) {
                         ++gDownwellResultsAssetFailures;
                         exitCode=downwellGameplayFailed(__LINE__);
                         break;
@@ -3377,6 +3569,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
                     if(!gemStreakHud.bind(activeGamePack, activeGamePackEnd)){exitCode=downwellGameplayFailed(__LINE__);break;}
                     if(!titleHud.bind(activeGamePack, activeGamePackEnd)){exitCode=downwellGameplayFailed(__LINE__);break;}
+                    if(!timerHud.bind(activeGamePack, activeGamePackEnd)){exitCode=downwellGameplayFailed(__LINE__);break;}
                     overlayAssetStorage = memory.menuForeground() + storage.resultsOffset;
                     overlayAssetCapacity = storage.resultsCapacity;
                     residentCover = ResidentCover::none;
@@ -3755,7 +3948,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellClearOracleBytes=AmigaClearOracleBuffers::bytes;
 #endif
                     if (!upgradeSource.acquire()) { exitCode=downwellGameplayFailed(__LINE__); break; }
-                    if (!clear.enter(port, scenes.styleCursor(), liveInput,
+                    if (!clear.enter(port, scenes.playStyle(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                             DOWNWELL_HUD_BANK_BYTES, upgradeSource.view().data, upgradeSource.view().bytes,
                             upgradeSource.mask(), DOWNWELL_SELECTIONMASK_BANK_BYTES)) { exitCode=downwellGameplayFailed(__LINE__); break; }
@@ -3783,6 +3976,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                         !sliceEnd.prepare(memory.game(),memory.hud(),gameBitmap,bank,clear.assets.bankBytes,nullSprite,palette)) {
                         exitCode=downwellGameplayFailed(__LINE__);break;
                     }
+                    // The slice ends the run here: record it as saveStats would.
+                    (void)port.recordRunEnd();
+                    syncRunRecords(port);
+                    flushSave(platform);
                     if (!encounterFrame.beginDraw() || !encounterFrame.publishable()) break;
                     platform.publish(sliceEnd.presentation());
                     sliceEnd.presented=true;
@@ -3843,7 +4040,15 @@ __attribute__((noinline)) static int runDownwell(void) {
                         actorSpriteAt(bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back], channel - 1);
                     sprite.hide();
                 }
-                const unsigned playerId = port.player().spriteId(), playerFrame = port.player().spriteFrame();
+                unsigned playerId = port.player().spriteId(), playerFrame = port.player().spriteFrame();
+                // The upgrade bank keeps style 0's living poses only (its
+                // DMA budget); other styles use the matching usual pose.
+                switch (playerId) {
+                case 25: case 26: case 28: case 29: playerId = 27; break;
+                case 32: case 33: case 34: case 35: playerId = 31; break;
+                case 38: case 40: case 42: playerId = 37; break;
+                default: break;
+                }
                 const auto playerArt = upgradeSource.view();
                 const unsigned parts = amigaRendererHardwareSpritePartCount(playerArt.data, playerArt.data + playerArt.bytes, playerId, playerFrame);
                 bool ready = parts > 0 && parts <= 8;
@@ -3929,6 +4134,110 @@ __attribute__((noinline)) static int runDownwell(void) {
                 platform.publish(clear.copper(back)); front = back;
                 if(!encounterFrame.finish())break;
                 continue;
+            }
+#endif
+#ifndef DOWNWELL_REPLAY_VERIFY
+            // W1.10 objPauseMenu. objControlerN opens it on pauseInput while
+            // the player can act in rmMain; the paused world neither steps
+            // nor draws, and the menu owns the fixed PF2 well until it closes.
+            {
+                bool shopMenuOpen = false;
+                for (const auto& shop : port.shops().instances)
+                    if (shop.present && shop.menu.active) shopMenuOpen = true;
+                const bool pausable = pauseTextReady && activeGamePack && !port.dead() &&
+                    !port.deathResults().active && !port.shops().noControl && !shopMenuOpen &&
+                    !gDownwellShopPack && !port.exitDither().active && residentCover == ResidentCover::none &&
+                    !port.deathSequence().flashVisible();
+                if ((pauseKeys & 1) && !pauseMenu.open() && (port.dead() || port.deathResults().active)) {
+                    // Escape on the death screens still leaves the game.
+                    syncRunRecords(port); flushSave(platform);
+                    (void)encounterFrame.finish(); exitCode = 0; break;
+                }
+                bool opened = false;
+                if (!pauseMenu.open() && pauseKeys && pausable &&
+                    (pauseScratch || (pauseScratch = static_cast<UBYTE*>(
+                        AllocMem(AmigaPauseOverlay::scratchBytes, MEMF_ANY))))) {
+                    fenceDisplay();
+                    if (!selectPauseBank().data) { exitCode=downwellGameplayFailed(__LINE__); break; }
+                    AmigaHardware::blitterDrain();
+                    AmigaPauseOverlay::begin(&renderer, pauseScratch);
+                    pauseMenu.openPause(false);
+                    pauseKey = {};
+                    pausePrior = liveInput;
+                    opened = true;
+                }
+                if (pauseMenu.open()) {
+                    fenceDisplay();
+                    using Menu = downwell::PauseMenu;
+                    Menu::Action action = Menu::Action::none;
+                    const auto unlock = downwell::UnlockProgress::from(saveState.totalGems);
+                    if (!opened) {
+                        // The menu is created during objControlerN's Step and
+                        // first steps on the next update.
+                        Menu::Input in;
+                        in.leftPressed = liveInput.left && !pausePrior.left;
+                        in.rightPressed = liveInput.right && !pausePrior.right;
+                        in.left = liveInput.left; in.right = liveInput.right;
+                        in.confirm = liveInput.fire && !pausePrior.fire;
+                        in.cancel = liveInput.cancel && !pausePrior.cancel;
+                        in.pause = pauseKeys != 0;
+                        pausePrior = liveInput;
+                        const unsigned oldShader = saveState.shader;
+                        action = pauseMenu.step(in, saveState, unlock);
+                        if (saveState.shader != oldShader) {
+                            selectPaletteData(saveState.shader);
+                            palette.assign(selectedPaletteData);
+                            gameplayScene.repaint(palette);
+                        }
+                    }
+                    if (action == Menu::Action::none) {
+                        const auto bank = overlayBank.view(TransientOwner::pause);
+                        if (!bank.data) { exitCode=downwellGameplayFailed(__LINE__); break; }
+                        const auto key = AmigaPauseOverlay::key(pauseMenu, saveState);
+                        if (key != pauseKey || pauseMenu.screen == Menu::Screen::palette) {
+                            Menu::View view;
+                            view.text = &pauseText;
+                            view.palettes = downwell::palettes::entries;
+                            view.paletteCount = downwell::palettes::count;
+                            view.save = &saveState; view.unlock = unlock;
+                            view.area = port.runStage().area; view.level = port.runStage().level;
+                            view.hard = port.hardMode();
+                            AmigaHardware::blitterDrain();
+                            AmigaPauseOverlay::compose(&renderer, pauseScratch, {bank.data, bank.data + bank.bytes,
+                                activeGamePack, activeGamePackEnd}, pauseMenu, view, 0, 284);
+                            pauseKey = key;
+                        }
+                        if(!encounterFrame.finish())break;
+                        continue;
+                    }
+                    // Closing: give the well back to the HUD's own overlays.
+                    AmigaHardware::blitterDrain();
+                    AmigaPauseOverlay::clear(&renderer);
+                    FreeMem(pauseScratch, AmigaPauseOverlay::scratchBytes); pauseScratch = nullptr;
+                    overlayBank.release();
+                    invalidateHudText(); gemStreakHud.invalidate(); streakView = {}; invalidateTitle();
+                    flushSave(platform);
+                    if (action == Menu::Action::resume) {
+                        pauseFireLatch = liveInput.fire;
+                        if(!encounterFrame.finish())break;
+                        continue;
+                    }
+                    if (action == Menu::Action::quit) {
+                        syncRunRecords(port); flushSave(platform);
+                        (void)encounterFrame.finish(); exitCode = 0; break;
+                    }
+                    // RETRY and STYLE SELECT: ResetPlayer without saveStats.
+                    newRunSeed = liveFrameCount;
+                    const auto destination = port.restartFromResults(action == Menu::Action::retry ?
+                        downwell::DeathMenuSequence::Action::Retry : downwell::DeathMenuSequence::Action::StyleSelect,
+                        newRunSeed, initialRingOrigin);
+                    if (!scenes.enterResultsDestination(destination)) break;
+                    newRunWorldPending = true;
+                    sceneResetRequested = true;
+                    resultsWasActive = false;
+                    if(!encounterFrame.finish())break;
+                    continue;
+                }
             }
 #endif
             DW_PROFILE_PHASE(profileSimulation);
@@ -4159,6 +4468,11 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                 }
             }
+            // W1.10 timerNumber: global.gameTime is the run clock.
+            if (activeGamePack && !port.deathResults().active &&
+                !timerHud.draw(&renderer, AmigaTimerHud::view(saveState.showTimer, port.runTimeTicks()))) {
+                exitCode=downwellGameplayFailed(__LINE__);break;
+            }
             if (wasDeathFlash != port.deathSequence().flashVisible()) {
                 // PF2 is above the world AND hardware sprites. Only touch this
                 // overlay on the two visibility edges; preserve the terrain
@@ -4217,6 +4531,14 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_PROFILE_ENTRY
                 ++gDownwellEntryResultsFrames;
 #endif
+#ifndef DOWNWELL_REPLAY_VERIFY
+                if (!resultsWasActive) {
+                    // saveStats ran at the first death movement; write it as
+                    // DeathMenu opens (not mid-fall), with checkAreaLevel.
+                    syncRunRecords(port);
+                    flushSave(platform);
+                }
+#endif
                 if (!selectOverlayAssetBank(false)) { exitCode=downwellGameplayFailed(__LINE__); break; }
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -4225,8 +4547,26 @@ __attribute__((noinline)) static int runDownwell(void) {
                     false
 #endif
                 );
-                redrawResultsRows(&renderer, port, backdropChanged);
-                redrawResultsProgress(&renderer, port.deathResults(), backdropChanged);
+                {
+                    // DeathMenu Draw state of the unlock notice.
+                    const int stage = port.deathResults().menu.goalNotice;
+                    if (stage == 1 && resultsNotice.stage == 0) { resultsNotice.desc = 4; resultsNotice.text = 4; }
+                    resultsNotice.stage = stage;
+                    if (stage >= 2 && resultsNotice.desc > 0) --resultsNotice.desc;
+                    if (stage >= 3) {
+                        resultsNotice.frameTenths += 3;
+                        if (resultsNotice.text > 0) --resultsNotice.text;
+                    }
+                }
+                const bool noticeChanged = !(resultsNotice == shownResultsNotice);
+                // The notice covers rows and part of the bar: repaint under it.
+                const bool underNotice = backdropChanged ||
+                    (noticeChanged && (resultsNotice.stage >= 2 || shownResultsNotice.stage >= 2));
+                const bool rowsRedrawn = redrawResultsRows(&renderer, port, underNotice);
+                const bool progressRedrawn = redrawResultsProgress(&renderer, port.deathResults(), underNotice);
+                if (resultsNotice.stage >= 2 && (underNotice || rowsRedrawn || progressRedrawn))
+                    composeResultsNotice(&renderer, resultsNotice, port.deathResults().progress.goal);
+                shownResultsNotice = resultsNotice;
                 redrawResultsChoices(&renderer, port, backdropChanged);
             }
 #ifndef DOWNWELL_REPLAY_VERIFY

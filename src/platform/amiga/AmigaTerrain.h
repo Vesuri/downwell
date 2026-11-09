@@ -109,6 +109,7 @@ public:
     void setBreakablePublisher(downwell::AreaOneBuilder::BreakableEmitter publisher){breakablePublisher_=publisher;}
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
+    void applyRunStyle(unsigned style, bool hard) { builder_.applyRunStyle(style, hard); }
     // Import simulation state without replaying Create or consuming RNG.
     // The caller transfers the matching RNG separately. Existing terrain is
     // not imported; use only before the first generated pattern in a room.

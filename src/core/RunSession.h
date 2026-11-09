@@ -551,20 +551,21 @@ struct RunSession {
     // from the current normal run adapter.
     // global.playStyle as the builder saw it (style 4 discounts stock).
     unsigned playStyle = 0;
+    bool hardMode = false; // global.hardMode, chosen at style select
     template<class Range, class Choice>
     ShopWorld::Instance* createShop(int x, int y, Range random, Choice chooseFarewell, int health) {
         return shops.create(x, y, random, chooseFarewell, health, stage.area > 0 ? stage.area : 1,
-                            false, playStyle, upgrades.levels[14] != 0);
+                            hardMode, playStyle, upgrades.levels[14] != 0);
     }
     template<class Range,class Choice,class Owner>
     ShopWorld::Instance* createRegisteredShop(int x,int y,Range random,Choice chooseFarewell,int health,Owner& owner){
         return shops.createRegistered(x,y,random,chooseFarewell,health,stage.area>0?stage.area:1,
-            false,playStyle,upgrades.levels[14]!=0,owner,effectsSucceeded);
+            hardMode,playStyle,upgrades.levels[14]!=0,owner,effectsSucceeded);
     }
     template<class Range,class Choice,class Owner,class Lookup>
     ShopWorld::Instance* createRegisteredShop(int x,int y,Range random,Choice chooseFarewell,int health,Owner& owner,Lookup& lookup){
         return shops.createRegisteredWithText(x,y,random,chooseFarewell,health,stage.area>0?stage.area:1,
-            false,playStyle,upgrades.levels[14]!=0,owner,effectsSucceeded,lookup);
+            hardMode,playStyle,upgrades.levels[14]!=0,owner,effectsSucceeded,lookup);
     }
     LevelExit levelExit;
     GoalTimeField goalField;

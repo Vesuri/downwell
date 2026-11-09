@@ -62,6 +62,12 @@ void Palette::setFadeBaseColor(uint16_t fadeBaseColor)
     this->fadeBaseColor = fadeBaseColor;
 }
 
+void Palette::assign(const uint16_t* palette)
+{
+    for (uint16_t i = 0; i < colorCount_; i++) sourcePalette[i] = palette[i];
+    update();
+}
+
 void Palette::update()
 {
     uint16_t baseR = fadeBaseColor >> 8;

@@ -2,6 +2,7 @@
 #include <proto/exec.h>
 #include <proto/graphics.h>
 #include <exec/execbase.h>
+#include <dos/dosextens.h>
 #include <graphics/gfxbase.h>
 #include <graphics/view.h>
 #include <hardware/dmabits.h>
@@ -105,6 +106,29 @@ LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)
         if (publishedCopper_) AmigaHardware::setCopperList(publishedCopper_, false);
     }
     return read;
+}
+
+bool AmigaPlatform::saveFile(const char* name, const UBYTE* source, ULONG bytes)
+{
+    DW_PROFILE_SCOPE(profileSceneFileIo);
+    if (!DOSBase || !source || !name) return false;
+    if (active_) beginIo();
+    struct Process* const self = (struct Process*)FindTask(0);
+    const APTR window = self->pr_WindowPtr;
+    self->pr_WindowPtr = (APTR)-1;
+    bool written = false;
+    const BPTR file = Open((CONST_STRPTR)name, MODE_NEWFILE);
+    if (file) {
+        written = Write(file, (APTR)source, (LONG)bytes) == (LONG)bytes;
+        Close(file); // Kickstart 1.3's Close returns no result.
+    }
+    self->pr_WindowPtr = window;
+    if (active_) {
+        endIo();
+        AmigaHardware::blitterDrain();
+        if (publishedCopper_) AmigaHardware::setCopperList(publishedCopper_, false);
+    }
+    return written;
 }
 
 ULONG AmigaPlatform::vblankHandler()

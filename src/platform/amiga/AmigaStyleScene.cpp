@@ -12,9 +12,11 @@ bool AmigaStyleScene::bindIcons(){
     if(end_-pack_<20||word(pack_+4)!=2||word(pack_+6)!=20)return false;
     const unsigned count=dword(pack_+8);
     if(count>unsigned(end_-pack_-20)/24)return false;
-    for(unsigned i=0;i<14;++i){
-        const unsigned id=i<8?65510:i<12?65511:i==12?65512:65513;
-        const unsigned variant=i<8?i:i<12?i-8:0;
+    for(unsigned i=0;i<iconCount;++i){
+        const unsigned style=i/8;
+        const unsigned id=i<lockedIcon?(style==0?65510:65513+style):
+            i<rightIcon?65511:i==rightIcon?65512:65513;
+        const unsigned variant=i<lockedIcon?i%8:i<rightIcon?i-lockedIcon:0;
         unsigned lo=0,hi=count;const UBYTE* r=nullptr;
         while(lo<hi){const unsigned mid=lo+(hi-lo)/2;const auto* p=pack_+20+mid*24;
             const unsigned key=dword(p),wanted=id*65536u+variant;
@@ -33,10 +35,12 @@ bool AmigaStyleScene::prepareIcons(unsigned slot,int top,Frame& frame){
     // Certify the whole moving layer before changing either commands or DMA
     // headers. A partially vertically clipped sprite retains the planar path.
     for(unsigned i=0;i<drawList_.count;++i){const auto& c=drawList_.commands[i];
-        if(c.id<65500||c.id>65503)continue;
-        if(c.id==65500&&c.frame>=8)return false;
-        const unsigned index=c.id==65500?c.frame:c.id==65501?8+locks++:c.id==65502?12:13;
-        if(index>=14||used==8||locks>4)return false;
+        if(c.id<65500||c.id>65507)continue;
+        const bool run=c.id==65500||c.id>=65504;
+        if(run&&c.frame>=8)return false;
+        const unsigned index=run?(c.id==65500?0:c.id-65503)*8+c.frame:
+            c.id==65501?lockedIcon+locks++:c.id==65502?rightIcon:leftIcon;
+        if(index>=iconCount||used==8||locks>4)return false;
         const auto& icon=icons_[index];const int y=c.y-top-icon.y;
         if(y<0&&y+icon.height>0)return false;
         if(y<284&&y+icon.height>284)return false;
@@ -51,7 +55,7 @@ bool AmigaStyleScene::prepareIcons(unsigned slot,int top,Frame& frame){
     }
     unsigned out=0;
     for(unsigned i=0;i<drawList_.count;++i){const auto& c=drawList_.commands[i];
-        if(c.id>=65500&&c.id<=65503)continue;
+        if(c.id>=65500&&c.id<=65507)continue;
         drawList_.commands[out++]=c;
     }
     drawList_.count=out;frame.hardware=true;return true;

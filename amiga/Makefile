@@ -622,6 +622,7 @@ AMIGA_FRONT_BANK := $(REPO)/generated/amiga-front.dwap
 AMIGA_SCENE_BANKS := $(REPO)/generated/amiga-scene-banks.h
 AMIGA_RESULTS := $(REPO)/generated/amiga-results.dwap
 AMIGA_SHOP := $(REPO)/generated/amiga-shop.dwap
+AMIGA_PAUSE := $(REPO)/generated/amiga-pause.dwap
 AMIGA_CLEAR := $(REPO)/generated/amiga-clear.dwap
 ROOM_PACK := $(REPO)/generated/downwell-runtime-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
@@ -651,7 +652,7 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).wind $(OUT).encountermasks
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).wind $(OUT).encountermasks
 
 $(OUT).entrymask: $(AMIGA_ENTRY_MASK)
 	@mkdir -p $(@D)
@@ -724,7 +725,7 @@ $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/generated/amiga-pattern-terrain.bin $(REPO)/tools/generate-amiga-transient-banks.py
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_PAUSE) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/generated/amiga-pattern-terrain.bin $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
@@ -734,6 +735,10 @@ $(OUT).results: $(AMIGA_RESULTS)
 	cp -f $< $@
 
 $(OUT).shop: $(AMIGA_SHOP)
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(OUT).pause: $(AMIGA_PAUSE)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
@@ -1167,6 +1172,8 @@ $(AMIGA_RESULTS): $(REPO)/tools/generate-amiga-hud.py
 
 $(AMIGA_SHOP): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
 	$(MAKE) -C $(REPO) generate-amiga-shop
+$(AMIGA_PAUSE): $(REPO)/tools/generate-amiga-hud.py
+	$(MAKE) -C $(REPO) generate-amiga-pause
 
 $(AMIGA_CLEAR): $(REPO)/tools/generate-amiga-hud.py $(REPO)/tools/amiga_scene_contract.py $(REPO)/data/language.ini
 	$(MAKE) -C $(REPO) generate-amiga-clear

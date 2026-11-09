@@ -46,7 +46,9 @@ void PlayerMotion::enterRoom(bool fireHeld, int landingOffset)
     const int facing = facing_;
     const bool rules = gunRules_, delayKill = gunDelayKill_;
     const int consumption = gunConsumption_, rof = gunRof_, recoil = gunRecoilFifths_;
+    const int style = playStyle_;
     *this = PlayerMotion(false, landingOffset);
+    playStyle_ = style;
     // scrPlayerInit clears nonAuto; the selected gun is global state.
     gunRules_ = rules; gunDelayKill_ = delayKill;
     gunConsumption_ = consumption; gunRof_ = rof; gunRecoilFifths_ = recoil;
@@ -104,6 +106,7 @@ void PlayerMotion::beginSpin()
 
 void PlayerMotion::stompBounce(int playStyle)
 {
+    if (playStyle < 0) playStyle = playStyle_;
     beginSpin();
     // scrEnemyStomped: Boulder (2) uses scrFjump(0,1.5); others use 2.5.
     speedY_ = playStyle == 2 ? -384 : -640;
@@ -170,10 +173,16 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         --shotDelay_;
     // Gravity precedes horizontal movement/support checks in the recovered
     // player Step. Walking off an edge must start falling this same frame.
-    speedY_ += gravity;
-    if (++gravityRemainder_ >= 5) {
-        ++speedY_;
-        gravityRemainder_ -= 5;
+    if (playStyle_ == 3) {
+        // scrGravity_n: global.grav / 1.5 = 512/3 fifths of Q8 per Step.
+        setVerticalSpeedFifths(speedYFifths() + (gravityThirds_ < 2 ? 171 : 170));
+        gravityThirds_ = gravityThirds_ < 2 ? gravityThirds_ + 1 : 0;
+    } else {
+        speedY_ += gravity;
+        if (++gravityRemainder_ >= 5) {
+            ++speedY_;
+            gravityRemainder_ -= 5;
+        }
     }
     if (speedY_ >= fallMaximum) {
         speedY_ = fallMaximum;
@@ -272,6 +281,8 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         grounded_ = false;
         speedY_ = jumpSpeed;
         gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
+        // scrPlayerInit: style 3's jumpsp *= 0.85 (3.74 = 4787.2 fifths).
+        if (playStyle_ == 3) setVerticalSpeedFifths(-4787);
         jumpShootLocked_ = true;
         // scrJump's dry, rocketless branch: objJumpFx at the instance x/y.
         addDust(true, long(oldPixelX) * fixedOne, long(oldPixelY) * fixedOne, 0);
@@ -419,7 +430,10 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         if (!running_)
             runPhaseTenths_ = 0;
         else
-            runPhaseTenths_ = (runPhaseTenths_ + 3) % 80;
+            // imgsprun: 0.3, or 0.25 for style 2 (alternate 2 and 3 tenths;
+            // the floor of every exact quarter step is the same frame).
+            runPhaseTenths_ = (runPhaseTenths_ + (playStyle_ != 2 ? 3 :
+                (runPhaseTenths_ % 5 == 0 ? 2 : 3))) % 80;
     } else {
         runPhaseTenths_ = 0;
     }
@@ -430,7 +444,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         if (!idling_)
             idlePhaseTenths_ = 0;
         else
-            idlePhaseTenths_ = (idlePhaseTenths_ + 1) % 40;
+            idlePhaseTenths_ = (idlePhaseTenths_ + (playStyle_ == 2 ? 2 : 1)) % 40;
     } else {
         idlePhaseTenths_ = 0;
     }
@@ -483,15 +497,19 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
         digest.addU32(0x414d4d4f); digest.addI32(ammoCapacity_);
     }
     if (nonAuto_) digest.addU32(0x4e4f4e41);
+    if (playStyle_) { digest.addU32(0x5354594c); digest.addI32(playStyle_); digest.addU32(gravityThirds_); }
     if(!motionSucceeded_)digest.addU32(0x4641494c);
 }
 
 int PlayerMotion::spriteId(bool dead) const
 {
     if (dead) return 0; // playerSpriteControl: sprPlDead.
-    if (grounded_) return running_ ? 27 : balancing_ ? 15 : 31;
+    // styleSet: spriteIdle, spriteRun and spriteAir by global.playStyle.
+    static const int idle[5] = {31, 33, 34, 35, 32}, run[5] = {27, 25, 26, 28, 29},
+        air[5] = {37, 38, 40, 28, 42};
+    if (grounded_) return running_ ? run[playStyle_] : balancing_ ? 15 : idle[playStyle_];
     if (spinJumping_) return 1;
-    return airborneShot_ ? 3 : 37;
+    return airborneShot_ ? 3 : air[playStyle_];
 }
 
 unsigned PlayerMotion::spriteFrame(bool dead, int deathAnimation) const

@@ -137,7 +137,14 @@ public:
     unsigned landings() const { return landings_; }
     unsigned shots() const { return shots_; }
     unsigned recharges() const { return recharges_; }
-    void stompBounce(int playStyle = 0);
+    // scrEnemyStomped and the Collision scripts: -1 uses the run's style.
+    void stompBounce(int playStyle = -1);
+    // global.playStyle (styleSet/scrPlayerInit/scrGravity_n): 3 (levitate)
+    // has gravity / 1.5 and jumpsp * 0.85; 2 (boulder) animates its run at
+    // 0.25 and idle at 0.2; each style has its own idle, run and air art.
+    // Global, so it survives room changes like the gun.
+    void setPlayStyle(int style) { playStyle_ = style < 0 || style > 4 ? 0 : style; }
+    int playStyle() const { return playStyle_; }
     void contactKnockback(int enemyX, int enemyY);
     void appendStateDigest(downwell::StateDigest& digest) const;
 
@@ -212,6 +219,8 @@ private:
     unsigned emptyShots_ = 0, emptyMessages_ = 0, landings_ = 0;
     Dust dust_[3] = {};
     unsigned dustCount_ = 0;
+    int playStyle_ = 0;
+    unsigned gravityThirds_ = 0; // style 3's 512/3-fifth gravity, 171+171+170
     bool wallColliding_ = false; // scrWallCol's previous-Step xcollision
     void addDust(bool jump, long x, long y, int emitTo) {
         if (dustCount_ < 3) dust_[dustCount_++] = {jump, x, y, emitTo};

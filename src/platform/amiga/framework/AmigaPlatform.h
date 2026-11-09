@@ -41,6 +41,10 @@ public:
     // servers, interrupts and disk DMA; the display stays owned. Drain the
     // blitter first. Returns the bytes read, or -1.
     LONG loadFile(const char* name, UBYTE* destination, ULONG bytes);
+    // The same bracketing for one Open(MODE_NEWFILE)/Write/Close. DOS
+    // requesters (a write-protected or missing volume) are suppressed: the
+    // call fails instead of waiting on a Workbench window nobody can see.
+    bool saveFile(const char* name, const UBYTE* source, ULONG bytes);
     void restore();
 
 private:

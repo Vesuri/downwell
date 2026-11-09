@@ -168,8 +168,16 @@ public:
     struct Setup {
         unsigned level = 1, style = 0;
         bool member = false, firstBoot = true;
+        bool hard = false; // global.hardMode (builderCavern)
     };
     void reset(int x, int y, GameMakerRandom& random, const Setup& setup);
+    // W1.10: the first boot's 1-1 checkpoint is captured before style select.
+    // Apply the chosen style and mode to it: style 4 lifts scrLevelPat1's
+    // pre-made shop. rightRoomAmt keeps the checkpoint's two side rooms.
+    void applyRunStyle(unsigned style, bool hard) {
+        style_ = style > 4 ? 0 : style; hard_ = hard;
+        if (levelLength_ == 16) shopMade_ = style_ != 4;
+    }
     void restoreInitialCheckpoint(int x, int y, int generationCount,
                                   int firstRightRoom, int secondRightRoom);
     bool step(const BuilderPatternPack& patterns, GameMakerRandom& random,
@@ -259,7 +267,7 @@ private:
     int rightRooms_[4] = {-1, -1, -1, -1};
     int sideRoomLog_[4] = {-1, -1, -1, -1};
     unsigned rightRoomCount_ = 2, levelLength_ = 16, style_ = 0;
-    bool member_ = false;
+    bool member_ = false, hard_ = false;
     int startPattern_ = -1;
     bool startReversed_ = false;
     std::uint32_t startRowsGenerated_ = 0;
