@@ -57,6 +57,8 @@ GAME_IDS = frozenset({
     65112,
     # W1.7 levelNumber's V (CAVERN).
     65141,
+    # W1.8 merchant speech: "?", D, K and W.
+    65113, 65123, 65130, 65142,
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
@@ -95,7 +97,7 @@ CAVERN_ROOTS = frozenset({
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
     {65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
-     65108, 65109, 65110, 65111, 65112, 65141} |
+     65108, 65109, 65110, 65111, 65112, 65113, 65123, 65130, 65141, 65142} |
     {65120 + ord(c) - ord('A') for c in 'ABCEGHILMNOPRSTUY'}) & GAME_IDS
 # W1.3 room effects (gem chunk, sparkles, flash, red splash turns, fire,
 # small smoke) raised the measured DMA atlas from 106,574 to 109,410 bytes.
@@ -112,8 +114,9 @@ CAVERN_IDS = frozenset(
 # (red striped player poses, frames 1024..2047, both parities and facings)
 # add 28,396 CPU bytes: 253,090 -> 281,486, and 16,640 Chip plane bytes:
 # 121,374 -> 138,014; the 23 upgrade icons (moved out of the HUD bank) add
-# 6,572 and 5,320 more: 288,058 and 143,334. The full reference catalogue:
-# 299,882 and 148,562.
+# 6,572 and 5,320 more: 288,058 and 143,334. W1.8's merchant-speech glyphs
+# ("?", D, K, W) add 310 and 160: 288,368 and 143,494. The full reference
+# catalogue: 300,192 and 148,722.
 BANK_BUDGETS.update({'cavern': 284 * 1024, 'cavern-planes': 144 * 1024})
 
 

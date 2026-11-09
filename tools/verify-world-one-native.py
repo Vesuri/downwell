@@ -130,7 +130,7 @@ def main():
                         if inDense:
                             print(checked('printf "DENSE %u shards=%u speed=%d rng=%u\\n", $w->tick_,$w->timeStop_.shards.count_,$w->timeStop_.roomSpeed,(unsigned)$w->enemyRandom_.drawCount_'),flush=True)
                     if tick and (tick%16==0 or inDense) and not resultPending and tick!=levelStart:
-                        observed=checked('printf "CHECK %d %ld %ld %d %u\\n", $w->run_.stage.level,$w->player_.x_,$w->player_.y_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
+                        observed=checked('printf "CHECK %d %ld %ld %d %u %u %d %u\\n", $w->run_.stage.level,$w->player_.x_,$w->player_.y_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_,$w->currencyAccount_.currency,$w->run_.shops.noControl,$w->shopSpeechLive_')
                         match=re.search(r'CHECK ([\d -]+)',observed)
                         actual=list(map(int,match[1].split())) if match else []
                         if actual!=witnesses[tick]:

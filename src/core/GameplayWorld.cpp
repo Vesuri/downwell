@@ -108,6 +108,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto limboShards=limboShards_;
     const auto areaTitles=compactAreaTitles_;const auto areaTitleCount=compactAreaTitleCount_;
     const auto language=compactLanguage_;
+    const auto shopSpeechText=shopSpeechText_;
     const auto registeredFlash=registeredFlash_;
     const auto controllerRoomSpeed=controllerRoomSpeed_;
     const auto droneBullets=droneBullets_;
@@ -199,6 +200,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     levelNumbers_=levelNumbers;
     limboShards_=limboShards;
     configureCompactAreaTitles(areaTitles,areaTitleCount,language);
+    shopSpeechText_=shopSpeechText;
     registeredFlash_=registeredFlash;
     controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
@@ -323,6 +325,7 @@ bool GameplayWorld::retireGameplayRoom() {
     // room load; an already retired lifetime must not receive a second callback.
     if(levelNumbers_&&!levelNumbers_->clear())return run_.effectsSucceeded=false;
     compactTitle_={};for(auto& r:compactRewards_)r={};liveRewards_=0;
+    for(auto& r:shopSpeech_)r={};shopSpeechLive_=0;
     if(limboShards_&&!limboShards_->clear())return run_.effectsSucceeded=false;
     if(registeredFlash_&&!registeredFlash_->clear())return run_.effectsSucceeded=false;
     if(resultInstance_&&!resultInstance_->clear())return run_.effectsSucceeded=false;
@@ -1684,6 +1687,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
+    if(run_.shops.allocatedCount)createCompactShopSpeech();
     // levelBeginCue at an airborne landing precedes comboDone (scrWallCol).
     if(player_.landings()!=landingsBefore)compactLevelBeginCue();
     if(run_.combo.completion.rewardCreated&&!createCompactComboReward())return {};
@@ -1772,6 +1776,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(downwell::AlarmBank::advanceValue(cameraShakeAlarm_))cameraMotion_.stopShake();
     advanceEnemyAlarms();
     if(run_.effectsSucceeded&&gunsActive_()&&!advanceCompactGunAlarms())return {};
+    // fxRisingText 212 Alarms 0 and 1; no RNG, no cross-family effects.
+    if(shopSpeechLive_)for(unsigned index=0;index<2;++index)
+        for(auto& r:shopSpeech_)if(r.rise.live&&!r.rise.alarmEvent(index))--shopSpeechLive_;
     if(!reconcilePhase(PhaseBoundary::alarm))return {};
     currencyStepOrder_.clear();
     if(currencyInstances_&&currencyInstances_->size()&&(!currencyOrderCapture_||!currencyEventDispatch_||
@@ -2040,7 +2047,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!debrisStepDispatch_(debrisStepContext_,key)){run_.effectsSucceeded=false;return {};}
     }
     // moduleText (373) and itemNotif (374) follow debris (370).
-    if((guns_.textEnd||guns_.noticeEnd)&&!stepModuleTexts())return {};
+    if((guns_.textEnd||guns_.noticeEnd||shopSpeechLive_)&&!stepModuleTexts())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,0x7fffffff)){
         run_.effectsSucceeded=false;return {};
     }
@@ -3585,7 +3592,22 @@ bool GameplayWorld::stepModuleTexts(){
         if(t.live&&t.birth!=tick_)t.step();}
     for(unsigned i=0;i<guns_.noticeEnd;++i){auto& n=guns_.notices[i];
         if(n.live&&n.birth!=tick_)n.step();}
+    if(shopSpeechLive_)for(auto& r:shopSpeech_)if(r.rise.live&&r.rise.birth!=tick_)r.rise.step();
     return true;
+}
+
+// Shop Step's scrRisingTextShop(msgx, keeper.y - 18, text): msgx is
+// keeper.x + 2 and the keeper stands at the counter's x + 18.
+void GameplayWorld::createCompactShopSpeech(){
+    for(unsigned i=0;i<downwell::ShopWorld::capacity;++i){
+        const auto& shop=run_.shops.instances[i];
+        if(!shop.allocated||shop.sourceId||shop.feedback.message==downwell::ShopFeedback::Message::none)continue;
+        auto& r=shopSpeech_[i];
+        if(!r.rise.live)++shopSpeechLive_;
+        r={};r.rise.live=true;r.rise.x=shop.x+20;r.rise.y=long(shop.y-18)<<16;r.rise.birth=tick_;
+        r.text=shopSpeechText_.text(shop.feedback.message,shop.farewellVariant);
+        for(r.length=0;r.text&&r.text[r.length];)++r.length;
+    }
 }
 
 bool GameplayWorld::collideGunModules(){

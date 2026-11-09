@@ -18,7 +18,10 @@ public:
         downwell::gameplayCompactNoLoopCapacity + downwell::gameplayCompactMovingCapacity + compactFireLayerCapacity +
         // W1.7: combo counter (10 digits, 3 icons), each reward text (12
         // digits/icons, COMBO!, reward, flash) and nine gem-high afterimages.
-        13 + 4 * 18 + 9;
+        13 + 4 * 18 + 9 +
+        // W1.8: one merchant speech line ("COME AGAIN!", the longest English
+        // one, has ten glyphs). World 1 builds at most one shop per level.
+        12;
     static constexpr int playerStartY = 142, replayGroundY = 200;
     GameplayBob actors[capacity]{};
     unsigned count = 0;
@@ -85,6 +88,7 @@ private:
     // moduleText (-1000) and itemNotif (-50000): bordered glyph markers.
     template<class Append> bool drawCompactGunTexts(const GameplayWorld& world,Append& append,bool notices,int viewX,int viewY);
     template<class Append> bool drawCompactHudTexts(const GameplayWorld& world,Append& append,int viewY);
+    bool drawCompactShopSpeech(const GameplayWorld& world,int viewX,int viewY);
     bool glyph(unsigned id,int x,int y,unsigned pen);
     const downwell::FontGlyphMasks* titleGlyphs_=nullptr;
     downwell::LevelNumberTextDrawState* titleText_=nullptr;

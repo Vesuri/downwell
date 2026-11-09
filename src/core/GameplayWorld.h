@@ -36,6 +36,7 @@
 #include "core/GameplayWhiteJellies.h"
 #include "core/GameplayRedBalls.h"
 #include "core/GameplayShopInstances.h"
+#include "core/CompactShopSpeech.h"
 #include "core/MovingFxInstances.h"
 #include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
@@ -2710,6 +2711,7 @@ public:
         downwell::AreaOneBuilder::Setup setup;
         setup.level = unsigned(run_.stage.level);
         setup.style = style;
+        run_.playStyle = style;
         setup.member = run_.upgrades.levels[14] != 0;
         builder.resetRoom(x, y, enemyRandom_, setup);
         return true;
@@ -3067,6 +3069,10 @@ private:
     void advanceCompactHudAlarms();
     void advanceCompactHudDraw();
     downwell::CompactLevelTitle compactTitle_;
+    void createCompactShopSpeech();
+    downwell::CompactShopSpeech shopSpeech_[downwell::ShopWorld::capacity];
+    unsigned shopSpeechLive_=0;
+    downwell::CompactShopSpeechText shopSpeechText_;
     downwell::CompactComboRewardRecord compactRewards_[4]; // compactComboRewardCapacity
     downwell::CompactGemStreakHud gemHud_;
     const downwell::AreaTitle* compactAreaTitles_=nullptr;
@@ -3171,6 +3177,14 @@ public:
         compactAreaTitles_=titles;compactAreaTitleCount_=count;compactLanguage_=language;
     }
     const downwell::CompactLevelTitle& compactLevelTitle()const{return compactTitle_;}
+    // The merchant's speech strings in the configured language; without
+    // them the speech records live and move but draw nothing.
+    bool configureCompactShopSpeech(const downwell::ShopLanguageEntry* entries,unsigned count,const char* language){
+        return shopSpeechText_.configure(entries,count,language);
+    }
+    // One fxRisingText per shop (indexed like ShopWorld::instances).
+    const downwell::CompactShopSpeech* compactShopSpeech()const{return shopSpeech_;}
+    unsigned compactShopSpeechLive()const{return shopSpeechLive_;}
     static constexpr unsigned compactComboRewardCapacity=4;
     const downwell::CompactComboRewardRecord* compactComboRewards()const{return compactRewards_;}
     unsigned compactComboRewardsLive()const{return liveRewards_;}

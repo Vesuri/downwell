@@ -17,6 +17,7 @@
 #include "../../core/CollisionOwnerFixture.h"
 #include "GameplayEncounterCoverage.h"
 #include "../../../generated/downwell-area-titles.h"
+#include "../../../generated/downwell-shop-speech.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
@@ -2397,6 +2398,9 @@ void testBuilderCheckpoints(const char* roomPath, const char* objectPath, const 
 }
 
 // Input-only route: inspect terrain to choose buttons, never modify the world.
+// Debugger hook: DOWNWELL_SLICE_BREAK_TICK=n calls this before tick n.
+__attribute__((noinline)) void sliceBreak(void* world){__asm__ volatile(""::"r"(world):"memory");}
+
 // This checks the actual room builder and collision adapters, not exit fixtures.
 void testWorldOneSlice(const char* roomPath, const char* objectPath, const char* patternPath) {
     auto rb=readFile(roomPath),ob=readFile(objectPath),pb=readFile(patternPath);
@@ -2424,6 +2428,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     auto& game=*gamePointer;
     require(game.effectsSucceeded()&&owner->attach(game),"slice owner attaches");
     game.configureCompactAreaTitles(downwell::area_titles::entries,downwell::area_titles::count,"english");
+    require(game.configureCompactShopSpeech(downwell::shop_speech::entries,downwell::shop_speech::count,"english"),
+        "slice merchant speech strings");
     game.initializeEntryInput(false); // normal room-entry scrPlayerInit alarm[2]
     downwell::GameplayEncounterSession session(game,*owner);
     require(session.start(),"slice uses the production encounter session and input edges");
@@ -2433,7 +2439,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // period (variant/40). Shots draw RNG, so every policy change reshuffles
     // the whole route; DOWNWELL_SLICE_VARIANT sweeps them (and
     // DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
-    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):445u;
+    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):87u;
     const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
     const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
     std::ofstream tape(output+".inputs",std::ios::binary);
@@ -2446,6 +2452,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     unsigned routeSideStops=0,routeFrozen=0,routeDoused=0,routeShards=0,routeFireViews=0;
     unsigned routeCorpses=0,routeWallHits=0,routeDust=0;
     unsigned routeTitles=0,routeRewards=0,routeGemHigh=0;
+    // W1.8: a shop visit with a funded, a sold-out and an insufficient press,
+    // then Leave with the farewell; merchant speech, prompt and reactions.
+    unsigned routeShops=0,routeFunded=0,routeSoldOut=0,routePoor=0,routeFarewells=0;
+    unsigned routeSpeechFrames=0,routePromptFrames=0,routeThankful=0,routeConfused=0,routeGoodbye=0;
     for(unsigned level=1;level<=3;++level){
         int target=240,deepest=176+game.player().offsetY();unsigned stuck=0,updates=0,shopTick=0;
         std::uint32_t lastSteering=0;unsigned jellies=0,redBalls=0,steeringKills=0,eyes=0;
@@ -2457,6 +2467,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         unsigned peakCorpses=0,wallHitFrames=0,dustFrames=0,emptyTextFrames=0,emptyShots=0;
         // W1.7: level title, combo counter and rewards, streak bar, gem high.
         unsigned titleFrames=0,comboFrames=0,rewardFrames=0,peakCombo=0,barFrames=0,gemHighFrames=0,afterImageFrames=0;
+        // W1.8: the scripted visit (one press per action, then release).
+        bool shopVisited=false;std::vector<downwell::Input> shopScript;unsigned shopStep=0;
+        unsigned speechFrames=0,promptFrames=0;
         // W1.4: GunModule births/pickups, gun changes and the new shot owners.
         unsigned modules=0,pickups=0,gunChanges=0,rangedShots=0,laserShots=0,casings=0,trails=0,notices=0;
         unsigned peakBullets=0,peakCasings=0,peakTrails=0,lastModuleEnd=0,lastTextEnd=0;
@@ -2515,6 +2528,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             {
                 const auto& sc=game.compactScenery();
                 int sx=0,sy=0;bool scenery=false,module=false;
+                // W1.8: walk to the counter of a shop on the route.
+                for(const auto& shop:game.shops().instances)
+                    if(!scenery&&!shopVisited&&shop.present&&!abandoned.count({shop.x,shop.y})&&
+                       y>=shop.y-160&&y<=shop.y+12&&std::abs(shop.x-x)<=260)
+                        {scenery=module=true;sx=shop.x-6;sy=shop.y;}
                 // W1.4: collect a resting GunModule in the side rooms first.
                 {const auto& g=game.compactGuns();
                 for(unsigned i=0;!scenery&&i<g.moduleEnd;++i){const auto& m=g.modules[i];
@@ -2563,13 +2581,43 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     if(x>=200&&x<=280)escape=0;
                 }
             }
+            // At the counter: Up (the fire button) opens the shop.
+            if(!shopVisited&&!game.shops().noControl&&game.shops().interactable&&!lastFire){input={};input.fire=true;}
             if(game.shops().noControl){
-                input={};input.left=(shopTick%4)==0;input.fire=(shopTick%4)==2;++shopTick;
-            }else shopTick=0;
+                if(!shopTick){
+                    // Plan on opening: buy the cheapest affordable item, press it
+                    // again (sold out), press an item the rest cannot pay, Leave.
+                    const downwell::ShopWorld::Instance* open=nullptr;
+                    for(const auto& shop:game.shops().instances)if(shop.present&&shop.menu.active)open=&shop;
+                    require(open!=nullptr,"slice shop owns the open menu");
+                    int funded=-1,poor=-1;const unsigned money=game.currency();
+                    for(int i=0;i<3;++i)if(open->stock.items[i].remaining&&open->stock.items[i].price<=money&&
+                        (funded<0||open->stock.items[i].price<open->stock.items[funded].price))funded=i;
+                    for(int i=0;i<3;++i)if(i!=funded&&open->stock.items[i].price>money-(funded>=0?open->stock.items[funded].price:0))poor=i;
+                    shopScript.clear();shopStep=0;
+                    auto wait=[&](unsigned n){for(unsigned k=0;k<n;++k)shopScript.push_back({});};
+                    int cursor=1;
+                    auto moveTo=[&](int to){
+                        while(cursor!=to){downwell::Input m;if(to>cursor){m.right=true;++cursor;}else{m.left=true;--cursor;}
+                            shopScript.push_back(m);wait(6);}
+                    };
+                    auto press=[&](unsigned after){downwell::Input m;m.fire=true;shopScript.push_back(m);wait(after);};
+                    wait(45); // the greeting
+                    if(funded>=0){moveTo(funded+1);press(45);press(45);}
+                    if(poor>=0){moveTo(poor+1);press(45);}
+                    moveTo(0);press(2);
+                }
+                input=shopStep<shopScript.size()?shopScript[shopStep++]:downwell::Input{};
+                ++shopTick;
+            }else{
+                if(shopTick){shopVisited=true;++routeShops;escape=240;detourX=detourY=0;}
+                shopTick=0;
+            }
             // Release the style-confirm button before the first gameplay press.
             if(level==1&&updates==0)input={};
             states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
-                <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
+                <<' '<<game.health()<<' '<<game.randomDrawCount()<<' '<<game.currency()
+                <<' '<<game.shops().noControl<<' '<<game.compactShopSpeechLive()<<'\n';
             lastFire=input.fire;lastPlayerX=game.player().offsetXFixed();
             const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
             downwell::GameplayEncounterSession::Frame frame(session);
@@ -2592,8 +2640,13 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             std::vector<std::uint32_t> liveEnemies;
             for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
                 if(e.active&&e.health>0)liveEnemies.push_back(e.lifetimeId);}
+            if(const char* at=std::getenv("DOWNWELL_SLICE_BREAK_TICK"))if(game.tick()==unsigned(std::atoi(at)))sliceBreak(&game);
             game.step(packed);
-            require(frame.beginDraw(true)&&frame.finish(),"slice encounter frame completes");
+            if(!(frame.beginDraw(true)&&frame.finish())){
+                std::cerr<<"slice frame failure level="<<level<<" update="<<updates<<" tick="<<game.tick()
+                    <<" effects="<<game.effectsSucceeded()<<" generation="<<game.generationSucceeded()<<'\n';
+                require(false,"slice encounter frame completes");
+            }
             {
                 const int px=240+game.player().offsetX();
                 // A side-room stop begins after the start field's and
@@ -2631,6 +2684,19 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     emptyText|=game.compactGuns().notices[i].live&&game.compactGuns().notices[i].empty;
                 wallHitFrames+=wallHit;dustFrames+=dust;emptyTextFrames+=emptyText;
                 titleFrames+=game.compactLevelTitle().live;
+                if(game.compactShopSpeechLive())++speechFrames;
+                for(const auto& shop:game.shops().instances)if(shop.present){
+                    if(shop.prompt.frame()>=2&&!shop.menu.active)++promptFrames;
+                    routeThankful+=shop.feedback.thankful!=0;routeConfused+=shop.feedback.confused!=0;routeGoodbye+=shop.feedback.goodbye!=0;
+                    using M=downwell::ShopFeedback::Message;
+                    switch(shop.feedback.message){
+                    case M::maido:++routeFunded;break;
+                    case M::question:case M::what:case M::huh:++routeSoldOut;break;
+                    case M::poor:++routePoor;break;
+                    case M::thank:++routeFarewells;break;
+                    default:break;
+                    }
+                }
                 comboFrames+=game.comboCount()>=5;peakCombo=std::max(peakCombo,game.comboCount());
                 for(unsigned i=0;i<GameplayWorld::compactComboRewardCapacity;++i)
                     if(game.compactComboRewards()[i].live){++rewardFrames;break;}
@@ -2780,6 +2846,17 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
             <<" exit="<<game.levelResultRequested()<<" x="<<game.player().offsetX()<<" y="<<game.player().offsetY()
             <<" shop="<<game.shops().noControl<<std::endl;
+        routeSpeechFrames+=speechFrames;routePromptFrames+=promptFrames;
+        std::cout<<"Slice level="<<level<<" shopVisited="<<shopVisited<<" speechFrames="<<speechFrames<<" promptFrames="<<promptFrames
+            <<" funded="<<routeFunded<<" soldOut="<<routeSoldOut<<" poor="<<routePoor<<" farewells="<<routeFarewells
+            <<" thankful="<<routeThankful<<" confused="<<routeConfused<<" goodbye="<<routeGoodbye<<" currency="<<game.currency()<<std::endl;
+        if(level==3)require(routeShops&&routeFunded&&routeSoldOut&&routePoor&&routeFarewells,
+            "the route visits a shop: a purchase, a sold-out and a too-poor reply, and the farewell");
+        if(level==3)require(routeSpeechFrames&&routePromptFrames&&routeThankful&&routeConfused&&routeGoodbye,
+            "the merchant speaks, the prompt shows and the keeper reacts");
+        for(const auto& shop:game.shops().instances)if(shop.allocated)
+            std::cout<<"Slice level="<<level<<" shopAt="<<shop.x<<','<<shop.y<<" stock="<<shop.stock.items[0].upgrade<<'/'<<shop.stock.items[0].price
+                <<' '<<shop.stock.items[1].upgrade<<'/'<<shop.stock.items[1].price<<' '<<shop.stock.items[2].upgrade<<'/'<<shop.stock.items[2].price<<std::endl;
         if(level==1)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
         if(level>=2){routeRedBalls+=redBalls;routeEyes+=eyes;}
         if(level==3)require(routeRedBalls&&routeEyes,"1-2/1-3 spawn red balls with drawn eyes");
@@ -2796,7 +2873,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         unsigned clear=0;
         for(;clear<600&&!game.nextLevelRequested();++clear){
             states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
-                <<' '<<game.health()<<' '<<game.randomDrawCount()<<'\n';
+                <<' '<<game.health()<<' '<<game.randomDrawCount()<<' '<<game.currency()
+                <<' '<<game.shops().noControl<<' '<<game.compactShopSpeechLive()<<'\n';
             bool fire=clear%4==2;downwell::Input input;input.fire=fire;tape.put(char(downwell::packReplayInput(input)));++total;
             downwell::GameplayEncounterSession::Frame frame(session);
             require(frame.valid()&&frame.sampleInput(input),"slice Result frame samples input");

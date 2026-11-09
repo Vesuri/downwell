@@ -42,6 +42,7 @@ public:
     unsigned size()const{return noLoopCount_+movingCount_;}
     unsigned noLoopCount()const{return noLoopCount_;}
     bool noLoopFull()const{return noLoopCount_==NoLoopCapacity;}
+    unsigned dropped()const{return dropped_;} // effects a full store discarded
     unsigned movingCount()const{return movingCount_;}
     const NoLoop& noLoop(unsigned index)const{return noLoop_[index];}
     const Moving& moving(unsigned index)const{return moving_[index];}
@@ -49,7 +50,10 @@ public:
     // scrEffectSpawn: Create, then sprite, image_speed, image_angle, depth.
     bool spawnNoLoop(Real x,Real y,int sprite,Real speed,Real angle,Real depth){
         unsigned count;
-        if(!good_||noLoopCount_==NoLoopCapacity||!frames(sprite,count))return fail();
+        if(!good_||!frames(sprite,count))return fail();
+        // Both stores are cosmetic (no RNG, no gameplay reads): a full store
+        // drops the new effect instead of ending the game.
+        if(noLoopCount_==NoLoopCapacity){++dropped_;return true;}
         NoLoop record;record.handle=next_;
         auto& e=record.effect;
         const auto accept=[](const auto&){return true;};
@@ -63,7 +67,9 @@ public:
     bool spawnMoving(Real x,Real y,int sprite,Real imageSpeed,Real angle,Real speed){
         unsigned count;Moving record;record.handle=next_;
         auto& e=record.effect;RunnerImageValue px,py,rate,turn;Real component;
-        if(!good_||movingCount_==MovingCapacity||!frames(sprite,count)||
+        if(!good_||!frames(sprite,count))return fail();
+        if(movingCount_==MovingCapacity){++dropped_;return true;}
+        if(
            !px.assign(x)||!py.assign(y)||!e.create(px,py)||
            !e.setSprite(sprite,count,[](const auto&){return true;})||
            !rate.assign(imageSpeed)||!turn.assign(angle))return fail();
@@ -105,6 +111,7 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
+    unsigned dropped_=0;
     void retire(){
         unsigned kept=0;
         for(unsigned i=0;i<noLoopCount_;++i)if(!noLoop_[i].effect.destroyRequested)noLoop_[kept++]=noLoop_[i];

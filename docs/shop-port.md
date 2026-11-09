@@ -642,3 +642,18 @@ clears, multi-digit streak changes, removal, sold-out stock and shop closure.
 The GDB gate requires exactly seven executed comparisons in addition to zero
 asset/pixel failures. This is still a controlled renderer fixture: it does not
 claim a naturally encountered shop or original Windows screenshot equivalence.
+
+## Compact merchant speech (normal Amiga build)
+
+The compact `ShopWorld` path turns each update's `ShopFeedback::Message`
+into the shop's `fxRisingText` 212 (`CompactShopSpeech`, one per shop) at
+`msgx = keeper.x + 2` (counter x + 20) and `keeper.y - 18`, replacing the
+previous one as `scrRisingTextShop` does. Object 212 has no sprite, so its
+Collision with itself never fires, and it steps before Shop 277: a new record
+first moves on the next update. It rises with `ysp *= 0.85`, Alarm 1 (60)
+starts the `drawing` toggle and Alarm 0 (90) removes it, as for "EMPTY!".
+Strings come from `generated/downwell-shop-speech.h` (only the ten speech
+keys, every language) through `ShopLanguageLookup`; the first sold-out reply
+is the Step's literal "?" and `logThank` uses the Create-time farewell. The
+Amiga draws it with the font-2 border glyphs; "?", D, K and W were added for
+the English strings. Stock prices now use the run's play style.

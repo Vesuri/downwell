@@ -382,6 +382,19 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactGunTexts(const Gam
     return true;
 }
 
+// The merchant's fxRisingText (scrRisingTextShop), drawn like "EMPTY!":
+// centred font-2 cells, spaces skipped.
+bool AmigaGameplayDrawList::drawCompactShopSpeech(const GameplayWorld& port,int viewX,int viewY){
+    const auto* speech=port.compactShopSpeech();
+    for(unsigned i=0;i<downwell::ShopWorld::capacity;++i){const auto& r=speech[i];
+        if(!r.rise.live||!r.rise.visible()||!r.text)continue;
+        const int x=r.left(viewX,160)-4*r.length,y=r.rise.pixelY();
+        for(int k=0;k<r.length;++k)
+            if(r.text[k]!=' '&&!glyph(borderGlyph(r.text[k]),downwellPlayfieldX+x+8*k+4-viewX,y-5-viewY,1))return false;
+    }
+    return true;
+}
+
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency,
     const AmigaActorFrames* prepared) {
@@ -882,6 +895,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 return append(UWORD(sprite),UWORD(frame),x,y,0);
             }))ready=false;
     if(port.compactGuns().noticeEnd&&!drawCompactGunTexts(port,append,true,worldViewX,worldViewY))ready=false;
+    if(port.compactShopSpeechLive()&&!drawCompactShopSpeech(port,worldViewX,worldViewY))ready=false;
 #endif
 
     // Original compatibility depth -200000: ahead of ordinary gameplay,

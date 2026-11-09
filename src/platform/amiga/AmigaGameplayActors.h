@@ -22,6 +22,7 @@ inline unsigned amigaBorderGlyph(char c){
     if(c>='0'&&c<='9')return 65100u+unsigned(c-'0');
     if(c=='+')return 65111u;
     if(c=='!')return 65112u;
+    if(c=='?')return 65113u;
     if(c=='-')return 65110u;
     return 65120u+unsigned(c-'A');
 }

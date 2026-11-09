@@ -279,6 +279,10 @@ TEXT_SELECTIONS["game"][65112] = "!"  # W1.6 fxRisingText "EMPTY!"
 TEXT_SELECTIONS["game"].update({65120 + ord(letter) - ord("A"): letter for letter in GUN_TEXT_LETTERS})
 # W1.7 levelNumber "CAVERN-n": V is the only letter the gun names lack.
 TEXT_SELECTIONS["game"][65120 + ord("V") - ord("A")] = "V"
+# W1.8 merchant speech (English shopSold, shopGreet*, shopBye*, shopPoor,
+# shopWhat*, and the literal "?"): D, K and W are the letters still missing.
+TEXT_SELECTIONS["game"][65113] = "?"
+TEXT_SELECTIONS["game"].update({65120 + ord(letter) - ord("A"): letter for letter in "DKW"})
 
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield

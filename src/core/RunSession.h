@@ -547,22 +547,24 @@ struct RunSession {
         return CurrencyStepResult::collected;
     }
     // Shop Create snapshots prices from run ownership; acquiring a card later
-    // does not reprice already-created stock. Other style/difficulty modes
-    // remain separate from the current usual-style, normal run adapter.
+    // does not reprice already-created stock. Hard mode remains separate
+    // from the current normal run adapter.
+    // global.playStyle as the builder saw it (style 4 discounts stock).
+    unsigned playStyle = 0;
     template<class Range, class Choice>
     ShopWorld::Instance* createShop(int x, int y, Range random, Choice chooseFarewell, int health) {
         return shops.create(x, y, random, chooseFarewell, health, stage.area > 0 ? stage.area : 1,
-                            false, 0, upgrades.levels[14] != 0);
+                            false, playStyle, upgrades.levels[14] != 0);
     }
     template<class Range,class Choice,class Owner>
     ShopWorld::Instance* createRegisteredShop(int x,int y,Range random,Choice chooseFarewell,int health,Owner& owner){
         return shops.createRegistered(x,y,random,chooseFarewell,health,stage.area>0?stage.area:1,
-            false,0,upgrades.levels[14]!=0,owner,effectsSucceeded);
+            false,playStyle,upgrades.levels[14]!=0,owner,effectsSucceeded);
     }
     template<class Range,class Choice,class Owner,class Lookup>
     ShopWorld::Instance* createRegisteredShop(int x,int y,Range random,Choice chooseFarewell,int health,Owner& owner,Lookup& lookup){
         return shops.createRegisteredWithText(x,y,random,chooseFarewell,health,stage.area>0?stage.area:1,
-            false,0,upgrades.levels[14]!=0,owner,effectsSucceeded,lookup);
+            false,playStyle,upgrades.levels[14]!=0,owner,effectsSucceeded,lookup);
     }
     LevelExit levelExit;
     GoalTimeField goalField;

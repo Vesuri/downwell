@@ -714,6 +714,12 @@ $(REPO)/generated/downwell-area-titles.h: $(REPO)/tools/generate-area-titles.py 
 
 obj/DownwellAmiga.o: $(REPO)/generated/downwell-area-titles.h
 
+# W1.8 merchant speech strings (the same tool writes the full shop table).
+$(REPO)/generated/downwell-shop-speech.h: $(REPO)/tools/generate-shop-text.py $(REPO)/data/language.ini
+	python3 $(REPO)/tools/generate-shop-text.py
+
+obj/DownwellAmiga.o: $(REPO)/generated/downwell-shop-speech.h
+
 $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@

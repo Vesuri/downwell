@@ -19,6 +19,10 @@ class ShopTextExtractionTest(unittest.TestCase):
         self.assertEqual(values['Other', 'shopGreet0'], 'ä星')
         self.assertEqual(values['Other', 'shopWhat1'], ' ')
 
+    def test_speech_keys_are_shop_keys(self):
+        self.assertTrue(set(shop_text.SPEECH_KEYS) <= set(shop_text.KEYS))
+        self.assertEqual(len(set(shop_text.SPEECH_KEYS)), 10)
+
     def test_literal_preserves_utf8_and_adjacent_digits(self):
         text = 'ä星"\\012'
         escaped = shop_text.literal(text)

@@ -1,4 +1,5 @@
 #include "core/ShopText.h"
+#include "core/CompactShopSpeech.h"
 #include "downwell-shop-text.h"
 #include <cassert>
 #include <cstdio>
@@ -30,5 +31,39 @@ int main(){
     }
     const char* missing=nullptr;language="__missing_language__";
     assert(lookup.lookup("shopExit",missing)&&std::strcmp(missing," ")==0);
-    std::puts("Shop text assignment order, failure prefixes and generated language lookup passed");
+    // W1.8 compact merchant speech: synthetic table, no language payload.
+    {
+        static const ShopLanguageEntry table[]={
+            {"a","shopSold","s"},{"a","shopGreet0","g0"},{"a","shopGreet1","g1"},{"a","shopGreet2","g2"},
+            {"a","shopBye0","b0"},{"a","shopBye1","b1"},{"a","shopBye2","b2"},{"a","shopPoor","p"},
+            {"a","shopWhat0","w"},{"a","shopWhat1","h"}};
+        CompactShopSpeechText text;
+        assert(text.configure(table,10,"a"));
+        using M=ShopFeedback::Message;
+        const M messages[]={M::welcome,M::hello,M::hoho,M::maido,M::poor,M::question,M::what,M::huh};
+        const char* expected[]={"g0","g1","g2","s","p","?","w","h"};
+        for(unsigned i=0;i<8;++i)assert(std::strcmp(text.text(messages[i],0),expected[i])==0);
+        for(unsigned farewell=0;farewell<3;++farewell){
+            const char bye[]={'b',char('0'+farewell),0};
+            assert(std::strcmp(text.text(M::thank,farewell),bye)==0);
+        }
+        assert(!text.text(M::thank,3)&&!text.text(M::none,0));
+        // A missing language falls back to langString's " ", not a failure.
+        assert(text.configure(table,10,"b")&&std::strcmp(text.text(M::maido,0)," ")==0);
+        assert(!text.configure(nullptr,0,"a"));
+        // fxRisingText: flashing from Alarm 1 (60), destroyed by Alarm 0 (90),
+        // rising by ysp *= 0.85 from -3, and kept ten pixels inside the view.
+        CompactShopSpeech r;r.rise.live=true;r.rise.x=20;r.rise.y=long(100)<<16;r.length=5;
+        unsigned updates=0,hidden=0;
+        while(r.rise.live){
+            ++updates;
+            for(unsigned index=0;index<2;++index)(void)r.rise.alarmEvent(index);
+            if(!r.rise.live)break;
+            r.rise.step();hidden+=!r.rise.visible();
+            if(updates<60)assert(r.rise.visible());
+        }
+        assert(updates==90&&hidden==15&&r.rise.pixelY()<100&&r.rise.pixelY()>=80);
+        assert(r.left(0,160)==30&&(r.rise.x=150,r.left(0,160))==130&&(r.rise.x=80,r.left(0,160))==80);
+    }
+    std::puts("Shop text assignment order, failure prefixes, generated language lookup and merchant speech passed");
 }

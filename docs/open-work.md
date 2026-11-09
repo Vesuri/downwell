@@ -86,8 +86,11 @@ turn and landing dust, the empty-gun smoke and "EMPTY!", and the
 controller HUD (the combo counter over the player, `comboRewardText` 383, the
 `levelNumber` 372 title at first landing or kill, the streak bar with " N"
 and its icon, GEM HIGH with the gem-high afterimages, the counting gem total
-and the owned-upgrade icons), compact
-shops, level exit, upgrade selection, level transitions, death, results and Retry all work.
+and the owned-upgrade icons), shops (stock and prices by
+area, style and membership, the prompt sign, the merchant's animation and
+thankful, confused and goodbye reactions, funded, too-poor and sold-out
+purchases, Leave with the farewell, and the merchant's speech), level exit,
+upgrade selection, level transitions, death, results and Retry all work.
 After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 Known approximations: overlapping `moduleText` records never push each other
@@ -97,12 +100,14 @@ leaves `fa_middle` set; "EMPTY!" reuses the `itemNotif` record for
 `fxRisingText`, skips its Collision with `fxRisingText` and is born after the
 whole player Step. `levelNumber` has no hard-mode "-H" yet (item 10), and
 it is drawn on the fixed HUD layer: above the world and the hardware sprites,
-and hidden while the death flash covers the playfield.
+and hidden while the death flash covers the playfield. The merchant's speech
+(`fxRisingText` from `scrRisingTextShop`) uses the same alignment as "EMPTY!"
+and rises in Q16 like `itemNotif` rather than binary64. The Shop Step's
+messages, sounds and BGM gain are produced but silent until W2, and its
+`shopInView` and `keeperAngry` flags drive only sounds. The criminal route
+cannot happen in the pinned build: only a shop case's `destroyed` flag sets
+`global.criminal`, and nothing writes it (`original-behavior-audit.md`).
 
-8. **Complete shops.** Merchant speech and prompts, keeper behaviour, funded,
-   insufficient and sold-out purchases, the criminal route, and the
-   source shop-placement rules per style.
-   Reference: [Shop contract](shop-port.md).
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
    selectable, including the balloon/decoy target that steering enemies
@@ -148,7 +153,7 @@ Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handl
 and keep audio out of scenes that do not use it.
 
 The target A500 has 1 MiB of Chip RAM (ECS 8372A Agnus): normal startup
-leaves 651,128 Chip bytes free and gameplay entry takes the 143,334-byte
+leaves 651,128 Chip bytes free and gameplay entry takes the 143,494-byte
 cavern plane atlas, so about 495 KiB remains for samples and later art. Gameplay already recycles
 the garden region (staging ring, HUD bank, on-demand shop or results art);
 the HUD bank may not exceed 14,976 bytes there, or the 31,104-byte exit and
@@ -207,7 +212,12 @@ the prepared actor-frame table grew from 640 to 1,024 entries. The
 `levelNumber` title publishes to the HUD layer only when a letter appears or
 moves (a third of its updates; its baked letters cost one per reveal step).
 The quiet-fall witness went from 195 to 197 fields (the per-update HUD state
-and pose sharing; the title starts at the landing).
+and pose sharing; the title starts at the landing). W1.8: each shop's speech
+is a rising-text record (stepped with the notices, gated by a live count), up
+to ten glyph BOBs; the four new glyphs add 310 bytes to the cavern CPU bank
+(now 288,368) and 160 Chip bytes to its plane atlas (now 143,494). A full
+no-loop or moving effect store now drops the new effect instead of failing
+the game; the store sizes (32 and 48) are unchanged.
 
 ### WR. Restructure for world 1
 

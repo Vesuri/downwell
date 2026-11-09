@@ -32,6 +32,7 @@ extern "C" { volatile unsigned gDownwellSceneAdmissionFailure; }
 #endif
 #include "../../../generated/amiga-cavern-planes.h"
 #include "../../../generated/downwell-area-titles.h"
+#include "../../../generated/downwell-shop-speech.h"
 extern "C" int amigaBlitterBindGamePlanes(const UBYTE*,unsigned,const UBYTE*,unsigned,const UBYTE*);
 extern "C" void amigaBlitterReleaseGamePlanes();
 extern "C" {
@@ -2262,7 +2263,9 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     // levelNumber's langString("area" + n), English as the shipped default.
     port.configureCompactAreaTitles(downwell::area_titles::entries,downwell::area_titles::count,"english");
-    if (!rooms.valid() || !objects.valid() ||
+    // Shop Step's scrRisingTextShop strings for the merchant's speech.
+    if (!port.configureCompactShopSpeech(downwell::shop_speech::entries,downwell::shop_speech::count,"english") ||
+        !rooms.valid() || !objects.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
         !verificationReplay.valid() || verificationReplay.frameCount()>downwell::ReplayFrameTrace::capacity ||
 #endif
