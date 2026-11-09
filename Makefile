@@ -720,6 +720,11 @@ test-shop-text: build/shop-text-test
 	python3 tests/test_generate_shop_text.py
 	./build/shop-text-test
 test: test-shop-text
+# W2.1: the world-1 sound inventory (docs/sound-inventory.md) matches the
+# extraction and the Paula conversion (tools/convert-amiga-sfx.py).
+.PHONY: verify-sound-inventory
+verify-sound-inventory:
+	python3 tools/sound-inventory.py --check
 # W1.10: pause menu strings and the PALETTE menu's colour sets.
 generated/downwell-menu-text.h: tools/generate-menu-text.py data/language.ini
 	python3 tools/generate-menu-text.py
