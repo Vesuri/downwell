@@ -17,7 +17,7 @@ first world of Downwell, from boot to the end of level 1-3, fully implemented
 and feature complete in the normal Amiga executable. Work it in this order:
 
 1. gameplay and visuals (W1);
-2. audio (W2);
+2. sound effects (W2; music is deferred to WM);
 3. performance (W3, which absorbs section 0 and the world-1 part of section 5).
 
 Restructure the code alongside (WR) so the Amiga build compiles in only what
@@ -111,8 +111,8 @@ messages, sounds and BGM gain are produced but silent until W2, and its
 cannot happen in the pinned build: only a shop case's `destroyed` flag sets
 `global.criminal`, and nothing writes it (`original-behavior-audit.md`).
 The pause menus drop the PC-only DISPLAY, LANGUAGE, Quick Start and key
-binding screens, and the BGM and volume options are stored but silent until
-W2. PlayMenu's HARD MODE label is static (no whomp). The save is written at
+binding screens, and the BGM and volume options are stored but silent (volume
+until W2, BGM until WM). PlayMenu's HARD MODE label is static (no whomp). The save is written at
 static moments (results opening, pause close and its actions, style confirm,
 slice end and quit), not on every `ini_write_real`; the slice end counts as a
 run end for the records. The clear screen shows the style-0 poses for every
@@ -150,35 +150,165 @@ style select, patched with the chosen style and hard mode.
     `irandom_range(-1,1)`. The draws feed the world RNG, so adding it reshuffles
     the route.
 
-### W2. Audio
+### W2. Sound effects
 
-There is no audio in the normal Amiga build. Convert offline and play on
-Paula, with scene-local residency:
+Scope set by the user on 2026-11-09: world 1's **sound effects** on Paula.
+**Music is deferred** (see WM): every song is Ogg Vorbis and will have to be
+recomposed for a tracker later. Sounds that are needlessly long may be left
+out. Quality is an experiment, with Chip RAM kept in check. Work the items in
+order; each sound group closes only when it is audible on a natural route in
+the normal build. User decisions (2026-11-09):
+- **Chip:** spend it generously and get in as many sounds as fit, instead of
+  setting a small budget.
+- **No streaming:** nothing streams from Fast RAM. A long sound is cut to fit
+  Chip, or dropped.
+- **Panning:** four hard-panned voices, as Amiga players expect. Some of them
+  will later go to music.
 
-- music: `bgmOverworld` 193 (garden), `bgmArea1` 194, `bgmShopCave` 192, and
-  `bgmSecret` 200 if the void rooms use it;
-- every sound effect world 1 reaches: player and guns, each enemy family
-  (the jelly and red-ball `sound` hooks are no-ops today),
-  stomps, gems, rock breaks, box, plant, gem-chunk and TorchFire hooks (no-ops), shopkeeper voices, void enter and exit, combo,
-  menus and the time-field winds (reuse `AmigaWindAudio` and the prepared
-  wind bank), the time-stop and resume sounds (184/185), the BGM pause and
-  resume around `pTimeStop`, and `voidAmbience` 376;
-- every gun's shot sound (`bStatSound`), the module pickup (105/106) and the
-  `moduleText` letter sound (334);
-- the master gain option and the original voice and priority rules.
+**Known facts (first static pass, 2026-11-09):**
+- **Assets:**
+  - There are 351 sound-effect assets. After the -30 dB crop at 8,363 Hz
+    (`tools/convert-amiga-sfx.py`, output in `extracted/amiga-sfx/`) they
+    total 3.1 MB.
+  - The plausible world-1 candidates number about 165, roughly 440 KiB at
+    8,363 Hz. That figure leaves out four long sounds: the seven time-field
+    winds 349–355 (421 KB), the void ambience `amb1` 191 (a 723 KB loop), the
+    clear screen's `sfxFalling` 186 (a 69 KB loop) and `sfxTitleAppear` 188
+    (30 KB). It still counts every footstep and landing material, and it
+    counts the front-end and results sounds, which need not stay resident in
+    gameplay.
+- **Original playback rules:**
+  - GameMaker runs 32 channels (`audio_channel_num(32)`).
+  - `soundPlay` carries a priority and a cut-previous flag.
+  - `soundPlayOL` adds a category (footsteps, gunshot, gunwall, merchant,
+    enemymove, music, waterEnemy, waterThings, UI, boss) and cuts the
+    category's previous sound. Its `enemymove` and `waterEnemy` categories
+    skip sounds from offscreen callers.
+  - Gain is the asset volume × `global.gameVolume` × `audio_master_gain`.
+  - Pitch changes: low ammo +0.8, the death and results progress bars, and
+    `objPlayer_n` Alarm 8. Water is not in world 1.
+- **Audio state is read back only by audio:** `bgmDuck`, `gunshotStop`,
+  `levelBeginCue` (`sfxFalling`), `sfxGemBoostLow` and `soundLand`'s recharge
+  check. No gameplay state depends on it.
+- **RNG inside sound calls is gameplay-visible.** Examples are
+  `choose(91, 92, 93)`, the break sounds' `choose` and the wind `choose`.
+  These draws must stay exactly where the compact world consumes them.
+- **What exists today:**
+  - `AmigaWindAudio` streams one mono sound from a Fast-RAM bank through two
+    4,096-byte Chip fragments, with VBlank and audio IRQs and a master gain.
+  - The prepared `WindBank` is 1.5 MB at 22,030 Hz.
+  - `SoundPlayScript` and the `RunSession` hooks drive the registered owners.
+  - The compact world's hooks return true and are marked `// Audio is W2`.
+- **Memory:**
+  - Gameplay keeps roughly 470 KiB of Chip in reserve: 520 KiB before the
+    W1.7 and W1.10 art. Re-measure it.
+  - The launchers emulate 8 MiB of Fast RAM, which holds the CPU banks.
 
-Budget Chip memory against [section 7](#7-establish-memory-fit-and-failure-handling)
-and keep audio out of scenes that do not use it.
+1. **Inventory: what world 1 actually uses.**
+   - **Static pass:** a committed tool (manifest only, no payload) lists
+     every play, stop, pitch and gain call per code entry. It includes
+     inherited parent events, sound-holding variables (`breakSound`,
+     `bounceSnd`, `windsnd`, `spawnSound`, `pBulSound`) and the material and
+     gun tables (`sfxFs`, `sfxJl`, `sfxBhit`, `bStatSound`). It resolves them
+     to IDs, limited to what world 1 reaches: its rooms, builder patterns
+     and terrain materials, the objects the compact world creates, and the
+     Amiga's front-end menus.
+   - **Dynamic pass:** the host logs every sound request (tick, ID, priority,
+     loop, cut, category, gain, pitch) on the natural routes. These are the
+     world-one tape, the menus driver, a death route and a hard-mode route.
+   - **Output:** a per-scene table in `docs/sound-inventory.md` with counts,
+     bytes, peak concurrency and a verdict per sound: keep, share a sibling
+     variant (the RNG draw stays), loop a short segment, or drop (with the
+     reason).
+   - **RNG audit:** confirm every sound-argument RNG draw is consumed in the
+     compact world. A missing one is a gameplay fix with re-recorded tapes,
+     done as its own change.
+2. **Conversion and the quality experiment.**
+   - **Bank generator:** grow `convert-amiga-sfx.py` into the bank generator.
+     Per sound it sets:
+     - the rate (for example 8,363, 11,025 or 16,726 Hz, with rate × peak
+       pitch under Paula's ~28 kHz);
+     - the crop threshold;
+     - an optional loop segment;
+     - peak normalisation, with the asset volume moved into the Paula volume
+       for 8-bit headroom.
+   - **Previews:** Paula-like preview WAVs (zero-order hold, the A500's
+     fixed filter, the LED filter optional) for listening, plus a FS-UAE
+     check of the chosen set.
+   - **Per-scene Chip totals:** the manifest records them. There is no fixed
+     budget: fit as many sounds as the measured reserve allows, and leave
+     room for W3 and later world-1 art.
+   - **Exit:** the user picks the rate and crop per sound class (thuds,
+     clicks, guns, gems, voices).
+3. **Core sound requests.**
+   - **Request ring:** a fixed `SoundRequests` ring in `src/core`, filled at
+     the original call sites in source order. The compact world, shops, run
+     session, pause menu, clear screen, results and front end all write to
+     it. The `// Audio is W2` stubs become real requests and the missing
+     sites are added.
+   - **Core bookkeeping:** `global.OLchannel`, cut-previous and offscreen
+     suppression live in core. `isPlaying` comes from the backend's voice
+     state, which only audio branches read.
+   - **No gameplay change:** the host world-one tape stays byte-identical,
+     and host tests check the request logs of the routes.
+   - **SDL:** it may play the logged requests as a reference. This is
+     optional.
+4. **Paula mixer.**
+   - **Generalise `AmigaWindAudio`** into four voices, with commands
+     published by the main loop and applied in the VBlank, and no allocation
+     in IRQs.
+   - **Voice stealing:** take a free voice; otherwise steal the lowest
+     priority (the oldest on ties) when the new sound's priority is at least
+     as high; otherwise drop the sound.
+   - **Playback:** one-shots end on a silent word and loops repeat their
+     segment. The period comes from rate × pitch; the volume is asset ×
+     `gameVolume` × master, scaled to 0–64.
+   - **Panning:** each voice is hard-panned (Paula's 0 and 3 left, 1 and 2
+     right). Alternate sides between consecutive starts where that is free.
+   - **No streaming:** every sample is Chip-resident. Any long sound that is
+     kept (winds, ambience, the clear-screen whoosh) is cut to a short loop
+     or segment.
+   - **Music later:** let WM reserve some of the four voices.
+5. **Scene-local banks.**
+   - **Gameplay bank:** loaded with the cavern banks and kept across Retry,
+     like the plane atlas. Pause sounds live in it.
+   - **Front-end bank:** title, garden, style select and menus.
+   - **Clear and results sounds:** in the gameplay bank or in those scenes'
+     transient banks, whichever the inventory favours.
+   - **Gates:** measure free and largest Chip before and after
+     (`verify-amiga-memory`, `verify-amiga-startup`), and keep the 1 MiB
+     startup gate.
+6. **Wire world 1 by groups.** Each group is audible on a natural route and
+   checked natively: GDB reads the voice table at the ticks the host log
+   names. The groups:
+   1. player, guns (`bStatSound`, empty, recharge, low ammo), bullet hits,
+      stomps and gems, on the world-one route;
+   2. enemies, rock and box breaks, torches and gem chunks;
+   3. shops, the keeper's voice, module pickups (105/106) and the
+      `moduleText` letters (334), on the W1.8 shop route;
+   4. side rooms (void enter and exit 184/185, the ambience if kept),
+      time-stop and the winds;
+   5. combo, upgrade sounds (jetpack loop, rocket jump, gem shoot), the
+      clear screen, death, results, unlock notices, menus, palette, title
+      and the level-begin cue;
+   6. the master gain and the stored volume option.
 
-The target A500 has 1 MiB of Chip RAM (ECS 8372A Agnus): normal startup
-leaves 651,128 Chip bytes free and gameplay entry takes the 143,494-byte
-cavern plane atlas, so about 495 KiB remains for samples and later art. Gameplay already recycles
-the garden region (staging ring, HUD bank, on-demand shop or results art);
-the HUD bank may not exceed 14,976 bytes there, or the 31,104-byte exit and
-entry cover masks no longer fit beside it;
-the garden art is reloaded from disk when shown again. Keep scene-local
-residency and measure free and largest Chip before and after
-(`verify-amiga-memory`, `verify-amiga-startup`).
+**Gates for every step:**
+- Quiet-fall stays ≤ 197 fields: idle audio costs nothing but Paula DMA, with
+  no per-update scans.
+- The world-one native replay still ends `END 2 1 8768 2 249994`.
+- 1 MiB startup passes.
+- W3 costs are noted: IRQ and VBlank time per start, Chip and Fast bytes.
+
+### WM. Music (deferred)
+
+The songs (`bgmOverworld` 193, `bgmArea1` 194, `bgmShopCave` 192 for the
+shop radio, and `bgmSecret` 200 as the void-room ambience variant) are Ogg
+Vorbis and need recomposing as tracker modules. That is not part of the world
+1 slice yet. Until then the BGM calls, `bgmDuck`, the BGM pause and resume
+around `pTimeStop`, the level-begin music start and the BGM option keep their
+state but stay silent. W2's mixer must let a module player reserve voices
+later.
 
 ### W3. Performance
 
