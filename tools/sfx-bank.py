@@ -26,8 +26,9 @@ normalised to 8 bits; the asset volume and the normalisation move into the
 Paula volume (0-64), so quiet sounds keep their resolution. Rounding, no
 dither. Lengths are padded to whole words.
 
-Previews: zero-order hold at the Paula rate, the A500's fixed one-pole RC
-low-pass (360 ohm, 0.1 uF: 4,421 Hz), the LED filter off, rendered at 4 x
+Previews: zero-order hold at the Paula rate, with (p/) and without (praw/)
+the A500's fixed one-pole RC low-pass (360 ohm, 0.1 uF: 4,421 Hz), the LED
+filter always off, rendered at 4 x
 44,100 Hz and decimated to 44,100 Hz 16-bit. One voice at volume 64 is full
 scale; the source preview uses the same scale with the asset volume, so the
 two compare at equal loudness. The ~5 Hz output high-pass is left out.
@@ -161,10 +162,10 @@ def quantise(x, volume):
     return q, int(min(64, max(1, round(64 * volume * peak))))
 
 
-def kernel():
+def kernel(a500_filter):
     fs = OUT_RATE * OVERSAMPLE
     a = np.exp(-2 * np.pi * RC_HZ / fs)
-    rc = (1 - a) * a ** np.arange(96)
+    rc = (1 - a) * a ** np.arange(96) if a500_filter else np.ones(1)
     taps = 127
     n = np.arange(taps) - (taps - 1) / 2
     fc = 20000 / fs
@@ -173,10 +174,12 @@ def kernel():
     return k
 
 
-KERNEL = kernel()
+# Preview folders: "p" with the A500's fixed filter, "praw" without it (the
+# bare zero-order hold, as an A1200 or an unfiltered emulator plays it).
+KERNELS = {"p": kernel(True), "praw": kernel(False)}
 
 
-def paula_preview(q, rate, volume, loop, loop_seconds=6.0):
+def paula_preview(q, rate, volume, loop, k, loop_seconds=6.0):
     if not q.size:
         return np.zeros(int(0.1 * OUT_RATE))
     s = q.astype(np.float64) * (volume / 64 / 128)
@@ -185,8 +188,8 @@ def paula_preview(q, rate, volume, loop, loop_seconds=6.0):
     fs = OUT_RATE * OVERSAMPLE
     n = int(np.ceil(s.size * fs / rate))
     held = s[np.minimum((np.arange(n) * rate / fs).astype(np.int64), s.size - 1)]
-    held = np.concatenate([held, np.zeros(KERNEL.size)])
-    return np.convolve(held, KERNEL)[63::OVERSAMPLE]  # the anti-alias FIR's centre
+    held = np.concatenate([held, np.zeros(k.size)])
+    return np.convolve(held, k)[63::OVERSAMPLE]  # the anti-alias FIR's centre
 
 
 def write_wav(path, y):
@@ -314,11 +317,12 @@ def preview(policy, sounds, inputs):
             for choice in choices(s, policy):
                 q, vol, loop = build(s, s["source"], policy, rate, choice)
                 key = variant_key(rate, choice if s["class"] == "long" else crop_key(choice))
-                y = paula_preview(q, paula_rate(rate), vol, loop)
-                write_wav(out / "p" / f"{s['id']}_{key}.wav", y)
+                for folder, k in KERNELS.items():
+                    y = paula_preview(q, paula_rate(rate), vol, loop, k)
+                    write_wav(out / folder / f"{s['id']}_{key}.wav", y)
+                    if s["class"] != "long":
+                        reels.setdefault((s["class"], folder + "_" + key), []).extend([y, gap])
                 variants[key] = {"bytes": int(q.size), "vol": vol, "loop": loop}
-                if s["class"] != "long":
-                    reels.setdefault((s["class"], key), []).extend([y, gap])
         rate, choice = current(s, policy)
         data.append({"id": s["id"], "name": s["name"], "class": s["class"], "scenes": s["scenes"],
                      "verdict": s["verdict"], "volume": s["volume"], "maxPitch": max_pitch(s, policy),

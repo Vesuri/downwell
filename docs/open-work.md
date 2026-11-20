@@ -244,8 +244,8 @@ area-1 patterns, and names every cut with its reason.
      per-class choices from `tools/sfx-bank-policy.json`. Its bank sets
      each sound's Paula rate (nearest period), crop or long-sound cut, peak
      normalisation and Paula volume (asset volume × peak), and records
-     per-scene Chip totals. Its previews (zero-order hold, the A500's fixed
-     4.4 kHz RC filter, LED filter off) cover every kept sound at 8,363,
+     per-scene Chip totals. Its previews (zero-order hold without interpolation, with or
+     without the A500's fixed 4.4 kHz RC filter, LED filter off) cover every kept sound at 8,363,
      11,025, 13,979 and 16,726 Hz with -24, -30 and -36 dB crops, plus the
      source at the same loudness and per-class reels. The listening page
      (`extracted/amiga-sfx/preview/index.html`) shows the Chip totals of the

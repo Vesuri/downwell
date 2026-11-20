@@ -61,7 +61,10 @@ textarea { width: 100%; min-height: 220px; font: 12px/1.4 ui-monospace, Menlo, m
 <h1>Paula sound choices for world 1</h1>
 <p class="lead" id="lead"></p>
 
-<section class="panel totals" id="totals"></section>
+<section class="panel totals"><div class="controls" style="margin-bottom:8px">
+  <label>A500 fixed filter</label>
+  <button id="f-p">On (A500)</button><button id="f-praw">Off (raw hold)</button></div>
+  <div id="totals"></div></section>
 <div id="classes"></div>
 
 <section class="panel">
@@ -97,6 +100,9 @@ function variantKey(s, rate) { return (rate ?? cls(s.class).rate) + '_' + choice
 function current(s) { return s.variants[variantKey(s)]; }
 const kib = b => (b / 1024).toFixed(1);
 
+let filterDir = 'p';
+try { if (localStorage.getItem(KEY + '-filter') === 'praw') filterDir = 'praw'; } catch (e) {}
+const reelDir = () => filterDir + '_';
 const audio = new Audio();
 let playing = null;
 function play(src, btn) {
@@ -115,7 +121,8 @@ function lead() {
   const rates = policy.rates.map(r => `${r.toLocaleString()} Hz (period ${DATA.periods[r]})`).join(', ');
   document.getElementById('lead').innerHTML =
     `Each kept sound from the W2.1 inventory, as Paula would play it: 8-bit, peak-normalised, with the asset volume ` +
-    `moved into the Paula volume; zero-order hold, the A500's fixed 4.4 kHz output filter, LED filter off. ` +
+    `moved into the Paula volume; zero-order hold with no interpolation, LED filter off. The switch below chooses ` +
+    `whether the A500's fixed 4.4 kHz output filter (always present on an A500) is applied. ` +
     `Candidate rates: ${rates}. “Source” is the original at the same loudness. ` +
     `Pick a rate and crop per class; the totals follow. Choices are remembered in this browser.`;
 }
@@ -161,7 +168,7 @@ function classSection(c) {
     cropSel.value = c.crop;
     ctl.append(Object.assign(document.createElement('label'), { textContent: 'Crop' }), cropSel);
     ctl.append(playButton('▶ Source reel', () => `reel/${c.key}_src.wav`, 'Every sound of the class, original'));
-    ctl.append(playButton('▶ Paula reel', () => `reel/${c.key}_${c.rate}_${cropKey(c.crop)}.wav`, 'Every sound of the class at the chosen rate and crop'));
+    ctl.append(playButton('▶ Paula reel', () => `reel/${c.key}_${reelDir()}${c.rate}_${cropKey(c.crop)}.wav`, 'Every sound of the class at the chosen rate and crop'));
   }
   head.append(title, ctl); sec.append(head, warn);
 
@@ -176,10 +183,10 @@ function classSection(c) {
     const tr = document.createElement('tr');
     const listen = document.createElement('td');
     listen.append(playButton('Source', () => `src/${s.id}.wav`), ' ',
-                  playButton('Paula', () => `p/${s.id}_${variantKey(s)}.wav`));
+                  playButton('Paula', () => `${filterDir}/${s.id}_${variantKey(s)}.wav`));
     const rates = document.createElement('td');
     for (const r of policy.rates) {
-      rates.append(playButton(`${Math.round(r / 1000)}k`, () => `p/${s.id}_${variantKey(s, r)}.wav`, `${r} Hz`), ' ');
+      rates.append(playButton(`${Math.round(r / 1000)}k`, () => `${filterDir}/${s.id}_${variantKey(s, r)}.wav`, `${r} Hz`), ' ');
     }
     const vol = document.createElement('td'); vol.className = 'num';
     const by = document.createElement('td'); by.className = 'num kib';
@@ -234,6 +241,16 @@ document.getElementById('reset').addEventListener('click', () => {
   applyChoices(JSON.parse(fileChoices)); try { localStorage.removeItem(KEY); } catch (e) {}
   location.reload();
 });
+function setFilter(d) {
+  filterDir = d;
+  try { localStorage.setItem(KEY + '-filter', d); } catch (e) {}
+  document.getElementById('f-p').classList.toggle('on', d === 'p');
+  document.getElementById('f-praw').classList.toggle('on', d === 'praw');
+  if (playing) { audio.pause(); playing.classList.remove('on'); playing = null; }
+}
+document.getElementById('f-p').addEventListener('click', () => setFilter('p'));
+document.getElementById('f-praw').addEventListener('click', () => setFilter('praw'));
+setFilter(filterDir);
 lead(); refresh();
 </script>
 </body>
