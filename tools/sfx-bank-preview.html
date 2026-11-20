@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paula sound choices</title>
+<!-- Template for tools/sfx-bank.py --preview; the generated copy in
+     extracted/amiga-sfx/preview/ embeds the data and links the WAVs. -->
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #dddbd3;
+  --accent: #2f6f5e; --accent-ink: #ffffff; --warn: #a3471b; --bar: #2f6f5e; --bar-over: #b8452a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161715; --panel: #1f201e; --ink: #ecebe6; --muted: #9c9b94; --line: #33342f;
+    --accent: #6cbfa6; --accent-ink: #10221c; --warn: #f0a36f; --bar: #6cbfa6; --bar-over: #f07d5e;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161715; --panel: #1f201e; --ink: #ecebe6; --muted: #9c9b94; --line: #33342f;
+  --accent: #6cbfa6; --accent-ink: #10221c; --warn: #f0a36f; --bar: #6cbfa6; --bar-over: #f07d5e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0; }
+p.lead { color: var(--muted); margin: 0 0 20px; max-width: 75ch; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 0 0 16px; }
+.totals { position: sticky; top: 0; z-index: 2; }
+.totals table td:last-child, .totals table th:last-child { text-align: right; }
+.meter { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin: 8px 0 2px; }
+.meter > div { height: 100%; background: var(--bar); }
+.meter.over > div { background: var(--bar-over); }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+.head { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+label { color: var(--muted); font-size: 12px; }
+select { font: inherit; padding: 3px 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+button { font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 5px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--accent); }
+button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.warn { color: var(--warn); font-size: 12px; }
+.muted { color: var(--muted); }
+code { font-size: 12px; }
+textarea { width: 100%; min-height: 220px; font: 12px/1.4 ui-monospace, Menlo, monospace; background: var(--bg);
+  color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.kib { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+<h1>Paula sound choices for world 1</h1>
+<p class="lead" id="lead"></p>
+
+<section class="panel totals" id="totals"></section>
+<div id="classes"></div>
+
+<section class="panel">
+  <div class="head"><h2>Export</h2>
+    <div class="controls"><button class="primary" id="copy">Copy policy JSON</button>
+      <button id="reset">Reset to the file's choices</button></div></div>
+  <p class="muted">Paste this over <code>tools/sfx-bank-policy.json</code>, then run
+    <code>tools/sfx-bank.py --bank</code>.</p>
+  <textarea id="export" readonly></textarea>
+</section>
+</main>
+<script>
+const DATA = /*DATA*/null;
+const KEY = 'sfx-bank-choices-v1';
+const policy = JSON.parse(JSON.stringify(DATA.policy));
+const fileChoices = JSON.stringify(policyChoices(DATA.policy));
+try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) applyChoices(saved); } catch (e) {}
+
+function policyChoices(p) {
+  return { classes: Object.fromEntries(p.classes.map(c => [c.key, { rate: c.rate, crop: c.crop }])),
+           long: Object.fromEntries(Object.entries(p.long).filter(([k]) => k !== 'comment').map(([k, v]) => [k, v.cut])) };
+}
+function applyChoices(ch) {
+  for (const c of policy.classes) if (ch.classes && ch.classes[c.key]) Object.assign(c, ch.classes[c.key]);
+  for (const [k, v] of Object.entries(ch.long || {})) if (policy.long[k] && policy.long[k].cuts[v]) policy.long[k].cut = v;
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(policyChoices(policy))); } catch (e) {} }
+
+const cls = k => policy.classes.find(c => c.key === k);
+const cropKey = db => 'c' + (-db);
+function choiceOf(s) { const c = cls(s.class); return s.class === 'long' ? policy.long[s.id].cut : cropKey(c.crop); }
+function variantKey(s, rate) { return (rate ?? cls(s.class).rate) + '_' + choiceOf(s); }
+function current(s) { return s.variants[variantKey(s)]; }
+const kib = b => (b / 1024).toFixed(1);
+
+const audio = new Audio();
+let playing = null;
+function play(src, btn) {
+  if (playing === btn && !audio.paused) { audio.pause(); btn.classList.remove('on'); playing = null; return; }
+  if (playing) playing.classList.remove('on');
+  audio.src = src; audio.currentTime = 0; audio.play();
+  btn.classList.add('on'); playing = btn;
+}
+audio.addEventListener('ended', () => { if (playing) playing.classList.remove('on'); playing = null; });
+function playButton(text, src, title) {
+  const b = document.createElement('button'); b.textContent = text; if (title) b.title = title;
+  b.addEventListener('click', () => play(src(), b)); return b;
+}
+
+function lead() {
+  const rates = policy.rates.map(r => `${r.toLocaleString()} Hz (period ${DATA.periods[r]})`).join(', ');
+  document.getElementById('lead').innerHTML =
+    `Each kept sound from the W2.1 inventory, as Paula would play it: 8-bit, peak-normalised, with the asset volume ` +
+    `moved into the Paula volume; zero-order hold, the A500's fixed 4.4 kHz output filter, LED filter off. ` +
+    `Candidate rates: ${rates}. “Source” is the original at the same loudness. ` +
+    `Pick a rate and crop per class; the totals follow. Choices are remembered in this browser.`;
+}
+
+function totals() {
+  const sums = {}, run = new Set(['gameplay', 'shop', 'pause']);
+  for (const sc of DATA.scenes) sums[sc] = 0;
+  let runBytes = 0, all = 0;
+  for (const s of DATA.sounds) {
+    const b = current(s).bytes; all += b;
+    for (const sc of s.scenes) sums[sc] += b;
+    if (s.scenes.some(sc => run.has(sc))) runBytes += b;
+  }
+  const reserve = policy.chipReserveKiB * 1024;
+  const pct = Math.min(100, runBytes / reserve * 100);
+  const rows = DATA.scenes.map(sc => `<tr><td>${sc}</td><td class="kib">${kib(sums[sc])} KiB</td></tr>`).join('');
+  document.getElementById('totals').innerHTML =
+    `<div class="head"><h2>Chip totals</h2><span class="muted">all kept sounds: <b class="kib">${kib(all)} KiB</b></span></div>
+     <div class="meter ${runBytes > reserve ? 'over' : ''}"><div style="width:${pct}%"></div></div>
+     <div class="muted">Resident during a run (gameplay, shop, pause): <b class="kib">${kib(runBytes)} KiB</b>
+       of the ${policy.chipReserveKiB} KiB of Chip free in gameplay (measured at 1-1 on the 1 MiB build; W3 and later art need some too).</div>
+     <details style="margin-top:8px"><summary class="muted">By scene (a sound used in several is counted in each)</summary>
+     <table style="margin-top:6px;max-width:360px">${rows}</table></details>`;
+}
+
+function classSection(c) {
+  const sec = document.createElement('section'); sec.className = 'panel';
+  const sounds = DATA.sounds.filter(s => s.class === c.key);
+  const head = document.createElement('div'); head.className = 'head';
+  const title = document.createElement('div');
+  const bytes = document.createElement('span'); bytes.className = 'muted kib';
+  title.innerHTML = `<h2>${c.label}</h2>`; title.appendChild(bytes);
+  const ctl = document.createElement('div'); ctl.className = 'controls';
+  const warn = document.createElement('div'); warn.className = 'warn';
+  const rateSel = document.createElement('select');
+  for (const r of policy.rates) rateSel.add(new Option(`${r.toLocaleString()} Hz`, r));
+  rateSel.value = c.rate;
+  ctl.append(Object.assign(document.createElement('label'), { textContent: 'Rate' }), rateSel);
+  let cropSel = null;
+  if (c.key !== 'long') {
+    cropSel = document.createElement('select');
+    for (const d of policy.crops) cropSel.add(new Option(`${d} dB`, d));
+    cropSel.value = c.crop;
+    ctl.append(Object.assign(document.createElement('label'), { textContent: 'Crop' }), cropSel);
+    ctl.append(playButton('▶ Source reel', () => `reel/${c.key}_src.wav`, 'Every sound of the class, original'));
+    ctl.append(playButton('▶ Paula reel', () => `reel/${c.key}_${c.rate}_${cropKey(c.crop)}.wav`, 'Every sound of the class at the chosen rate and crop'));
+  }
+  head.append(title, ctl); sec.append(head, warn);
+
+  const wrap = document.createElement('div'); wrap.className = 'scroll';
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr><th class="num">ID</th><th>Name</th><th>Scenes</th><th class="num">Vol</th>
+    <th>Listen</th><th>All rates at this ${c.key === 'long' ? 'cut' : 'crop'}</th>${c.key === 'long' ? '<th>Cut</th>' : ''}
+    <th class="num">Paula vol</th><th class="num">Bytes</th></tr></thead>`;
+  const tbody = document.createElement('tbody'); table.appendChild(tbody);
+  const cells = [];
+  for (const s of sounds) {
+    const tr = document.createElement('tr');
+    const listen = document.createElement('td');
+    listen.append(playButton('Source', () => `src/${s.id}.wav`), ' ',
+                  playButton('Paula', () => `p/${s.id}_${variantKey(s)}.wav`));
+    const rates = document.createElement('td');
+    for (const r of policy.rates) {
+      rates.append(playButton(`${Math.round(r / 1000)}k`, () => `p/${s.id}_${variantKey(s, r)}.wav`, `${r} Hz`), ' ');
+    }
+    const vol = document.createElement('td'); vol.className = 'num';
+    const by = document.createElement('td'); by.className = 'num kib';
+    tr.innerHTML = `<td class="num">${s.id}</td><td><code>${s.name}</code>${s.verdict !== 'keep' ? `<div class="muted" style="font-size:12px">${s.verdict}</div>` : ''}</td>
+      <td class="muted">${s.scenes.join(', ')}</td><td class="num">${s.volume}</td>`;
+    tr.append(listen, rates);
+    if (c.key === 'long') {
+      const td = document.createElement('td'); const sel = document.createElement('select');
+      for (const k of s.choices) sel.add(new Option(k, k));
+      sel.value = policy.long[s.id].cut;
+      sel.addEventListener('change', () => { policy.long[s.id].cut = sel.value; refresh(); });
+      td.append(sel); tr.append(td);
+    }
+    tr.append(vol, by); tbody.appendChild(tr);
+    cells.push({ s, vol, by });
+  }
+  wrap.appendChild(table); sec.appendChild(wrap);
+
+  function update() {
+    let total = 0;
+    for (const { s, vol, by } of cells) {
+      const v = current(s); total += v.bytes;
+      vol.textContent = v.vol; by.textContent = v.bytes.toLocaleString() + (v.loop ? ' ⟲' : '');
+    }
+    bytes.textContent = ` ${sounds.length} sounds, ${kib(total)} KiB`;
+    const msgs = [];
+    for (const s of sounds) {
+      const p = DATA.periods[c.rate] / s.maxPitch;
+      if (p < DATA.minPeriod && !msgs.some(m => m.p === s.maxPitch))
+        msgs.push({ p: s.maxPitch, t: `At ${c.rate} Hz, pitch ${s.maxPitch} needs period ${p.toFixed(0)}, under Paula's ${DATA.minPeriod}: ${c.pitchNote || ''}` });
+    }
+    warn.textContent = msgs.map(m => m.t).join(' · ');
+  }
+  rateSel.addEventListener('change', () => { c.rate = +rateSel.value; refresh(); });
+  if (cropSel) cropSel.addEventListener('change', () => { c.crop = +cropSel.value; refresh(); });
+  return { sec, update };
+}
+
+const sections = policy.classes.map(classSection);
+document.getElementById('classes').append(...sections.map(x => x.sec));
+function refresh() {
+  for (const x of sections) x.update();
+  totals(); save();
+  const out = JSON.parse(JSON.stringify(policy));
+  document.getElementById('export').value = JSON.stringify(out, null, 1) + '\n';
+}
+document.getElementById('copy').addEventListener('click', () => {
+  const t = document.getElementById('export'); t.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject()).catch(() => document.execCommand('copy'));
+});
+document.getElementById('reset').addEventListener('click', () => {
+  applyChoices(JSON.parse(fileChoices)); try { localStorage.removeItem(KEY); } catch (e) {}
+  location.reload();
+});
+lead(); refresh();
+</script>
+</body>
+</html>

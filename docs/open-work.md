@@ -233,30 +233,49 @@ area-1 patterns, and names every cut with its reason.
   - `SoundPlayScript`, `TimeFieldWind`, `BulletWallSound` and the
     `RunSession` hooks drive the registered owners.
   - The compact world's hooks return true and are marked `// Audio is W2`.
-- **Memory:** gameplay keeps roughly 470 KiB of Chip in reserve, down from
-  520 KiB before the W1.7 and W1.10 art. Re-measure it. At 16,726 Hz the
-  short gameplay sounds alone would double to about 570 KiB, so W2.2 must
-  choose rates per sound class.
+- **Memory:** measured on 2026-11-20 with the normal 1 MiB build in level
+  1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
+  one block, so about 465 KiB. Startup leaves 651,136.
 
-2. **Conversion and the quality experiment.**
-   - **Bank generator:** grow `convert-amiga-sfx.py` into the bank generator.
-     Per sound it sets:
-     - the rate (for example 8,363, 11,025 or 16,726 Hz, with rate × peak
-       pitch under Paula's ~28 kHz);
-     - the crop threshold;
-     - an optional loop segment;
-     - peak normalisation, with the asset volume moved into the Paula volume
-       for 8-bit headroom.
-   - **Previews:** Paula-like preview WAVs (zero-order hold, the A500's
-     fixed output filter) for listening, plus a FS-UAE check of the chosen
-     set. The switchable LED filter is off, both in the previews and at run
-     time, where the mixer clears it while it owns audio and restores the
-     previous state on exit.
-   - **Per-scene Chip totals:** the manifest records them. There is no fixed
-     budget: fit as many sounds as the measured reserve allows, and leave
-     room for W3 and later world-1 art.
-   - **Exit:** the user picks the rate and crop per sound class (thuds,
-     clicks, guns, gems, voices).
+2. **Conversion and the quality experiment.** The tools are in place; the
+   user's choice is open.
+   - **Done:** `tools/sfx-bank.py` (`make amiga-sfx-preview`,
+     `make amiga-sfx-bank`) reads the kept sounds from the inventory and the
+     per-class choices from `tools/sfx-bank-policy.json`. Its bank sets
+     each sound's Paula rate (nearest period), crop or long-sound cut, peak
+     normalisation and Paula volume (asset volume × peak), and records
+     per-scene Chip totals. Its previews (zero-order hold, the A500's fixed
+     4.4 kHz RC filter, LED filter off) cover every kept sound at 8,363,
+     11,025, 13,979 and 16,726 Hz with -24, -30 and -36 dB crops, plus the
+     source at the same loudness and per-class reels. The listening page
+     (`extracted/amiga-sfx/preview/index.html`) shows the Chip totals of the
+     choices and exports a policy.
+   - **Cost per class**, run-resident (gameplay, shop, pause), KiB at -30 dB:
+
+     | Class | Sounds | 8,363 | 11,025 | 13,979 | 16,726 |
+     |---|---:|---:|---:|---:|---:|
+     | thuds (footsteps, landings) | 37 | 47 | 63 | 79 | 95 |
+     | guns | 17 | 45 | 59 | 75 | 90 |
+     | impacts | 21 | 49 | 64 | 82 | 98 |
+     | creatures | 20 | 74 | 97 | 124 | 148 |
+     | gems and combos | 15 | 48 | 64 | 81 | 97 |
+     | stings | 8 | 24 | 32 | 40 | 48 |
+     | shopkeeper voice | 11 | 26 | 35 | 44 | 53 |
+     | UI | 24 | 16 | 21 | 26 | 31 |
+     | long (default cuts) | 11 | 188 | 247 | 314 | 376 |
+
+     All short sounds at 8,363 Hz: 303 KiB at -24 dB, 328 at -30, 347 at
+     -36. The seven winds swell for 2–5 s before their body, so their cuts
+     keep a faded window around the loudest part: 86 KiB at 1.5 s, 143 at
+     2.5 s, 229 at 4 s (8,363 Hz).
+   - **Pitch limits:** Paula's shortest period is 124. Guns reach pitch 1.8
+     at half ammo (`scrShotSound`), so they cannot use 16,726 Hz; the
+     results progress-bar fill (328) reaches 2.2, so it stays at or under
+     11,025 Hz unless its pitch is capped.
+   - **Remaining:**
+     - the user picks the rate and crop per class and the long-sound cuts
+       on the listening page; the exported policy is committed;
+     - an FS-UAE listening check of the chosen bank.
 3. **Core sound requests.**
    - **First, as its own gameplay change:**
      - Add the five missing sound draws to the compact world, with a

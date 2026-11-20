@@ -725,6 +725,15 @@ test: test-shop-text
 .PHONY: verify-sound-inventory
 verify-sound-inventory:
 	python3 tools/sound-inventory.py --check
+
+# W2.2: Paula previews and the listening page
+# (extracted/amiga-sfx/preview/index.html), and the bank of the policy's
+# current choices (extracted/amiga-sfx/bank/), from tools/sfx-bank-policy.json.
+.PHONY: amiga-sfx-preview amiga-sfx-bank
+amiga-sfx-preview:
+	python3 tools/sfx-bank.py --preview
+amiga-sfx-bank:
+	python3 tools/sfx-bank.py --bank
 # W1.10: pause menu strings and the PALETTE menu's colour sets.
 generated/downwell-menu-text.h: tools/generate-menu-text.py data/language.ini
 	python3 tools/generate-menu-text.py
