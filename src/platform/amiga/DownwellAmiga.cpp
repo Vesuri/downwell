@@ -1350,7 +1350,7 @@ static bool redrawResultsProgress(AmigaRenderer* renderer,
 // 64800 + code glyphs) slide up four pixels, with the style's run sprite
 // (25, 26, 28, 29) between them. It is drawn over the rows and the progress
 // bar; unlockNotice(gr) names step gr + 1: styles at steps 3, 7, 11 and 13,
-// otherwise the next palette. The notice sound waits for W2.
+// otherwise the next palette. Its sound is the results 329 (RunSession).
 struct ResultsNotice {
     int stage = 0, desc = 4, text = 4;
     unsigned frameTenths = 0; // styleUnlockSpriteFrame, never reset by Create
@@ -4162,6 +4162,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaHardware::blitterDrain();
                     AmigaPauseOverlay::begin(&renderer, pauseScratch);
                     pauseMenu.openPause(false);
+                    // objPauseMenu Create (audio_pause_all), then sound 326.
+                    port.pauseAllSounds();
+                    port.playUiSound(pauseMenu.sound);
                     pauseKey = {};
                     pausePrior = liveInput;
                     opened = true;
@@ -4184,6 +4187,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         pausePrior = liveInput;
                         const unsigned oldShader = saveState.shader;
                         action = pauseMenu.step(in, saveState, unlock);
+                        if (pauseMenu.sound >= 0) port.playUiSound(pauseMenu.sound);
                         if (saveState.shader != oldShader) {
                             selectPaletteData(saveState.shader);
                             palette.assign(selectedPaletteData);
@@ -4218,6 +4222,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     invalidateHudText(); gemStreakHud.invalidate(); streakView = {}; invalidateTitle();
                     flushSave(platform);
                     if (action == Menu::Action::resume) {
+                        port.resumeAllSounds();
                         pauseFireLatch = liveInput.fire;
                         if(!encounterFrame.finish())break;
                         continue;

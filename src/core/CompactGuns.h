@@ -122,7 +122,7 @@ struct CompactModuleTextRecord {
         alarm[index] = -1;
         switch (index) {
         case 0:
-            if (shown < length) { ++shown; alarm[0] = 5; } // soundPlay(334) is W2
+            if (shown < length) { ++shown; alarm[0] = 5; } // the owner plays 334
             else alarm[1] = 120;
             return true;
         case 1: exit = 1; alarm[2] = 4; return true;

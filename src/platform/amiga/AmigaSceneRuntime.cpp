@@ -352,8 +352,10 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
         menuCameraY_ = 142 * fixedOne;
 
     if (!menuNapping_ && menuTitleDelay_ < 0 && menuTitleImage_ == 0 &&
-        menuCameraX_ > 324 * fixedOne && menuCameraX_ < 332 * fixedOne)
+        menuCameraX_ > 324 * fixedOne && menuCameraX_ < 332 * fixedOne) {
         menuTitleDelay_ = 15;
+        if (!firstBoot_) { sounds_.play(188, 80, false, true); firstBoot_ = true; }
+    }
     if (menuTitleDelay_ > 0) {
         --menuTitleDelay_;
     } else if (menuTitleDelay_ == 0 &&
@@ -380,8 +382,10 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
     if (teleportWasActive && titleWasReady && !menuEnterActive_) {
         if (menuSequenceDelay_ < 0)
             menuSequenceDelay_ = 30;
-        if (menuSequenceDelay_ > 0 && --menuSequenceDelay_ == 0)
+        if (menuSequenceDelay_ > 0 && --menuSequenceDelay_ == 0) {
             menuEnterActive_ = true;
+            sounds_.play(360, 80, false, true); // EnterSequence Create
+        }
     }
     if (enterWasActive) {
         if (menuCameraLockerY_ < 1000 * fixedOne) {
@@ -417,20 +421,23 @@ void AmigaSceneRuntime::stepStyleSelect(const downwell::Input& input,
     // ignore confirmation.
     if (styleYOffset_ == 0 && !styleSelected_) {
         if (rightPressed) {
-            if (styleCursor_ < 4) ++styleCursor_;
-            else styleSmoothX_ += 4 * fixedOne;
+            if (styleCursor_ < 4) { ++styleCursor_; sounds_.playOL(331, 90, false, true, "UI"); }
+            else { styleSmoothX_ += 4 * fixedOne; sounds_.playOL(333, 90, false, true, "UI"); }
         }
         if (leftPressed) {
-            if (styleCursor_ > 0) --styleCursor_;
+            if (styleCursor_ > 0) { --styleCursor_; sounds_.playOL(331, 90, false, true, "UI"); }
             else {
                 styleSmoothX_ -= 4 * fixedOne;
                 if (hardUnlocked_) hardMode_ = !hardMode_;
+                if (hardMode_) sounds_.playOL(320, 90, false, true, "UI");
+                else { sounds_.stop(320); sounds_.playOL(333, 90, false, true, "UI"); }
             }
         }
         if (firePressed && unsigned(styleCursor_) <= styleUnlock_) {
             playStyle_ = unsigned(styleCursor_);
             styleSelected_ = true;
             styleConfirmed_ = true;
+            sounds_.playOL(332, 90, false, true, "UI");
         }
     }
     const long targetX = styleCursor_ * 48 * fixedOne;
@@ -458,6 +465,7 @@ void AmigaSceneRuntime::step(const downwell::Input& input)
 void AmigaSceneRuntime::step(const downwell::Input& input,const downwell::ShopInteraction::Input& edges)
 {
     ++tick_;
+    sounds_.step(tick_);
     if (scene_ == AmigaScene::splash)
         stepSplash(edges.confirm);
     else if (scene_ == AmigaScene::menu)

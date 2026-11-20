@@ -28,8 +28,7 @@ class SoundVoices {
 public:
     static constexpr unsigned capacity=32;
     static constexpr int firstVoice=1000000;
-    // Source gain of a fresh voice: the asset volume, set by the owner's
-    // table. Unknown assets start at full gain.
+    // Source gain of a fresh voice: the asset volume (SourceSoundDurations).
     using AssetGain=MotionBinary64 (*)(int asset);
 
     void configureAssetGain(AssetGain gain){assetGain_=gain;}
@@ -93,6 +92,8 @@ public:
     }
     bool playing(int id)const{return find(id)!=nullptr;}
     unsigned liveCount()const{return count_;}
+    // f(asset) for each live voice (route logs: peak concurrency per sound).
+    template<class F> void forEachLive(F f)const{for(unsigned i=0;i<count_;++i)f(voices_[i].asset);}
 private:
     struct Voice {
         int id=-1,asset=-1,priority=0;
@@ -114,7 +115,7 @@ private:
     unsigned count_=0;
     int next_=firstVoice;
     std::uint32_t serial_=0;
-    AssetGain assetGain_=nullptr;
+    AssetGain assetGain_=&SourceSoundDurations::gain;
 };
 }
 #endif

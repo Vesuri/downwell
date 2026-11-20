@@ -19,6 +19,7 @@ template<class Position> struct BasicGemMotion {
     CurrencyStepSound sound;
     bool attracted = false;
     bool attractorAtBirth = false;
+    bool bounced = false; // W2.3: this step's floor bounce (soundPlay(bounceSnd, 30, 0, 1))
     static long q8(long value) { return value < 0 ? -((-value + 25) / 50) : (value + 25) / 50; }
     static long q8(const GemPosition& value){return value.q8();}
     static int pixel(const GemPosition& value){return static_cast<int>(value.pixel());}
@@ -59,6 +60,7 @@ template<class Position> struct BasicGemMotion {
     }
     template<class Solid, class Random>
     bool step(long targetX, long targetY, Solid solid, Random& random, bool large=false) {
+        bounced = false;
         if (!lifetime.advance(attracted)) return false;
         sound.begin(large?1:0,random);
         // Animation belongs to the world's earlier animation traversal, not
@@ -83,6 +85,7 @@ template<class Position> struct BasicGemMotion {
             // fractional negative endpoints still needs runner verification.
             vy = -6400 - static_cast<long>(random.randomIntegerSmall(8960));
             vx = vx * 7 / 10;
+            bounced = true;
         } else y = nextY;
         if (vx > -640 && vx < 640) vx = vx < 0 ? -640 : vx > 0 ? 640 : 0;
         const long radius = (attractorAtBirth ? 48L : 24L) * 256;

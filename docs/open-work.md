@@ -243,7 +243,8 @@ area-1 patterns, and names every cut with its reason.
     fragments, with VBlank and audio IRQs and a master gain.
   - `SoundPlayScript`, `TimeFieldWind`, `BulletWallSound` and the
     `RunSession` hooks drive the registered owners.
-  - The compact world's hooks return true and are marked `// Audio is W2`.
+  - The compact world, shops, run session, pause menu, clear screen,
+    results and front end write `SoundRequests` (W2.3).
 - **Memory:** measured on 2026-11-20 with the normal 1 MiB build in level
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
@@ -258,29 +259,31 @@ area-1 patterns, and names every cut with its reason.
    with `tools/sfx-bank-policy.json`; `--preview` rebuilds the listening
    page. Paula's minimum period (124) bounds pitch × rate: at 8,363 Hz the
    guns' 1.8 and the progress-bar fill's 2.2 fit.
-3. **Core sound requests.**
-   - **Done:** the gameplay change (the sound RNG draws, `SoundVoices` and
-     the player's hop, grace jump, wall kick and tiny jump). Its quiet-fall
-     recovery is in W3.
-   - **Route logs:** the host logs every sound request (tick, ID, priority,
-     loop, cut, category, gain, pitch) on the natural routes: the world-one
-     tape, the menus driver, a death route and a hard-mode route. The
-     inventory gains each sound's observed count and peak concurrency.
-   - **Request ring:** a fixed `SoundRequests` ring in `src/core`, filled at
-     the original call sites in source order. The compact world, shops, run
-     session, pause menu, clear screen, results and front end all write to
-     it. The `// Audio is W2` stubs become real requests and the missing
-     sites are added.
-   - **Core bookkeeping:** `global.OLchannel`, cut-previous and offscreen
-     suppression live in core. The gameplay-visible `isPlaying` reads (the
-     recharge sound and `global.voidWind`) use the source-duration model.
-     The audio-only ones may use the backend's voice state.
-   - **No further gameplay change:** after the RNG fix, the host tapes stay
-     byte-identical, and host tests check the request logs of the routes.
-   - **SDL:** it may play the logged requests as a reference. This is
-     optional.
+3. **Request gaps.** The core `SoundRequests` rings are filled at the
+   world-1 call sites, and `make test-sound-routes` checks three host routes
+   against `tests/data/sound-routes` (world one, a hard-mode run that dies
+   in 1-2 through the results, and the menus driver). These sites are still
+   missing:
+   - the shop case break 10 (`shopCase`);
+   - the frog-against-frog bump 116, which the compact world does not model;
+   - the garden player's footsteps, landing and jump (the menu player has
+     no material or step timing);
+   - the Exploding Knees and decoy sounds, with their W1.9 owners.
+
+   The floor material for footsteps and landings is approximated from three
+   probes under the player. The pause menu's sounds are only on the native
+   menus route (`tools/verify-menus-native.py`), not on a host route.
 4. **Paula mixer.** It is also the first player of the W2.2 bank: listen
    to the chosen set in FS-UAE before wiring.
+   - **Request contract:** drain `GameplayWorld::soundRequests()` and
+     `AmigaSceneRuntime::sounds().requests()` once per frame (nothing on the
+     Amiga drains them yet; a full ring drops its oldest request). Drain the
+     run's ring before `restartFromResults` or any world rebuild, which
+     resets it. A play carries asset × script gain, pitch, priority, loop,
+     cut and the `OLchannel` category; a gain request may carry a fade time
+     (`fadeMs`); ids below `SoundVoices::firstVoice` name an asset (all its
+     voices). Music requests (category 5, `levelBeginCue`) are logged for WM
+     and may be ignored.
    - **Generalise `AmigaWindAudio`** into four voices, with commands
      published by the main loop and applied in the VBlank, and no allocation
      in IRQs.

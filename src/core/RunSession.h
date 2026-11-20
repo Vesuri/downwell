@@ -42,7 +42,8 @@
 #include "Profile.h"
 #include "SoundPlayScript.h"
 #include "TimeFieldWind.h"
-#include "SoundVoices.h"
+#include "SoundRequests.h"
+#include "ShopViewEvents.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -67,6 +68,76 @@ struct RunSession {
     // W2.3: audio_is_playing as gameplay sees it (source lengths, not a
     // device). Room changes keep voices; ResetPlayer/scrInitialize stop all.
     SoundVoices voices;
+    // W2.3: every sound the run asks for, in call order (see SoundRequests).
+    SoundRequests soundRequests;
+    // Script fields for owners that keep none of their own (the compact
+    // world's objects); nothing reads them back across calls.
+    SoundPlayState soundCaller;
+    SoundRequestAudio audio(int category=-1,bool cut=false){
+        return SoundRequestAudio(voices,soundRequests).context(category,cut);
+    }
+    // soundPlay(asset, priority, loop, cut): the new voice (sndsnd).
+    int soundPlay(int asset,int priority,bool loop,bool cut){
+        SoundPlayEnvironment env;auto a=audio(-1,cut);int result=-1;
+        SoundPlayScript::plain(soundCaller,env,a,asset,priority,loop,cut,result,effectsSucceeded);
+        return result;
+    }
+    // soundPlayOL(asset, priority, loop, cut, channel): the voice if it is
+    // playing, else -1 (and -1 for an offscreen enemymove/waterEnemy call,
+    // which also needs the caller's y and the view: the overload below).
+    // The gunshot channel's bgmDuck is music (WM).
+    int soundPlayOL(int asset,int priority,bool loop,bool cut,const char* channel){
+        SoundPlayEnvironment env;return soundPlayOL(asset,priority,loop,cut,channel,env);
+    }
+    int soundPlayOL(int asset,int priority,bool loop,bool cut,const char* channel,
+        MotionBinary64 y,MotionBinary64 viewY,MotionBinary64 viewHeight){
+        SoundPlayEnvironment env;env.y=y;env.viewY=viewY;env.viewHeight=viewHeight;
+        return soundPlayOL(asset,priority,loop,cut,channel,env);
+    }
+    int soundPlayOL(int asset,int priority,bool loop,bool cut,const char* channel,SoundPlayEnvironment& env){
+        const int category=SoundPlayScript::channel(channel);
+        auto a=audio(category,cut);int result=-1;bool returned=false;
+        SoundPlayScript::overlap(soundCaller,env,a,[]{return true;},overlapSounds[category],
+            asset,priority,loop,cut,channel,result,returned,effectsSucceeded);
+        return returned?result:-1;
+    }
+    bool stopSound(int id){return audio().stop(id);}
+    bool setSoundGain(int id,MotionBinary64 gain,int time=0){return audio().setGain(id,gain,time);}
+    bool setSoundPitch(int id,MotionBinary64 pitch){return audio().setPitch(id,pitch);}
+    // W2.3: Shop Step's sounds for the compact shops, after the interaction:
+    // the step's merchant and UI sounds (ShopFeedback), then the !criminal
+    // branch's sfxSkInRange on entering the view (left/top in room pixels,
+    // 160 x 284) and sfxSkAnger once the player passes the keeper.
+    void playShopSounds(int viewLeft,int viewTop,int playerX){
+        for(auto& shop:shops.instances){
+            if(!shop.allocated||shop.sourceId)continue;
+            const auto& f=shop.feedback;
+            for(unsigned i=0;i<f.soundCount;++i)
+                soundPlayOL(f.sounds[i].resource,f.sounds[i].priority,false,true,
+                    f.sounds[i].channel==ShopFeedback::Channel::merchant?"merchant":"UI");
+            if(!shop.present)continue;
+            struct Ops {
+                RunSession& run;const ShopWorld::Instance& shop;int left,top,player;
+                MotionBinary64 x(){return MotionBinary64::fromInteger(shop.x);}
+                MotionBinary64 y(){return MotionBinary64::fromInteger(shop.y);}
+                MotionBinary64 keeperX(){return MotionBinary64::fromInteger(shop.x+18);}
+                bool view(unsigned field,MotionBinary64& out){
+                    const int values[]={left,top,160,284};out=MotionBinary64::fromInteger(values[field]);return true;
+                }
+                bool playerX(MotionBinary64& out){out=MotionBinary64::fromInteger(player);return true;}
+                bool sound(int id){run.soundPlayOL(id,90,false,true,"merchant");return run.effectsSucceeded;}
+            } ops{*this,shop,viewLeft,viewTop,playerX};
+            if(!ShopViewEvents::step(shop.shopInView,shop.keeperAngry,ops))effectsSucceeded=false;
+        }
+    }
+    void playDeathSounds(){
+        soundPlay(89,100,false,false);
+        setSoundGain(backgroundMusicId,MotionBinary64::fromInteger(0));
+        stopSound(backgroundMusicId);
+    }
+    // objPauseMenu Create's audio_pause_all and its Resume's audio_resume_all.
+    bool pauseAllSounds(){return audio().pauseAll();}
+    bool resumeAllSounds(){return audio().resumeAll();}
     template<class Audio> bool playSkeletonStompSound(SoundPlayState& caller,
         SoundPlayEnvironment& environment,Audio& audio){
         int result=-1;bool returned=false;
@@ -527,18 +598,35 @@ struct RunSession {
     }
     // Pickup-only upgrade effects: nonGemGainGem (combo rewards) does not
     // invoke scrRechargeGem. Ownership is sampled at collection, not birth.
+    // W2.3 sounds: a floor bounce below the view top (viewTopQ8: the view's
+    // top relative to the gem's origin, in Q8; the default never plays),
+    // Alarm 2's sfxGemDisappear for an unattracted expiry, and scrGainGem's
+    // pickup (sfxUpgradeGem_pickup_shoot with pugGemPop, else sfxGemGet) and
+    // scrRechargeGem's recharge.
     template<class Solid, class Random>
     CurrencyStepResult collectCurrency(GemMotion& motion, bool large, unsigned amount,
-        PlayerMotion& player, CurrencyAccount& currency, Solid solid, Random& random) {
+        PlayerMotion& player, CurrencyAccount& currency, Solid solid, Random& random,
+        long viewTopQ8=0x7fffffffL) {
+        const bool attracted=motion.attracted;
         const auto result = stepCurrency(motion, large, amount,
             player.frameStartXFixed(), player.frameStartYFixed(),
             player.offsetXFixed(), player.offsetYFixed(), currency, solid, random,
             upgrades.levels[20] != 0);
+        if(result==CurrencyStepResult::expired){
+            if(!attracted)soundPlay(166,30,false,true);
+            return result;
+        }
+        if(motion.bounced&&GemMotion::q8(motion.y)>viewTopQ8)soundPlay(motion.sound.bounceSound,30,false,true);
         if (result == CurrencyStepResult::collected) {
             gemStreakRise.reset();
-            if(upgrades.levels[4])player.rechargeFromGem(amount);
+            playGemPickup();
+            if(upgrades.levels[4]&&player.rechargeFromGem(amount))soundPlay(27,90,false,true);
         }
         return result;
+    }
+    void playGemPickup(){
+        if(upgrades.levels[16])soundPlay(341,70,false,true);
+        else soundPlayOL(167,60,false,true,"UI");
     }
     // objCurrency's stopped branch (pTimeStop outside fields) skips motion
     // and alarms; collection by the player still sees the gem.
@@ -547,7 +635,8 @@ struct RunSession {
         if(!motion.collectible(player.offsetXFixed(),player.offsetYFixed(),large))return CurrencyStepResult::alive;
         currency.collect(amount,300,upgrades.levels[20]!=0);
         gemStreakRise.reset();
-        if(upgrades.levels[4])player.rechargeFromGem(amount);
+        playGemPickup();
+        if(upgrades.levels[4]&&player.rechargeFromGem(amount))soundPlay(27,90,false,true);
         return CurrencyStepResult::collected;
     }
     // Shop Create snapshots prices from run ownership; acquiring a card later
@@ -670,6 +759,77 @@ struct RunSession {
         // The placed start field predates generated ordinary/exit fields.
         if(startFieldPresent)startField.advanceDraw(timeStopped,random);
         results.presentationStep();
+        if(results.active)playResultsDrawSounds();
+    }
+    // W2.3 DeathMenu sounds. Step and alarms (after results.beginStep):
+    // sfxUiMove_Up_in_menu per cursor edge, Alarm 0's sfxUiNumbers_Appear and
+    // Alarm 1's sfxUiProgress_Bar_Celebration.
+    void playResultsStepSounds(){
+        if(!results.active)return;
+        for(unsigned n=results.inputEffects.navigationSounds;n;--n)soundPlayOL(324,90,false,true,"UI");
+        if(results.alarmSounds&1)soundPlayOL(325,90,false,true,"UI");
+        if(results.alarmSounds&2)soundPlayOL(327,90,false,true,"UI");
+    }
+    // Create's sfxUiGame_Over_Appear when the results open.
+    void playResultsOpenSound(bool wasActive){
+        if(results.active&&!wasActive)soundPlayOL(319,90,false,true,"UI");
+    }
+    // Draw: the fill blip at 1 + (progBarLength / 96) * 1.2 from the bar's
+    // pre-fill length, the finish sound, and the goal's pop.
+    void playResultsDrawSounds(){
+        const auto& f=results.frame;
+        if(f.fillSound){
+            const int voice=soundPlayOL(328,90,false,true,"UI");
+            // progBarLength / 96 = (fake - previous goal) / (next - previous)
+            // with the pre-fill total (the frame's displayed total).
+            MotionBinary64 fraction,length,unit,scaled,pitch=MotionBinary64::fromInteger(1);
+            const auto ninetySix=MotionBinary64::fromInteger(96);
+            const auto span=f.nextGoal-f.previousGoal,done=f.displayedTotal-f.previousGoal;
+            if(span<0x7fffffffULL&&done<0x7fffffffULL&&
+               divideBinary64(MotionBinary64::fromInteger(std::int32_t(done)),MotionBinary64::fromInteger(std::int32_t(span)),fraction)&&
+               multiplyBinary64(ninetySix,fraction,length)&&divideBinary64(length,ninetySix,unit)&&
+               multiplyBinary64(unit,{0x3ff33333u,0x33333333u},scaled)&&pitch.add(scaled))
+                setSoundPitch(voice,pitch);
+        }
+        if(f.completedSound)soundPlayOL(330,80,false,true,"UI");
+        if(f.unlockedGoal>=0)soundPlayOL(329,90,false,true,"UI");
+    }
+
+    // Result Create: pause the song, then fade the whoosh in (not in area 3).
+    int levelClearWhoosh=-1;
+    void playLevelClearOpenSounds(){
+        bool playing=false;
+        if(voices.isPlaying(backgroundMusicId,playing)&&playing)audio().pause(backgroundMusicId);
+        levelClearWhoosh=stage.area!=3?soundPlayOL(186,80,true,true,"UI"):-1;
+        if(voices.playing(levelClearWhoosh)){
+            setSoundGain(levelClearWhoosh,MotionBinary64::fromInteger(0));
+            setSoundGain(levelClearWhoosh,MotionBinary64::fromInteger(1),1000);
+        }
+    }
+    // scrResult, scrGainUg/gainHp and Result Alarm 0/1 sounds.
+    void playLevelClearEffectSound(LevelClearSelection::Effect event,unsigned value){
+        using E=LevelClearSelection::Effect;
+        switch(event){
+        case E::moveSound:soundPlayOL(338,90,false,true,"UI");break;
+        case E::grantChoice:{
+            const unsigned t=levelClear.offers.ids[value];
+            if(t==13||t==6)soundPlay(3,90,false,true);
+            if(t==21)soundPlay(167,60,false,true);
+            break;
+        }
+        case E::confirmSound:soundPlayOL(339,90,false,true,"UI");break;
+        case E::fadeWhoosh:
+            if(voices.playing(levelClearWhoosh))setSoundGain(levelClearWhoosh,MotionBinary64::fromInteger(0),1500);
+            break;
+        case E::nextLevel:stopSound(levelClearWhoosh);break;
+        default:break;
+        }
+    }
+    // objTransDither Alarm 0: soundPlayOL(187, 80, 0, 1, "UI").
+    void advanceExitDitherAlarm(){
+        const bool before=exitDither.soundRequested;
+        exitDither.advanceAlarm();
+        if(exitDither.soundRequested&&!before)soundPlayOL(187,80,false,true,"UI");
     }
 
     // Called only after the backend retires the old room's display/DMA.
@@ -679,6 +839,7 @@ struct RunSession {
         if (!levelResultRequested || levelClearActive) return false;
         if (!levelClear.create(style, heartGoal, health, upgrades, player, random)) return false;
         levelClearActive = true;
+        playLevelClearOpenSounds();
         flashEffects.clear();
         wallBackground.clear();
         smokeEffects.clear();
@@ -709,7 +870,7 @@ struct RunSession {
                         GameMakerRandom& random, Emit emit,DitherBirth birth) {
         return stepLevelClearScheduled(confirm,leftPressed,rightPressed,heartGoal,currency,player,health,
             random,emit,birth,[&](auto event){
-                exitDither.advanceAlarm();return levelClear.advanceAlarmsChecked(event);
+                advanceExitDitherAlarm();return levelClear.advanceAlarmsChecked(event);
             });
     }
     template<class Emit,class DitherBirth,class Alarms>
@@ -721,25 +882,47 @@ struct RunSession {
     }
     // W2.3: scrPlMovement's sound scripts, in source order, right after the
     // player's motion. Only their RNG draws and audio_is_playing reads change
-    // gameplay; the requests follow.
-    bool playPlayerSounds(PlayerMotion& player,GameMakerRandom& random,bool dead){
+    // gameplay. floor is the material index (soundFootstep's switch:
+    // breakable, thin, foliage, rock, metal) of instance_place(x, y + 2,
+    // sParentSolid); every table's irandom_range(1, count) consumes two words
+    // whatever the count. fullStepGain: pTimeStop || groundRoom() || atPit.
+    struct PlayerFloor { int operator()()const{return 2;} };
+    template<class Floor=PlayerFloor>
+    bool playPlayerSounds(PlayerMotion& player,GameMakerRandom& random,bool dead,Floor floor={},bool fullStepGain=false){
         using Event=PlayerMotion::SoundEvent;
+        // initSfxFs / initSfxJl: global.sfxFs[i] and global.sfxJl[i].
+        static const std::uint8_t steps[5][5]={{3,48,49,50},{3,63,64,65},{4,51,52,53,54},{4,55,56,57,58},{4,59,60,61,62}};
+        static const std::uint8_t lands[5][5]={{3,66,67,68},{2,81,82},{4,69,70,71,72},{4,73,74,75,76},{4,77,78,79,80}};
+        const auto material=[&]{const int m=floor();return m<0||m>4?0:m;};
         for(unsigned i=0;i<player.soundEventCount();++i){
             switch(player.soundEvent(i)){
             case Event::jump:case Event::wallKick:
                 random.chooseIndexSmall(1); // soundPlay(choose(86), 80, 0, 1)
+                soundPlay(86,80,false,true);
                 break;
             case Event::land:
                 // soundLand: landOn && !global.death && !napping, then only
-                // while sfxGunRecharge is silent. Every material table's
-                // irandom_range(1, count) consumes two words.
-                if(!dead&&!voices.playing(27))random.irandomSmall(3);
+                // while sfxGunRecharge is silent.
+                if(!dead&&!voices.playing(27)){
+                    const auto& table=lands[material()];
+                    soundPlayOL(table[1+random.irandomSmall(table[0]-1u)],60,false,true,"footsteps");
+                }
                 break;
-            case Event::footstep:
-                random.irandomSmall(3); // soundFootstep
+            case Event::footstep:{
+                const auto& table=steps[material()];
+                soundPlayOL(table[1+random.irandomSmall(table[0]-1u)],60,false,true,"footsteps");
+                // sndgain = audio_sound_get_gain(sndsnd) * (1 or 0.7).
+                MotionBinary64 gain,scaled;
+                if(voices.getGain(soundCaller.sndsnd,gain)&&(fullStepGain||
+                   multiplyBinary64(gain,{0x3fe66666u,0x66666666u},scaled))){
+                    soundCaller.sndgain=fullStepGain?gain:scaled;
+                    setSoundGain(soundCaller.sndsnd,soundCaller.sndgain);
+                }
                 break;
+            }
             case Event::hardLandTurn:
-                break; // soundPlay(88, 30, 0, 1): no draw
+                soundPlay(88,30,false,true); // no draw
+                break;
             }
         }
         startRechargeSounds(player); // the landing's scrWallCol recharge follows
@@ -748,11 +931,7 @@ struct RunSession {
     // soundPlay(27, 90, 0, 1) for each successful scrRecharge since the last
     // call: the landing, stomps and contact knockback (scrFjump).
     void startRechargeSounds(PlayerMotion& player){
-        for(unsigned n=player.takeRechargeSounds();n;--n){
-            int voice=-1;
-            voices.stop(27);
-            voices.play(27,90,false,voice);
-        }
+        for(unsigned n=player.takeRechargeSounds();n;--n)soundPlay(27,90,false,true);
     }
     // goalTimeField 255 (and its child startTimeField) Collision with
     // objPlayer_n at the published player position: a new voidWind once the
@@ -777,7 +956,8 @@ struct RunSession {
     // Result Step after scrResult, and the goal fields' contact.
     bool resultStepWind(GameMakerRandom& random){
         std::int32_t sound=0;
-        if(!fieldWind.contact(random,sound,overlapSounds[8],MotionBinary64::fromInteger(1),voices))
+        auto a=audio(SoundPlayScript::channel("UI"),true);
+        if(!fieldWind.contact(random,sound,overlapSounds[8],MotionBinary64::fromInteger(1),a))
             return effectsSucceeded=false;
         return true;
     }
@@ -796,6 +976,7 @@ struct RunSession {
                 exitDither.create(0, levelClear.motion.viewY());
             }
             if (event == LevelClearSelection::Effect::nextLevel) nextLevelRequested = true;
+            playLevelClearEffectSound(event,value);
             emit(event, value);
         };
         if(!alarms([&](auto event,unsigned value){
@@ -829,7 +1010,7 @@ struct RunSession {
 
     void advanceLevelExitAlarms(int viewX, int viewY) {
         if (!levelExitPresent) return;
-        exitDither.advanceAlarm();
+        advanceExitDitherAlarm();
         levelExit.advanceAlarms([&](LevelExit::Effect effect, int, int) {
             if (effect == LevelExit::Effect::ditherTransition) {
                 exitDitherRequested = true;
@@ -875,7 +1056,7 @@ struct RunSession {
         oxygen=MotionBinary64::fromInteger(100);
         for(auto& sound:overlapSounds)sound=0;
         fieldWind={};
-        voices.stopAll();
+        audio().stopAll();
         gems = {};
         gems.lifetime = saved.lifetimeGems;
         gems.record = saved.bestRunGems;

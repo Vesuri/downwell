@@ -3212,7 +3212,7 @@ private:
                 if(record.objectId==68){
                     if(instances_.resolve(resultDither_)!=&record||alarm!=0)return false;
                     run_.exitDither.alarm0=record.alarms.get(0);
-                    run_.exitDither.advanceAlarm();record.alarms.set(0,run_.exitDither.alarm0);
+                    run_.advanceExitDitherAlarm();record.alarms.set(0,run_.exitDither.alarm0);
                     return true;
                 }
                 if(!record.alarms.advanceOne(alarm))return true;

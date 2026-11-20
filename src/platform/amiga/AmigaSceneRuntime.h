@@ -4,6 +4,7 @@
 #include "core/Input.h"
 #include "core/ShopInteraction.h"
 #include "core/ResultsDestination.h"
+#include "core/FrontEndSounds.h"
 #include <cstdint>
 
 enum class AmigaScene {
@@ -67,6 +68,8 @@ public:
     unsigned playStyle() const { return playStyle_; }
     // One-shot: PlayMenu confirmed (ini_write_real style and hardMode).
     bool takeStyleConfirmed() { const bool value = styleConfirmed_; styleConfirmed_ = false; return value; }
+    // W2.3: the front end's sound requests (drained by the backend).
+    downwell::FrontEndSounds& sounds() { return sounds_; }
 
 private:
     static int roundedPixel(long value);
@@ -132,6 +135,8 @@ private:
     long styleVerticalDitherY_;
     unsigned styleUnlock_ = 0, playStyle_ = 0;
     bool hardUnlocked_ = false, hardMode_ = false, styleConfirmed_ = false;
+    bool firstBoot_ = false; // global.firstBoot: the title sting plays once
+    downwell::FrontEndSounds sounds_;
 };
 
 #endif

@@ -1656,7 +1656,7 @@ public:
         // The admitted Result singleton follows object 37 and the existing
         // scalar object-68 wipe. A new wipe born by this Alarm 0 is not stepped
         // by this alarm phase. Full registered wipe ownership remains separate.
-        if(alarm==0)run_.exitDither.advanceAlarm();
+        if(alarm==0)run_.advanceExitDitherAlarm();
         return run_.effectsSucceeded=run_.levelClear.selection.advanceAlarmChecked(alarm,
             [&](auto event,unsigned value){return emit(context,event,value)&&run_.effectsSucceeded;});
     }
@@ -2528,6 +2528,20 @@ public:
         },[this]{return enemyRandom_.chooseIndexSmall(3);},health_,owner,lookup);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
+    // W2.3: the run's sound requests (the backend drains them each frame)
+    // and the voice model behind them.
+    downwell::SoundRequests& soundRequests() { return run_.soundRequests; }
+    // Scripts outside the world's step (pause menu, death and results
+    // menus): soundPlayOL(id, 90, 0, 1, "UI") and objPauseMenu's
+    // audio_pause_all / audio_resume_all (Resume also re-pauses the song in a
+    // void room).
+    int playUiSound(int id) { return run_.soundPlayOL(id, 90, false, true, "UI"); }
+    void pauseAllSounds() { run_.pauseAllSounds(); }
+    void resumeAllSounds() {
+        run_.resumeAllSounds();
+        if (run_.timeStopped) { auto audio = run_.audio(); audio.pause(run_.backgroundMusicId); }
+    }
+    const downwell::SoundVoices& soundVoices() const { return run_.voices; }
     template<class Body> bool withShopStepState(Body body){
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=body(run_.shops.inputState(),currencyAccount_)&&run_.effectsSucceeded;
@@ -2704,13 +2718,13 @@ public:
         auto* edges=encounterInput_?&encounterInput_->publication():nullptr;
         bool& publishedConfirm=edges?edges->confirm:confirm;
         if(edges){leftPressed=edges->left;rightPressed=edges->right;}
-        ++tick_;
+        ++tick_;run_.soundRequests.setTick(tick_);
         run_.voices.advance(); // W2.3: the Result room's source steps keep the audio clock
         return run_.stepLevelClearPositioned(publishedConfirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, player_, health_, enemyRandom_, emit,[](int,int){return true;},
             [this](auto event){
                 if(!resultRoomAlarms_){
-                    run_.exitDither.advanceAlarm();return run_.levelClear.advanceAlarmsChecked(event);
+                    run_.advanceExitDitherAlarm();return run_.levelClear.advanceAlarmsChecked(event);
                 }
                 return resultRoomAlarms_(resultRoomAlarmsContext_,
                     [](void* context,downwell::LevelClearSelection::Effect effect,unsigned value){
@@ -3012,6 +3026,13 @@ private:
     // Uses the cell index when ready; the native-box build has none, so it
     // scans as bulletSolidContact does.
     int breakableAt(int x, int y) const;
+    int playerFloorMaterial() const;
+    void playShotSound(int ammoBefore);
+    bool playPlayerHurt();
+    void playEnemySound(int sound,int roomY);
+    void soundPlayOLAt(int sound,int priority,bool loop,bool cut,const char* channel,int roomY);
+    void compactLevelBeginMusic();
+    downwell::TimeStopAudio timeStopAudio_; // bgmDuck's caller fields (unused until WM)
     unsigned blocksDestroyed_;
     std::uint64_t checkpoint_;
     downwell::StateDigest trajectory_;

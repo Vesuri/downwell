@@ -247,6 +247,12 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     cameraShakeAlarm_=-1;
     cameraY_=cameraPixelY_=cameraPixelX_=0;
     ringOrigin_=initialRingOrigin%ringHeight;
+    // ResetPlayer: audio_resume_all, audio_stop_all, then the confirm sound.
+    // The rebuilt run starts an empty ring and voice model; the backend must
+    // drain the old ring before this call.
+    run_.resumeAllSounds();
+    run_.audio().stopAll();
+    run_.soundPlayOL(321,90,false,true,"UI");
     if(playerBirthPending_)return destination;
     if(!birthPlayerOwnership())return downwell::ResultsDestination::none;
     initializeMainCameraFrame();
@@ -1053,7 +1059,8 @@ void GameplayWorld::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmE
     }
     if (effect.alarm == 0) enemy.alarm0 = effect.ticks;
     else enemy.alarm1 = effect.ticks;
-    // Audio output is not yet implemented by this backend.
+    // Alarm 0's jump (116) or Alarm 1's prepare (113), from the frog itself.
+    if (effect.sound >= 0) playEnemySound(effect.sound, enemy.y + 176);
 }
 
 bool GameplayWorld::captureEnemyStepOrder(){
@@ -1324,6 +1331,9 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         enemy.facing = bat.facing;
         enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         if(!effects.succeeded)return false;
+        // enmBat Step: the hit's sfxBatHit, then a sfxBatFly per wake test.
+        if (effects.hit) playEnemySound(112, enemy.y + 176);
+        for (unsigned n = 0; n < effects.wakeSounds; ++n) playEnemySound(110, enemy.y + 176);
         if (effects.hit) {
             enemy.alarm0 = 3;
             if(!publishEnemyImage(enemy,0))return false;
@@ -1364,10 +1374,12 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
         enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
         if(!effects.succeeded)return false;
+        if (effects.hit) playEnemySound(115, enemy.y + 176); // sfxFrogHit
     } else if (enemy.objectId == 117) {
         DW_PROFILE_SCOPE(profileEnemySnail);
         const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
         if (hitAlarm >= 0) {
+            playEnemySound(120, enemy.y + 176); // sfxSlugHit
             if(!publishEnemyImage(enemy,0))return false;
             enemy.imagePhase = 0; enemy.imageRemainder = 0;
             enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
@@ -1588,6 +1600,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const unsigned oldCurrency = currencyAccount_.currency;
     const unsigned oldGemStreak = currencyAccount_.streak;
     const unsigned oldShots = player_.shots();
+    const int ammoBeforeStep=player_.ammo(); // scrShotSound reads stammo before the charge is spent
     bool bulletChanged = false;
 #ifdef DOWNWELL_REFERENCE_FRAME_WORK
     unsigned destroyedBlockCount = 0;
@@ -1602,6 +1615,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     ++tick_;
     // W2.3: the audio clock of this source step (see SoundVoices).
+    run_.soundRequests.setTick(tick_);
     run_.startRechargeSounds(player_);
     run_.voices.advance();
     // objControlerN (37) runs after objPlayer_n (35), so it sees this
@@ -1611,10 +1625,18 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const auto streakTimerBeforeStep=currencyAccount_.timer;
     const bool stoppedBeforeStep=stopped();
     currencyAccount_.beginStep(false,stoppedBeforeStep);
-    run_.selectWeaponLevel(currencyAccount_);
+    {
+        // scrControlBeginstepCheck: sfxGemBoostEnter on reaching gem high,
+        // sfxGemBoostEnd on leaving it unless dead.
+        const bool wasHigh=run_.gemHigh;
+        run_.selectWeaponLevel(currencyAccount_);
+        if(run_.gemHigh&&!wasHigh)run_.soundPlay(158,90,false,true);
+        else if(!run_.gemHigh&&wasHigh&&!death_.active)run_.soundPlay(160,90,false,true);
+    }
     run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     run_.results.beginStep(input,encounterInput_?&encounterInput_->publication():nullptr);
+    run_.playResultsStepSounds();
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     const auto activation = downwell::advanceMainRoomActivationChecked(activationY_,
@@ -1687,7 +1709,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if(!playerTimeTransition_)return !compactTimeStop()||beginCompactTimeStop(x,y);
             return run_.effectsSucceeded&&
                 playerTimeTransition_(playerTimeContext_,playerInstance_,motion,x,y)&&run_.effectsSucceeded;
-        },[this](PlayerMotion& motion){return run_.playPlayerSounds(motion,enemyRandom_,death_.active);});
+        },[this](PlayerMotion& motion){
+            return run_.playPlayerSounds(motion,enemyRandom_,death_.active,[this]{return playerFloorMaterial();},run_.timeStopped);
+        });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
     if(run_.shops.allocatedCount)createCompactShopSpeech();
@@ -1723,14 +1747,19 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if(!run_.smokeEffects.emitDirected(x,y,Real::fromInteger(direction),Real::fromInteger(4),enemyRandom_))
                 {run_.effectsSucceeded=false;return {};}
     }
+    if(player_.emptyShots()!=emptyShotsBefore)run_.soundPlay(26,90,false,true); // sfxGunEmpty
     if(stopped()!=stoppedBeforeStep){
         currencyAccount_.streak=streakBeforeStep;currencyAccount_.timer=streakTimerBeforeStep;
         currencyAccount_.beginStep(false,stopped());
     }
     if (player_.shots() != oldShots && gunsActive_()) {
+        playShotSound(ammoBeforeStep);
         if(!firePlayerGun(muzzleX,muzzleY-4,muzzleX,muzzleY))return {};
+        // The shot that spends the last charge: soundPlay(26, 90, 0, 1).
+        if(player_.ammo()==0)run_.soundPlay(26,90,false,true);
         bulletChanged=true;
     } else if (player_.shots() != oldShots) {
+        playShotSound(ammoBeforeStep);
         const int muzzleOffset = emitter_.nextOffset();
         // Marked records remain resolvable until Draw cleanup; never compact
         // them away merely because gameplay/rendering has stopped using them.
@@ -1998,7 +2027,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
         const auto result = run_.collectCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
             player_, currencyAccount_,
-            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
+            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_,
+            boneViewTopQ8_-176L*256);
         if (result != downwell::CurrencyStepResult::alive) {
             gem.active = false;
             continue;
@@ -2084,12 +2114,17 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.imageScaleY(),
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)}, enemy.x, enemy.y};
         },
-        [this](EnemyState& enemy) { return compactEnemyDeath(enemy, true); },
+        [this](EnemyState& enemy) {
+            // scrEnemyStomped's soundPlayOL(122, 50, 0, 1, "footsteps")
+            // precedes the death the compact world runs here.
+            run_.soundPlayOL(122,50,false,true,"footsteps");
+            return compactEnemyDeath(enemy, true);
+        },
         [](downwell::EnemyContact) {},
         [this](int x,int y) {
             compactDamageSlowdown();
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
-                x,y,240,176);
+                x,y,240,176)&&playPlayerHurt();
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
     if (steeringPopulation_ && !collideSteeringEnemies()) return {};
     run_.startRechargeSounds(player_); // stomps and contact knockback (scrFjump)
@@ -2300,7 +2335,11 @@ struct GameplayWorld::SteeringOps {
         enemy->imagePhase=0;enemy->imageRemainder=0;
         return world.publishEnemyImage(*enemy,0);
     }
-    bool sound(int,int,int,int,const char*){return true;} // Audio is W2.
+    bool sound(int id,int priority,int loop,int cut,const char* channel){
+        if(!enemy)return false;
+        world.soundPlayOLAt(id,priority,loop!=0,cut!=0,channel,enemy->y+176);
+        return world.run_.effectsSucceeded;
+    }
     bool lengthdir(bool vertical,Real speed,Real angle,Real& value){
         return downwell::WhiteJellyStep::movementComponent(vertical,speed,angle,value);
     }
@@ -2308,8 +2347,9 @@ struct GameplayWorld::SteeringOps {
         return enemy&&object==57&&world.steeringWallMeeting(
             downwell::enemyContactMask(enemy->objectId,enemy->spriteId),x,y,hit);
     }
-    bool enemyDeath(){ // scrEnemyDeath
-        world.run_.combo.state.enemyDefeated();++world.run_.kills;world.compactLevelBeginCue();return true;
+    bool enemyDeath(){ // scrEnemyDeath, gunshotStop included
+        world.run_.combo.state.enemyDefeated();world.run_.stopSound(world.run_.overlapSounds[1]);
+        ++world.run_.kills;world.compactLevelBeginCue();return true;
     }
     // scrSmoke(x,y,1,0) and scrFlashballfx(x,y,1,0,0) create objects with
     // Create RNG; emitMovingFx 704 has none.
@@ -2607,10 +2647,11 @@ bool GameplayWorld::collideSteeringEnemies(){
             [&](int x,int y){
                 compactDamageSlowdown();
                 return succeeded=run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
-                    x,y,240,176);
+                    x,y,240,176)&&playPlayerHurt();
             },downwell::NoContactRetirement{},stompY);
         if(!succeeded||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
         if(result==downwell::EnemyContact::stomp){
+            run_.soundPlayOL(122,50,false,true,"footsteps");
             // scrEnemyStomped: scrDamageToEnemy(100), hit and stomped; the
             // death, combo and reward follow in the jelly's next Step.
             actor->health-=100;actor->hit=true;actor->stomped=true;
@@ -2774,7 +2815,10 @@ struct GameplayWorld::SceneryOps {
     std::uint32_t debris=0; // the latest breakablesDebris birth
     bool changed=false,destroyed=false;
     bool fail(){return world.run_.effectsSucceeded=false;}
-    bool sound(int,int,int,int){return true;} // Audio is W2.
+    bool sound(int id,int priority,int loop,int cut){
+        world.run_.soundPlay(id,priority,loop!=0,cut!=0);
+        return world.run_.effectsSucceeded;
+    }
     bool movingFx(Real px,Real py,int sprite,Real rate,Real angle,Real speed){
         return world.compactEffects_.spawnMoving(px,py,sprite,rate,angle,speed)||fail();
     }
@@ -3038,8 +3082,16 @@ struct GameplayWorld::BoxOps {
     using Handle=std::uint32_t;
     GameplayWorld& world;downwell::InstanceHandle key;
     bool fail(){return world.run_.effectsSucceeded=false;}
-    bool soundOverlap(int,int,int,int,const char*){return true;} // Audio is W2.
-    bool sound(int,int,int,int){return true;}
+    // objBox_n Step: the break on waterThings (channel 7: no view test) and
+    // the gunpowder chain's sfxUpgradeGunpowder_Bullet.
+    bool soundOverlap(int id,int priority,int loop,int cut,const char* channel){
+        world.run_.soundPlayOL(id,priority,loop!=0,cut!=0,channel);
+        return world.run_.effectsSucceeded;
+    }
+    bool sound(int id,int priority,int loop,int cut){
+        world.run_.soundPlay(id,priority,loop!=0,cut!=0);
+        return world.run_.effectsSucceeded;
+    }
     bool smoke(Real x,Real y,int count,int vary){return count==1&&vary==0&&world.emitBoxSmoke(x,y);}
     bool flash(Real x,Real y,int count,int vary,int radius){
         return count==1&&vary==0&&radius==2&&world.emitBoxFlash(x,y);
@@ -3089,8 +3141,8 @@ bool GameplayWorld::stepCompactBox(unsigned index){
 // W1.4 compact guns: bStatInitLevel1's seven guns, bulletRanged/bulletLaser
 // shots, bulletCasing, fxLaserTrail, GunModule, moduleText and itemNotif.
 // Room coordinates are offset by (240,176) as for the other compact owners.
-// Audio hooks (shot, pickup, letter sounds) are W2; wall-hit, blood and
-// impact effects are W1.6; upgrades 1 (Reverse Engineering) and 8 (Hot
+// The shot, pickup and letter sounds go through the run's SoundRequests
+// (W2.3); wall-hit, blood and impact effects are W1.6; upgrades 1 (Reverse Engineering) and 8 (Hot
 // Casing) are W1.9.
 
 namespace {
@@ -3105,6 +3157,22 @@ int GameplayWorld::breakableAt(int x,int y)const{
     for(unsigned i=0;i<breakableCount_;++i){const auto& b=breakables_[i];
         if(b.active&&!b.destroyRequested&&x>=b.x-8&&x<b.x+8&&y>=b.y-8&&y<b.y+8)return int(i);}
     return -1;
+}
+
+// soundFootstep/soundLand's instance_place(x, y + 2, sParentSolid).material
+// as the material index, probing the mask's bottom row two pixels down
+// (centre first): shop furniture is metal, boxes breakable, gem chunks rock,
+// thin platforms thin, walls foliage. Audio only: it picks the sample.
+int GameplayWorld::playerFloorMaterial()const{
+    const int px=player_.offsetX(),y=player_.offsetY()+9;
+    const int probes[]={px,px-4,px+3};
+    for(const int x:probes){
+        if(run_.shops.playerSolidAt(x+240,y+176))return 4;
+        if(breakableAt(x,y)>=0)return 0;
+        if(gemChunkBlocks(x+240,y+176))return 3;
+        if(solidResolver_&&solidResolver_(solidResolverContext_,x,y))return 2;
+    }
+    return 1; // Landed with no wall below: a thin platform.
 }
 
 GameplayWorld::BulletState* GameplayWorld::birthBullet(int x,int y,int sprite){
@@ -3181,6 +3249,37 @@ bool GameplayWorld::emitPlayerBullets(int muzzleX,int muzzleY,int playerY,int an
     return true;
 }
 
+// scrPDamage after the damage number: soundPlay(5, 90, 0, 0). Its
+// bgmDuck(500, 0.7) is music (WM).
+bool GameplayWorld::playPlayerHurt(){
+    run_.soundPlay(5,90,false,false);
+    return run_.effectsSucceeded;
+}
+
+// soundPlayOL from a caller at room y against the published view (top,
+// height 284): enemymove and waterEnemy calls outside it are silent.
+void GameplayWorld::soundPlayOLAt(int sound,int priority,bool loop,bool cut,const char* channel,int roomY){
+    auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
+    if(!top.zero())top.high-=8u<<20;
+    run_.soundPlayOL(sound,priority,loop,cut,channel,downwell::MotionBinary64::fromInteger(roomY),
+        top,downwell::MotionBinary64::fromInteger(284));
+}
+void GameplayWorld::playEnemySound(int sound,int roomY){soundPlayOLAt(sound,50,false,true,"enemymove",roomY);}
+
+// scrShotSound: the gun's bStatSound on the gunshot channel; at half charge
+// or less (stammo before this shot) the low-ammo blip, and the gun asset's
+// pitch rises by 0.8 (area 1). The gunshot channel's bgmDuck is music (WM).
+void GameplayWorld::playShotSound(int ammoBefore){
+    const int sound=currentGun().sound;
+    run_.soundPlayOL(sound,80,false,true,"gunshot");
+    auto pitch=downwell::MotionBinary64::fromInteger(1); // audio_sound_get_pitch(sndsnd), dry
+    if(ammoBefore*2<=player_.ammoCapacity()){
+        pitch={0x3ffcccccu,0xcccccccdu}; // 1 + 0.8
+        run_.soundPlayOL(90,85,false,true,"UI");
+    }
+    run_.setSoundPitch(sound,pitch);
+}
+
 // scrPlayerShootN's charged branch after PlayerMotion's recoil and charge:
 // shake, bullets, bulletCasing, then the burst.
 bool GameplayWorld::firePlayerGun(int playerX,int playerY,int muzzleX,int muzzleY){
@@ -3208,6 +3307,7 @@ bool GameplayWorld::burstFire(){
     const int y=int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
     if(!emitPlayerBullets(x,y+4,y,shotAngle_,false))return false;
     if(followCamera_&&!requestCameraShake(gun.shake,gun.shakeDuration))return false;
+    playShotSound(player_.ammo()); // scrShotSound: stammo is already spent
     player_.setVerticalSpeedFifths(gun.recoilFifths);
     auto* casing=downwell::CompactGuns::append(guns_.casings,guns_.casingEnd);
     if(!casing)return run_.effectsSucceeded=false;
@@ -3244,6 +3344,9 @@ bool GameplayWorld::bulletEnemyContact(BulletState& bullet,const downwell::Proje
             downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)};
         if(!enemy.active||enemy.health<=0||!path.intersects(contact))continue;
         consumed=true;
+        // scrTypicalBulletDamage: soundPlay(29, 90, 0, 1) after the damage
+        // (a compact death runs inside the damage below, so it plays first).
+        if(enemy.objectId!=112)run_.soundPlay(29,90,false,true);
         if(enemy.objectId==115||enemy.objectId==118)
             return hitSteeringEnemy(enemy,bulletDirection(bullet),bullet.damage)||(run_.effectsSucceeded=false);
         downwell::RunnerImageValue bx,by;
@@ -3257,7 +3360,10 @@ bool GameplayWorld::bulletEnemyContact(BulletState& bullet,const downwell::Proje
             bullet.damage,bulletDirection(bullet),
             [this](const EnemyState& record){return publishEnemyActivation(record,false);});
         if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
-        if(impact.kind==downwell::BulletImpactKind::immune&&!compactImmuneSpark(bx.promoted(),by.promoted()))return false;
+        if(impact.kind==downwell::BulletImpactKind::immune){
+            if(!compactImmuneSpark(bx.promoted(),by.promoted()))return false;
+            run_.soundPlay(impact.sound,50,false,true); // choose(30, 31)
+        }
         if((impact.kind==downwell::BulletImpactKind::damaged||impact.kind==downwell::BulletImpactKind::defeated)&&
            !compactBulletImpact(enemy,bx.promoted(),by.promoted(),bulletDirection(bullet),bullet.damage,false))return false;
         consumed=impact.kind!=downwell::BulletImpactKind::ignored;
@@ -3465,7 +3571,7 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
            !downwell::ProjectilePublication::coordinate(shot.y,176,ly))return run_.effectsSucceeded=false;
         if(enemy.objectId==112){ // bulletImmune: the 112 spark, then choose(30,31).
             destroy=true;if(!compactImmuneSpark(lx.promoted(),ly.promoted()))return false;
-            (void)enemyRandom_.chooseIndexSmall(2);break;
+            run_.soundPlay(30+int(enemyRandom_.chooseIndexSmall(2)),50,false,true);break;
         }
         bool ignored=false;
         for(unsigned k=0;k<bullet.laserHitCount;++k)if(bullet.laserHits[k]==enemy.lifetimeId)ignored=true;
@@ -3473,11 +3579,12 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         if(bullet.laserHitCount<4)bullet.laserHits[bullet.laserHitCount++]=enemy.lifetimeId;
         if(enemy.health>bullet.damage)destroy=true;
         if(enemy.objectId==115||enemy.objectId==118){
+            run_.soundPlay(16,50,false,true); // sndEnemyhurt
             if(!hitSteeringEnemy(enemy,shot.direction,bullet.damage))return false;
             continue;
         }
-        // scrBloodfx, scrDamageEnemy, scrFlashballfx(x,y,1,0,2), scrBulletImpact:
-        // the hit's blood and flash precede the (here immediate) death.
+        // scrBloodfx, scrDamageEnemy, scrFlashballfx(x,y,1,0,2), soundPlay(16),
+        // scrBulletImpact: the hit precedes the (here immediate) death.
         if(!compactBulletImpact(enemy,lx.promoted(),ly.promoted(),shot.direction,bullet.damage,true))return false;
         const auto impact=downwell::applyBulletDamage(enemy,run_.kills,enemyRandom_,
             [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
@@ -3518,7 +3625,11 @@ bool GameplayWorld::advanceCompactGunAlarms(){
         if(index==3&&burstAlarm_>0&&--burstAlarm_==0){burstAlarm_=-1;if(!burstFire())return false;}
         for(unsigned i=0;i<guns_.moduleEnd;++i)if(guns_.modules[i].live)guns_.modules[i].alarmEvent(index);
         if(index<2)for(unsigned i=0;i<guns_.casingEnd;++i)if(guns_.casings[i].live)(void)guns_.casings[i].alarmEvent(index);
-        for(unsigned i=0;i<guns_.textEnd;++i)if(guns_.texts[i].live)(void)guns_.texts[i].alarmEvent(index);
+        for(unsigned i=0;i<guns_.textEnd;++i)if(guns_.texts[i].live){
+            auto& t=guns_.texts[i];const int shown=t.shown;
+            (void)t.alarmEvent(index);
+            if(t.shown!=shown)run_.soundPlay(334,80,false,true); // Alarm 0: the next letter
+        }
         if(index<2)for(unsigned i=0;i<guns_.noticeEnd;++i)if(guns_.notices[i].live)(void)guns_.notices[i].alarmEvent(index);
     }
     return run_.effectsSucceeded;
@@ -3633,6 +3744,7 @@ bool GameplayWorld::collideGunModules(){
 
 // GunModule Collision with objPlayer_n.
 bool GameplayWorld::pickupGunModule(downwell::CompactGunModuleRecord& m){
+    run_.soundPlay(28,50,false,true); // sfxPickupWeapon
     // scrEffectSpawn(plx, ply, sprFxAmmoCharge, 1, 0, -50500)
     const int px=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
     const int py=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
@@ -3672,6 +3784,8 @@ bool GameplayWorld::drawCompactGunTexts(){
         auto* n=downwell::CompactGuns::append(guns_.notices,guns_.noticeEnd);
         if(!n)return run_.effectsSucceeded=false;
         n->x=t.x;n->y=long(t.y+4)<<16;n->type=t.type;n->amount=t.amount;n->birth=tick_+1;
+        // allShown: sfxShopBuyBtry (ammo) or sfxShopBuyHeart (HP).
+        if(t.type==0||t.type==1)run_.soundPlay(t.type==0?105:106,100,false,true);
     }
     return true;
 }
@@ -3798,9 +3912,20 @@ bool GameplayWorld::beginCompactTimeStop(int publishedX,int publishedY){
             const auto field=fieldAt(downwell::contactWorldBounds({publishedX*256L,publishedY*256L,facing,1,31}));
             id=field.hit?1:-4;fx=downwell::MotionBinary64::fromInteger(field.x);
             fy=downwell::MotionBinary64::fromInteger(field.y);return true;
-        },[](downwell::PlayerTimeStop::AudioQuery,bool& value){value=false;return true;}, // Audio is W2.
+        },[&](downwell::PlayerTimeStop::AudioQuery query,bool& value){
+            auto audio=run_.audio();
+            return downwell::TimeStopAudio::query(query,run_.backgroundMusicId,run_.fieldWind.voice,audio,value);
+        },
         [&](downwell::PlayerTimeStop::Effect effect){
             using Effect=downwell::PlayerTimeStop::Effect;
+            if(downwell::TimeStopAudio::handles(effect)){
+                // Void enter/exit, the wind's stop and the song's pause and
+                // resume; bgmDuck(200, 0.7) is music (WM).
+                if(effect==Effect::duckMusic)return true;
+                downwell::SoundPlayEnvironment env;auto audio=run_.audio();
+                return timeStopAudio_.emit(effect,run_.soundCaller,env,run_.stage.area,
+                    run_.backgroundMusicId,run_.fieldWind.voice,audio)&&run_.effectsSucceeded;
+            }
             if(effect==Effect::shake)return requestTimeStopCameraShake();
             if(effect==Effect::oxygenFloor)return run_.floorTimeStopOxygen();
             if(effect==Effect::change)pauseMilliseconds_+=30; // fxTimeChange Create: sleep(30)
@@ -3936,13 +4061,14 @@ bool GameplayWorld::compactImmuneSpark(downwell::MotionBinary64 x,downwell::Moti
 
 // scrTypicalBulletDamage (usual and spread shots) or bulletLaser's Collision
 // with subparentEnemy, after the damage itself: the impact for scrDeadBody,
-// then the 605 splash (usual) or blood and a flash (laser). Their sounds are W2.
+// then the 605 splash (usual) or blood, a flash and sndEnemyhurt (laser).
 bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
     std::uint32_t direction,int damage,bool laser){
     enemy.takenImpactDamage=damage;
     compactMomentDelay(); // scrDamageEnemy
-    if(!compactDamageEffectsAdmitted)return true;
-    if(laser)return compactBloodfx(x,y)&&run_.emitFlash<1,0,2>(x,y,enemyRandom_);
+    if(!compactDamageEffectsAdmitted){if(laser)run_.soundPlay(16,50,false,true);return run_.effectsSucceeded;}
+    if(laser)return compactBloodfx(x,y)&&run_.emitFlash<1,0,2>(x,y,enemyRandom_)&&
+        (run_.soundPlay(16,50,false,true),run_.effectsSucceeded);
     downwell::RunnerImageValue angle;
     if(!downwell::ProjectilePublication::angle(direction,angle)||
        !compactEffects_.spawnNoLoop(x,y,605,{0x3fd99999u,0x9999999au},angle.promoted(),{}))
@@ -3963,9 +4089,19 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         case 116:sprite=158;break;case 117:sprite=179;break;case 119:sprite=281;break;
         default:return run_.effectsSucceeded=false;
     }
-    compactMomentDelay(); // scrEnemyDeath
+    // scrEnemyDeath: gunshotStop (toggleGuncut is on) before momentDelay.
+    run_.stopSound(run_.overlapSounds[1]);
+    compactMomentDelay();
     compactLevelBeginCue();
     const Real x=Real::fromInteger(enemy.x+240),y=Real::fromInteger(enemy.y+176);
+    int deathSound;
+    switch(enemy.objectId){
+        case 111:deathSound=121;break;case 112:deathSound=123;break;case 113:deathSound=114;break;
+        case 116:deathSound=111;break;case 117:deathSound=119;break;default:deathSound=124;break;
+    }
+    // The family's last act before instance_destroy.
+    struct DeathSound {GameplayWorld& world;int sound,y;~DeathSound(){if(world.run_.effectsSucceeded)world.playEnemySound(sound,y);}}
+        lastAct{*this,deathSound,enemy.y+176};
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
     if(stomped&&!compactBloodfx(x,y))return false;
     if(!compactBloodfx(x,y)||!emitBoxSmoke(x,y)||!run_.emitFlash<1,0,0>(x,y,enemyRandom_))return false;
@@ -4098,8 +4234,8 @@ bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path
     if(!compactWallEffect(real(x,240),real(y,176),101,0))return false;
     // soundBullet(thatWall): objWall_n is foliage, a single-sample table
     // whose irandom_range(1, 1) still consumes two words.
-    enemyRandom_.irandomSmall(0);
-    return true;
+    run_.soundPlayOL(29+int(enemyRandom_.irandomSmall(0)),60,false,true,"gunwall");
+    return run_.effectsSucceeded;
 }
 
 // A full no-loop pool drops the cosmetic puff rather than latching failure.
@@ -4132,11 +4268,30 @@ void GameplayWorld::compactLevelBeginCue(){
     }
     if(!compactTitle_.create(title?title->characters:nullptr,title?title->length:0,run_.stage.level,run_.hardMode))
         compactTitle_={};
+    compactLevelBeginMusic();
+}
+// levelBeginCue after levelNumber's Create: stop sfxFalling, then start the
+// area's song unless it plays (music is silent until WM; the request and
+// its voice are kept so the log and the voice count match the original).
+void GameplayWorld::compactLevelBeginMusic(){
+    run_.stopSound(186);
+    int music;
+    if(!downwell::RunSession::areaMusic(run_.stage.area,music))return;
+    run_.backgroundMusicId=music;
+    if(run_.voices.playing(music))return;
+    run_.setSoundGain(music,downwell::MotionBinary64::fromInteger(1));
+    run_.soundPlayOL(music,100,true,true,"music");
 }
 
 // comboDone's instance_create(xx, view y + 64 + 64, comboRewardText); Create
 // destroys it at once while global.death. A full store drops the text.
 bool GameplayWorld::createCompactComboReward(){
+    // Create's milestone sounds precede its global.death destroy: sfxCombo1
+    // with nonGemGainGem's sfxGemGet, sfxCombo2, sfxCombo3 with gainHp's.
+    const unsigned mask=run_.combo.reward.soundMask;
+    if(mask&1){run_.soundPlayOL(315,80,false,true,"UI");run_.soundPlay(167,80,false,true);}
+    if(mask&2)run_.soundPlayOL(316,80,false,true,"UI");
+    if(mask&4){run_.soundPlayOL(317,80,false,true,"UI");run_.soundPlay(3,90,false,true);}
     if(dead())return true;
     for(auto& r:compactRewards_)if(!r.live){
         const long viewX=long(160+cameraPixelX_)<<16,viewY=long(34+cameraPixelY_)<<16;

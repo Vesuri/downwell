@@ -57,6 +57,9 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     }, &context, run.timeStopped); // pTimeStop before this Begin Step's transition
     player.configureMovementBoundary([](void* opaque) {
         auto& c = *static_cast<Context*>(opaque);
+        // The first death movement (!prvdeath): sfxDeath, then the song's
+        // gain to 0 and its stop, then saveStats.
+        if(c.death.movementDead()&&!c.run.gems.recorded)c.run.playDeathSounds();
         c.run.gems.observeDeathMovement(c.death.movementDead(), c.currency.gameGem);
     }, &context);
     DW_PROFILE_PHASE(profilePlayerMotion);
@@ -111,6 +114,7 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
         facing, currency, [&random] { return 1u + random.chooseIndexSmall(3); },
         [&run, &currency](unsigned id) { run.consumables.grant(id, currency); },
         [](auto&, auto) {});
+    run.playShopSounds(viewX, viewY, shopPlayerX);
     player.face(facing);
     run.shops.advanceKeepers(shopPlayerX, false, run.stage.area, shopRandom);
     run.shops.advancePresentation();
@@ -121,7 +125,9 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     run.advanceLevelExitAlarms(viewX, viewY);
     death.publishHealth(health);
     death.advanceAlarms(player.grounded());
+    const bool resultsWereActive=run.results.active;
     run.results.open(death.menuReady, run.gems.lifetime, currency.gameGem);
+    run.playResultsOpenSound(resultsWereActive);
     return motion;
 }
 

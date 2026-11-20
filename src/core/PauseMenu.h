@@ -44,7 +44,8 @@ struct PauseMenuText {
 // - Options keep Back, BGM, Timer and Volume; DISPLAY and LANGUAGE (PC
 //   window, scale and language menus) have no Amiga meaning.
 // - The PC build's QUIT item is kept; confirming it leaves the game.
-// Sounds are recorded (soundPlayOL ids) for W2; nothing here plays them.
+// Each step leaves its soundPlayOL id in `sound`; the owner plays it
+// (GameplayWorld::playUiSound) and pauses/resumes all sounds around it.
 struct PauseMenu {
     enum class Screen : unsigned char { closed, pause, confirm, palette, stats, options };
     enum class Action : unsigned char { none, resume, retry, styleSelect, quit };

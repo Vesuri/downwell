@@ -16,6 +16,7 @@
 #include "core/GameplayEncounterSession.h"
 #include "../../core/CollisionOwnerFixture.h"
 #include "GameplayEncounterCoverage.h"
+#include "../../core/SoundRequestLog.h"
 #include "../../../generated/downwell-area-titles.h"
 #include "../../../generated/downwell-shop-speech.h"
 #include <cmath>
@@ -2435,6 +2436,14 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     require(session.start(),"slice uses the production encounter session and input edges");
     LiveSceneWorld live(patterns,objects);
     live.bind(game,rooms,room);
+    // W2.3 hard-mode route: the same policy after style select's hard mode
+    // (objPlayer_n Create's styleUpdate), as the Amiga build applies it.
+    const bool hardRoute=std::getenv("DOWNWELL_SLICE_HARD")!=nullptr;
+    if(hardRoute){
+        require(game.beginRun(0,true),"hard-mode slice begins the run");
+        live.builder.applyRunStyle(0,true);
+    }
+    bool died=false;
     // The route's fire cadence phase (variant%40) and W1.5 hover phase and
     // period (variant/40). Shots draw RNG, so every policy change reshuffles
     // the whole route; DOWNWELL_SLICE_VARIANT sweeps them (and
@@ -2444,6 +2453,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
     std::ofstream tape(output+".inputs",std::ios::binary);
     std::ofstream states(output+".states");
+    // W2.3: the route's sound requests, drained after every step.
+    downwell_test::SoundRequestLog sounds(output+".sounds");
+    require(sounds.good(),"open slice sound log");
+    game.soundRequests().clear();
     unsigned routePickups=0,routeNewGunShots=0;
     require(bool(tape),"open slice input tape");
     unsigned total=0;
@@ -2642,6 +2655,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 if(e.active&&e.health>0)liveEnemies.push_back(e.lifetimeId);}
             if(const char* at=std::getenv("DOWNWELL_SLICE_BREAK_TICK"))if(game.tick()==unsigned(std::atoi(at)))sliceBreak(&game);
             game.step(packed);
+            sounds.drain(game.soundRequests(),game.soundVoices());
             if(!(frame.beginDraw(true)&&frame.finish())){
                 std::cerr<<"slice frame failure level="<<level<<" update="<<updates<<" tick="<<game.tick()
                     <<" effects="<<game.effectsSucceeded()<<" generation="<<game.generationSucceeded()<<'\n';
@@ -2846,6 +2860,24 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
             <<" exit="<<game.levelResultRequested()<<" x="<<game.player().offsetX()<<" y="<<game.player().offsetY()
             <<" shop="<<game.shops().noControl<<std::endl;
+        if(game.dead()&&hardRoute){
+            // The death route: the depleted run's sequence through
+            // DeathMenu's results (fill, goals) with no further input.
+            died=true;
+            unsigned tail=0;
+            for(;tail<900;++tail){
+                downwell::Input input;const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
+                downwell::GameplayEncounterSession::Frame frame(session);
+                require(frame.valid()&&frame.sampleInput(input),"death frame samples input");
+                game.step(packed);
+                sounds.drain(game.soundRequests(),game.soundVoices());
+                require(frame.beginDraw(true)&&frame.finish(),"death frame completes");
+                if(sounds.plays(330))break; // DeathMenu Draw: the bar completed
+            }
+            std::cout<<"Slice death level="<<level<<" tail="<<tail<<" results="<<game.deathResults().active<<std::endl;
+            require(game.deathSequence().menuReady&&game.deathResults().active,"the death route reaches the results");
+            break;
+        }
         routeSpeechFrames+=speechFrames;routePromptFrames+=promptFrames;
         std::cout<<"Slice level="<<level<<" shopVisited="<<shopVisited<<" speechFrames="<<speechFrames<<" promptFrames="<<promptFrames
             <<" funded="<<routeFunded<<" soldOut="<<routeSoldOut<<" poor="<<routePoor<<" farewells="<<routeFarewells
@@ -2879,6 +2911,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             downwell::GameplayEncounterSession::Frame frame(session);
             require(frame.valid()&&frame.sampleInput(input),"slice Result frame samples input");
             require(game.stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"slice Result Step");
+            sounds.drain(game.soundRequests(),game.soundVoices());
             require(frame.beginDraw(true)&&frame.finish(),"slice Result frame completes");
         }
         require(game.nextLevelRequested(),"slice Result Alarm 1");
@@ -2901,7 +2934,21 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             require(!game.finishWorldOneSlice(),"slice transition is consumed once");
         }
     }
-    std::cout<<"World one slice route passed: "<<total<<" inputs\n";
+    const char* routeName=hardRoute?(died?"hard-mode-death":"hard-mode"):"world-one";
+    std::cout<<"World one slice sounds: "<<sounds.requests()<<" requests, "<<sounds.kinds(downwell::SoundRequest::play)
+        <<" plays, peak "<<sounds.peakVoices()<<" voices, dropped "<<sounds.dropped()<<'\n';
+    require(sounds.dropped()==0,"the slice never overflows the sound request ring");
+    // Group 1: jumps, landings, footsteps, the recharge, wall hits.
+    require(sounds.plays(86)&&sounds.plays(27)&&sounds.plays(29),"the route jumps, recharges and hits walls");
+    bool landed=false,stepped=false;
+    for(int id=66;id<=82;++id)landed|=sounds.plays(id)!=0;
+    for(int id=48;id<=65;++id)stepped|=sounds.plays(id)!=0;
+    require(landed&&stepped,"the route lands and runs on terrain");
+    std::string reason;
+    if(died)require(sounds.plays(89)&&sounds.plays(5)&&sounds.plays(319)&&sounds.plays(328),
+        "the death route hurts, dies, opens the results and fills the bar");
+    require(sounds.matchesExpectation(routeName,reason),reason.c_str());
+    std::cout<<"World one slice route passed: "<<routeName<<' '<<total<<" inputs\n";
 }
 
 void testNaturalExit(const char* roomPath, const char* objectPath, const char* patternPath) {

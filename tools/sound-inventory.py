@@ -25,7 +25,7 @@ import pathlib
 import re
 import sys
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 UTMT = ROOT / 'extracted/utmt-0.9.2.0'
 CE = UTMT / 'CodeEntries'
@@ -160,6 +160,22 @@ COMPARE = re.compile(r'(?:object_index|parent)\s*[!=]=\s*\w+|\w+\s*[!=]=\s*objec
 CASE = re.compile(r'case "(.)":((?:(?!case "|default:).)*)', re.S)
 IDENT = re.compile(r'\b[A-Za-z_]\w*\b')
 BUILDERS = ('gml_GlobalScript_scrBuilder', 'gml_GlobalScript_builderCavern')
+
+
+ROUTES = ROOT / 'tests' / 'data' / 'sound-routes'
+
+
+def load_routes():
+    """W2.3 host route summaries: {route: {asset: (plays, peak)}}."""
+    routes = {}
+    for f in sorted(ROUTES.glob('*.summary')):
+        sounds = {}
+        for line in f.read_text().splitlines():
+            parts = line.split()
+            if len(parts) == 3 and parts[0].isdigit():
+                sounds[int(parts[0])] = (int(parts[1]), int(parts[2]))
+        routes[f.stem] = sounds
+    return routes
 
 
 def sha(path):
@@ -336,7 +352,7 @@ def main():
         rows.append({'id': i, 'name': a['name'], 'bytes': size, 'seconds': seconds, 'loop': s['loop'],
                      'scenes': scenes, 'owners': owners_shown, 'verdict': verdict,
                      'volume': a['volume']})
-    text = render(rows, reached_objects, rng_sites, paula)
+    text = render(rows, reached_objects, rng_sites, paula, load_routes())
     if args.check:
         if OUTPUT.read_text() != text:
             sys.exit(f'{OUTPUT} is stale: run tools/sound-inventory.py')
@@ -357,7 +373,7 @@ def _balanced_tail(text):
     return False
 
 
-def render(rows, reached_objects, rng_sites, paula):
+def render(rows, reached_objects, rng_sites, paula, routes):
     def kib(n):
         return f'{n / 1024:.1f}'
     kept = [r for r in rows if not r['verdict'].startswith('drop')]
@@ -373,7 +389,13 @@ def render(rows, reached_objects, rng_sites, paula):
            f'- {len(reached_objects)} objects are reachable from the world-1 rooms; '
            f'{len(rows)} sounds are referenced by their code, '
            f'{len(kept)} of them kept or cut ({kib(sum(r["bytes"] or 0 for r in kept))} KiB '
-           f'before cuts).', '',
+           f'before cuts).',
+           '- Observed and Peak come from the W2.3 host sound routes in',
+           '  `tests/data/sound-routes` (' + ', '.join(
+               f'`{name}` `{sha(ROUTES / (name + ".summary"))[:12]}`' for name in routes) + '):',
+           '  plays requested over all routes, and the most live voices of the sound',
+           '  at once on any route (source durations, after each frame\'s requests).',
+           f'  {sum(1 for r in rows if any(r["id"] in v for v in routes.values()))} of the sounds above are observed.', '',
            '## Totals by scene', '',
            'A sound used in several scenes is counted in each.', '',
            '| Scene | Sounds | KiB | Long (> 2 s) or cut, KiB | The rest, KiB |',
@@ -387,14 +409,17 @@ def render(rows, reached_objects, rng_sites, paula):
             'rooms, time-stop), shop, pause (pause menu and its screens), clear (the',
             'upgrade screen between levels), results (death and results).', '',
             '## Sounds', '',
-            '| ID | Name | Bytes | s | Loop | Scenes | Played by | Verdict |',
-            '|---:|---|---:|---:|:-:|---|---|---|']
+            '| ID | Name | Bytes | s | Loop | Scenes | Played by | Observed | Peak | Verdict |',
+            '|---:|---|---:|---:|:-:|---|---|---:|---:|---|']
     for r in rows:
         owners = ', '.join(r['owners'][:6]) + (f' +{len(r["owners"]) - 6}' if len(r['owners']) > 6 else '')
         b = f'{r["bytes"]:,}' if r['bytes'] is not None else '–'
         s = f'{r["seconds"]:.2f}' if r['seconds'] is not None else '–'
+        seen = [v[r['id']] for v in routes.values() if r['id'] in v]
+        observed = f'{sum(p for p, _ in seen):,}' if seen else ''
+        peak = str(max(k for _, k in seen)) if seen else ''
         out.append(f'| {r["id"]} | `{r["name"]}` | {b} | {s} | {"yes" if r["loop"] else ""} | '
-                   f'{", ".join(r["scenes"])} | {owners} | {r["verdict"]} |')
+                   f'{", ".join(r["scenes"])} | {owners} | {observed} | {peak} | {r["verdict"]} |')
     out += ['', '## Sound-argument RNG draws', '',
             'Each of these consumes the world RNG whether or not audio plays, so the',
             'port must make the same draws. Port status is for the compact',

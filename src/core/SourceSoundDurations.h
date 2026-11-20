@@ -3,6 +3,8 @@
 // W2.3: the source length of each sound resource in 60 Hz steps (ceil of
 // frames * 60 / rate), for SoundVoices' audio_is_playing model. The table is
 // written by tools/sound-durations.py from the extracted audio; lengths only.
+// gain() is the asset volume a fresh voice reads back (audio_sound_get_gain).
+#include "MotionBinary64.h"
 #include <cstdint>
 namespace downwell {
 struct SourceSoundDurations {
@@ -12,6 +14,17 @@ struct SourceSoundDurations {
         };
         constexpr unsigned count=sizeof(table)/sizeof(table[0]);
         return id>=0&&unsigned(id)<count?table[id]:0;
+    }
+    static MotionBinary64 gain(int id){
+        struct Bits {std::uint32_t high,low;};
+        static const Bits table[]={
+#include "../../generated/sound-gains.inc"
+        };
+        constexpr unsigned count=sizeof(table)/sizeof(table[0]);
+        // scrInitialize: audio_sound_gain(sfxGunM, 0.5, 0) before any run.
+        if(id==18)return {0x3fe00000u,0};
+        if(id<0||unsigned(id)>=count)return MotionBinary64::fromInteger(1);
+        return {table[id].high,table[id].low};
     }
 };
 }

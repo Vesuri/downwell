@@ -862,8 +862,8 @@ $(REPO)/generated/contact-motion.inc: $(REPO)/tools/generate-contact-motion.cpp 
 	$(MAKE) -C $(REPO) generated/contact-motion.inc
 
 $(OBJECTS): $(REPO)/generated/smoke-trig.inc
-$(OBJECTS): $(REPO)/generated/sound-durations.inc
-$(REPO)/generated/sound-durations.inc: $(REPO)/tools/sound-durations.py
+$(OBJECTS): $(REPO)/generated/sound-durations.inc $(REPO)/generated/sound-gains.inc
+$(REPO)/generated/sound-durations.inc $(REPO)/generated/sound-gains.inc: $(REPO)/tools/sound-durations.py
 	$(MAKE) -C $(REPO) generated/sound-durations.inc
 $(OBJECTS): $(REPO)/generated/atan-q16.inc
 $(REPO)/generated/atan-q16.inc: $(REPO)/tools/generate-atan-table.py

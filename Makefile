@@ -5,7 +5,7 @@ CXX := clang++
 # Define this before any prerequisite list expands it. Several host checks
 # compile multiple sources in one invocation; their .d file covers only the
 # final source and cannot replace these explicit header dependencies.
-HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc generated/sound-durations.inc
+HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc generated/sound-durations.inc generated/sound-gains.inc
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
@@ -727,11 +727,12 @@ verify-sound-inventory:
 	python3 tools/sound-inventory.py --check
 
 # W2.3: generated/sound-durations.inc (each sound's source length in steps,
-# for SoundVoices' audio_is_playing) matches the extracted audio.
+# for SoundVoices' audio_is_playing) and sound-gains.inc (asset volumes)
+# match the extracted audio.
 .PHONY: verify-sound-durations
 verify-sound-durations:
 	python3 tools/sound-durations.py --check
-generated/sound-durations.inc: tools/sound-durations.py extracted/audio/manifest.json
+generated/sound-durations.inc generated/sound-gains.inc: tools/sound-durations.py extracted/audio/manifest.json
 	python3 tools/sound-durations.py
 
 # W2.2: Paula previews and the listening page
@@ -852,7 +853,7 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc generated/clear-motion.inc generated/sound-durations.inc
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc generated/clear-motion.inc generated/sound-durations.inc generated/sound-gains.inc
 
 build/generate-clear-motion: tools/generate-clear-motion.cpp src/core/LevelClearMotion.h src/core/HudReal.h
 	@mkdir -p build
@@ -3716,3 +3717,17 @@ build/amiga-terrain-ownership-test: $(TERRAIN_OWNERSHIP_TEST_SOURCES) $(HOST_CHE
 verify-terrain-ownership: build/amiga-terrain-ownership-test generate-room-pack generate-object-pack generate-builder-pattern-pack
 	./build/amiga-terrain-ownership-test generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp generated/downwell-sprites.dwsc
 test: verify-terrain-ownership
+
+# W2.3 sound routes: each route's SoundRequests summary against
+# tests/data/sound-routes/<route>.summary (DOWNWELL_WRITE_SOUND_ROUTES=1
+# rewrites them; tools/sound-inventory.py reads them).
+.PHONY: test-sound-routes
+build/amiga-front-end-sound-test: tests/platform/amiga/AmigaFrontEndSoundTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaSceneRuntime.h tests/core/SoundRequestLog.h $(wildcard src/core/*.h) generated/sound-durations.inc generated/sound-gains.inc
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaFrontEndSoundTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp
+test-sound-routes: build/amiga-front-end-sound-test generate-room-pack generate-object-pack generate-builder-pattern-pack $(AMIGA_SCENE_TEST_TARGET)
+	@mkdir -p tmp
+	./build/amiga-front-end-sound-test
+	DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_OUTPUT=tmp/sound-route-world-one ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	DOWNWELL_SLICE_HARD=1 DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_OUTPUT=tmp/sound-route-hard-mode-death ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+test: test-sound-routes
