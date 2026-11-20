@@ -137,6 +137,20 @@ public:
     unsigned landings() const { return landings_; }
     unsigned shots() const { return shots_; }
     unsigned recharges() const { return recharges_; }
+    // W2.3: sound scripts called inside this Begin Step, in source order
+    // (scrUpButtonFunctions, the landing block, the footstep). Their RNG draws
+    // belong to the owner, right after step() and before any later draw:
+    // jump and wallKick are soundPlay(choose(86)); land is soundLand (gated
+    // on sfxGunRecharge and death); footstep is soundFootstep; hardLandTurn is
+    // the hard-landing hop's soundPlay(88). recharge is a successful
+    // scrRecharge (sfxGunRecharge), also from stompBounce/contactKnockback;
+    // the owner drains those with takeRechargeSounds().
+    enum class SoundEvent : unsigned char { jump, wallKick, land, footstep, hardLandTurn };
+    unsigned soundEventCount() const { return soundEventCount_; }
+    SoundEvent soundEvent(unsigned index) const { return soundEvents_[index]; }
+    unsigned takeRechargeSounds() { const unsigned n = pendingRecharges_; pendingRecharges_ = 0; return n; }
+    bool hardLandJump() const { return hardLandJump_; }
+    bool wallPose() const { return wallPose_; }
     // scrEnemyStomped and the Collision scripts: -1 uses the run's style.
     void stompBounce(int playStyle = -1);
     // global.playStyle (styleSet/scrPlayerInit/scrGravity_n): 3 (levitate)
@@ -157,6 +171,17 @@ private:
     static unsigned integerSquareRoot(unsigned value);
     void beginSpin();
     void recharge();
+    void jump(const downwell::Input& input, int x, int y);
+    bool solidBelowWithin(int pixels) const;
+    void addSound(SoundEvent event) { if (soundEventCount_ < 4) soundEvents_[soundEventCount_++] = event; }
+    void setFacing(int value);
+    SoundEvent soundEvents_[4] = {};
+    unsigned soundEventCount_ = 0, pendingRecharges_ = 0;
+    // scrPlayerInit: airstatus = 1, hardLand = hardLandJump = 0,
+    // tinyJumpThreshold = 0. The two counters are alarm[6] and alarm[10].
+    bool airstatus_ = true, hardLand_ = false, hardLandJump_ = false, tinyJumpThreshold_ = false;
+    unsigned hardLandAlarm_ = 0, tinyJumpAlarm_ = 0;
+    bool wallPose_ = false; // playerSpriteControl's sprPlayerWall (20) frame 0
     unsigned recharges_ = 0; // Successful scrRecharge calls, not capacity grants.
 
     long x_;

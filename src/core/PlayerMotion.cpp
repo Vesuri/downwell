@@ -38,6 +38,7 @@ PlayerMotion::PlayerMotion(bool startsGrounded, int landingOffset)
     unsigned index;
     for (index = 0; index < landingProfileSize; ++index)
         landingProfile_[index] = landingOffset;
+    airstatus_ = !startsGrounded; // scrPlayerInit's airborne entry pose
 }
 
 void PlayerMotion::enterRoom(bool fireHeld, int landingOffset)
@@ -120,7 +121,49 @@ void PlayerMotion::recharge()
     if (ammo_ < ammoCapacity_) {
         ammo_ = ammoCapacity_;
         ++recharges_;
+        ++pendingRecharges_; // soundPlay(27, 90, 0, 1)
     }
+}
+
+// scrJump's dry, rocketless branch.
+void PlayerMotion::jump(const downwell::Input& input, int x, int y)
+{
+    speedY_ = jumpSpeed;
+    gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
+    // scrPlayerInit: style 3's jumpsp *= 0.85 (3.74 = 4787.2 fifths).
+    if (playStyle_ == 3) setVerticalSpeedFifths(-4787);
+    addSound(SoundEvent::jump); // soundPlay(choose(86), 80, 0, 1)
+    // objJumpFx at the instance x/y.
+    addDust(true, long(x) * fixedOne, long(y) * fixedOne, 0);
+    jumpShootLocked_ = true;
+    grounded_ = false;
+    hardLandJump_ = false;
+    if (input.left || input.right) spinJumping_ = true;
+    spinPhaseTwentieths_ = 0; // scrJump explicitly resets image_index
+    ++jumps_;
+}
+
+// place_meeting(xx, yy + pixels, sParentSolid) below the player: the landing
+// surface is within reach when standing on it is less than that far down.
+bool PlayerMotion::solidBelowWithin(int pixels) const
+{
+    const int px = fixedToPixel(x_), py = fixedToPixel(y_);
+    long landing = landingY_ / fixedOne;
+    if (landingResolver_ != 0) landing = landingResolver_(landingResolverContext_, px, py);
+    else if (usesLandingProfile_) {
+        int profileX = px - landingProfileLeft;
+        if (profileX < 0) profileX = 0;
+        if (profileX >= (int)landingProfileSize) profileX = (int)landingProfileSize - 1;
+        landing = landingProfile_[profileX];
+    }
+    return landing - py < pixels;
+}
+
+void PlayerMotion::setFacing(int value)
+{
+    if (facing_ == value) return;
+    if (facingPublication_ && !facingPublication_(facingPublicationContext_, value)) { motionSucceeded_ = false; return; }
+    facing_ = value;
 }
 
 void PlayerMotion::contactKnockback(int enemyX, int enemyY)
@@ -168,6 +211,9 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     bool shotFired = false;
     bool horizontalCollision = false;
     dustCount_ = 0;
+    soundEventCount_ = 0;
+    // scrPlMovement reads grounded as the previous scrWallCol left it.
+    const bool groundedAtEntry = grounded_;
 
     if (shotDelay_ > 0)
         --shotDelay_;
@@ -229,6 +275,51 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             motionSucceeded_=false;return {};
         }
     }
+    // scrUpButtonFunctions' dUp block, before scrWallCol integrates the new
+    // speeds: jump, the hard-landing grace jump, the wall kick and the tiny
+    // jump threshold's grounded shot. Instance x/y are the previous Step's
+    // published position.
+    bool groundedBlock = groundedAtEntry, tinyShot = false;
+    const auto publishedX = [this] { return fixedToPixel(frameStartX_); };
+    const auto publishedY = [this] { return fixedToPixel(frameStartY_); };
+    if (!controlsLocked && !dead && firePressed) {
+        if (!interactable) {
+            if (groundedAtEntry) {
+                if (tinyJumpThreshold_ && !(solidResolver_ && solidMaskAt(publishedX(), publishedY() - 16)))
+                    tinyJumpThreshold_ = false;
+                if (tinyJumpThreshold_ && !hardLandJump_) {
+                    tinyShot = true; // scrPlayerShootN while grounded
+                    tinyJumpThreshold_ = false;
+                } else {
+                    jump(input, oldPixelX, oldPixelY);
+                    groundedBlock = false;
+                }
+            } else if (hardLandJump_) {
+                if (solidBelowWithin(8)) jump(input, oldPixelX, oldPixelY);
+                else hardLandJump_ = false;
+            } else if (spinJumping_ && solidResolver_) {
+                int kick = 0; // xsp = -maxsp toward the side away from the wall
+                if (input.left) { if (solidMaskAt(publishedX() + 3, publishedY())) kick = -1; }
+                else if (input.right) { if (solidMaskAt(publishedX() - 3, publishedY())) kick = 1; }
+                if (kick) {
+                    // objJumpFx at x/y (image_angle 90 or 270), choose(86).
+                    addDust(true, long(publishedX()) * fixedOne, long(publishedY()) * fixedOne, kick);
+                    addSound(SoundEvent::wallKick);
+                    jumpShootLocked_ = true;
+                    grounded_ = false;
+                    shotPhaseQuarters_ = 0; // image_index = 0
+                    tinyJumpAlarm_ = 30;
+                    tinyJumpThreshold_ = true;
+                    hardLandJump_ = false;
+                    speedY_ = -4 * fixedOne; // wallkicksp
+                    gravityRemainder_ = 0;
+                    speedX_ = kick * 2 * fixedOne; // maxsp
+                    spinJumping_ = false;
+                }
+            }
+        }
+        if (!jumpShootLocked_) spinJumping_ = false;
+    }
     if (solidResolver_ != 0) {
         long remaining = speedX_;
         while (remaining != 0) {
@@ -277,24 +368,13 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             grounded_ = false;
     }
 
-    if (!controlsLocked && !interactable && firePressed && grounded_) {
-        grounded_ = false;
-        speedY_ = jumpSpeed;
-        gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
-        // scrPlayerInit: style 3's jumpsp *= 0.85 (3.74 = 4787.2 fifths).
-        if (playStyle_ == 3) setVerticalSpeedFifths(-4787);
-        jumpShootLocked_ = true;
-        // scrJump's dry, rocketless branch: objJumpFx at the instance x/y.
-        addDust(true, long(oldPixelX) * fixedOne, long(oldPixelY) * fixedOne, 0);
-        if (input.left || input.right) spinJumping_ = true;
-        spinPhaseTwentieths_ = 0; // scrJump explicitly resets image_index
-        ++jumps_;
-    }
-    // scrUpButtonFunctions clears spin when held fire is no longer jump-locked,
-    // even if a shot is still delayed or ammunition is empty.
-    if (!controlsLocked && input.fire && !jumpShootLocked_) spinJumping_ = false;
-    if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
-        !jumpShootLocked_ && !nonAuto_ && ammo_ == 0) {
+    // scrUpButtonFunctions' dUpHeld block: scrPlayerShootN clears the spin
+    // whenever it is called, whether or not a charge remains.
+    // grounded is still the Begin Step's (an edge walk-off is scrWallCol's).
+    const bool shootCall = tinyShot || (!controlsLocked && input.fire && !groundedBlock && shotDelay_ == 0 &&
+        !jumpShootLocked_ && !hardLandJump_ && !nonAuto_);
+    if (shootCall) spinJumping_ = false;
+    if (shootCall && ammo_ == 0) {
         // scrPlayerShootN's empty-charge branch still brakes a fast fall.
         // It consumes no charge and creates no bullet or shooting animation.
         if (speedY_ > 3 * fixedOne ||
@@ -305,8 +385,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         ++emptyShots_;
         if (!noChargeMessage_) { noChargeMessage_ = true; ++emptyMessages_; }
         shotDelay_ = 16;
-    } else if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
-               !jumpShootLocked_ && !nonAuto_ && ammo_ > 0) {
+    } else if (shootCall && ammo_ > 0) {
         if (gunRules_) {
             // if (ysp > global.pBulRecoil) ysp = global.pBulRecoil
             if (speedY_ * 5 + gravityRemainder_ > gunRecoilFifths_)
@@ -325,15 +404,56 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             shotDelay_ = downwell::machineGunProfile(gemHigh).interval;
         }
         ++shots_;
-        airborneShot_ = true;
+        if (!groundedBlock) airborneShot_ = true; // scrPlMovement's !grounded pFired branch
         shotFired = true;
     }
 
-    // scrPlMovement's grounded branch runs after input/jump decisions.
-    if (grounded_ && comboCompletion_ && !comboTimeStopped_) comboCompletion_(comboContext_);
+    // scrPlMovement's grounded block, after the jump decisions: the landing
+    // block (the hard-landing hop or soundLand), comboDone and the footstep.
+    bool hopped = false;
+    if (groundedBlock) {
+        if (airstatus_) {
+            airstatus_ = false;
+            if (hardLand_ && (rawInput.left || rawInput.right) && playStyle_ != 3) {
+                // scrFjump(0, 1): scrRecharge, grounded = 0, ysp = -1. Its
+                // spinJumping = 1 is cleared again by this block.
+                recharge();
+                grounded_ = false;
+                speedY_ = -fixedOne;
+                gravityRemainder_ = 0;
+                hardLandJump_ = true;
+                hardLandAlarm_ = 15;
+                addSound(SoundEvent::hardLandTurn);
+                hopped = true;
+            } else {
+                addSound(SoundEvent::land);
+            }
+            hardLand_ = false;
+            noChargeMessage_ = false;
+            spinJumping_ = false;
+            airborneShot_ = false;
+        }
+        if (comboCompletion_ && !comboTimeStopped_) comboCompletion_(comboContext_);
+        // sprite_index == spriteRun (imgsprun 0.3) entering frame 1 or 5.
+        if (running_ && playStyle_ != 2 && playStyle_ != 3 &&
+            ((runPhaseTenths_ >= 10 && runPhaseTenths_ < 13) || (runPhaseTenths_ >= 50 && runPhaseTenths_ < 53)))
+            addSound(SoundEvent::footstep);
+    }
+    // playerSpriteControl: a spin beside a wall shows the kick pose.
+    wallPose_ = false;
+    if (!(groundedBlock && !hopped) && spinJumping_ && solidResolver_ && !dead) {
+        if (input.left) { if (solidMaskAt(publishedX() + 3, publishedY())) { wallPose_ = true; setFacing(-1); } }
+        else if (input.right) { if (solidMaskAt(publishedX() - 3, publishedY())) { wallPose_ = true; setFacing(1); } }
+        if (!motionSucceeded_) return {};
+    }
+    if (!grounded_) airstatus_ = true;
     // scrPlMovement's death/saveStats tail precedes scrWallCol and its
     // landing combo/recharge. Keep that observable boundary shared.
     if (movementBoundary_) movementBoundary_(movementBoundaryContext_);
+    // scrWallCol's head: hardLand holds through a fall of at least
+    // hardLandSp (1.2 = 1536 fifths) and toggles otherwise.
+    if (!hardLand_ && !hardLandJump_) hardLand_ = true;
+    else if (hardLand_ && speedY_ * 5 + gravityRemainder_ < 1536) hardLand_ = false;
     if (!grounded_) {
         if (solidResolver_ != 0 && speedY_ < 0) {
             long collisionX = x_ * 5;
@@ -461,6 +581,9 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     if (spinJumping_ && wasSpinning)
         spinPhaseTwentieths_ = (spinPhaseTwentieths_ + 6) % 160;
     if (!spinJumping_) spinPhaseTwentieths_ = 0;
+    // alarm[6] clears hardLandJump, alarm[10] tinyJumpThreshold.
+    if (hardLandAlarm_ && --hardLandAlarm_ == 0) hardLandJump_ = false;
+    if (tinyJumpAlarm_ && --tinyJumpAlarm_ == 0) tinyJumpThreshold_ = false;
     wallColliding_ = horizontalCollision;
     priorFire_ = input.fire;
     PlayerMotionDelta motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
@@ -498,6 +621,10 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     }
     if (nonAuto_) digest.addU32(0x4e4f4e41);
     if (playStyle_) { digest.addU32(0x5354594c); digest.addI32(playStyle_); digest.addU32(gravityThirds_); }
+    digest.addU32(0x4c414e44); // W2.3 landing, hop and wall-kick state
+    digest.addBool(airstatus_); digest.addBool(hardLand_); digest.addBool(hardLandJump_);
+    digest.addBool(tinyJumpThreshold_); digest.addU32(hardLandAlarm_); digest.addU32(tinyJumpAlarm_);
+    digest.addBool(wallPose_);
     if(!motionSucceeded_)digest.addU32(0x4641494c);
 }
 
@@ -508,7 +635,7 @@ int PlayerMotion::spriteId(bool dead) const
     static const int idle[5] = {31, 33, 34, 35, 32}, run[5] = {27, 25, 26, 28, 29},
         air[5] = {37, 38, 40, 28, 42};
     if (grounded_) return running_ ? run[playStyle_] : balancing_ ? 15 : idle[playStyle_];
-    if (spinJumping_) return 1;
+    if (spinJumping_) return wallPose_ ? 20 : 1;
     return airborneShot_ ? 3 : air[playStyle_];
 }
 
@@ -521,7 +648,7 @@ unsigned PlayerMotion::spriteFrame(bool dead, int deathAnimation) const
         return running_ ? runPhaseTenths_ / 10
                         : balancing_ ? balancePhaseQuarters_ / 4
                                      : idlePhaseTenths_ / 10;
-    if (spinJumping_) return spinPhaseTwentieths_ / 20;
+    if (spinJumping_) return wallPose_ ? 0 : spinPhaseTwentieths_ / 20;
     if (airborneShot_)
         return shotPhaseQuarters_ / 4 < 3 ? shotPhaseQuarters_ / 4 : 3;
     return downwell::playerAirFrame(speedYFifths());

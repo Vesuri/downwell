@@ -5,7 +5,7 @@ CXX := clang++
 # Define this before any prerequisite list expands it. Several host checks
 # compile multiple sources in one invocation; their .d file covers only the
 # final source and cannot replace these explicit header dependencies.
-HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc
+HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc generated/sound-durations.inc
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
@@ -726,6 +726,14 @@ test: test-shop-text
 verify-sound-inventory:
 	python3 tools/sound-inventory.py --check
 
+# W2.3: generated/sound-durations.inc (each sound's source length in steps,
+# for SoundVoices' audio_is_playing) matches the extracted audio.
+.PHONY: verify-sound-durations
+verify-sound-durations:
+	python3 tools/sound-durations.py --check
+generated/sound-durations.inc: tools/sound-durations.py extracted/audio/manifest.json
+	python3 tools/sound-durations.py
+
 # W2.2: Paula previews and the listening page
 # (extracted/amiga-sfx/preview/index.html), and the bank of the policy's
 # current choices (extracted/amiga-sfx/bank/), from tools/sfx-bank-policy.json.
@@ -844,7 +852,7 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc generated/clear-motion.inc
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc generated/clear-motion.inc generated/sound-durations.inc
 
 build/generate-clear-motion: tools/generate-clear-motion.cpp src/core/LevelClearMotion.h src/core/HudReal.h
 	@mkdir -p build

@@ -63,6 +63,8 @@ GAME_IDS = frozenset({
     # mirrored planar and DMA forms.
     *(base + ident for base in (0, 62000, 63000)
       for ident in (25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42)),
+    # W2.3 the wall-kick pose sprPlayerWall (frame 0 is drawn).
+    20, 62020, 63020,
 })
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
@@ -70,8 +72,9 @@ GAME_IDS = frozenset({
 # growth, not permission to consume all of the measured free Chip RAM. Only
 # the full-catalogue reference oracles load it; production gameplay leases
 # the cavern banks below.
+# W2.3's wall-kick pose takes the reference game planes past 176 KiB.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 102 * 1024,
-                'game': 372 * 1024, 'game-planes': 176 * 1024}
+                'game': 372 * 1024, 'game-planes': 177 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -99,6 +102,8 @@ CAVERN_ROOTS = frozenset({
     525, 528, 529, 530, 531, 532, 533, 534, 535,
     # W1.10 per-style player art.
     25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
+    # W2.3 the wall-kick pose.
+    20,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
@@ -125,7 +130,9 @@ CAVERN_IDS = frozenset(
 # catalogue: 300,192 and 148,722. W1.10's per-style idle, run and air art
 # (styles 1-4, with mirrored, DMA and afterimage forms) adds 78,466 and
 # 30,510: 366,834 and 174,004 (full catalogue 378,658 and 179,232).
-BANK_BUDGETS.update({'cavern': 360 * 1024, 'cavern-planes': 172 * 1024})
+# W2.3's wall-kick pose sprPlayerWall (frame 0, mirrored, DMA and afterimage
+# forms) takes the cavern CPU bank past 360 KiB: ceiling 361 KiB.
+BANK_BUDGETS.update({'cavern': 361 * 1024, 'cavern-planes': 172 * 1024})
 
 
 def require_budget(bank, size):

@@ -400,6 +400,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
         }
     }
     ++tick_;
+    // W2.3: the audio clock of this source step (see SoundVoices).
+    run_.startRechargeSounds(mainPlayerMotion_);
+    run_.voices.advance();
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
     inputFirePressed_ = fire && !inputFire_;
@@ -574,6 +577,12 @@ void StartupRuntime::stepInternal(bool advancePressed,
                 if(!run_.effectsSucceeded)return false;
                 updateMainEnemyInteractions();
                 if(!run_.effectsSucceeded)return false;
+                run_.startRechargeSounds(mainPlayerMotion_); // stomps and contact knockback
+                // Registered collision owners dispatch the goal fields' wind
+                // themselves (dispatchTimeFieldWind) and own place_meeting; this is
+                // for the unregistered reference.
+                if(!lifecycle_.hasPlaceMeeting()&&!run_.collideGoalFieldWind(random_,roundGameMakerCoordinate(mainPlayerX_),
+                    roundGameMakerCoordinate(mainPlayerY_),mainPlayerMotion_.facing()))return false;
                 run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
                     roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
             }
@@ -933,6 +942,9 @@ void StartupRuntime::updateMainBullets() {
                     }
                     return applied;
                 }
+                // W2.3 soundBullet(thatWall): objWall_n is foliage, a
+                // single-sample table whose irandom_range(1, 1) still draws.
+                random_.irandomSmall(0);
                 return true;
             }
             return false;
@@ -1676,7 +1688,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
             return false;
         },[this,&instance](const PlayerMotion&,int,int){
             return !timeEffectDispatch_||timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::playerBegin,0);
-        });
+        },[this](PlayerMotion& motion){return run_.playPlayerSounds(motion,random_,mainDeath_.active);});
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);

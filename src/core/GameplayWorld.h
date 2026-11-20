@@ -2705,6 +2705,7 @@ public:
         bool& publishedConfirm=edges?edges->confirm:confirm;
         if(edges){leftPressed=edges->left;rightPressed=edges->right;}
         ++tick_;
+        run_.voices.advance(); // W2.3: the Result room's source steps keep the audio clock
         return run_.stepLevelClearPositioned(publishedConfirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, player_, health_, enemyRandom_, emit,[](int,int){return true;},
             [this](auto event){
@@ -2715,7 +2716,8 @@ public:
                     [](void* context,downwell::LevelClearSelection::Effect effect,unsigned value){
                         return (*static_cast<decltype(event)*>(context))(effect,value);
                     },&event);
-            },[this](std::int32_t y){return !resultInstance_||resultInstance_->publishY(y);},[]{return true;});
+            },[this](std::int32_t y){return !resultInstance_||resultInstance_->publishY(y);},[]{return true;},
+            [this]{return run_.resultStepWind(enemyRandom_);});
     }
     bool levelClearActive() const { return run_.levelClearActive; }
     bool nextLevelRequested() const { return run_.nextLevelRequested; }

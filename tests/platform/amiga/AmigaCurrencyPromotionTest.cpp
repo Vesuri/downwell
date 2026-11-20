@@ -105,7 +105,7 @@ int main(int argc,char** argv){
             "overflow entry complete source RNG state");
         const auto& b=host.mainBuilderState();
         require(b.y()==704&&b.generationCount()==-30&&b.rightRoomCount()==2&&
-            b.rightRoom(0)==3&&b.rightRoom(1)==12&&!b.rowsGenerated()&&!b.spawnerMade()&&!b.endReached(),
+            b.rightRoom(0)==6&&b.rightRoom(1)==12&&!b.rowsGenerated()&&!b.spawnerMade()&&!b.endReached(),
             "overflow entry source builder checkpoint");
     }
     AmigaPortRuntime game(300,false,1201-176,true,{},{},{},&terrain);game.initializeEntryInput(false);

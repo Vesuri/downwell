@@ -87,17 +87,18 @@ NAME_REF_IGNORE = {'gml_GlobalScript_scrInitialize'}
 RNG_STATUS = {
     'gml_GlobalScript_scrEnemyStomped': 'W1.9: only with Exploding Knees (pugExplodingKnees)',
     'gml_GlobalScript_scrJump': 'not world 1: water only',
+    'gml_GlobalScript_scrUpButtonFunctions': 'consumed: jump and wall kick (RunSession::playPlayerSounds)',
     'gml_GlobalScript_scrTypicalBulletDamage': 'consumed (StandardBulletImpact)',
-    'gml_GlobalScript_soundBullet': '**missing**: compactBulletWallHit makes no draw',
-    'gml_GlobalScript_soundFootstep': '**missing**: the compact player makes no footstep draws',
-    'gml_GlobalScript_soundLand': '**missing**, audio-gated: only while sfxGunRecharge is not playing',
-    'gml_Object_Result_Step_0': '**missing**, audio-gated: the clear screen, while global.voidWind is not playing',
+    'gml_GlobalScript_soundBullet': 'consumed (compactBulletWallHit; foliage, so one sample)',
+    'gml_GlobalScript_soundFootstep': 'consumed (RunSession::playPlayerSounds)',
+    'gml_GlobalScript_soundLand': 'consumed, audio-gated: only while sfxGunRecharge is not playing (SoundVoices)',
+    'gml_Object_Result_Step_0': 'consumed, audio-gated: while global.voidWind is not playing (RunSession::resultStepWind)',
     'gml_Object_Scattered16_Collision_objPlayer_n': 'consumed (ScatteredEvents); W1.9 knees branch',
     'gml_Object_Scattered16_Step_0': 'consumed (ScatteredEvents)',
     'gml_Object_TorchFire_Collision_objPlayer_n': 'W1.9: only with Exploding Knees',
     'gml_Object_bulletExplosion1_Create_0': 'W1.9: only the decoy balloon creates it (every bStatExplode is 0)',
     'gml_Object_bulletLaser_Collision_subparentEnemy': 'consumed (GameplayWorld laser immune branch)',
-    'gml_Object_goalTimeField_Collision_objPlayer_n': '**missing**, audio-gated: while global.voidWind is not playing',
+    'gml_Object_goalTimeField_Collision_objPlayer_n': 'consumed, audio-gated: while global.voidWind is not playing (RunSession::collideGoalFieldWind)',
     'gml_Object_objBox_n_Create_0': 'consumed for area 1 (AreaOneBuilder); the other cases are other areas',
     'gml_Object_objCurrency_Step_0': 'consumed (CurrencyStepSound)',
 }
@@ -145,7 +146,9 @@ ASSIGN = re.compile(r'\b' + VARS + r'\s*=\s*(choose\([^)]*\)|\d+)\s*;')
 # Sound tables: element [n][0] of the material and hit tables is a count.
 TABLE = re.compile(r'global\.(sfxFs|sfxJl|sfxBhit|bStatSound)\[[^\]]*\]\[\s*([^\]]*)\]\s*=\s*(\d+)\s*;')
 COUNTED = {'sfxFs', 'sfxJl', 'sfxBhit'}
-SOUND_RNG = re.compile(r'(?:soundPlay|soundPlayOL)\s*\(\s*(choose\([^)]*,[^)]*\)|global\.sfx\w+\[[^;]*irandom_range)'
+# Every choose() draws one word, even with a single argument
+# (docs/runner-choose.md).
+SOUND_RNG = re.compile(r'(?:soundPlay|soundPlayOL)\s*\(\s*(choose\([^)]*\)|global\.sfx\w+\[[^;]*irandom_range)'
                        r'|\b' + VARS + r'\s*=\s*choose\(')
 OBJVAR = re.compile(r'(?:chunkOrCrate|global\.pBulObject|global\.bStatObject\[[^\]]*\]\[[^\]]*\]|'
                     r'spEnemy\[[^\]]*\]\[[^\]]*\])\s*=\s*(choose\([^)]*\)|\d+)\s*;')

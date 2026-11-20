@@ -13,6 +13,9 @@ struct NoPlayerPositionPublication {
 };
 struct NoPlayerScalePublication { bool operator()(int)const{return true;} };
 struct NoPlayerTimeTransition { bool operator()(const PlayerMotion&,int,int)const{return true;} };
+// W2.3: the player's Begin Step sound scripts (PlayerMotion::soundEvent), run
+// right after its motion so their RNG draws precede shops and later objects.
+struct NoPlayerSounds { bool operator()(PlayerMotion&)const{return true;} };
 struct UnindexedPlayerGoalContact {
     bool operator()(RunSession& run,MotionBinary64 x,MotionBinary64 y,int facing,bool& hit)const{
         return run.playerGoalContact(x,y,facing,hit);
@@ -24,12 +27,14 @@ struct UnindexedPlayerGoalContact {
 // Activation remains before this phase; enemy alarms remain after it.
 // No renderer or instance-store representation is selected here.
 template<class PublishPosition=NoPlayerPositionPublication,class PublishScale=NoPlayerScalePublication,
-         class GoalContact=UnindexedPlayerGoalContact,class TimeTransition=NoPlayerTimeTransition>
+         class GoalContact=UnindexedPlayerGoalContact,class TimeTransition=NoPlayerTimeTransition,
+         class PlayerSounds=NoPlayerSounds>
 inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     PlayerDeathSequence& death, RunSession& run, CurrencyAccount& currency,
     int& health, GameMakerRandom& random, const Input& input,
     int originX, int originY, int viewX, int viewY, bool controlsLocked = false,
-    PublishPosition publishPosition = {},PublishScale publishScale={},GoalContact goalContact={},TimeTransition timeTransition={}) {
+    PublishPosition publishPosition = {},PublishScale publishScale={},GoalContact goalContact={},TimeTransition timeTransition={},
+    PlayerSounds playerSounds={}) {
     death.beginStep(input.fire);
     run.combo.beginStep();
     struct Context {
@@ -68,6 +73,7 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
         run.effectsSucceeded=false;
         return motion;
     }
+    if(!playerSounds(player)){run.effectsSucceeded=false;return motion;}
     // objPlayer_n Begin Step [11..18] skips the collision call itself when
     // goalStop/death suppress accounting, not only the eventual increment.
     // It queries the old published x/y before shop/interactable processing.

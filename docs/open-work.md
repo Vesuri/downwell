@@ -149,6 +149,17 @@ style select, patched with the chosen style and hard mode.
     black transparent) jittered by `irandom_range(-2,2)` and
     `irandom_range(-1,1)`. The draws feed the world RNG, so adding it reshuffles
     the route.
+12. **Walking enemy wedged in a solid hangs the compact world.** Found with the
+    W2.3 RNG stream: currency tape `--overflow` with startup seed 40 and
+    encounter route 0 (`SCAN_ROUTE`-style override of `amigaOverflowRoute`).
+    Around post-Step frame 831 a grounded `enmSnake`-family walker (object 111)
+    at offset (-34, 1706.6) is suddenly inside a solid band from y-20 to y,
+    with nothing below. `WalkingEnemyMotion::step` then takes its
+    `place_meeting(x, y + ysp)` branch, and the "count down to the floor" loop
+    never ends. The source has the same loop shape, so the original relies on
+    walkers never overlapping a solid's underside; find what writes the solid
+    over the walker (incremental generation or a box/cell update) before
+    adding any guard. A hang on a natural route is a ship blocker.
 
 ### W2. Sound effects
 
@@ -248,11 +259,9 @@ area-1 patterns, and names every cut with its reason.
    page. Paula's minimum period (124) bounds pitch × rate: at 8,363 Hz the
    guns' 1.8 and the progress-bar fill's 2.2 fit.
 3. **Core sound requests.**
-   - **First, as its own gameplay change:**
-     - Add the five missing sound draws to the compact world, with a
-       source-duration model for the two audio-gated ones.
-     - Then re-record and re-verify the routes: world one, the menus, and
-       the shop at W1.8.
+   - **Done:** the gameplay change (the sound RNG draws, `SoundVoices` and
+     the player's hop, grace jump, wall kick and tiny jump). Its quiet-fall
+     recovery is in W3.
    - **Route logs:** the host logs every sound request (tick, ID, priority,
      loop, cut, category, gain, pitch) on the natural routes: the world-one
      tape, the menus driver, a death route and a hard-mode route. The
@@ -314,7 +323,8 @@ area-1 patterns, and names every cut with its reason.
 **Gates for every step:**
 - Quiet-fall stays ≤ 197 fields: idle audio costs nothing but Paula DMA, with
   no per-update scans.
-- The world-one native replay still ends `END 2 1 8768 2 249994`.
+- The world-one native replay still ends `END 2 1 8275 1 265269` (slice
+  variant 119).
 - 1 MiB startup passes.
 - W3 costs are noted: IRQ and VBlank time per start, Chip and Fast bytes.
 
@@ -393,6 +403,27 @@ so animating screens never show a cleared well; the pause bank is 8,818
 bytes and the results bank grew to 28,672 for the unlock notice's glyphs.
 The Timer publishes its 16 HUD rows on every update while shown and costs
 nothing while off.
+
+W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
+197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about
+0.4–0.7 ms per update by an instruction trace against the previous build:
+- About 700 cycles in `PlayerMotion::step`: the hard-land state, the two
+  alarms, `airstatus`, the wall-pose test and the call's larger frame.
+- About 2,000 cycles in `GameplayWorld::step`: the `SoundVoices` clock, the
+  recharge starts and the goal-field wind gate, plus diffuse growth across
+  unrelated lines.
+- Compiling the world-side calls out still gives 200, and builds that differ
+  only in layout vary by about ±3 fields.
+- Already done: `SoundVoices` keeps live voices packed (an idle world scans
+  nothing), and the wind skips its contact test while `global.voidWind`
+  plays.
+- Recover the gate before W3's 20 ms work, and move the player's rare-state
+  bookkeeping behind a single test.
+
+The wall-kick pose (`sprPlayerWall`, frame 0 with mirrored, DMA and
+afterimage forms) takes the cavern CPU bank to 368,798 bytes (ceiling raised
+to 361 KiB) and its plane atlas to 175,094 Chip bytes. The reference game
+planes' ceiling is now 177 KiB.
 
 ### WR. Restructure for world 1
 
@@ -1320,7 +1351,7 @@ cases separately from eligible gem-only frames before another compositor
 attempt. Use the effect-coverage census described in the profiling procedure
 to establish that the chosen window actually exercises each proposed path;
 producer-phase timings alone do not prove smoke/debris or raster coverage.
-Use the seed-40 route-21 tape for shade subtraction and channel overflow. Preserve
+Use the seed-87 route-34 tape for shade subtraction and channel overflow. Preserve
 the unshaded actor/BOB pass, topmost unshaded hardware suffix, shaded raster prefix, and
 controller/ordinary-actor boundary when changing
 the retained raster. Do not tune sub-millisecond stamp helpers. Mixed producers and entry cover still

@@ -633,10 +633,10 @@ this selector as well: host composition alone does not prove sprite DMA.
 
 For a natural channel-overflow and shade-subtraction workload, run
 `./build/amiga-currency-promotion-test --overflow --census`. This uses ordinary
-startup seed 40 and encounter input route 21, not injected currency or changed
+startup seed 87 and encounter input route 34, not injected currency or changed
 RNG state. `make test-amiga-currency-promotion` runs both tapes. Reproduce its
 source replay independently with
-`DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_CASE=40:21 make verify-contact-profile`.
+`DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_CASE=87:34 make verify-contact-profile`.
 The shared route helper is checked against the search's original button
 formula, including entrance boundaries. CSV rows include required sprite parts,
 death state and actual shade pixel changes: the latter compares the unshaded
@@ -650,15 +650,15 @@ The search's `max_visible_currency` excludes disappearance-flash frames;
 
 Use `SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 VERIFY_TIMEOUT_SECONDS=600 bash amiga/profile.sh fps`
 for its native 1,800-update window. The wrapper first runs both host renderer
-tapes and verifies the seed-40 entry checkpoint (including all RNG words), then
+tapes and verifies the seed-87 entry checkpoint (including all RNG words), then
 restores the ordinary executable on exit. `PROFILE_OVERFLOW=1` also selects
 this tape for `trace` and `frames`; do not combine it with another tape flag.
-For example, capture all-raster shade subtraction (842–851), a shaded
-prefix with an unshaded sprite suffix (932–941), and nine-channel overflow
-(even frames 962–972, alternating with seven parts) separately:
+For example, capture all-raster shade subtraction (1233–1242), a shaded
+prefix with an unshaded sprite suffix (1493–1502), and nine-channel overflow
+(frames 1523–1528, after two eight-part frames) separately:
 
 ```sh
-SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=841,931,961 TRACE_FIELDS=40 \
+SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=1232,1492,1522 TRACE_FIELDS=40 \
   TRACE_OUTPUT="$PWD/tmp/trace/overflow" VERIFY_TIMEOUT_SECONDS=600 \
   bash amiga/profile.sh trace
 ```
@@ -676,7 +676,7 @@ Use them before proposing removal of hidden producers, alongside native costs.
 
 For source-backed currency pixels, generate a witness with
 `./build/amiga-currency-promotion-test --overflow --pixel-witness > tmp/currency-pixels.txt`.
-Capture ticks `850,932,962,964,966,968,970,972` with
+Capture ticks `1240,1500,1523,1524,1525,1526,1527,1528` with
 `PROFILE_OVERFLOW=1`, `DUMP_TICKS` and `profile.sh frames`, then run
 `python3 tools/verify-amiga-currency-frames.py tmp/currency-frames tmp/currency-pixels.txt
 --reference tmp/currency-reference-frames` (on one command line). The reference

@@ -42,6 +42,7 @@
 #include "Profile.h"
 #include "SoundPlayScript.h"
 #include "TimeFieldWind.h"
+#include "SoundVoices.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -63,6 +64,9 @@ struct RunSession {
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
     TimeFieldWind fieldWind; // global.voidWind survives ordinary room changes.
+    // W2.3: audio_is_playing as gameplay sees it (source lengths, not a
+    // device). Room changes keep voices; ResetPlayer/scrInitialize stop all.
+    SoundVoices voices;
     template<class Audio> bool playSkeletonStompSound(SoundPlayState& caller,
         SoundPlayEnvironment& environment,Audio& audio){
         int result=-1;bool returned=false;
@@ -715,10 +719,75 @@ struct RunSession {
         return stepLevelClearPositioned(confirm,leftPressed,rightPressed,heartGoal,currency,player,health,
             random,emit,birth,alarms,[](std::int32_t){return true;},[]{return true;});
     }
-    template<class Emit,class DitherBirth,class Alarms,class Position,class Wipe>
+    // W2.3: scrPlMovement's sound scripts, in source order, right after the
+    // player's motion. Only their RNG draws and audio_is_playing reads change
+    // gameplay; the requests follow.
+    bool playPlayerSounds(PlayerMotion& player,GameMakerRandom& random,bool dead){
+        using Event=PlayerMotion::SoundEvent;
+        for(unsigned i=0;i<player.soundEventCount();++i){
+            switch(player.soundEvent(i)){
+            case Event::jump:case Event::wallKick:
+                random.chooseIndexSmall(1); // soundPlay(choose(86), 80, 0, 1)
+                break;
+            case Event::land:
+                // soundLand: landOn && !global.death && !napping, then only
+                // while sfxGunRecharge is silent. Every material table's
+                // irandom_range(1, count) consumes two words.
+                if(!dead&&!voices.playing(27))random.irandomSmall(3);
+                break;
+            case Event::footstep:
+                random.irandomSmall(3); // soundFootstep
+                break;
+            case Event::hardLandTurn:
+                break; // soundPlay(88, 30, 0, 1): no draw
+            }
+        }
+        startRechargeSounds(player); // the landing's scrWallCol recharge follows
+        return effectsSucceeded;
+    }
+    // soundPlay(27, 90, 0, 1) for each successful scrRecharge since the last
+    // call: the landing, stomps and contact knockback (scrFjump).
+    void startRechargeSounds(PlayerMotion& player){
+        for(unsigned n=player.takeRechargeSounds();n;--n){
+            int voice=-1;
+            voices.stop(27);
+            voices.play(27,90,false,voice);
+        }
+    }
+    // goalTimeField 255 (and its child startTimeField) Collision with
+    // objPlayer_n at the published player position: a new voidWind once the
+    // last one ends. gameVolume is 1 until the options model it.
+    bool goalWindPossible()const{
+        // The contact's first act is audio_is_playing(global.voidWind); a
+        // playing wind makes the overlap unobservable, so skip its query.
+        return (levelExitPresent||startFieldPresent)&&!voices.playing(fieldWind.voice);
+    }
+    bool collideGoalFieldWind(GameMakerRandom& random,int x,int y,int facing){
+        if(!effectsSucceeded)return false;
+        if(!goalWindPossible())return true;
+        bool hit=false;
+        if(x>=-1048576&&x<=1048576&&y>=-1048576&&y<=1048576){
+            // playerGoalContact's integral path: published pixels with unit
+            // scales are exactly each field's rectangle test.
+            hit=(levelExitPresent&&goalField.meetsPlayer(x,y))||(startFieldPresent&&startField.meetsPlayer(x,y));
+        }else if(!playerGoalContact(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),facing,hit))
+            return effectsSucceeded=false;
+        return !hit||resultStepWind(random);
+    }
+    // Result Step after scrResult, and the goal fields' contact.
+    bool resultStepWind(GameMakerRandom& random){
+        std::int32_t sound=0;
+        if(!fieldWind.contact(random,sound,overlapSounds[8],MotionBinary64::fromInteger(1),voices))
+            return effectsSucceeded=false;
+        return true;
+    }
+    struct NoResultStepTail { bool operator()()const{return true;} };
+    // ResultTail is Result Step's code after scrResult (W2.3: its voidWind).
+    template<class Emit,class DitherBirth,class Alarms,class Position,class Wipe,class ResultTail=NoResultStepTail>
     bool stepLevelClearPositioned(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
                         CurrencyAccount& currency, PlayerMotion& player, int& health,
-                        GameMakerRandom& random, Emit emit,DitherBirth birth,Alarms alarms,Position position,Wipe wipe) {
+                        GameMakerRandom& random, Emit emit,DitherBirth birth,Alarms alarms,Position position,Wipe wipe,
+                        ResultTail resultTail={}) {
         if (!effectsSucceeded || !levelClearActive || nextLevelRequested) return false;
         const auto effect = [&](LevelClearSelection::Effect event, unsigned value) {
             if (event == LevelClearSelection::Effect::dither) {
@@ -741,6 +810,7 @@ struct RunSession {
         if(!ok||!effectsSucceeded)return effectsSucceeded=false;
         std::int32_t y;
         if(!levelClear.motion.instanceY(y)||!position(y)||!effectsSucceeded)return effectsSucceeded=false;
+        if(!resultTail()||!effectsSucceeded)return effectsSucceeded=false;
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
         return ok;
@@ -805,6 +875,7 @@ struct RunSession {
         oxygen=MotionBinary64::fromInteger(100);
         for(auto& sound:overlapSounds)sound=0;
         fieldWind={};
+        voices.stopAll();
         gems = {};
         gems.lifetime = saved.lifetimeGems;
         gems.record = saved.bestRunGems;

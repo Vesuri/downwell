@@ -1601,6 +1601,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 #endif
 
     ++tick_;
+    // W2.3: the audio clock of this source step (see SoundVoices).
+    run_.startRechargeSounds(player_);
+    run_.voices.advance();
     // objControlerN (37) runs after objPlayer_n (35), so it sees this
     // update's pTimeStop. Apply the previous value here; the player's
     // transition below corrects the streak timer on the frames it changes.
@@ -1684,7 +1687,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if(!playerTimeTransition_)return !compactTimeStop()||beginCompactTimeStop(x,y);
             return run_.effectsSucceeded&&
                 playerTimeTransition_(playerTimeContext_,playerInstance_,motion,x,y)&&run_.effectsSucceeded;
-        });
+        },[this](PlayerMotion& motion){return run_.playPlayerSounds(motion,enemyRandom_,death_.active);});
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
     if(run_.shops.allocatedCount)createCompactShopSpeech();
@@ -2089,10 +2092,15 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 x,y,240,176);
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
     if (steeringPopulation_ && !collideSteeringEnemies()) return {};
+    run_.startRechargeSounds(player_); // stomps and contact knockback (scrFjump)
     // subparentEnemy's Collision with parentTimeField, then fxTimeShard 238.
     if (compactTimeStop() && (run_.timeFields.size() || run_.levelExitPresent || run_.startFieldPresent) &&
         !collideEnemyTimeFields()) return {};
     if (timeStop_.shards.size() && !collideTimeShards()) return {};
+    // goalTimeField 255 (with its child startTimeField) precedes scenery 289.
+    if (run_.goalWindPossible() &&
+        !run_.collideGoalFieldWind(enemyRandom_,240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
+            176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),player_.facing())) return {};
     if (!scenery_.empty() && !collideCompactScenery()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
@@ -4087,7 +4095,11 @@ bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path
            !value.add(fraction)))return downwell::MotionBinary64::fromInteger(c.pixel+origin);
         return value;
     };
-    return compactWallEffect(real(x,240),real(y,176),101,0);
+    if(!compactWallEffect(real(x,240),real(y,176),101,0))return false;
+    // soundBullet(thatWall): objWall_n is foliage, a single-sample table
+    // whose irandom_range(1, 1) still consumes two words.
+    enemyRandom_.irandomSmall(0);
+    return true;
 }
 
 // A full no-loop pool drops the cosmetic puff rather than latching failure.

@@ -3419,7 +3419,8 @@ callers. Values are rounded ms/frame; this is not a sum of inclusive functions.
 
 The figures below belong to the historical seed-8/route-4 trajectory. After
 the source Step-order correction, that route no longer supplies this coverage.
-The current source-checked workload is seed 40, route 21, documented in
+The current source-checked workload is seed 87, route 34 (seed 40, route 21
+until the W2.3 sound draws reshuffled the RNG), documented in
 [profiling](amiga-profiling.md). Its frame numbers and timings must not be
 compared directly with this table or used to imply a rendering speedup.
 

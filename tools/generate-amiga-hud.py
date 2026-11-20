@@ -88,6 +88,7 @@ SELECTIONS = {
         27: None,    # sprPlayerRunExg
         31: None,    # sprPlayerIdle
         37: None,    # sprPlayerAir
+        20: [0],     # sprPlayerWall: W2.3 wall-kick pose (frame 0 only)
         # W1.10 styleSet's idle, run and air art for styles 1-4.
         25: None, 26: None, 28: None, 29: None,
         32: None, 33: None, 34: None, 35: None,
@@ -225,7 +226,7 @@ SELECTIONS = {
 }
 
 # Living player poses (PlayerMotion::spriteId(false)) with afterimages.
-AFTERIMAGE_PLAYER_IDS = (1, 3, 12, 15, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42)
+AFTERIMAGE_PLAYER_IDS = (1, 3, 12, 15, 20, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42)
 
 TEXT_SELECTIONS = {
     # English DeathMenu labels from language.ini. Uncoloured font masks allow
@@ -881,7 +882,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                                 originY=sprite["originX"])
                 encoded.append((metadata, 768 + frame_index, stride, data))
             if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 551, 568, 569,
-                    0, 1, 3, 12, 15, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
+                    0, 1, 3, 12, 15, 20, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
                     153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278,
                     158, 165, 179, 281, 337)):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
@@ -1167,7 +1168,7 @@ def build_records(manifest, extracted, profile, language_path=None):
     # Gameplay and upgrade player DMA words share the identical offline encoder.
     if profile in ("game", "clear"):
         hardware = []
-        actors = (0, 1, 3, 12, 15, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
+        actors = (0, 1, 3, 12, 15, 20, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
                   485, 486, 487, 496, 497, 602, 603, 707)
         if profile == "clear":

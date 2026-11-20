@@ -2344,7 +2344,7 @@ void testBuilderCheckpoints(const char* roomPath, const char* objectPath, const 
         authoredBuilder.objectId == 65 && authoredBuilder.instanceId == 100856 &&
         authoredBuilder.x == -16 && authoredBuilder.y == 704,
         "builder checkpoint is anchored to the serialized builder, not the player");
-    for (unsigned seed : {2u, 4u, 8u}) {
+    for (unsigned seed : {2u, 4u, amigaOverflowSeed}) {
         downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,
             &rooms, &objects, seed, &patterns);
         entry.skipToGameForTesting();
@@ -2439,7 +2439,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // period (variant/40). Shots draw RNG, so every policy change reshuffles
     // the whole route; DOWNWELL_SLICE_VARIANT sweeps them (and
     // DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
-    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):87u;
+    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):119u;
     const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
     const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
     std::ofstream tape(output+".inputs",std::ios::binary);

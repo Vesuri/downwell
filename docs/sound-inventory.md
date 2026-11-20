@@ -223,17 +223,20 @@ port must make the same draws. Port status is for the compact
 |---|---:|---|---|
 | `GlobalScript_scrEnemyStomped` | 23 | `soundPlay(choose(91, 92, 93), 60, 0, 1);` | W1.9: only with Exploding Knees (pugExplodingKnees) |
 | `GlobalScript_scrJump` | 24 | `soundPlayOL(choose(313, 314), 80, 0, 1, "waterThings");` | not world 1: water only |
+| `GlobalScript_scrJump` | 32 | `soundPlay(choose(86), 80, 0, 1);` | not world 1: water only |
 | `GlobalScript_scrTypicalBulletDamage` | 42 | `soundPlay(choose(30, 31), 50, 0, 1);` | consumed (StandardBulletImpact) |
-| `GlobalScript_soundBullet` | 22 | `soundPlayOL(global.sfxBhit[sfxIndex][irandom_range(1, global.sfxBhit[sfxIndex][0])], 60, 0, 1, "gunwall");` | **missing**: compactBulletWallHit makes no draw |
-| `GlobalScript_soundFootstep` | 27 | `footstepsnd = soundPlayOL(global.sfxFs[sfxIndex][irandom_range(1, global.sfxFs[sfxIndex][0])], 60, 0, 1, "footsteps");` | **missing**: the compact player makes no footstep draws |
-| `GlobalScript_soundLand` | 28 | `soundPlayOL(global.sfxJl[sfxIndex][irandom_range(1, global.sfxJl[sfxIndex][0])], 60, 0, 1, "footsteps");` | **missing**, audio-gated: only while sfxGunRecharge is not playing |
-| `Object_Result_Step_0` | 4 | `windsnd = choose(349, 350, 351, 352, 353, 354, 355);` | **missing**, audio-gated: the clear screen, while global.voidWind is not playing |
+| `GlobalScript_scrUpButtonFunctions` | 44 | `soundPlay(choose(86), 80, 0, 1);` | consumed: jump and wall kick (RunSession::playPlayerSounds) |
+| `GlobalScript_scrUpButtonFunctions` | 62 | `soundPlay(choose(86), 80, 0, 1);` | consumed: jump and wall kick (RunSession::playPlayerSounds) |
+| `GlobalScript_soundBullet` | 22 | `soundPlayOL(global.sfxBhit[sfxIndex][irandom_range(1, global.sfxBhit[sfxIndex][0])], 60, 0, 1, "gunwall");` | consumed (compactBulletWallHit; foliage, so one sample) |
+| `GlobalScript_soundFootstep` | 27 | `footstepsnd = soundPlayOL(global.sfxFs[sfxIndex][irandom_range(1, global.sfxFs[sfxIndex][0])], 60, 0, 1, "footsteps");` | consumed (RunSession::playPlayerSounds) |
+| `GlobalScript_soundLand` | 28 | `soundPlayOL(global.sfxJl[sfxIndex][irandom_range(1, global.sfxJl[sfxIndex][0])], 60, 0, 1, "footsteps");` | consumed, audio-gated: only while sfxGunRecharge is not playing (SoundVoices) |
+| `Object_Result_Step_0` | 4 | `windsnd = choose(349, 350, 351, 352, 353, 354, 355);` | consumed, audio-gated: while global.voidWind is not playing (RunSession::resultStepWind) |
 | `Object_Scattered16_Collision_objPlayer_n` | 17 | `soundPlay(choose(91, 92, 93), 60, 0, 1);` | consumed (ScatteredEvents); W1.9 knees branch |
 | `Object_Scattered16_Step_0` | 16 | `breakSound = choose(171, 172, 173, 174);` | consumed (ScatteredEvents) |
 | `Object_TorchFire_Collision_objPlayer_n` | 17 | `soundPlay(choose(91, 92, 93), 60, 0, 1);` | W1.9: only with Exploding Knees |
 | `Object_bulletExplosion1_Create_0` | 11 | `soundPlayOL(choose(91, 92, 93), 60, 0, 1, "gunwall");` | W1.9: only the decoy balloon creates it (every bStatExplode is 0) |
 | `Object_bulletLaser_Collision_subparentEnemy` | 43 | `soundPlay(choose(30, 31), 50, 0, 1);` | consumed (GameplayWorld laser immune branch) |
-| `Object_goalTimeField_Collision_objPlayer_n` | 3 | `windsnd = choose(349, 350, 351, 352, 353, 354, 355);` | **missing**, audio-gated: while global.voidWind is not playing |
+| `Object_goalTimeField_Collision_objPlayer_n` | 3 | `windsnd = choose(349, 350, 351, 352, 353, 354, 355);` | consumed, audio-gated: while global.voidWind is not playing (RunSession::collideGoalFieldWind) |
 | `Object_objBox_n_Create_0` | 9 | `breakSound = choose(171, 172, 173, 174);` | consumed for area 1 (AreaOneBuilder); the other cases are other areas |
 | `Object_objBox_n_Create_0` | 12 | `breakSound = choose(175, 176, 177, 178);` | consumed for area 1 (AreaOneBuilder); the other cases are other areas |
 | `Object_objBox_n_Create_0` | 15 | `breakSound = choose(171, 172, 173, 174);` | consumed for area 1 (AreaOneBuilder); the other cases are other areas |
