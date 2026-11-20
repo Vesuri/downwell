@@ -237,45 +237,16 @@ area-1 patterns, and names every cut with its reason.
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
 
-2. **Conversion and the quality experiment.** The tools are in place; the
-   user's choice is open.
-   - **Done:** `tools/sfx-bank.py` (`make amiga-sfx-preview`,
-     `make amiga-sfx-bank`) reads the kept sounds from the inventory and the
-     per-class choices from `tools/sfx-bank-policy.json`. Its bank sets
-     each sound's Paula rate (nearest period), crop or long-sound cut, peak
-     normalisation and Paula volume (asset volume × peak), and records
-     per-scene Chip totals. Its previews (zero-order hold without interpolation, with or
-     without the A500's fixed 4.4 kHz RC filter, LED filter off) cover every kept sound at 8,363,
-     11,025, 13,979 and 16,726 Hz with -24, -30 and -36 dB crops, plus the
-     source at the same loudness and per-class reels. The listening page
-     (`extracted/amiga-sfx/preview/index.html`) shows the Chip totals of the
-     choices and exports a policy.
-   - **Cost per class**, run-resident (gameplay, shop, pause), KiB at -30 dB:
-
-     | Class | Sounds | 8,363 | 11,025 | 13,979 | 16,726 |
-     |---|---:|---:|---:|---:|---:|
-     | thuds (footsteps, landings) | 37 | 47 | 63 | 79 | 95 |
-     | guns | 17 | 45 | 59 | 75 | 90 |
-     | impacts | 21 | 49 | 64 | 82 | 98 |
-     | creatures | 20 | 74 | 97 | 124 | 148 |
-     | gems and combos | 15 | 48 | 64 | 81 | 97 |
-     | stings | 8 | 24 | 32 | 40 | 48 |
-     | shopkeeper voice | 11 | 26 | 35 | 44 | 53 |
-     | UI | 24 | 16 | 21 | 26 | 31 |
-     | long (default cuts) | 11 | 188 | 247 | 314 | 376 |
-
-     All short sounds at 8,363 Hz: 303 KiB at -24 dB, 328 at -30, 347 at
-     -36. The seven winds swell for 2–5 s before their body, so their cuts
-     keep a faded window around the loudest part: 86 KiB at 1.5 s, 143 at
-     2.5 s, 229 at 4 s (8,363 Hz).
-   - **Pitch limits:** Paula's shortest period is 124. Guns reach pitch 1.8
-     at half ammo (`scrShotSound`), so they cannot use 16,726 Hz; the
-     results progress-bar fill (328) reaches 2.2, so it stays at or under
-     11,025 Hz unless its pitch is capped.
-   - **Remaining:**
-     - the user picks the rate and crop per class and the long-sound cuts
-       on the listening page; the exported policy is committed;
-     - an FS-UAE listening check of the chosen bank.
+2. **Conversion and the quality experiment.** Decided on 2026-11-20:
+   every class at **8,363 Hz with a -24 dB crop**; the seven winds as
+   1.5 s swells, the void ambience as a 2 s loop, `sfxFalling` a 1 s loop,
+   the jetpack a 0.5 s loop and the title sting 2.5 s. The run bank
+   (gameplay, shop, pause) is 417 KiB of the 465 KiB free, leaving about
+   47 KiB for the mixer, W3 and later art; all kept sounds come to 491 KiB.
+   The bank comes from `tools/sfx-bank.py --bank` (`make amiga-sfx-bank`)
+   with `tools/sfx-bank-policy.json`; `--preview` rebuilds the listening
+   page. Paula's minimum period (124) bounds pitch × rate: at 8,363 Hz the
+   guns' 1.8 and the progress-bar fill's 2.2 fit.
 3. **Core sound requests.**
    - **First, as its own gameplay change:**
      - Add the five missing sound draws to the compact world, with a
@@ -299,7 +270,8 @@ area-1 patterns, and names every cut with its reason.
      byte-identical, and host tests check the request logs of the routes.
    - **SDL:** it may play the logged requests as a reference. This is
      optional.
-4. **Paula mixer.**
+4. **Paula mixer.** It is also the first player of the W2.2 bank: listen
+   to the chosen set in FS-UAE before wiring.
    - **Generalise `AmigaWindAudio`** into four voices, with commands
      published by the main loop and applied in the VBlank, and no allocation
      in IRQs.
