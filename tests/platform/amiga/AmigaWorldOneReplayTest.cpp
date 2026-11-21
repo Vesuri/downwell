@@ -144,9 +144,10 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
         }
         ++w;
     };
-    unsigned enemyPeak=0,bulletPeak=0;
+    unsigned enemyPeak=0,bulletPeak=0,breakablePeak=0,gemPeak=0;
     auto frameStep=[&](auto&& step){
         enemyPeak=std::max(enemyPeak,game.enemyCount());bulletPeak=std::max(bulletPeak,game.bulletSlotEnd());
+        breakablePeak=std::max(breakablePeak,game.breakableSlots());gemPeak=std::max(gemPeak,game.gemSlotEnd());
         if(!session){step();drainSounds();logDraw();return;}
         downwell::GameplayEncounterSession::Frame frame(*session);
         require(frame.valid()&&frame.sampleInput(downwell::unpackReplayInput(std::uint8_t(tape[t-1]))),"replay frame samples input");
@@ -182,7 +183,7 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
     std::cout<<"REPLAY "<<(owned?"owned":"unowned")<<" matched "<<w<<" witnesses over "<<t<<" of "<<tape.size()
         <<" inputs; tick="<<game.tick()<<" area="<<game.runStage().area<<" level="<<game.runStage().level
         <<" hp="<<game.health()<<" draws="<<game.randomDrawCount()
-        <<" terrain-peak="<<nativeTerrainPeak<<" enemy-peak="<<enemyPeak<<" bullet-peak="<<bulletPeak<<std::endl;
+        <<" terrain-peak="<<nativeTerrainPeak<<" run-peak="<<nativeRunPeak<<" enemy-peak="<<enemyPeak<<" bullet-peak="<<bulletPeak<<" breakable-peak="<<breakablePeak<<" gem-peak="<<gemPeak<<std::endl;
     require(w==witnesses.size()&&t==tape.size(),"replay consumes the whole route");
 }
 

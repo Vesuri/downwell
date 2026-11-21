@@ -34,7 +34,7 @@
 namespace {
 int parityFrame = 0;
 downwell::StateDigest nativeTerrainDigest;
-unsigned nativeTerrainPeak=0;
+unsigned nativeTerrainPeak=0,nativeRunPeak=0;
 bool sawExtendedEnemyAnimation = false;
 bool sawPairedFrogAir = false, sawPairedFrogGround = false;
 bool sawPairedFrogHit = false;
@@ -85,6 +85,7 @@ struct LiveSceneWorld {
     void checkTerrainIdentities()const{
         require(terrainLifetimes->valid(),"native terrain identity owner stays valid");
         nativeTerrainPeak=std::max(nativeTerrainPeak,terrainLifetimes->size());
+        nativeRunPeak=std::max(nativeRunPeak,terrainLifetimes->runStorage().runsUsed());
         nativeTerrainDigest.addU32(terrainLifetimes->size());
         require(terrainLifetimes->visit([&](const auto& id,bool active,bool destroyed){
             nativeTerrainDigest.addI32(id.object);nativeTerrainDigest.addI32(id.x);nativeTerrainDigest.addI32(id.y);

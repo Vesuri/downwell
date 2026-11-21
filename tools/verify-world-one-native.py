@@ -102,7 +102,23 @@ def main():
                 node=int(checked(f'printf "%lu\\n", *(unsigned long*){node}').split()[-1])
             memoryFormat='printf "FREE'+' %lu'*len(memoryRegions)+'\\n"'+''.join(
                 f',*(unsigned long*)({node}+28)' for node,_ in memoryRegions)
+        # DOWNWELL_TERRAIN_SAMPLE=1 (WR.5): the native terrain lifetimes'
+        # run descriptors and source records ever in use, and live cells.
+        # Builds without source records (the shipping build) report records=0.
+        terrainPeak=None
+        terrainFormat='printf "TERRAIN %u 0 %u\\n",$nt->runs_.used_,$nt->runs_.population_'
+        if os.environ.get('DOWNWELL_TERRAIN_SAMPLE')=='1':
+            checked(f"set $nt=(GameplayWorld::NativeTerrain*)&'{storageSymbol(r'_ZZL11runDownwellvE20nativeTerrainStorage')}'")
+            terrainPeak=[0,0,0]
+            if 'sources_' in g.cmd('ptype $nt->runs_'):
+                terrainFormat=('printf "TERRAIN %u %u %u\\n",$nt->runs_.used_,$nt->runs_.sources_.used_,'
+                               '$nt->runs_.population_+$nt->runs_.sources_.population_')
+        def sampleTerrain():
+            if terrainPeak is None: return
+            values=re.search(r'TERRAIN (\d+) (\d+) (\d+)',checked(terrainFormat))
+            for i in range(3): terrainPeak[i]=max(terrainPeak[i],int(values[i+1]))
         def sampleMemory(tick,scene):
+            if tick%32==0: sampleTerrain()
             if not memoryRegions: return
             free=list(map(int,re.search(r'FREE ([\d ]+)',checked(memoryFormat))[1].split()))
             for (node,attributes),value in zip(memoryRegions,free):
@@ -110,6 +126,8 @@ def main():
                 if low is None: memoryLow[node]=[value,value,tick,scene,attributes]
                 elif value<low[1]: low[1:4]=value,tick,scene
         def reportMemory():
+            if terrainPeak is not None:
+                print(f'TERRAIN peak runs={terrainPeak[0]} records={terrainPeak[1]} cells={terrainPeak[2]}',flush=True)
             if not memoryRegions: return
             use={'chip':0,'other':0}
             for node,(first,low,tick,scene,attributes) in memoryLow.items():

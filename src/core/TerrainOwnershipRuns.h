@@ -92,6 +92,8 @@ public:
     };
     using Cursor=SelectedCursor<false>;
     unsigned size()const{return population_;}
+    // Run descriptors ever in use at once (the free list reuses retired ones).
+    unsigned runsUsed()const{return used_;}
     void clear(){
         for(auto& locator:locator_)locator=0;
         head_=tail_=free_=reserved_=End;used_=population_=0;

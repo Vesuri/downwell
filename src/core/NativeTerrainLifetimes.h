@@ -403,6 +403,7 @@ public:
         return unboundedWallArt_?runs_.visit(emit):runs_.visitRows(first,end,emit);
     }
     unsigned runCount()const{return runs_.runCount();}
+    const Runs& runStorage()const{return runs_;}
     unsigned available()const{return Capacity-size();}
     bool contains(InstanceHandle h)const{return good_&&runs_.contains(h);}
     bool read(InstanceHandle h,Identity& id,bool& active,bool& destroyed)const{

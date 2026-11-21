@@ -32,14 +32,18 @@ def sections(elf):
 
 
 def symbols(elf):
+    """Sized symbols, each address once: GCC aliases the complete and base
+    constructors (and other identical entry points) to one body."""
     pattern = re.compile(r"^([0-9a-f]+) (.{7}) (\S+)\t([0-9a-f]+) (.*)$")
+    seen = set()
     for line in run("-t", "-C", elf).splitlines():
         match = pattern.match(line)
         if not match:
             continue
-        _, flags, section, size, name = match.groups()
+        address, flags, section, size, name = match.groups()
         size = int(size, 16)
-        if size and section.startswith("."):
+        if size and section.startswith(".") and (section, address) not in seen:
+            seen.add((section, address))
             yield section, size, name
 
 
