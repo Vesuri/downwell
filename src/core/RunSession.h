@@ -292,7 +292,16 @@ struct RunSession {
     Consumables consumables;
     UpgradeInventory upgrades;
     ShopWorld shops;
-    WallBackgroundTiles<2048> wallBackground;
+    // Wall tiles come only from the reference runner's stored wall
+    // collision (StartupRuntime) and host owner fixtures. Freestanding
+    // targets link neither, so their store keeps one slot, not 32 KB; an
+    // unexpected append beyond it fails effects instead of drawing.
+#ifdef DOWNWELL_FREESTANDING
+    static constexpr unsigned wallTileCapacity=1;
+#else
+    static constexpr unsigned wallTileCapacity=2048;
+#endif
+    WallBackgroundTiles<wallTileCapacity> wallBackground;
     bool addWallBackground(MotionBinary64 x,MotionBinary64 y){
         if(!effectsSucceeded)return false;
         return effectsSucceeded=wallBackground.append(x,y);

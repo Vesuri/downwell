@@ -974,11 +974,11 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
 #endif
             run_.effectsSucceeded=false;return false;
         }
-        if ((x[source] & 15) || (y[source] & 15) || x[source] < -512 ||
-            x[source] >= 512 || y[source] < 0 || y[source] >= 8192) {
+        if ((x[source] & 15) || (y[source] & 15) || x[source] < -breakableIndexLeft ||
+            x[source] >= breakableIndexLeft || y[source] < 0 || y[source] >= 8192) {
             breakableIndexReady_ = false;
         } else if (breakableIndexReady_) {
-            auto& cell = breakableIndex_[(y[source] >> 4) * 64 + ((x[source] + 512) >> 4)];
+            auto& cell = breakableIndex_[(y[source] >> 4) * breakableIndexColumns + ((x[source] + breakableIndexLeft) >> 4)];
             if (cell) breakableIndexReady_ = false;
             cell = index + 1;
         }
@@ -1006,9 +1006,9 @@ bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::Generat
         if(!allocation->publish(record.nativeRegistration,index)){
             run_.effectsSucceeded=false;return false;
         }
-        if((x&15)||(y&15)||x < -512||x>=512||y<0||y>=8192)breakableIndexReady_=false;
+        if((x&15)||(y&15)||x < -breakableIndexLeft||x>=breakableIndexLeft||y<0||y>=8192)breakableIndexReady_=false;
         else if(breakableIndexReady_){
-            auto& cell=breakableIndex_[(y>>4)*64+((x+512)>>4)];
+            auto& cell=breakableIndex_[(y>>4)*breakableIndexColumns+((x+breakableIndexLeft)>>4)];
             if(cell)breakableIndexReady_=false;
             cell=index+1;
         }
@@ -1040,10 +1040,10 @@ bool GameplayWorld::breakableActiveAt(int x, int y) const
 }
 
 int GameplayWorld::indexedBreakable(int x, int y) const {
-    x += 512 + 8;
+    x += breakableIndexLeft + 8;
     y += 8;
-    if (x < 0 || x >= 1024 || y < 0 || y >= 8192) return -1;
-    return (int)breakableIndex_[(y >> 4) * 64 + (x >> 4)] - 1;
+    if (x < 0 || x >= 2 * breakableIndexLeft || y < 0 || y >= 8192) return -1;
+    return (int)breakableIndex_[(y >> 4) * breakableIndexColumns + (x >> 4)] - 1;
 }
 
 void GameplayWorld::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect)

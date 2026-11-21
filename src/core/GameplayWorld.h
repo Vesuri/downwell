@@ -2430,7 +2430,7 @@ public:
     bool emitBoxSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitBoxSmoke(x,y,enemyRandom_);}
     bool emitBoxFlash(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitBoxFlash(x,y,enemyRandom_);}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
-    const downwell::WallBackgroundTiles<2048>& wallBackgroundTiles()const{return run_.wallBackground;}
+    const downwell::WallBackgroundTiles<downwell::RunSession::wallTileCapacity>& wallBackgroundTiles()const{return run_.wallBackground;}
     bool addWallBackground(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.addWallBackground(x,y);}
     bool emitSmokeBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
         return run_.emitSmokeBurst(x,y,enemyRandom_);
@@ -3039,7 +3039,11 @@ private:
     downwell::CurrencyRewardFields boxRewards_[breakableCapacity]{};
     unsigned breakableCount_;
     bool breakableIndexReady_ = false;
-    std::uint16_t breakableIndex_[64 * 512];
+    // 16x16 cells over x -256..256, y 0..8192. Breakables on the eight
+    // slice routes sit at x -208..208; any box outside the grid (or off
+    // the 16-pixel lattice) drops the index and every query scans instead.
+    static constexpr int breakableIndexLeft = 256, breakableIndexColumns = 32;
+    std::uint16_t breakableIndex_[breakableIndexColumns * 512];
     int indexedBreakable(int x, int y) const;
     // W1.4 point query: the live, unretired box whose 16x16 cell holds (x,y).
     // Uses the cell index when ready; the native-box build has none, so it
