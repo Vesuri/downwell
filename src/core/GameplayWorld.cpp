@@ -1063,6 +1063,36 @@ void GameplayWorld::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmE
     if (effect.sound >= 0) playEnemySound(effect.sound, enemy.y + 176);
 }
 
+// enmFrog Collision with enmFrog: of two overlapping frogs, the lower id (the
+// earlier one in step order) acts, once per overlapping frog. If grounded it
+// jumps as Alarm 0 does (ysp = -jumpsp, xsp = nsp, soundPlayOL(116, 50, 0, 1,
+// "enemymove")); prepare = 0 and alarm[1] = 90 either way. No RNG.
+void GameplayWorld::bumpCompactFrogs()
+{
+    // One pass collects the live frogs in step order with their bounds (the
+    // serialized mask 166 for every frog); a jump changes speeds, not
+    // positions, so the bounds hold for the whole pass. Owner-resident, never
+    // a 68000 stack array.
+    static EnemyState* frog[enemyCapacity];
+    static downwell::ContactBounds box[enemyCapacity];
+    unsigned frogs = 0;
+    for (unsigned i = 0; i < enemyStepOrder_.size(); ++i) {
+        auto* enemy = const_cast<EnemyState*>(resolveEnemyLifetime(enemyStepOrder_.handle(i)));
+        if (!enemy || enemy->objectId != 113 || !enemy->active || enemy->destroyRequested) continue;
+        frog[frogs] = enemy;
+        box[frogs++] = downwell::contactWorldBounds({enemy->x * 256L, enemy->y * 256L, enemy->facing,
+            enemy->imageScaleY(), 166});
+    }
+    for (unsigned i = 0; i + 1 < frogs; ++i)
+        for (unsigned j = i + 1; j < frogs; ++j) {
+            if (!downwell::contactBoundsOverlap(box[i], box[j])) continue;
+            auto effect = downwell::frogJumpAlarm(frog[i]->grounded, frog[i]->motionState);
+            effect.alarm = 1;
+            effect.ticks = 90;
+            applyFrogAlarm(*frog[i], effect);
+        }
+}
+
 bool GameplayWorld::captureEnemyStepOrder(){
     const auto revision=enemyOrderRevision_?enemyOrderRevision_(enemyOrderContext_):0xffffffffu;
     if(enemyOrderCapture_&&enemyOrderValid_&&revision!=0xffffffffu&&
@@ -1971,6 +2001,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
     }
+    bumpCompactFrogs();
     // parentMovingFx (220) follows the enemies, before damage numbers (221).
     if(compactEffects_.movingCount()&&!compactEffects_.stepMoving(compactEffectStepPhase,
         [this](const downwell::MovingFx& fx,bool& moving){
@@ -3161,13 +3192,14 @@ int GameplayWorld::breakableAt(int x,int y)const{
 
 // soundFootstep/soundLand's instance_place(x, y + 2, sParentSolid).material
 // as the material index, probing the mask's bottom row two pixels down
-// (centre first): shop furniture is metal, boxes breakable, gem chunks rock,
+// (centre first): shop furniture is metal and the keeper's invisible wall
+// rock, boxes breakable, gem chunks rock,
 // thin platforms thin, walls foliage. Audio only: it picks the sample.
 int GameplayWorld::playerFloorMaterial()const{
     const int px=player_.offsetX(),y=player_.offsetY()+9;
     const int probes[]={px,px-4,px+3};
     for(const int x:probes){
-        if(run_.shops.playerSolidAt(x+240,y+176))return 4;
+        if(const int shop=run_.shops.wallMaterialAt(x+240,y+176,true);shop>=0)return shop;
         if(breakableAt(x,y)>=0)return 0;
         if(gemChunkBlocks(x+240,y+176))return 3;
         if(solidResolver_&&solidResolver_(solidResolverContext_,x,y))return 2;
@@ -3426,6 +3458,8 @@ bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::Proje
                     if(solidResolver_(solidResolverContext_,x,y)&&path.intersects(x,x+1,y,y+1)){consumed=true;return compactBulletWallHit(path);}
         }
     }
+    // W2.6: shopTable and objInvisWall are subparentSolidWall too.
+    if(const int material=shopWallOn(path,false);material>=0){consumed=true;return compactBulletWallHit(path,material);}
     if((!scenery_.empty()||guns_.moduleEnd)&&!hitCompactShootable(path,bullet,consumed))return false;
     return true;
 }
@@ -3481,7 +3515,8 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
     };
     const auto solidPoint=[&](int px,int py){
         if(solidResolver_&&solidResolver_(solidResolverContext_,px,py))return true;
-        return breakableAt(px,py)>=0||gemChunkBlocks(px+240,py+176);
+        return breakableAt(px,py)>=0||gemChunkBlocks(px+240,py+176)||
+            run_.shops.wallMaterialAt(px+240,py+176,true)>=0; // W2.6: every shop child is parentWall
     };
     const auto shootableAt=[&](const downwell::ContactBounds& box){
         for(unsigned i=0;i<guns_.moduleEnd;++i){const auto& m=guns_.modules[i];
@@ -3548,10 +3583,14 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
             const downwell::ProjectileSegment point(shot.x,shot.y,0,0);
             if(!hitGemChunk(point,bullet.damage,hit,consumed))return false;
         }else{
-            // scrEffectSpawn(x, y, hitWallFx 96, 0.5, 0, -10000).
+            // scrEffectSpawn(x, y, hitWallFx 96, 0.5, 0, -10000), then
+            // soundPlay(15, 30, 0, 1). The scrSmokefx(x, y, 1, 0) between
+            // them is still missing (open-work W1.11: its draws reshuffle
+            // every route).
             destroy=true;
-            if(!compactWallEffect(downwell::MotionBinary64::fromInteger(x+240),
-                   downwell::MotionBinary64::fromInteger(py+176),96,-10000))return false;
+            const auto wx=downwell::MotionBinary64::fromInteger(x+240),wy=downwell::MotionBinary64::fromInteger(py+176);
+            if(!compactWallEffect(wx,wy,96,-10000))return false;
+            run_.soundPlay(15,30,false,true);
         }
     }else{
         const auto box=mask(py);
@@ -3695,6 +3734,8 @@ bool GameplayWorld::stepCasings(){
         bool hit=false;
         if(solidResolver_&&segmentResolver_)hit=segmentResolver_(solidResolverContext_,path);
         if(hit&&!compactBulletWallHit(path))return false;
+        if(!hit){const int material=shopWallOn(path,false);
+            if(material>=0){hit=true;if(!compactBulletWallHit(path,material))return false;}}
         if(!hit&&scenery_.gemChunkEnd){bool chunk=false,consumed=false;
             if(!hitGemChunk(path,0,chunk,consumed))return false;hit=chunk;}
         if(!hit){
@@ -4216,11 +4257,20 @@ void GameplayWorld::advanceCompactControllerAlarm(){
 // scrEffectSpawn(hitWallFx 101, 0.5, 0, 0). The bullet is destroyed either
 // way, so the effect's position never feeds back into the simulation. The
 // tenth truncates toward zero in Q20 (GameMaker divides the double).
-bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path){
+int GameplayWorld::shopWallOn(const downwell::ProjectileSegment& path,bool cases)const{
+    if(!run_.shops.allocatedCount)return -1;
+    auto x=path.x,y=path.y;x.pixel+=240;y.pixel+=176;
+    return run_.shops.wallMaterialOn(downwell::ProjectileSegment(x,y,path.dx,path.dy),cases);
+}
+bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path,int material){
     auto x=path.x,y=path.y;
     const std::int32_t vx=path.dx/10,vy=path.dy/10;
     if(!solidResolver_)return true;
-    for(unsigned step=0;!solidResolver_(solidResolverContext_,x.pixel,y.pixel);){
+    // collision_point(x, y, subparentSolidWall): terrain, or near a shop its
+    // table and invisible wall.
+    const auto solid=[&](int px,int py){return solidResolver_(solidResolverContext_,px,py)||
+        (run_.shops.allocatedCount&&run_.shops.wallMaterialAt(px+240,py+176,false)>=0);};
+    for(unsigned step=0;!solid(x.pixel,y.pixel);){
         y.advance(vy);x.advance(vx);
         if(++step>100)break;
     }
@@ -4233,8 +4283,10 @@ bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path
     };
     if(!compactWallEffect(real(x,240),real(y,176),101,0))return false;
     // soundBullet(thatWall): objWall_n is foliage, a single-sample table
-    // whose irandom_range(1, 1) still consumes two words.
-    run_.soundPlayOL(29+int(enemyRandom_.irandomSmall(0)),60,false,true,"gunwall");
+    // whose irandom_range(1, 1) still consumes two words; the shop's rock
+    // wall and metal table choose between two (initSfxBhit).
+    const int first=material==3?34:material==4?32:29;
+    run_.soundPlayOL(first+int(enemyRandom_.irandomSmall(material>=3?1:0)),60,false,true,"gunwall");
     return run_.effectsSucceeded;
 }
 

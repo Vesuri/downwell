@@ -6,14 +6,14 @@ Sizes are signed 8-bit mono at 8,363 Hz after the -30 dB tail crop
 (`tools/convert-amiga-sfx.py`), before any per-sound rate or cut
 chosen in W2.2.
 
-- Tool 1.2.0; UTMT manifest sha256 `2f080abb3284884b`;
+- Tool 1.3.0; UTMT manifest sha256 `2f080abb3284884b`;
   audio manifest sha256 `2e3a26e9fd36b0b6`; Paula conversion sha256 `aac86ae6c2157b8b`.
-- 114 objects are reachable from the world-1 rooms; 181 sounds are referenced by their code, 164 of them kept or cut (1619.2 KiB before cuts).
+- 114 objects are reachable from the world-1 rooms; 181 sounds are referenced by their code, 158 of them kept or cut (905.4 KiB before cuts).
 - Observed and Peak come from the W2.3 host sound routes in
-  `tests/data/sound-routes` (`hard-mode-death` `a2c5a4545aae`, `menus` `9715659b8307`, `world-one` `24f4ede26b72`):
+  `tests/data/sound-routes` (`hard-mode-death-v228` `29a156c90c05`, `hard-mode-death-v29-tour` `8fc32d72f304`, `hard-mode-death-v337-tour` `90acb18e66ea`, `hard-mode-death-v383` `df4fc6df7c05`, `hard-mode-death-v456-tour` `797b23d67fb3`, `hard-mode-death` `a2c5a4545aae`, `menus` `425476a89bb6`, `world-one-v38-tour` `f2c3fbcd1d8a`, `world-one` `a7f2d7bf6608`):
   plays requested over all routes, and the most live voices of the sound
   at once on any route (source durations, after each frame's requests).
-  96 of the sounds above are observed.
+  143 of the sounds above are observed.
 
 ## Totals by scene
 
@@ -21,9 +21,9 @@ A sound used in several scenes is counted in each.
 
 | Scene | Sounds | KiB | Long (> 2 s) or cut, KiB | The rest, KiB |
 |---|---:|---:|---:|---:|
-| front | 7 | 62.6 | 29.7 | 32.8 |
-| gameplay | 128 | 1488.7 | 1200.3 | 288.5 |
-| shop | 20 | 40.2 | 0.0 | 40.2 |
+| front | 15 | 76.8 | 29.7 | 47.1 |
+| gameplay | 124 | 779.1 | 493.8 | 285.2 |
+| shop | 18 | 36.0 | 0.0 | 36.0 |
 | pause | 5 | 6.1 | 0.0 | 6.1 |
 | clear | 12 | 488.4 | 477.8 | 10.6 |
 | results | 8 | 22.9 | 0.0 | 22.9 |
@@ -37,130 +37,130 @@ upgrade screen between levels), results (death and results).
 | ID | Name | Bytes | s | Loop | Scenes | Played by | Observed | Peak | Verdict |
 |---:|---|---:|---:|:-:|---|---|---:|---:|---|
 | 1 | `sndSplash` | 16,816 | 2.01 |  | gameplay | objPlayer_n |  |  | drop: water only (scrCheckInWater, area 3) |
-| 3 | `sndHpGain` | 2,272 | 0.27 |  | gameplay, shop, clear | Result, Shop, comboRewardText, objControlerN, objObtainableUg | 1 | 1 | keep |
-| 4 | `sndGem` | 1,328 | 0.16 |  | gameplay | objObtainableUg |  |  | keep |
-| 5 | `sndPlayerHurt` | 1,344 | 0.16 |  | gameplay | enmBat, enmCrawler, enmEyefish, enmFrog, enmGroundTurtle, enmRedBall +5 | 7 | 1 | keep |
-| 10 | `sndCaseBreak` | 3,984 | 0.48 |  | shop | shopCase |  |  | keep |
-| 14 | `sndCoinbounce1` | 1,392 | 0.17 |  | gameplay | objCurrency |  |  | keep |
-| 15 | `sndShotwall` | 928 | 0.11 |  | gameplay | bulletLaser |  |  | keep |
-| 16 | `sndEnemyhurt` | 1,488 | 0.18 |  | gameplay | bulletLaser | 25 | 1 | keep |
-| 18 | `sfxGunM` | 1,952 | 0.23 |  | gameplay | objControlerN, objPlayer_n | 146 | 1 | keep |
-| 19 | `sfxGunMB` | 2,016 | 0.24 |  | gameplay | objControlerN, objPlayer_n | 294 | 1 | keep |
-| 20 | `sfxGunL` | 3,360 | 0.40 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 21 | `sfxGunLB` | 2,832 | 0.34 |  | gameplay | objControlerN, objPlayer_n | 54 | 1 | keep |
-| 22 | `sfxGunS` | 3,536 | 0.42 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 23 | `sfxGunSB` | 3,760 | 0.45 |  | gameplay | objControlerN, objPlayer_n | 76 | 1 | keep |
-| 24 | `sfxGun3` | 3,040 | 0.36 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 25 | `sfxGun3B` | 3,088 | 0.37 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 26 | `sfxGunEmpty` | 1,439 | 0.17 |  | gameplay | objControlerN, objPlayer_n | 290 | 1 | keep |
-| 27 | `sfxGunRecharge` | 1,439 | 0.17 |  | gameplay | Scattered16, TorchFire, enmBat, enmCrawler, enmEyefish, enmFrog +8 | 130 | 1 | keep |
-| 28 | `sfxPickupWeapon` | 2,368 | 0.28 |  | gameplay | GunModule | 2 | 1 | keep |
-| 29 | `sfxBhitGeneral` | 803 | 0.10 |  | gameplay | bulletBlast, bulletCasing, bulletDrone, bulletExplosion1, bulletRanged, explosionSmall | 497 | 1 | keep |
-| 30 | `sfxBhitInvincible1` | 2,000 | 0.24 |  | gameplay | bulletCasing, bulletDrone, bulletLaser, bulletRanged | 38 | 1 | keep |
-| 31 | `sfxBhitInvincible2` | 1,968 | 0.24 |  | gameplay | bulletCasing, bulletDrone, bulletLaser, bulletRanged | 48 | 1 | keep |
-| 32 | `sfxBhitMetal1` | 1,696 | 0.20 |  | gameplay | bulletCasing, bulletDrone, bulletRanged |  |  | keep |
-| 33 | `sfxBhitMetal2` | 1,424 | 0.17 |  | gameplay | bulletCasing, bulletDrone, bulletRanged |  |  | keep |
-| 34 | `sfxBhitRock1` | 1,408 | 0.17 |  | gameplay | bulletCasing, bulletDrone, bulletRanged |  |  | keep |
-| 35 | `sfxBhitRock2` | 1,312 | 0.16 |  | gameplay | bulletCasing, bulletDrone, bulletRanged |  |  | keep |
-| 41 | `sfxGunN` | 1,248 | 0.15 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 42 | `sfxGunNB` | 1,865 | 0.22 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 43 | `sfxGunP` | 2,624 | 0.31 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 44 | `sfxGunPB` | 6,002 | 0.72 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 45 | `sfxGunB` | 2,272 | 0.27 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
-| 46 | `sfxGunBB` | 3,264 | 0.39 |  | gameplay | objControlerN, objPlayer_n |  |  | keep |
+| 3 | `sndHpGain` | 2,272 | 0.27 |  | gameplay, shop, clear | Result, Shop, comboRewardText, objControlerN, objObtainableUg | 5 | 1 | keep |
+| 4 | `sndGem` | 1,328 | 0.16 |  | gameplay | objObtainableUg |  |  | drop: unreachable: objObtainableUg sits inside a shopCase that nothing opens |
+| 5 | `sndPlayerHurt` | 1,344 | 0.16 |  | gameplay | enmBat, enmCrawler, enmEyefish, enmFrog, enmGroundTurtle, enmRedBall +5 | 34 | 1 | keep |
+| 10 | `sndCaseBreak` | 3,984 | 0.48 |  | shop | shopCase |  |  | drop: unreachable: nothing writes shopCase.destroyed (original-behavior-audit) |
+| 14 | `sndCoinbounce1` | 1,392 | 0.17 |  | gameplay | objCurrency |  |  | drop: unreachable: fxCasing never plays its bounceSnd, objCurrency replaces it before a bounce |
+| 15 | `sndShotwall` | 928 | 0.11 |  | gameplay | bulletLaser | 33 | 1 | keep |
+| 16 | `sndEnemyhurt` | 1,488 | 0.18 |  | gameplay | bulletLaser | 64 | 1 | keep |
+| 18 | `sfxGunM` | 1,952 | 0.23 |  | gameplay | objControlerN, objPlayer_n | 545 | 1 | keep |
+| 19 | `sfxGunMB` | 2,016 | 0.24 |  | gameplay | objControlerN, objPlayer_n | 761 | 1 | keep |
+| 20 | `sfxGunL` | 3,360 | 0.40 |  | gameplay | objControlerN, objPlayer_n | 10 | 1 | keep |
+| 21 | `sfxGunLB` | 2,832 | 0.34 |  | gameplay | objControlerN, objPlayer_n | 135 | 1 | keep |
+| 22 | `sfxGunS` | 3,536 | 0.42 |  | gameplay | objControlerN, objPlayer_n | 33 | 1 | keep |
+| 23 | `sfxGunSB` | 3,760 | 0.45 |  | gameplay | objControlerN, objPlayer_n | 159 | 1 | keep |
+| 24 | `sfxGun3` | 3,040 | 0.36 |  | gameplay | objControlerN, objPlayer_n | 22 | 1 | keep |
+| 25 | `sfxGun3B` | 3,088 | 0.37 |  | gameplay | objControlerN, objPlayer_n | 337 | 1 | keep |
+| 26 | `sfxGunEmpty` | 1,439 | 0.17 |  | gameplay | objControlerN, objPlayer_n | 1,683 | 1 | keep |
+| 27 | `sfxGunRecharge` | 1,439 | 0.17 |  | gameplay | Scattered16, TorchFire, enmBat, enmCrawler, enmEyefish, enmFrog +8 | 594 | 1 | keep |
+| 28 | `sfxPickupWeapon` | 2,368 | 0.28 |  | gameplay | GunModule | 9 | 1 | keep |
+| 29 | `sfxBhitGeneral` | 803 | 0.10 |  | gameplay | bulletBlast, bulletCasing, bulletDrone, bulletExplosion1, bulletRanged, explosionSmall | 2,143 | 2 | keep |
+| 30 | `sfxBhitInvincible1` | 2,000 | 0.24 |  | gameplay | bulletCasing, bulletDrone, bulletLaser, bulletRanged | 207 | 1 | keep |
+| 31 | `sfxBhitInvincible2` | 1,968 | 0.24 |  | gameplay | bulletCasing, bulletDrone, bulletLaser, bulletRanged | 215 | 1 | keep |
+| 32 | `sfxBhitMetal1` | 1,696 | 0.20 |  | gameplay | bulletCasing, bulletDrone, bulletRanged | 139 | 1 | keep |
+| 33 | `sfxBhitMetal2` | 1,424 | 0.17 |  | gameplay | bulletCasing, bulletDrone, bulletRanged | 144 | 1 | keep |
+| 34 | `sfxBhitRock1` | 1,408 | 0.17 |  | gameplay | bulletCasing, bulletDrone, bulletRanged | 2 | 1 | keep |
+| 35 | `sfxBhitRock2` | 1,312 | 0.16 |  | gameplay | bulletCasing, bulletDrone, bulletRanged | 1 | 1 | keep |
+| 41 | `sfxGunN` | 1,248 | 0.15 |  | gameplay | objControlerN, objPlayer_n | 25 | 1 | keep |
+| 42 | `sfxGunNB` | 1,865 | 0.22 |  | gameplay | objControlerN, objPlayer_n | 79 | 1 | keep |
+| 43 | `sfxGunP` | 2,624 | 0.31 |  | gameplay | objControlerN, objPlayer_n | 32 | 1 | keep |
+| 44 | `sfxGunPB` | 6,002 | 0.72 |  | gameplay | objControlerN, objPlayer_n | 294 | 1 | keep |
+| 45 | `sfxGunB` | 2,272 | 0.27 |  | gameplay | objControlerN, objPlayer_n | 105 | 1 | keep |
+| 46 | `sfxGunBB` | 3,264 | 0.39 |  | gameplay | objControlerN, objPlayer_n | 234 | 1 | keep |
 | 47 | `sfxDroneShoot` | 2,224 | 0.27 |  | gameplay | objDrone |  |  | keep |
-| 48 | `sfxFootstepBreakable1` | 800 | 0.10 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 49 | `sfxFootstepBreakable2` | 752 | 0.09 |  | gameplay | objPlayer_n | 3 | 1 | keep |
-| 50 | `sfxFootstepBreakable3` | 816 | 0.10 |  | gameplay | objPlayer_n |  |  | keep |
-| 51 | `sfxFootstepFoliage1` | 864 | 0.10 |  | gameplay | objPlayer_n | 5 | 1 | keep |
-| 52 | `sfxFootstepFoliage2` | 1,264 | 0.15 |  | gameplay | objPlayer_n | 3 | 1 | keep |
-| 53 | `sfxFootstepFoliage3` | 1,152 | 0.14 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 54 | `sfxFootstepFoliage4` | 1,216 | 0.15 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 55 | `sfxFsRock1` | 544 | 0.07 |  | gameplay | objPlayer_n |  |  | keep |
-| 56 | `sfxFsRock2` | 576 | 0.07 |  | gameplay | objPlayer_n |  |  | keep |
-| 57 | `sfxFsRock3` | 560 | 0.07 |  | gameplay | objPlayer_n |  |  | keep |
-| 58 | `sfxFsRock4` | 528 | 0.06 |  | gameplay | objPlayer_n |  |  | keep |
-| 59 | `sfxFsMetal1` | 640 | 0.08 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 60 | `sfxFsMetal2` | 608 | 0.07 |  | gameplay | objPlayer_n |  |  | keep |
-| 61 | `sfxFsMetal3` | 640 | 0.08 |  | gameplay | objPlayer_n |  |  | keep |
-| 62 | `sfxFsMetal4` | 624 | 0.07 |  | gameplay | objPlayer_n |  |  | keep |
-| 63 | `sfxFsThin1` | 400 | 0.05 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 64 | `sfxFsThin2` | 288 | 0.03 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 65 | `sfxFsThin3` | 288 | 0.03 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 66 | `sfxJumpLandBreakable1` | 1,568 | 0.19 |  | gameplay | objPlayer_n |  |  | keep |
-| 67 | `sfxJumpLandBreakable2` | 1,568 | 0.19 |  | gameplay | objPlayer_n | 5 | 1 | keep |
-| 68 | `sfxJumpLandBreakable3` | 1,552 | 0.19 |  | gameplay | objPlayer_n |  |  | keep |
-| 69 | `sfxJumpLandFoliage1` | 2,384 | 0.29 |  | gameplay | objPlayer_n | 53 | 1 | keep |
-| 70 | `sfxJumpLandFoliage2` | 2,112 | 0.25 |  | gameplay | objPlayer_n | 63 | 1 | keep |
-| 71 | `sfxJumpLandFoliage3` | 2,560 | 0.31 |  | gameplay | objPlayer_n | 63 | 1 | keep |
-| 72 | `sfxJumpLandFoliage4` | 3,024 | 0.36 |  | gameplay | objPlayer_n | 51 | 1 | keep |
-| 73 | `sfxJumpLandRock1` | 2,144 | 0.26 |  | gameplay | objPlayer_n |  |  | keep |
-| 74 | `sfxJumpLandRock2` | 2,288 | 0.27 |  | gameplay | objPlayer_n |  |  | keep |
-| 75 | `sfxJumpLandRock3` | 1,856 | 0.22 |  | gameplay | objPlayer_n |  |  | keep |
+| 48 | `sfxFootstepBreakable1` | 800 | 0.10 |  | gameplay | objPlayer_n | 5 | 1 | keep |
+| 49 | `sfxFootstepBreakable2` | 752 | 0.09 |  | gameplay | objPlayer_n | 4 | 1 | keep |
+| 50 | `sfxFootstepBreakable3` | 816 | 0.10 |  | gameplay | objPlayer_n | 2 | 1 | keep |
+| 51 | `sfxFootstepFoliage1` | 864 | 0.10 |  | front, gameplay | objPlayer_n | 18 | 1 | keep |
+| 52 | `sfxFootstepFoliage2` | 1,264 | 0.15 |  | front, gameplay | objPlayer_n | 11 | 1 | keep |
+| 53 | `sfxFootstepFoliage3` | 1,152 | 0.14 |  | front, gameplay | objPlayer_n | 13 | 1 | keep |
+| 54 | `sfxFootstepFoliage4` | 1,216 | 0.15 |  | front, gameplay | objPlayer_n | 10 | 1 | keep |
+| 55 | `sfxFsRock1` | 544 | 0.07 |  | gameplay | objPlayer_n | 2 | 1 | keep |
+| 56 | `sfxFsRock2` | 576 | 0.07 |  | gameplay | objPlayer_n | 3 | 1 | keep |
+| 57 | `sfxFsRock3` | 560 | 0.07 |  | gameplay | objPlayer_n | 1 | 1 | keep |
+| 58 | `sfxFsRock4` | 528 | 0.06 |  | gameplay | objPlayer_n | 3 | 1 | keep |
+| 59 | `sfxFsMetal1` | 640 | 0.08 |  | gameplay | objPlayer_n | 2 | 1 | keep |
+| 60 | `sfxFsMetal2` | 608 | 0.07 |  | gameplay | objPlayer_n | 7 | 1 | keep |
+| 61 | `sfxFsMetal3` | 640 | 0.08 |  | gameplay | objPlayer_n | 8 | 1 | keep |
+| 62 | `sfxFsMetal4` | 624 | 0.07 |  | gameplay | objPlayer_n | 4 | 1 | keep |
+| 63 | `sfxFsThin1` | 400 | 0.05 |  | gameplay | objPlayer_n | 4 | 1 | keep |
+| 64 | `sfxFsThin2` | 288 | 0.03 |  | gameplay | objPlayer_n | 7 | 1 | keep |
+| 65 | `sfxFsThin3` | 288 | 0.03 |  | gameplay | objPlayer_n | 7 | 1 | keep |
+| 66 | `sfxJumpLandBreakable1` | 1,568 | 0.19 |  | gameplay | objPlayer_n | 4 | 1 | keep |
+| 67 | `sfxJumpLandBreakable2` | 1,568 | 0.19 |  | gameplay | objPlayer_n | 14 | 1 | keep |
+| 68 | `sfxJumpLandBreakable3` | 1,552 | 0.19 |  | gameplay | objPlayer_n | 5 | 1 | keep |
+| 69 | `sfxJumpLandFoliage1` | 2,384 | 0.29 |  | front, gameplay | objPlayer_n | 136 | 1 | keep |
+| 70 | `sfxJumpLandFoliage2` | 2,112 | 0.25 |  | front, gameplay | objPlayer_n | 142 | 1 | keep |
+| 71 | `sfxJumpLandFoliage3` | 2,560 | 0.31 |  | front, gameplay | objPlayer_n | 114 | 1 | keep |
+| 72 | `sfxJumpLandFoliage4` | 3,024 | 0.36 |  | front, gameplay | objPlayer_n | 108 | 1 | keep |
+| 73 | `sfxJumpLandRock1` | 2,144 | 0.26 |  | gameplay | objPlayer_n | 3 | 1 | keep |
+| 74 | `sfxJumpLandRock2` | 2,288 | 0.27 |  | gameplay | objPlayer_n | 1 | 1 | keep |
+| 75 | `sfxJumpLandRock3` | 1,856 | 0.22 |  | gameplay | objPlayer_n | 1 | 1 | keep |
 | 76 | `sfxJumpLandRock4` | 2,192 | 0.26 |  | gameplay | objPlayer_n |  |  | keep |
-| 77 | `sfxJlMetal1` | 1,952 | 0.23 |  | gameplay | objPlayer_n |  |  | keep |
+| 77 | `sfxJlMetal1` | 1,952 | 0.23 |  | gameplay | objPlayer_n | 2 | 1 | keep |
 | 78 | `sfxJlMetal2` | 2,272 | 0.27 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 79 | `sfxJlMetal3` | 1,888 | 0.23 |  | gameplay | objPlayer_n |  |  | keep |
-| 80 | `sfxJlMetal4` | 2,160 | 0.26 |  | gameplay | objPlayer_n |  |  | keep |
-| 81 | `sfxJlThin1` | 1,120 | 0.13 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 82 | `sfxJlThin2` | 1,056 | 0.13 |  | gameplay | objPlayer_n | 3 | 1 | keep |
+| 79 | `sfxJlMetal3` | 1,888 | 0.23 |  | gameplay | objPlayer_n | 1 | 1 | keep |
+| 80 | `sfxJlMetal4` | 2,160 | 0.26 |  | gameplay | objPlayer_n | 2 | 1 | keep |
+| 81 | `sfxJlThin1` | 1,120 | 0.13 |  | gameplay | objPlayer_n | 9 | 1 | keep |
+| 82 | `sfxJlThin2` | 1,056 | 0.13 |  | gameplay | objPlayer_n | 13 | 1 | keep |
 | 83 | `sfxPlayerEat` | 4,672 | 0.56 |  | gameplay | objDeadBody |  |  | keep |
-| 86 | `sfxPlayerJump1` | 1,360 | 0.16 |  | gameplay | objPlayer_n | 277 | 1 | keep |
-| 88 | `sfxPlayerTurn` | 816 | 0.10 |  | gameplay | objPlayer_n | 67 | 1 | keep |
-| 89 | `sfxDeath` | 10,032 | 1.20 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 90 | `sfxNotifLowAmmo` | 944 | 0.11 |  | gameplay | objControlerN, objPlayer_n | 222 | 1 | keep |
+| 86 | `sfxPlayerJump1` | 1,360 | 0.16 |  | gameplay | objPlayer_n | 810 | 1 | keep |
+| 88 | `sfxPlayerTurn` | 816 | 0.10 |  | gameplay | objPlayer_n | 312 | 1 | keep |
+| 89 | `sfxDeath` | 10,032 | 1.20 |  | gameplay | objPlayer_n | 6 | 1 | keep |
+| 90 | `sfxNotifLowAmmo` | 944 | 0.11 |  | gameplay | objControlerN, objPlayer_n | 1,145 | 1 | keep |
 | 91 | `sfxEnmExplode1` | 3,360 | 0.40 |  | gameplay | Scattered16, TorchFire, bulletExplosion1, enmBat, enmEyefish, enmFrog +4 |  |  | keep |
 | 92 | `sfxEnmExplode2` | 2,528 | 0.30 |  | gameplay | Scattered16, TorchFire, bulletExplosion1, enmBat, enmEyefish, enmFrog +4 |  |  | keep |
 | 93 | `sfxEnmExplode3` | 3,024 | 0.36 |  | gameplay | Scattered16, TorchFire, bulletExplosion1, enmBat, enmEyefish, enmFrog +4 |  |  | keep |
-| 94 | `sfxSkAnger` | 4,160 | 0.50 |  | shop | Shop |  |  | keep |
-| 95 | `sfxSkHello` | 2,091 | 0.25 |  | shop | Shop |  |  | keep |
-| 96 | `sfxSkHohoho` | 3,952 | 0.47 |  | shop | Shop | 1 | 1 | keep |
-| 97 | `sfxSkHuh` | 2,091 | 0.25 |  | shop | Shop | 1 | 1 | keep |
-| 98 | `sfxSkQuestionmark` | 2,091 | 0.25 |  | shop | Shop |  |  | keep |
-| 99 | `sfxSkThank` | 2,091 | 0.25 |  | shop | Shop | 1 | 1 | keep |
-| 100 | `sfxSkTooPoor` | 2,091 | 0.25 |  | shop | Shop | 1 | 1 | keep |
-| 101 | `sfxSkWelcome` | 2,091 | 0.25 |  | shop | Shop |  |  | keep |
-| 102 | `sfxSkWhat` | 2,000 | 0.24 |  | shop | Shop |  |  | keep |
-| 103 | `sfxSkInRange` | 845 | 0.10 |  | shop | Shop | 1 | 1 | keep |
-| 104 | `sfxSkThankCheerful` | 3,296 | 0.39 |  | shop | Shop | 1 | 1 | keep |
-| 105 | `sfxShopBuyBtry` | 2,784 | 0.33 |  | shop | Shop, moduleText | 3 | 1 | keep |
-| 106 | `sfxShopBuyHeart` | 2,284 | 0.27 |  | shop | moduleText |  |  | keep |
-| 107 | `sfxShopSelect` | 272 | 0.03 |  | shop | Shop |  |  | keep |
-| 108 | `sfxShopBack` | 800 | 0.10 |  | shop | Shop |  |  | keep |
-| 109 | `sfxShopScroll` | 640 | 0.08 |  | shop | Shop | 5 | 1 | keep |
-| 110 | `sfxBatFly` | 3,280 | 0.39 |  | gameplay | enmBat | 26 | 1 | keep |
-| 111 | `sfxBatDeath` | 4,416 | 0.53 |  | gameplay | enmBat | 31 | 1 | keep |
-| 112 | `sfxBatHit` | 1,488 | 0.18 |  | gameplay | enmBat | 11 | 1 | keep |
-| 113 | `sfxFrogPrejump` | 4,576 | 0.55 |  | gameplay | enmFrog | 22 | 1 | keep |
-| 114 | `sfxFrogDeath` | 4,384 | 0.52 |  | gameplay | enmFrog | 11 | 1 | keep |
-| 115 | `sfxFrogHit` | 1,488 | 0.18 |  | gameplay | enmFrog | 14 | 1 | keep |
-| 116 | `sfxFrogJump` | 2,048 | 0.24 |  | gameplay | enmFrog | 10 | 1 | keep |
-| 117 | `sfxJellyDeath` | 5,776 | 0.69 |  | gameplay | enmWhiteJelly | 71 | 1 | keep |
-| 118 | `sfxJellyHit` | 3,952 | 0.47 |  | gameplay | enmWhiteJelly | 122 | 1 | keep |
-| 119 | `sfxSlugDeath` | 4,176 | 0.50 |  | gameplay | enmSnail | 1 | 1 | keep |
-| 120 | `sfxSlugHit` | 2,352 | 0.28 |  | gameplay | enmSnail | 3 | 1 | keep |
-| 121 | `sfxSnakeDeath` | 4,416 | 0.53 |  | gameplay | enmSnake | 9 | 1 | keep |
-| 122 | `sfxStompEnmUni` | 1,712 | 0.20 |  | gameplay | enmBat, enmEyefish, enmFrog, enmGroundTurtle, enmSnake, enmWhiteJelly | 61 | 1 | keep |
-| 123 | `sfxTurtleDeath` | 4,416 | 0.53 |  | gameplay | enmGroundTurtle | 16 | 1 | keep |
-| 124 | `sfxCrawlerDeath` | 4,176 | 0.50 |  | gameplay | enmCrawler | 6 | 1 | keep |
-| 125 | `sfxRedEyeDeath` | 4,256 | 0.51 |  | gameplay | enmRedBall, neonRedBall | 3 | 1 | keep |
-| 126 | `sfxRedEyeHit` | 2,080 | 0.25 |  | gameplay | enmRedBall, neonRedBall | 3 | 1 | keep |
-| 158 | `sfxGemBoostEnter` | 7,184 | 0.86 |  | gameplay | objControlerN | 2 | 1 | keep |
-| 159 | `sfxGemBoostLow` | 576 | 0.07 |  | gameplay | objControlerN |  |  | keep |
-| 160 | `sfxGemBoostEnd` | 3,328 | 0.40 |  | gameplay | objControlerN |  |  | keep |
-| 161 | `sfxGemChunkHit` | 1,472 | 0.18 |  | gameplay | gemChunk | 10 | 1 | keep |
-| 162 | `sfxGemChunkBreak` | 6,928 | 0.83 |  | gameplay | gemChunk | 1 | 1 | keep |
-| 163 | `sfxGemBounceBig1` | 1,056 | 0.13 |  | gameplay | objCurrency | 19 | 1 | keep |
-| 164 | `sfxGemBounceBig2` | 1,216 | 0.15 |  | gameplay | objCurrency | 37 | 1 | keep |
-| 166 | `sfxGemDisappear` | 896 | 0.11 |  | gameplay | objCurrency | 86 | 1 | keep |
-| 167 | `sfxGemGet` | 864 | 0.10 |  | gameplay, shop, clear | Result, Shop, comboRewardText, objCurrency, objObtainableUg | 354 | 1 | keep |
-| 168 | `sfxGemBounceSmall1` | 608 | 0.07 |  | gameplay | objCurrency | 77 | 1 | keep |
-| 169 | `sfxGemBounceSmall2` | 656 | 0.08 |  | gameplay | objCurrency | 57 | 1 | keep |
-| 170 | `sfxGemBounceSmall3` | 640 | 0.08 |  | gameplay | objCurrency | 94 | 1 | keep |
-| 171 | `sfxBreakRock1` | 2,240 | 0.27 |  | gameplay | Scattered16, objBox_n | 32 | 1 | keep |
-| 172 | `sfxBreakRock2` | 2,144 | 0.26 |  | gameplay | Scattered16, objBox_n | 23 | 1 | keep |
-| 173 | `sfxBreakRock3` | 2,128 | 0.25 |  | gameplay | Scattered16, objBox_n | 23 | 1 | keep |
-| 174 | `sfxBreakRock4` | 2,128 | 0.25 |  | gameplay | Scattered16, objBox_n | 26 | 1 | keep |
+| 94 | `sfxSkAnger` | 4,160 | 0.50 |  | shop | Shop | 6 | 1 | keep |
+| 95 | `sfxSkHello` | 2,091 | 0.25 |  | shop | Shop | 2 | 1 | keep |
+| 96 | `sfxSkHohoho` | 3,952 | 0.47 |  | shop | Shop | 6 | 1 | keep |
+| 97 | `sfxSkHuh` | 2,091 | 0.25 |  | shop | Shop | 2 | 1 | keep |
+| 98 | `sfxSkQuestionmark` | 2,091 | 0.25 |  | shop | Shop | 3 | 1 | keep |
+| 99 | `sfxSkThank` | 2,091 | 0.25 |  | shop | Shop | 6 | 1 | keep |
+| 100 | `sfxSkTooPoor` | 2,091 | 0.25 |  | shop | Shop | 10 | 1 | keep |
+| 101 | `sfxSkWelcome` | 2,091 | 0.25 |  | shop | Shop | 2 | 1 | keep |
+| 102 | `sfxSkWhat` | 2,000 | 0.24 |  | shop | Shop | 1 | 1 | keep |
+| 103 | `sfxSkInRange` | 845 | 0.10 |  | shop | Shop | 10 | 1 | keep |
+| 104 | `sfxSkThankCheerful` | 3,296 | 0.39 |  | shop | Shop | 6 | 1 | keep |
+| 105 | `sfxShopBuyBtry` | 2,784 | 0.33 |  | shop | Shop, moduleText | 10 | 1 | keep |
+| 106 | `sfxShopBuyHeart` | 2,284 | 0.27 |  | shop | moduleText | 5 | 1 | keep |
+| 107 | `sfxShopSelect` | 272 | 0.03 |  | shop | Shop |  |  | drop: unreachable: Shop menuState 0 never runs while the menu is active (Step opens it at 1) |
+| 108 | `sfxShopBack` | 800 | 0.10 |  | shop | Shop | 4 | 1 | keep |
+| 109 | `sfxShopScroll` | 640 | 0.08 |  | shop | Shop | 50 | 1 | keep |
+| 110 | `sfxBatFly` | 3,280 | 0.39 |  | gameplay | enmBat | 141 | 1 | keep |
+| 111 | `sfxBatDeath` | 4,416 | 0.53 |  | gameplay | enmBat | 149 | 1 | keep |
+| 112 | `sfxBatHit` | 1,488 | 0.18 |  | gameplay | enmBat | 73 | 1 | keep |
+| 113 | `sfxFrogPrejump` | 4,576 | 0.55 |  | gameplay | enmFrog | 88 | 1 | keep |
+| 114 | `sfxFrogDeath` | 4,384 | 0.52 |  | gameplay | enmFrog | 60 | 1 | keep |
+| 115 | `sfxFrogHit` | 1,488 | 0.18 |  | gameplay | enmFrog | 89 | 1 | keep |
+| 116 | `sfxFrogJump` | 2,048 | 0.24 |  | gameplay | enmFrog | 43 | 1 | keep |
+| 117 | `sfxJellyDeath` | 5,776 | 0.69 |  | gameplay | enmWhiteJelly | 253 | 1 | keep |
+| 118 | `sfxJellyHit` | 3,952 | 0.47 |  | gameplay | enmWhiteJelly | 503 | 1 | keep |
+| 119 | `sfxSlugDeath` | 4,176 | 0.50 |  | gameplay | enmSnail | 8 | 1 | keep |
+| 120 | `sfxSlugHit` | 2,352 | 0.28 |  | gameplay | enmSnail | 12 | 1 | keep |
+| 121 | `sfxSnakeDeath` | 4,416 | 0.53 |  | gameplay | enmSnake | 51 | 1 | keep |
+| 122 | `sfxStompEnmUni` | 1,712 | 0.20 |  | gameplay | enmBat, enmEyefish, enmFrog, enmGroundTurtle, enmSnake, enmWhiteJelly | 293 | 1 | keep |
+| 123 | `sfxTurtleDeath` | 4,416 | 0.53 |  | gameplay | enmGroundTurtle | 84 | 1 | keep |
+| 124 | `sfxCrawlerDeath` | 4,176 | 0.50 |  | gameplay | enmCrawler | 21 | 1 | keep |
+| 125 | `sfxRedEyeDeath` | 4,256 | 0.51 |  | gameplay | enmRedBall, neonRedBall | 11 | 1 | keep |
+| 126 | `sfxRedEyeHit` | 2,080 | 0.25 |  | gameplay | enmRedBall, neonRedBall | 26 | 1 | keep |
+| 158 | `sfxGemBoostEnter` | 7,184 | 0.86 |  | gameplay | objControlerN | 10 | 1 | keep |
+| 159 | `sfxGemBoostLow` | 576 | 0.07 |  | gameplay | objControlerN |  |  | drop: unreachable: scrControlBeginstepCheck only checks and stops sfxGemBoostLow |
+| 160 | `sfxGemBoostEnd` | 3,328 | 0.40 |  | gameplay | objControlerN | 4 | 1 | keep |
+| 161 | `sfxGemChunkHit` | 1,472 | 0.18 |  | gameplay | gemChunk | 40 | 1 | keep |
+| 162 | `sfxGemChunkBreak` | 6,928 | 0.83 |  | gameplay | gemChunk | 4 | 1 | keep |
+| 163 | `sfxGemBounceBig1` | 1,056 | 0.13 |  | gameplay | objCurrency | 133 | 1 | keep |
+| 164 | `sfxGemBounceBig2` | 1,216 | 0.15 |  | gameplay | objCurrency | 139 | 1 | keep |
+| 166 | `sfxGemDisappear` | 896 | 0.11 |  | gameplay | objCurrency | 341 | 1 | keep |
+| 167 | `sfxGemGet` | 864 | 0.10 |  | gameplay, shop, clear | Result, Shop, comboRewardText, objCurrency, objObtainableUg | 1,474 | 1 | keep |
+| 168 | `sfxGemBounceSmall1` | 608 | 0.07 |  | gameplay | objCurrency | 277 | 1 | keep |
+| 169 | `sfxGemBounceSmall2` | 656 | 0.08 |  | gameplay | objCurrency | 279 | 1 | keep |
+| 170 | `sfxGemBounceSmall3` | 640 | 0.08 |  | gameplay | objCurrency | 315 | 1 | keep |
+| 171 | `sfxBreakRock1` | 2,240 | 0.27 |  | gameplay | Scattered16, objBox_n | 125 | 1 | keep |
+| 172 | `sfxBreakRock2` | 2,144 | 0.26 |  | gameplay | Scattered16, objBox_n | 102 | 1 | keep |
+| 173 | `sfxBreakRock3` | 2,128 | 0.25 |  | gameplay | Scattered16, objBox_n | 95 | 1 | keep |
+| 174 | `sfxBreakRock4` | 2,128 | 0.25 |  | gameplay | Scattered16, objBox_n | 85 | 1 | keep |
 | 175 | `sfxBreakWood1` | 3,440 | 0.41 |  | gameplay | objBox_n |  |  | drop: objBox_n: wood boxes are area 2 |
 | 176 | `sfxBreakWood2` | 3,984 | 0.48 |  | gameplay | objBox_n |  |  | drop: objBox_n: wood boxes are area 2 |
 | 177 | `sfxBreakWood3` | 4,112 | 0.49 |  | gameplay | objBox_n |  |  | drop: objBox_n: wood boxes are area 2 |
@@ -169,12 +169,12 @@ upgrade screen between levels), results (death and results).
 | 180 | `sfxBreakMetal2` | 3,264 | 0.39 |  | gameplay | objBox_n |  |  | drop: objBox_n: metal boxes are area 4 |
 | 181 | `sfxBreakMetal3` | 3,392 | 0.41 |  | gameplay | objBox_n |  |  | drop: objBox_n: metal boxes are area 4 |
 | 182 | `sfxBreakMetal4` | 3,264 | 0.39 |  | gameplay | objBox_n |  |  | drop: objBox_n: metal boxes are area 4 |
-| 184 | `sfxVoidEnter` | 3,744 | 0.45 |  | gameplay | objPlayer_n | 16 | 1 | keep |
-| 185 | `sfxVoidExit` | 5,728 | 0.68 |  | gameplay | objPlayer_n | 12 | 1 | keep |
-| 186 | `sfxFalling` | 68,688 | 8.21 | yes | gameplay, clear | Result, enmBat, enmCrawler, enmEyefish, enmFrog, enmGroundTurtle +7 | 4 | 1 | cut: loop a short segment of the clear-screen whoosh |
-| 187 | `sfxDissipate` | 4,176 | 0.50 |  | front, gameplay | objTransDither | 8 | 1 | keep |
+| 184 | `sfxVoidEnter` | 3,744 | 0.45 |  | gameplay | objPlayer_n | 67 | 1 | keep |
+| 185 | `sfxVoidExit` | 5,728 | 0.68 |  | gameplay | objPlayer_n | 51 | 1 | keep |
+| 186 | `sfxFalling` | 68,688 | 8.21 | yes | gameplay, clear | Result, enmBat, enmCrawler, enmEyefish, enmFrog, enmGroundTurtle +7 | 16 | 1 | cut: loop a short segment of the clear-screen whoosh |
+| 187 | `sfxDissipate` | 4,176 | 0.50 |  | front, gameplay | objTransDither | 32 | 1 | keep |
 | 188 | `sfxTitleAppear` | 30,448 | 3.64 |  | front | objTitle | 1 | 1 | cut: shorten the title sting |
-| 191 | `amb1` | 723,408 | 86.50 | yes | gameplay | voidAmbience |  |  | cut: loop a short segment of the void ambience, or drop |
+| 191 | `amb1` | 723,408 | 86.50 | yes | gameplay | voidAmbience |  |  | drop: unreachable: voidAmbience plays only under tomato (area 5), and then bgmSecret 200 |
 | 192 | `bgmShopCave` | – | – |  | shop | Shop |  |  | drop: music, deferred to WM |
 | 200 | `bgmSecret` | – | – |  | gameplay | voidAmbience |  |  | drop: music, deferred to WM |
 | 201 | `bgmShopAqua` | – | – |  | shop | Shop |  |  | drop: music, deferred to WM |
@@ -183,39 +183,39 @@ upgrade screen between levels), results (death and results).
 | 310 | `sfxAquiferBreathingLowOxygen` | 3,616 | 0.43 |  | gameplay | objPlayer_n |  |  | drop: oxygen, area 3 only |
 | 313 | `sfxFootstepWater3` | 1,376 | 0.16 |  | gameplay | objPlayer_n |  |  | drop: water footsteps (scrJump in water) |
 | 314 | `sfxFootstepWater4` | 1,600 | 0.19 |  | gameplay | objPlayer_n |  |  | drop: water footsteps (scrJump in water) |
-| 315 | `sfxCombo1` | 7,600 | 0.91 |  | gameplay | comboRewardText | 5 | 1 | keep |
-| 316 | `sfxCombo2` | 11,280 | 1.35 |  | gameplay | comboRewardText |  |  | keep |
-| 317 | `sfxCombo3` | 15,696 | 1.88 |  | gameplay | comboRewardText |  |  | keep |
+| 315 | `sfxCombo1` | 7,600 | 0.91 |  | gameplay | comboRewardText | 24 | 1 | keep |
+| 316 | `sfxCombo2` | 11,280 | 1.35 |  | gameplay | comboRewardText | 4 | 1 | keep |
+| 317 | `sfxCombo3` | 15,696 | 1.88 |  | gameplay | comboRewardText | 1 | 1 | keep |
 | 318 | `sfxUiChange_Palette_Select` | 3,632 | 0.43 |  | pause | ShaderMenu |  |  | keep |
-| 319 | `sfxUiGame_Over_Appear` | 6,752 | 0.81 |  | results | DeathMenu | 1 | 1 | keep |
+| 319 | `sfxUiGame_Over_Appear` | 6,752 | 0.81 |  | results | DeathMenu | 6 | 1 | keep |
 | 320 | `sfxUiHard_Mode_Activate` | 14,928 | 1.79 |  | front | PlayMenu | 1 | 1 | keep |
 | 321 | `sfxUiMenu_Select_Confirm` | 976 | 0.12 |  | pause, results | ButtonMenu, DeathMenu, DisplayMenu, LanguageMenu, OptionMenu, OptionMenuAndroid +4 |  |  | keep |
 | 322 | `sfxUiMenu_Select_Go_Back` | 870 | 0.10 |  | pause | ButtonMenu, DisplayMenu, LanguageMenu, OptionMenu, OptionMenuAndroid, OptionMenuIpad +5 |  |  | keep |
 | 324 | `sfxUiMove_Up_in_menu` | 322 | 0.04 |  | pause, results | ButtonMenu, DeathMenu, DisplayMenu, LanguageMenu, OptionMenu, OptionMenuAndroid +6 |  |  | keep |
-| 325 | `sfxUiNumbers_Appear` | 480 | 0.06 |  | results | DeathMenu | 7 | 1 | keep |
+| 325 | `sfxUiNumbers_Appear` | 480 | 0.06 |  | results | DeathMenu | 42 | 1 | keep |
 | 326 | `sfxUiPress_Pause` | 1,440 | 0.17 |  | gameplay | objControlerN |  |  | keep |
-| 327 | `sfxUiProgress_Bar_Celebration` | 11,968 | 1.43 |  | results | DeathMenu |  |  | keep |
-| 328 | `sfxUiProgress_Bar_Fill` | 560 | 0.07 |  | results | DeathMenu | 22 | 1 | keep |
-| 329 | `sfxUiProgress_Bar_Finish` | 1,376 | 0.16 |  | results | DeathMenu |  |  | keep |
-| 330 | `sfxUiRetry` | 1,024 | 0.12 |  | results | DeathMenu | 1 | 1 | keep |
+| 327 | `sfxUiProgress_Bar_Celebration` | 11,968 | 1.43 |  | results | DeathMenu | 2 | 1 | keep |
+| 328 | `sfxUiProgress_Bar_Fill` | 560 | 0.07 |  | results | DeathMenu | 114 | 1 | keep |
+| 329 | `sfxUiProgress_Bar_Finish` | 1,376 | 0.16 |  | results | DeathMenu | 2 | 1 | keep |
+| 330 | `sfxUiRetry` | 1,024 | 0.12 |  | results | DeathMenu | 4 | 1 | keep |
 | 331 | `sfxUiStyle_Select_Backward` | 803 | 0.10 |  | front | PlayMenu | 3 | 1 | keep |
 | 332 | `sfxUiStyle_Select_Confirm` | 3,888 | 0.46 |  | front | PlayMenu | 1 | 1 | keep |
 | 333 | `sfxUiStyle_Select_Forward` | 1,280 | 0.15 |  | front | PlayMenu | 1 | 1 | keep |
-| 334 | `sfxUiTextLettersAppear` | 466 | 0.06 |  | shop | moduleText | 10 | 1 | keep |
+| 334 | `sfxUiTextLettersAppear` | 466 | 0.06 |  | shop | moduleText | 44 | 1 | keep |
 | 338 | `sfxUiUpgradeScrollRight` | 414 | 0.05 |  | pause, clear | Result, ShaderMenu |  |  | keep |
-| 339 | `sfxUiUpgradeSelect` | 7,312 | 0.87 |  | clear | Result | 4 | 1 | keep |
-| 341 | `sfxUpgradeGem_pickup_shoot` | 1,504 | 0.18 |  | gameplay | objCurrency |  |  | keep |
+| 339 | `sfxUiUpgradeSelect` | 7,312 | 0.87 |  | clear | Result | 16 | 1 | keep |
+| 341 | `sfxUpgradeGem_pickup_shoot` | 1,504 | 0.18 |  | gameplay | objCurrency | 26 | 1 | keep |
 | 342 | `sfxUpgradeGunpowder_Bullet` | 2,928 | 0.35 |  | gameplay | objBox_n |  |  | keep |
 | 343 | `sfxUpgradeJetpack_Fire_Loop` | 16,398 | 1.96 | yes | gameplay | objPlayer_n |  |  | cut: loop a short segment (jetpack loop) |
 | 344 | `sfxUpgradeRocket_Jump` | 3,856 | 0.46 |  | gameplay | objPlayer_n |  |  | keep |
-| 349 | `sfxMagicWind1` | 58,816 | 7.03 |  | gameplay, clear | Result, goalTimeField, startTimeField | 1 | 1 | cut: shorten (time-field wind) |
-| 350 | `sfxMagicWind2` | 61,120 | 7.31 |  | gameplay, clear | Result, goalTimeField, startTimeField |  |  | cut: shorten (time-field wind) |
-| 351 | `sfxMagicWind3` | 67,568 | 8.08 |  | gameplay, clear | Result, goalTimeField, startTimeField |  |  | cut: shorten (time-field wind) |
-| 352 | `sfxMagicWind4` | 70,320 | 8.41 |  | gameplay, clear | Result, goalTimeField, startTimeField |  |  | cut: shorten (time-field wind) |
-| 353 | `sfxMagicWind5` | 47,392 | 5.67 |  | gameplay, clear | Result, goalTimeField, startTimeField | 1 | 1 | cut: shorten (time-field wind) |
+| 349 | `sfxMagicWind1` | 58,816 | 7.03 |  | gameplay, clear | Result, goalTimeField, startTimeField | 4 | 1 | cut: shorten (time-field wind) |
+| 350 | `sfxMagicWind2` | 61,120 | 7.31 |  | gameplay, clear | Result, goalTimeField, startTimeField | 1 | 1 | cut: shorten (time-field wind) |
+| 351 | `sfxMagicWind3` | 67,568 | 8.08 |  | gameplay, clear | Result, goalTimeField, startTimeField | 3 | 1 | cut: shorten (time-field wind) |
+| 352 | `sfxMagicWind4` | 70,320 | 8.41 |  | gameplay, clear | Result, goalTimeField, startTimeField | 2 | 1 | cut: shorten (time-field wind) |
+| 353 | `sfxMagicWind5` | 47,392 | 5.67 |  | gameplay, clear | Result, goalTimeField, startTimeField | 2 | 1 | cut: shorten (time-field wind) |
 | 354 | `sfxMagicWind6` | 50,832 | 6.08 |  | gameplay, clear | Result, goalTimeField, startTimeField | 1 | 1 | cut: shorten (time-field wind) |
-| 355 | `sfxMagicWind7` | 64,528 | 7.72 |  | gameplay, clear | Result, goalTimeField, startTimeField | 1 | 1 | cut: shorten (time-field wind) |
-| 359 | `sfxTorchOut` | 3,696 | 0.44 |  | gameplay | TorchFire | 1 | 1 | keep |
+| 355 | `sfxMagicWind7` | 64,528 | 7.72 |  | gameplay, clear | Result, goalTimeField, startTimeField | 3 | 1 | cut: shorten (time-field wind) |
+| 359 | `sfxTorchOut` | 3,696 | 0.44 |  | gameplay | TorchFire | 7 | 1 | keep |
 | 360 | `sfxFallingDown` | 8,544 | 1.02 |  | front | EnterSequence | 1 | 1 | keep |
 
 ## Sound-argument RNG draws
@@ -232,7 +232,7 @@ port must make the same draws. Port status is for the compact
 | `GlobalScript_scrTypicalBulletDamage` | 42 | `soundPlay(choose(30, 31), 50, 0, 1);` | consumed (StandardBulletImpact) |
 | `GlobalScript_scrUpButtonFunctions` | 44 | `soundPlay(choose(86), 80, 0, 1);` | consumed: jump and wall kick (RunSession::playPlayerSounds) |
 | `GlobalScript_scrUpButtonFunctions` | 62 | `soundPlay(choose(86), 80, 0, 1);` | consumed: jump and wall kick (RunSession::playPlayerSounds) |
-| `GlobalScript_soundBullet` | 22 | `soundPlayOL(global.sfxBhit[sfxIndex][irandom_range(1, global.sfxBhit[sfxIndex][0])], 60, 0, 1, "gunwall");` | consumed (compactBulletWallHit; foliage, so one sample) |
+| `GlobalScript_soundBullet` | 22 | `soundPlayOL(global.sfxBhit[sfxIndex][irandom_range(1, global.sfxBhit[sfxIndex][0])], 60, 0, 1, "gunwall");` | consumed (compactBulletWallHit: foliage terrain, the shop wall (rock) and table (metal)) |
 | `GlobalScript_soundFootstep` | 27 | `footstepsnd = soundPlayOL(global.sfxFs[sfxIndex][irandom_range(1, global.sfxFs[sfxIndex][0])], 60, 0, 1, "footsteps");` | consumed (RunSession::playPlayerSounds) |
 | `GlobalScript_soundLand` | 28 | `soundPlayOL(global.sfxJl[sfxIndex][irandom_range(1, global.sfxJl[sfxIndex][0])], 60, 0, 1, "footsteps");` | consumed, audio-gated: only while sfxGunRecharge is not playing (SoundVoices) |
 | `Object_Result_Step_0` | 4 | `windsnd = choose(349, 350, 351, 352, 353, 354, 355);` | consumed, audio-gated: while global.voidWind is not playing (RunSession::resultStepWind) |

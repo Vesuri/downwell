@@ -137,6 +137,12 @@ private:
     bool hardUnlocked_ = false, hardMode_ = false, styleConfirmed_ = false;
     bool firstBoot_ = false; // global.firstBoot: the title sting plays once
     downwell::FrontEndSounds sounds_;
+    // W2.6: the garden's footstep and landing sample choice. The front end
+    // has no game RNG (the first run starts from the builder checkpoint), so
+    // irandom_range(1, 4) uses its own stream; it only picks the sample.
+    std::uint32_t gardenSoundRandom_ = 0x2545f491u;
+    unsigned menuImageFloor_ = 0;
+    void playGardenFoliage(int first);
 };
 
 #endif

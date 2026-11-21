@@ -245,6 +245,17 @@ void AmigaSceneRuntime::stepSplash(bool firePressed)
     }
 }
 
+// soundFootstep/soundLand on rmMenu's objWall_n floor (foliage):
+// soundPlayOL(global.sfxFs[2] or sfxJl[2][irandom_range(1, 4)], 60, 0, 1,
+// "footsteps"). groundRoom() keeps the footstep's full gain.
+void AmigaSceneRuntime::playGardenFoliage(int first)
+{
+    gardenSoundRandom_ ^= gardenSoundRandom_ << 13;
+    gardenSoundRandom_ ^= gardenSoundRandom_ >> 17;
+    gardenSoundRandom_ ^= gardenSoundRandom_ << 5;
+    sounds_.playOL(first + static_cast<int>(gardenSoundRandom_ % 4u), 60, false, true, "footsteps");
+}
+
 void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
 {
     ++menuTicks_;
@@ -262,6 +273,9 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
             menuGrounded_ = true;
             menuFallTicks_ = 0;
             menuSpeedY_ = 0;
+            // playerSpriteControl's nap wake: napping = 0, then soundLand
+            // while grounded (sfxJumpLandFoliage 69-72).
+            playGardenFoliage(69);
         }
     } else if (!menuTeleport_) {
         if (!controlsLocked && input.left != input.right) {
@@ -307,6 +321,14 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
 
     }
 
+    // scrPlMovement: on the run sprite, soundFootstep when image_index has
+    // just reached frame 1 or 5 (sfxFsFoliage 51-54).
+    if (!menuNapping_ && menuGrounded_ && menuSprite_ == 27) {
+        const unsigned frame = positiveFloatFloor(menuImage_);
+        if ((frame == 1 || frame == 5) && frame != menuImageFloor_)
+            playGardenFoliage(51);
+    }
+
     if (!menuNapping_) {
         if (!menuGrounded_) {
             menuSprite_ = 37;
@@ -325,6 +347,7 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
         }
     }
 
+    menuImageFloor_ = positiveFloatFloor(menuImage_);
     if (menuImageSpeed_ != 0)
         menuImage_ = addPositiveFloat(menuImage_, menuImageSpeed_);
     if (!menuNapping_ && menuGrounded_ && menuSprite_ == 27 &&

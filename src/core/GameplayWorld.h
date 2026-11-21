@@ -2927,6 +2927,8 @@ private:
     long viewCameraYQ8() const { return followCamera_ ? cameraPixelY_ * 256L : cameraY_; }
     void initializeMainCameraFrame();
     void applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect);
+    // W2.6: enmFrog's Collision with enmFrog after the enemy Steps.
+    void bumpCompactFrogs();
     void advanceEnemyAlarms();
     void updateCrawler(EnemyState& enemy, bool alarm, int cameraX, long cameraYQ8);
     GenerationStep generationStep_ = nullptr;
@@ -3095,7 +3097,10 @@ private:
     bool compactImmuneSpark(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
     bool compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
     void compactMomentDelay();
-    bool compactBulletWallHit(const downwell::ProjectileSegment& path);
+    // material: soundBullet's index (2 foliage terrain, 3 rock, 4 metal).
+    bool compactBulletWallHit(const downwell::ProjectileSegment& path,int material=2);
+    // W2.6: shop children on a local bullet path (ShopWorld::wallMaterialOn).
+    int shopWallOn(const downwell::ProjectileSegment& path,bool cases)const;
     bool compactWallEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,int depth);
     bool compactCosmeticEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,int depth);
     void compactDamageSlowdown();

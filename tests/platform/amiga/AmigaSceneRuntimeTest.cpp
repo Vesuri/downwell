@@ -2450,6 +2450,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
     const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):119u;
     const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
+    const bool shopTour=std::getenv("DOWNWELL_SLICE_SHOP_TOUR")!=nullptr;
     const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
     std::ofstream tape(output+".inputs",std::ios::binary);
     std::ofstream states(output+".states");
@@ -2493,6 +2494,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         unsigned titleFrames=0,comboFrames=0,rewardFrames=0,peakCombo=0,barFrames=0,gemHighFrames=0,afterImageFrames=0;
         // W1.8: the scripted visit (one press per action, then release).
         bool shopVisited=false;std::vector<downwell::Input> shopScript;unsigned shopStep=0;
+        // W2.6 coverage (DOWNWELL_SLICE_SHOP_TOUR): after the visit, jump onto
+        // the shop table behind the keeper (metal steps and landings, the
+        // keeper's anger) and shoot down into it (metal bullet hits).
+        unsigned tourPhase=0,tourTicks=0,tourLandings=0,tourHold=0;int tourX=0,tourY=0;bool tourAir=false;
         unsigned speechFrames=0,promptFrames=0;
         // W1.4: GunModule births/pickups, gun changes and the new shot owners.
         unsigned modules=0,pickups=0,gunChanges=0,rangedShots=0,laserShots=0,casings=0,trails=0,notices=0;
@@ -2634,8 +2639,38 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 input=shopStep<shopScript.size()?shopScript[shopStep++]:downwell::Input{};
                 ++shopTick;
             }else{
-                if(shopTick){shopVisited=true;++routeShops;escape=240;detourX=detourY=0;}
+                if(shopTick){shopVisited=true;++routeShops;escape=240;detourX=detourY=0;
+                    if(shopTour)for(const auto& shop:game.shops().instances)
+                        if(shop.present&&std::abs(shop.x-x)<=40&&std::abs(shop.y-y)<=24){tourPhase=1;tourX=shop.x;tourY=shop.y;escape=0;}}
                 shopTick=0;
+            }
+            if(tourPhase&&!game.shops().noControl){
+                // The glass cases (room y-18..-1 over x+36..x+91) cover the
+                // table, so the walkable metal is the cases' top (y-26).
+                const bool grounded=game.player().grounded();
+                const bool onCases=grounded&&y<=tourY-20&&x>=tourX+30&&x<=tourX+97;
+                input={};
+                if(std::getenv("DOWNWELL_TRACE_SLICE_TOUR"))std::cerr<<"TOUR phase="<<tourPhase<<" x="<<x-tourX
+                    <<" y="<<y-tourY<<" grounded="<<grounded<<" landings="<<tourLandings<<'\n';
+                if(++tourTicks>900||(tourPhase==4&&tourLandings>=4)){tourPhase=0;escape=240;}
+                else if(tourHold){input.fire=true;--tourHold;input.right=tourPhase==1;}
+                else if(tourPhase==1){
+                    // From the counter step: walk right past the keeper, then
+                    // a full jump onto the cases.
+                    if(onCases)tourPhase=2;
+                    else if(grounded&&y<=tourY-6){input.right=true;if(x>=tourX+4&&!lastFire)tourHold=16;}
+                    else if(grounded){input.left=true;} // fell behind the counter: back to the step
+                    else input.right=x<tourX+60;
+                }else if(tourPhase==2||tourPhase==3){
+                    // Walk the cases' top to the right end and back.
+                    const int goal=tourPhase==2?tourX+86:tourX+42;
+                    input.right=x<goal-1;input.left=x>goal+1;
+                    if(std::abs(x-goal)<=1)++tourPhase;
+                }else{
+                    // Hop in place and fire down through the cases into the table.
+                    if(grounded){if(tourAir)++tourLandings;tourAir=false;if(!lastFire)tourHold=8;}
+                    else{tourAir=true;input.fire=updates%4<2;input.left=x>tourX+66;input.right=x<tourX+62;}
+                }
             }
             // Release the style-confirm button before the first gameplay press.
             if(level==1&&updates==0)input={};
@@ -2945,7 +2980,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             require(!game.finishWorldOneSlice(),"slice transition is consumed once");
         }
     }
-    const char* routeName=hardRoute?(died?"hard-mode-death":"hard-mode"):"world-one";
+    // W2.6 coverage routes: another variant is its own route (world-one-v335).
+    std::string routeName=hardRoute?(died?"hard-mode-death":"hard-mode"):"world-one";
+    if(variant!=119u||shopTour)routeName+="-v"+std::to_string(variant);
+    if(shopTour)routeName+="-tour";
+    sounds.flush(); // complete even when a check below fails (route sweeps)
     std::cout<<"World one slice sounds: "<<sounds.requests()<<" requests, "<<sounds.kinds(downwell::SoundRequest::play)
         <<" plays, peak "<<sounds.peakVoices()<<" voices, dropped "<<sounds.dropped()<<'\n';
     require(sounds.dropped()==0,"the slice never overflows the sound request ring");

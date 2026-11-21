@@ -106,13 +106,12 @@ whole player Step. `levelNumber` is drawn on the fixed HUD layer: above the worl
 and hidden while the death flash covers the playfield. The merchant's speech
 (`fxRisingText` from `scrRisingTextShop`) uses the same alignment as "EMPTY!"
 and rises in Q16 like `itemNotif` rather than binary64. The Shop Step's
-messages, sounds and BGM gain are produced but silent until W2, and its
-`shopInView` and `keeperAngry` flags drive only sounds. The criminal route
+BGM gain is produced but silent until WM, and its `shopInView` and
+`keeperAngry` flags drive only sounds. The criminal route
 cannot happen in the pinned build: only a shop case's `destroyed` flag sets
 `global.criminal`, and nothing writes it (`original-behavior-audit.md`).
 The pause menus drop the PC-only DISPLAY, LANGUAGE, Quick Start and key
-binding screens, and the BGM and volume options are stored but silent (volume
-until W2, BGM until WM). PlayMenu's HARD MODE label is static (no whomp). The save is written at
+binding screens, and the BGM option is stored but silent until WM. PlayMenu's HARD MODE label is static (no whomp). The save is written at
 static moments (results opening, pause close and its actions, style confirm,
 slice end and quit), not on every `ini_write_real`; the slice end counts as a
 run end for the records. The clear screen shows the style-0 poses for every
@@ -129,6 +128,14 @@ style select, patched with the chosen style and hard mode.
    spread (its `bdirRand` and `decTimer` changes are in) to this item, and
    W1.5 left Time Field Damage (`pugTime`: `scrTypicalDamage` from the time
    fields), and W1.6 left Rest in Pieces (`pugRip`: corpses that explode).
+   Their sounds come with them (W2.6 left them here; the bank holds them):
+   the drone's shot 47 (upgrade 9: `objDrone` Alarm 0 and `bulletDrone`),
+   `sfxPlayerEat` 83 (Knife and Fork, upgrade 11: the compact world has no
+   corpse/player collision), `sfxEnmExplode1-3` 91-93 (Exploding Knees'
+   stomp, `Scattered16` and `TorchFire`, and `bulletExplosion1` from Rest in
+   Pieces and the decoy), the gunpowder box 342 (upgrade 5:
+   `chainReaction()` returns false), the jetpack loop 343 (upgrade 22) and
+   the rocket jump 344 (upgrade 18).
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the
@@ -140,15 +147,19 @@ style select, patched with the chosen style and hard mode.
     never fires `pooferBullet`) and `neonRedBall` 173 (the red ball's steering
     with ehp 40, maxsp 1.5, knock-back on hit, `sprNeonRedBall` and the
     `emitMovingFx` 704 trail, from above). Pass `run_.hardMode` to
-    `createCaverns` once both exist. Also still unseen natively: the results'
-    unlock notice (implemented; route variant 445 dies in 1-3 on the host but
-    is still alive in 1-2 natively at its last input, so a dying route that
-    crosses a goal still has to be found and captured).
+    `createCaverns` once both exist. (The results' unlock notice is seen
+    natively since W2.6: the hard-mode coverage route
+    `hard-mode-death-v456-tour` dies in 1-3 and unlocks the Matcha palette.)
 11. **Low-health flicker.** At 1 HP `playerDraw` replaces the player, on 7 of
     every 52 Draws, by two `shaderPlayerRed` copies (white and red texels red,
     black transparent) jittered by `irandom_range(-2,2)` and
     `irandom_range(-1,1)`. The draws feed the world RNG, so adding it reshuffles
-    the route.
+    the route. Re-search the routes once for this and for the laser's missing
+    wall smoke: `bulletLaser` Step's wall branch runs `scrSmokefx(x, y, 1, 0)`
+    (`emitBoxSmoke`) between its effect and `sndShotwall` 15, and its draws
+    reshuffle every route that fires the laser at a wall (world one's among
+    them). Re-searching means new slice variants, the sound-route summaries
+    and the native replays.
 12. **Walking enemy wedged in a solid hangs the compact world.** Found with the
     W2.3 RNG stream: currency tape `--overflow` with startup seed 40 and
     encounter route 0 (`SCAN_ROUTE`-style override of `amigaOverflowRoute`).
@@ -168,6 +179,13 @@ style select, patched with the chosen style and hard mode.
     encounter session's `retire()` then fails at exit (gameplay failure
     line 5576). Find which `break` fires: the route's Chip trace and bank
     loads are clean up to that point.
+
+14. **Garden jump.** `rmMenu`'s player is the full `objPlayer_n`, so the
+    original garden player can jump (and land on the bench, metal). The
+    port's menu player only walks, falls into the well and wakes from the
+    nap, so the garden has no jump 86 or jump landings; its footsteps and
+    nap-wake landing play (W2.6). The front end has no game RNG, so the
+    sample choice can stay on the front end's own stream.
 
 ### W2. Sound effects
 
@@ -191,13 +209,18 @@ and a verdict. The tool takes a closure from the world-1 rooms over object
 events, scripts and creations, keeping only the builder symbols in the
 area-1 patterns, and names every cut with its reason.
 - **What world 1 reaches:**
-  - 114 objects reach 181 sounds. 164 of them are kept or cut.
+  - 114 objects reach 181 sounds. 158 of them are kept or cut.
   - The rest are dropped:
     - music (WM);
     - water and oxygen sounds;
     - the wood and metal box breaks of areas 2 and 4;
     - the PC-only menus;
-    - `sfxNull`.
+    - `sfxNull`;
+    - six that world-1 code requests but never reaches in the pinned build
+      (W2.6, reasons in the inventory): `sndGem` 4 (its item sits in a case
+      nothing opens), `sndCaseBreak` 10, `sndCoinbounce1` 14,
+      `sfxShopSelect` 107 (Shop menu state 0 never runs while open),
+      `sfxGemBoostLow` 159 and the void ambience `amb1` 191.
 - **Sizes of the short sounds:**
 
   | Scene | Short sounds |
@@ -209,10 +232,10 @@ area-1 patterns, and names every cut with its reason.
   | Clear | 11 KiB |
   | Pause | 6 KiB |
 
-  The garden also needs the player's footstep, landing and jump sounds.
+  The garden's foliage footsteps and landings (51-54, 69-72) are in the
+  front end too.
 - **Long sounds, to be cut:**
   - the seven time-field winds 349–355 (5.7–8.4 s each, 411 KiB);
-  - `amb1` 191 (an 86 s loop, 706 KiB);
   - `sfxFalling` 186 (an 8 s loop);
   - `sfxTitleAppear` 188 (3.6 s);
   - the jetpack loop 343 (2 s).
@@ -236,21 +259,36 @@ area-1 patterns, and names every cut with its reason.
     Amiga cut.
   - The other audio reads (`bgmDuck`, `gunshotStop`, `levelBeginCue`,
     `sfxGemBoostLow`) only affect audio.
-- **RNG audit:** the compact `GameplayWorld` (the Amiga's shipping path) is
-  missing five world-1 sound draws, listed in the inventory:
-  - `soundFootstep`;
-  - `soundLand`;
-  - `soundBullet` (a bullet on an unbreakable wall);
-  - the goal-field wind;
-  - the clear screen's wind.
-
-  The Exploding Knees and decoy-balloon draws belong to W1.9. The other
-  world-1 draws are consumed.
+- **RNG audit:** the compact `GameplayWorld` (the Amiga's shipping path)
+  consumes every world-1 sound draw (the inventory's table) except the
+  Exploding Knees and decoy-balloon ones, which belong to W1.9.
 - **What exists today:**
   - `SoundPlayScript`, `TimeFieldWind`, `BulletWallSound` and the
     `RunSession` hooks drive the registered owners.
   - The compact world, shops, run session, pause menu, clear screen,
-    results and front end write `SoundRequests` (W2.3).
+    results and front end write `SoundRequests` (W2.3) at every world-1
+    call site except the W1.9 upgrades' (see W1.9). W2.6 added the laser's
+    wall hit 15, bullets and casings stopping on the shop table (metal
+    32/33) and the keeper's invisible wall (rock 34/35, also its footsteps
+    and landings), the frog-against-frog bump (`enmFrog` Collision with
+    `enmFrog`, after the enemy Steps), and the garden's footsteps and nap-wake
+    landing. The floor material for footsteps and landings is approximated
+    from three probes under the player; the garden's sample choice uses its
+    own stream because the front end has no game RNG.
+  - **Conversion (W2.2):** every class at 8,363 Hz with a -24 dB crop; the
+    seven winds as 1.5 s swells, `sfxFalling` a 1 s loop, the jetpack a
+    0.5 s loop and the title sting 2.5 s. The bank comes from
+    `tools/sfx-bank.py --bank` (`make amiga-sfx-bank`) with
+    `tools/sfx-bank-policy.json`; `--preview` rebuilds the listening page.
+    Paula's minimum period (124) bounds pitch × rate: at 8,363 Hz the guns'
+    1.8 and the progress-bar fill's 2.2 fit.
+  - **Routes:** `make test-sound-routes` checks the menus driver and eight
+    slice routes against `tests/data/sound-routes`: world one (variant 119),
+    the hard-mode death in 1-2, and six coverage variants
+    (`SOUND_COVERAGE_ROUTES`; `-tour` adds `DOWNWELL_SLICE_SHOP_TOUR`, a
+    climb onto the shop's cases after the visit). Together with the native
+    menus route (the pause menu's six) they play all 158 kept sounds but the
+    eight W1.9 ones.
   - **The Paula mixer (W2.4)** plays every sound in the normal build (W2.6):
     - `PaulaMixer.h` holds the portable plan and sequencer, and
       `AmigaPaulaAudio` is the hardware driver. It plays the DWSX pack that
@@ -277,12 +315,13 @@ area-1 patterns, and names every cut with its reason.
       (`SoundRequestLog::banks`), and `make test-paula-mixer` replays them
       through those packs.
   - **Scene banks (W2.5):** `AmigaSoundBanks` owns the mixer and four Chip
-    packs from `tools/pack-amiga-sfx.py`, each sound in exactly one:
-    - `Downwell.sndrun` (434,226 bytes): gameplay, shops and pause, plus
+    packs from `tools/pack-amiga-sfx.py`, each sound in exactly one except
+    that front-end sounds the run also plays are in both run and front:
+    - `Downwell.sndrun` (410,262 bytes): gameplay, shops and pause, plus
       what they share with clear and results. Resident (slot 0) from
       gameplay entry, after the cavern atlas, until the run leaves for the
       front end, so across Retry, pause, shops, clear and results.
-    - `Downwell.sndfront` (46,828): the front end, only while no run bank is
+    - `Downwell.sndfront` (62,092): the front end, only while no run bank is
       resident.
     - `Downwell.sndresults` (18,828) and `Downwell.sndclear` (7,108): loaded
       over the run bank (slot 1) while those screens show; the clear bank is
@@ -291,63 +330,23 @@ area-1 patterns, and names every cut with its reason.
     A pack loads only if the largest Chip block keeps 16 KiB beyond it, and
     a failed load leaves that bank silent (`gDownwellSoundBankFailures`).
     Measured at 1 MiB in W2.5: 600,104 bytes free in the front end, 45,992
-    (largest block 45,944) in gameplay, and 27,160 on the results screen;
-    W2.6 moved `sfxDissipate` 187 (the gameplay exit dither plays it too)
-    from the front pack to the run pack, so gameplay and results have 4,192
-    bytes less and the front end 4,192 more.
+    (largest block 45,944) in gameplay, and 27,160 on the results screen.
+    W2.6 since shrank the run pack by 23,964 bytes (dropping the unreachable
+    sounds, mostly the void ambience loop) and grew the front pack by 15,264
+    (the garden's footsteps and landings and `sfxDissipate` 187).
     `chip_memory_watch.gdb` prints `SOUND_BANKS` at every file load, and
     `verify_scenes.gdb` and `verify_clear.gdb` assert the bank sequence.
 - **Memory:** measured on 2026-11-20 with the normal 1 MiB build in level
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
 
-2. **Conversion and the quality experiment.** Decided on 2026-11-20:
-   every class at **8,363 Hz with a -24 dB crop**; the seven winds as
-   1.5 s swells, the void ambience as a 2 s loop, `sfxFalling` a 1 s loop,
-   the jetpack a 0.5 s loop and the title sting 2.5 s. The run bank
-   (gameplay, shop, pause) is 417 KiB of the 465 KiB free, leaving about
-   47 KiB for the mixer, W3 and later art; all kept sounds come to 491 KiB.
-   The bank comes from `tools/sfx-bank.py --bank` (`make amiga-sfx-bank`)
-   with `tools/sfx-bank-policy.json`; `--preview` rebuilds the listening
-   page. Paula's minimum period (124) bounds pitch × rate: at 8,363 Hz the
-   guns' 1.8 and the progress-bar fill's 2.2 fit.
-3. **Request gaps.** The core `SoundRequests` rings are filled at the
-   world-1 call sites, and `make test-sound-routes` checks three host routes
-   against `tests/data/sound-routes` (world one, a hard-mode run that dies
-   in 1-2 through the results, and the menus driver). These sites are still
-   missing:
-   - the shop case break 10 (`shopCase`);
-   - the frog-against-frog bump 116, which the compact world does not model;
-   - the garden player's footsteps, landing and jump (the menu player has
-     no material or step timing);
-   - the Exploding Knees and decoy sounds, with their W1.9 owners.
-
-   The floor material for footsteps and landings is approximated from three
-   probes under the player. The pause menu's sounds are only on the native
-   menus route (`tools/verify-menus-native.py`), not on a host route.
-6. **Cover and tune world 1's sounds.** The mixer is wired (see "What
-   exists today"); what remains:
-   - **Coverage:** the world-one, hard-mode death and menus routes (the
-     latter adds the pause menu's six; the death route with a 2,990-gem seed
-     adds the bar's celebration and goal sounds 327/329) start 104 of the
-     bank's 164 sounds natively. No route plays the other 60, so they are
-     not checked natively yet (a route per group, or a native probe that
-     triggers each sound through its game code):
-     - guns other than the starting one and their bullet hits (20, 22,
-       24, 25, 32-35, 41-47), `sndShotwall` 15, `sndGem` 4,
-       `sndCoinbounce1` 14, `sfxPlayerEat` 83, the gem boost 159/160, combo
-       2 and 3 (316/317), the upgrades 341-344 (gem shoot, gunpowder,
-       jetpack loop, rocket jump);
-     - the rock, metal and breakable footsteps and landings (50, 55-58, 60-62,
-       66, 68, 73-77, 79, 80), enemy explosions 91-93;
-     - the shop case break 10, the keeper's anger, hello, question mark,
-       welcome and what (94, 95, 98, 101, 102), buying a heart 106 and the
-       shop menu's select and back (107, 108);
-     - the void ambience `amb1` 191 and the winds 350-352.
-   - **Listening:** on the world-one host replay the plan steals 178 and
-     drops 73 of 1,771 plays (hard mode 135 and 42 of 1,921); natively, at
-     the A500's slower update rate, 20 and 9 of 1,838. Listen for drops and
-     cuts that matter and tune priorities if needed.
+6. **Listen and tune world 1's sounds.** Every reachable sound plays on a
+   natural route in the normal build (see "What exists today"); what remains
+   needs ears or a quiet host:
+   - **Listening:** on the world-one host replay the plan steals 179 and
+     drops 77 of 1,776 plays (hard mode 135 and 42 of 1,921); natively, at
+     the A500's slower update rate, far fewer (20 and 9 of 1,838 at W2.6).
+     Listen for drops and cuts that matter and tune priorities if needed.
    - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
      It passed before W2.4's deferred voice setup. Since then, the native
      probe's counters and timing pass, but two recordings under a load of 13+
@@ -473,7 +472,10 @@ W2.4's mixer costs, from the probe on the A500 (raster lines of about
 - **Wired (W2.6):** the longest VBlank service on the world-one and
   hard-mode death routes is 8 lines. Quiet-fall stays at 208 fields with
   the drain and `frame()` in the loop (`frame()` returns at once while no
-  voice plays and nothing is published).
+  voice plays and nothing is published). Finishing W2.6's requests (the
+  frog-against-frog bump scan, the shop walls) measures 210; the same tree
+  with the bump returning at once measures 211 and without its call 207, so
+  a few fields either way here are code layout, not the scan.
 
 The wall-kick pose (`sprPlayerWall`, frame 0 with mirrored, DMA and
 afterimage forms) takes the cavern CPU bank to 368,798 bytes (ceiling raised

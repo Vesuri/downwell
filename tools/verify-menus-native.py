@@ -235,6 +235,10 @@ def main():
         print('SOUND started natively:', ' '.join(f'{a}x{n}' for a, n in sorted(started.items())), flush=True)
         if expectedSounds - started.keys():
             raise RuntimeError(f'menu sounds never started natively: {sorted(expectedSounds - started.keys())}')
+        # W2.6: the garden's foliage footsteps (51-54) and nap-wake landing (69-72).
+        for name, group in (('garden footstep', range(51, 55)), ('garden landing', range(69, 73))):
+            if not started.keys() & set(group):
+                raise RuntimeError(f'no {name} started natively')
         save = Path('.run/dh1/save.ini')
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline and not save.exists(): time.sleep(0.5)

@@ -25,7 +25,7 @@ import pathlib
 import re
 import sys
 
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 UTMT = ROOT / 'extracted/utmt-0.9.2.0'
 CE = UTMT / 'CodeEntries'
@@ -77,6 +77,13 @@ SOUND_CUTS = {
     6: 'sndPlip: enemies outside world 1 only',
     **{i: 'objBox_n: wood boxes are area 2' for i in range(175, 179)},
     **{i: 'objBox_n: metal boxes are area 4' for i in range(179, 183)},
+    # W2.6: requested by world-1 code that never runs in the pinned build.
+    4: 'unreachable: objObtainableUg sits inside a shopCase that nothing opens',
+    10: 'unreachable: nothing writes shopCase.destroyed (original-behavior-audit)',
+    14: 'unreachable: fxCasing never plays its bounceSnd, objCurrency replaces it before a bounce',
+    107: 'unreachable: Shop menuState 0 never runs while the menu is active (Step opens it at 1)',
+    159: 'unreachable: scrControlBeginstepCheck only checks and stops sfxGemBoostLow',
+    191: 'unreachable: voidAmbience plays only under tomato (area 5), and then bgmSecret 200',
 }
 # Name references that only initialise a default (the gun sound is played
 # from global.pBulSound in scrShotSound).
@@ -89,7 +96,7 @@ RNG_STATUS = {
     'gml_GlobalScript_scrJump': 'not world 1: water only',
     'gml_GlobalScript_scrUpButtonFunctions': 'consumed: jump and wall kick (RunSession::playPlayerSounds)',
     'gml_GlobalScript_scrTypicalBulletDamage': 'consumed (StandardBulletImpact)',
-    'gml_GlobalScript_soundBullet': 'consumed (compactBulletWallHit; foliage, so one sample)',
+    'gml_GlobalScript_soundBullet': 'consumed (compactBulletWallHit: foliage terrain, the shop wall (rock) and table (metal))',
     'gml_GlobalScript_soundFootstep': 'consumed (RunSession::playPlayerSounds)',
     'gml_GlobalScript_soundLand': 'consumed, audio-gated: only while sfxGunRecharge is not playing (SoundVoices)',
     'gml_Object_Result_Step_0': 'consumed, audio-gated: while global.voidWind is not playing (RunSession::resultStepWind)',
@@ -130,11 +137,15 @@ def owner_scenes(owner):
     return scenes if isinstance(scenes, tuple) else (scenes,)
 
 
+# W2.6: sounds that rmMenu's objPlayer_n also plays in the garden: footsteps
+# on its objWall_n floor (foliage) and the nap wake's soundLand.
+GARDEN_SOUNDS = {51, 52, 53, 54, 69, 70, 71, 72}
+
+
 SCENE_ORDER = ['front', 'gameplay', 'shop', 'pause', 'clear', 'results']
 # Verdicts beyond "keep". Seconds are at the crop; the Amiga keeps all of
 # Chip for samples but nothing streams, so long sounds are cut or dropped.
 VERDICTS = {
-    191: 'cut: loop a short segment of the void ambience, or drop',
     186: 'cut: loop a short segment of the clear-screen whoosh',
     188: 'cut: shorten the title sting',
     349: 'cut: shorten (time-field wind)', 350: 'cut: shorten (time-field wind)',
@@ -338,8 +349,8 @@ def main():
         a = audio[i]
         s = sounds[i]
         owners_shown = sorted(o if not o.startswith('gml_') else o.split('_', 2)[-1] for o in s['owners'])
-        scenes = sorted({scene for o in s['owners'] if o in reached_objects and o not in NOT_ON_AMIGA
-                         for scene in owner_scenes(o)} or {'gameplay'},
+        scenes = sorted(({scene for o in s['owners'] if o in reached_objects and o not in NOT_ON_AMIGA
+                          for scene in owner_scenes(o)} or {'gameplay'}) | ({'front'} if i in GARDEN_SOUNDS else set()),
                         key=SCENE_ORDER.index)
         p = paula.get(i)
         size = p['bytes'] if p else None

@@ -3718,6 +3718,11 @@ verify-terrain-ownership: build/amiga-terrain-ownership-test generate-room-pack 
 	./build/amiga-terrain-ownership-test generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp generated/downwell-sprites.dwsc
 test: verify-terrain-ownership
 
+# W2.6 coverage routes: other slice variants (DOWNWELL_SLICE_VARIANT; -tour
+# adds DOWNWELL_SLICE_SHOP_TOUR, a climb onto the shop's cases after the
+# visit), picked so that every world-1 sound the core requests plays on some
+# route. The pause menu's sounds are on the native menus route.
+SOUND_COVERAGE_ROUTES := world-one-v38-tour hard-mode-death-v456-tour hard-mode-death-v337-tour hard-mode-death-v383 hard-mode-death-v228 hard-mode-death-v29-tour
 # W2.3 sound routes: each route's SoundRequests summary against
 # tests/data/sound-routes/<route>.summary (DOWNWELL_WRITE_SOUND_ROUTES=1
 # rewrites them; tools/sound-inventory.py reads them).
@@ -3730,6 +3735,15 @@ test-sound-routes: build/amiga-front-end-sound-test generate-room-pack generate-
 	./build/amiga-front-end-sound-test
 	DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_OUTPUT=tmp/sound-route-world-one ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_SLICE_HARD=1 DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_OUTPUT=tmp/sound-route-hard-mode-death ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	@set -e; for route in $(SOUND_COVERAGE_ROUTES); do \
+	  hard=; case $$route in hard-*) hard=DOWNWELL_SLICE_HARD=1;; esac; \
+	  tour=; case $$route in *-tour) tour=DOWNWELL_SLICE_SHOP_TOUR=1;; esac; \
+	  env $$hard $$tour DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_VARIANT=$$(echo $$route | sed -e 's/.*-v//' -e 's/-tour//') \
+	    DOWNWELL_SLICE_OUTPUT=tmp/sound-route-$$route ./$(AMIGA_SCENE_TEST_TARGET) \
+	    generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp > tmp/sound-route-$$route.log 2>&1 \
+	    || { tail -3 tmp/sound-route-$$route.log; exit 1; }; \
+	  tail -1 tmp/sound-route-$$route.log; \
+	done
 test: test-sound-routes
 
 # W2.4 Paula mixer: the DWSX pack of the W2.2 bank, the mixer's unit checks,
@@ -3748,7 +3762,7 @@ build/paula-mixer-test: tests/platform/amiga/PaulaMixerTest.cpp tests/platform/a
 test-paula-mixer: build/paula-mixer-test generated/amiga-sfx.bin test-sound-routes
 	python3 tools/pack-amiga-sfx.py --check
 	./build/paula-mixer-test generated/amiga-sfx.bin tmp/paula-probe-expected.wav
-	./build/paula-mixer-test generated/amiga-sfx.bin --route tmp/menus-route.sounds tmp/sound-route-world-one.sounds tmp/sound-route-hard-mode-death.sounds
+	./build/paula-mixer-test generated/amiga-sfx.bin --route tmp/menus-route.sounds tmp/sound-route-world-one.sounds tmp/sound-route-hard-mode-death.sounds $(SOUND_COVERAGE_ROUTES:%=tmp/sound-route-%.sounds)
 test: test-paula-mixer
 verify-amiga-paula-mixer: build/paula-mixer-test generated/amiga-sfx.bin
 	@mkdir -p tmp captures

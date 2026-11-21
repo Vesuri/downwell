@@ -185,6 +185,37 @@ public:
         });
         return hit;
     }
+    // W2.6: the shop children as walls, with soundBullet/soundFootstep's
+    // material index: shopTable 278 is metal (4) and objInvisWall 98 rock
+    // (3), both subparentSolidWall (59); shopCase 279 is metal but only
+    // parentWall (57), so scrBulCheckSolid passes it and the laser's
+    // position_meeting(parentWall) does not. -1 when nothing is there.
+    template<class Visit>
+    void visitWalls(bool cases, Visit visit) const {
+        if (!allocatedCount) return;
+        for (const auto& shop : instances) if (shop.allocated) {
+            visit(Rectangle{shop.x + 34, shop.y, shop.x + 93, shop.y + 7}, 4);
+            if (cases) for (int i = 0; i < 3; ++i) {
+                const int caseX = shop.x + 45 + i * 19;
+                visit(Rectangle{caseX - 9, shop.y - 18, caseX + 8, shop.y - 1}, 4);
+            }
+            if (shop.wallPresent) visit(Rectangle{shop.x - 8, shop.y, shop.x + 7, shop.y + 15}, 3);
+        }
+    }
+    int wallMaterialAt(int x, int y, bool cases) const {
+        int material = -1;
+        visitWalls(cases, [&](Rectangle r, int m) {
+            if (material < 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) material = m;
+        });
+        return material;
+    }
+    int wallMaterialOn(const ProjectileSegment& path, bool cases) const {
+        int material = -1;
+        visitWalls(cases, [&](Rectangle r, int m) {
+            if (material < 0 && path.intersects(r.left, r.right + 1, r.top, r.bottom + 1)) material = m;
+        });
+        return material;
+    }
     // Current shop children all belong to parentWall (57). The counter and
     // friendly keeper do not. Pure query in room coordinates, suitable for
     // each <=8-pixel LaserSightRay step; never dispatch damage or consume RNG.

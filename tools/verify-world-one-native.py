@@ -128,7 +128,7 @@ def main():
         levelStart=-1
         deadline=time.monotonic()+int(os.environ.get('DOWNWELL_ROUTE_SECONDS','1200'))
         with Input(g,log=lambda r: log.write(str(r)+'\n')) as controls:
-            for frame in range(14000):
+            for frame in range(20000):
                 if time.monotonic()>deadline:
                     raise TimeoutError('bounded world-one route')
                 stop=checked('continue')

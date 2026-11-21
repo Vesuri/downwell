@@ -31,6 +31,7 @@ class SoundRequestLog {
 public:
     explicit SoundRequestLog(const std::string& path):out_(path){}
     bool good()const{return bool(out_);}
+    void flush(){out_.flush();}
     void drain(downwell::SoundRequests& requests,const downwell::SoundVoices& voices){
         dropped_=requests.dropped();
         requests.drain([&](const downwell::SoundRequest& r){record(r);});
