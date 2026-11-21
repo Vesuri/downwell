@@ -20,8 +20,10 @@ and feature complete in the normal Amiga executable. Work it in this order:
 2. sound effects (W2; music is deferred to WM);
 3. performance (W3, which absorbs section 0 and the world-1 part of section 5).
 
-Restructure the code alongside (WR) so the Amiga build compiles in only what
-world 1 uses, while keeping already-implemented later-world code available.
+Restructure the code (WR) so the shipping Amiga executable holds only what
+world 1 uses and is as small as possible, while W3 makes it as fast as
+possible; already-implemented later-world code stays available to other
+builds and the host tests.
 Only after W is complete, continue with what world 2 needs: the skeleton
 encounter tasks (section 1), the catacombs (section 2) and the remaining
 content (section 4).
@@ -61,8 +63,7 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
   1 MiB Chip startup and the `quiet-fall` landing witness passing. Note any
   large new cost in the commit for W3.
 - **Restructuring** steps (WR) must be behaviour-neutral and pass the existing
-  gates; do them when they make the next W item easier, not as a separate
-  sweep.
+  gates. WR.1-WR.3 come before W1.9; WR.4 runs with W3.
 
 ### W1. Gameplay and visuals
 
@@ -479,26 +480,73 @@ planes' ceiling is now 177 KiB.
 
 ### WR. Restructure for world 1
 
-- Remove the `#if` tests of `REFERENCE_*` macros that nothing defines
-  (`REFERENCE_ACTOR_BOUNDS_TRIG`, `REFERENCE_COLLECTION_TERRAIN_READS`,
-  `REFERENCE_COLLISION_VISUAL`, `REFERENCE_JOURNAL_GEOMETRY_DECODE`,
-  `REFERENCE_SOURCE_{ADMISSION,CLEANUP,ROW}_SCAN`,
-  `REFERENCE_TERRAIN_ELIGIBILITY`, `REFERENCE_TYPED_TERRAIN_CLEANUP`) and the
-  `TERRAIN_RUN_STORE` stub, after confirming each is dead.
-- Add one world-1 manifest (areas, rooms, families, upgrades, banks) that
-  drives the existing admission points (`AmigaGameplayAssetAdmission`,
-  `RUNTIME_ROOMS`, `CAVERN_ROOTS`, family storage), plus a map-file gate beside
-  `audit` that fails when a family outside the manifest links code.
-- Park later-world code in its own directory, kept building through host
-  tests: the skeleton and bone families, catacomb builder pieces, and the
-  scene collision backend with its candidate `.mk` files. Cut their include
-  edges from `GameplayWorld.h` and `GameplayCollisionOwner.h`.
-- Move `*_VERIFY` and oracle code out of shipping sources
-  (`DownwellAmiga.cpp` has 279 conditionals) into verify-only objects, keeping
-  the GDB hook surface stable; group the 108 Amiga build knobs into
-  shipping, verify, profile and reference files.
-- Replace the stale `src/platform/amiga/README.md` with the current
-  structure and feature status.
+The shipping executable is 2,161,412 bytes (2,031,936 stripped) and must
+shrink: only world 1's code, no debug, reference or verify code, as small as
+possible, with W3 making it as fast as possible. Measured on 2026-11-21
+(`-O3`, `STRIP=1`, attributed to the defining class from `objdump -t -C`):
+
+- `.text` 1,547,906, `.rodata` 350,564 (prepared ammo HUD, currency and
+  field tables), `.data` 67,836; `.bss` 2,173,844 (RAM, not file).
+- The runner emulation is about 605 KB of code (36%):
+  `RecordLifecycleBinding` 245 KB (409 per-family `bind` instantiations of
+  1.3-3 KB), `GameplayCollisionOwner` 241 KB, and about 120 KB of
+  `RunnerSpatialIndex`, `RunnerLogicalLayerOrder`, `RunnerLayerLifetimes`,
+  `RunnerSourceRoomMembership`, `NativeTerrainLifetimes`,
+  `GameplayCollisionView` and `GameplayRoomLayers`. It also owns 1.3 MB of
+  the `.bss` (`collisionStorage` 898 KB, `nativeTerrainStorage` 412 KB).
+- `GameplayWorld` 295 KB, `runDownwell` 63 KB, then the draw list, run
+  session, upgrade scene, HUDs and painter at 10-40 KB each.
+- Skeleton and bone code (later worlds) links 39 KB. Identical LTO clones
+  waste about 27 KB (`MotionBinary64::fromInteger` six times). The
+  source-exact binary64 arithmetic is about 6 KB: not worth touching.
+- Optimisation alone: `.text` is 1,289,782 at `-O2` and 713,236 at `-Os`
+  (stripped executable 1.19 MB). The `-Os` build does not link as-is:
+  `SaveFile::Writer::real`'s 64-bit shift becomes a `__lshrdi3` call (the
+  64-bit helper audit forbids it); the measurement stubbed it.
+
+**Target:** a stripped shipping executable of at most 1 MB after WR.1-WR.3;
+WR.4 takes it well below that.
+
+1. **Build profiles.** Shipping: stripped, no trace hooks, no reference paths
+   and no debug code. A development build identical to shipping except for
+   the GDB hook surface the native routes read, so the routes still verify
+   shipping code. Verify, profile and reference builds stay separate
+   opt-ins: move `*_VERIFY` and oracle code out of the shipping sources
+   (`DownwellAmiga.cpp` has 281 conditionals) and group the Amiga build
+   knobs into shipping, development, verify, profile and reference sets.
+   Resolve the defaults that are on today: `REPLAY_FRAME_TRACE=1`,
+   `REFERENCE_FRAME_WORK=1` and `REFERENCE_ROW_PAINTING=1` (switch each off,
+   or rename it if it is the production path). Remove the `#if` tests of
+   `REFERENCE_*` macros nothing defines (`REFERENCE_ACTOR_BOUNDS_TRIG`,
+   `REFERENCE_COLLECTION_TERRAIN_READS`, `REFERENCE_COLLISION_VISUAL`,
+   `REFERENCE_JOURNAL_GEOMETRY_DECODE`,
+   `REFERENCE_SOURCE_{ADMISSION,CLEANUP,ROW}_SCAN`,
+   `REFERENCE_TERRAIN_ELIGIBILITY`, `REFERENCE_TYPED_TERRAIN_CLEANUP`) and
+   the `TERRAIN_RUN_STORE` stub, after confirming each is dead. Gate: a size
+   check on the shipping build beside `audit`.
+2. **`-Os` by default, speed only where it pays.** Fix the `__lshrdi3` use
+   first. Mark the measured hot paths (terrain painting, the actor draw
+   list, collision queries, the mixer and whatever the native profile
+   shows) for `-O2`/`-O3` per function, so it works under LTO. Choose them
+   from the A500 profile and judge them on W3's workloads: quiet-fall, the
+   world-one route and the worst frames, against the `-O3` build.
+3. **Link only world 1.** One world-1 manifest (areas, rooms, families,
+   upgrades, builders, banks) drives the existing admission points
+   (`AmigaGameplayAssetAdmission`, `RUNTIME_ROOMS`, `CAVERN_ROOTS`, family
+   storage) and decides what is compiled into the shipping link: the
+   skeleton and bone families, the catacomb builder pieces and the scene
+   collision backend drop out without moving files. A map-file gate beside
+   `audit` fails when code outside the manifest links.
+4. **Replace the runner emulation with world-1 ownership (with W3).** World 1
+   uses a fraction of what `GameplayCollisionOwner` and its bindings emulate.
+   Replace them with compact world-1 owners, removing most of the 605 KB of
+   code and 1.3 MB of RAM along with their per-update work. The new owners
+   must reproduce registration step order: the world-one native replay must
+   still end `END 2 1 8275 1 265269` and every sound route must pass.
+5. **Smaller items.** Fold identical clones and the duplicated
+   complete/base constructors (`GameplayWorld`'s is 14.5 KB twice), and
+   replace the stale `src/platform/amiga/README.md` with the current
+   structure and feature status.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
