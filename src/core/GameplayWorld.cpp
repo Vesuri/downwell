@@ -198,14 +198,18 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     runControllers_=runControllers;
     resultInstance_=resultInstance;
     levelNumbers_=levelNumbers;
+#ifndef DOWNWELL_WORLD_ONE_ONLY
     limboShards_=limboShards;
+#endif
     configureCompactAreaTitles(areaTitles,areaTitleCount,language);
     shopSpeechText_=shopSpeechText;
     registeredFlash_=registeredFlash;
     controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
     bones_=bones;
+#ifndef DOWNWELL_WORLD_ONE_ONLY
     skeletons_=skeletons;
+#endif
     blood_=blood;
     currencyInstances_=currencyInstances;
     configureCurrencyStepOrder(currencyOrderCapture,currencyOrderContext,currencyStepEligible);

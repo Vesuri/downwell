@@ -1,5 +1,7 @@
 # Diagnostic production-session admission; not a shipping backend selector.
 CPPFLAGS += -UDOWNWELL_EXTERNAL_COLLISION_BACKEND -DDOWNWELL_SCENE_COLLISION_BACKEND
+# The owner binds later-area families: not a world-one build.
+CPPFLAGS := $(filter-out -DDOWNWELL_WORLD_ONE_ONLY,$(CPPFLAGS))
 # Its collision owner binds source terrain records (see the Makefile).
 ifeq ($(REFERENCE_TERRAIN_RECORDS),0)
 ifeq ($(findstring -DDOWNWELL_TERRAIN_SOURCE_RECORDS,$(CPPFLAGS)),)

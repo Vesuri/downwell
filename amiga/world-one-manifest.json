@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "description": "WR.4: world one (area 1, the three cavern levels) in a shipping build. tools/audit-amiga-world-one.py fails when a sized code or data symbol of a later-area family links into a build without the collision owner (DOWNWELL_WORLD_ONE_ONLY).",
+  "areas": [
+    1
+  ],
+  "levels": [
+    1,
+    2,
+    3
+  ],
+  "laterAreaFamilies": [
+    {
+      "name": "skeleton",
+      "symbols": "Skeleton"
+    },
+    {
+      "name": "bone projectile",
+      "symbols": "BoneProjectile|BoneMotion|BoneView|StoredBone"
+    },
+    {
+      "name": "limbo shard",
+      "symbols": "LimboShard"
+    },
+    {
+      "name": "catacomb builder",
+      "symbols": "Catacomb"
+    }
+  ]
+}

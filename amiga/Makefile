@@ -603,11 +603,16 @@ endif
 # Source terrain records are bound only by GameplayCollisionOwner: match
 # DownwellAmiga's DOWNWELL_GAMEPLAY_COLLISION_OWNER selection. Without the
 # owner they stay empty (266 KB of BSS on the world-one route).
+# Builds without the owner are world-one builds (WR.4): later-area family
+# bindings compile out and `audit` checks world-one-manifest.json.
+DOWNWELL_OWNER_FLAGS := -DDOWNWELL_SCENE_COLLISION_BACKEND -DDOWNWELL_SCENE_VERIFY \
+	-DDOWNWELL_FIELD_VERIFY -DDOWNWELL_ENTRY_WIPE_VERIFY -DDOWNWELL_REPLAY_VERIFY -DDOWNWELL_COLLISION_OWNER
+ifneq ($(filter $(DOWNWELL_OWNER_FLAGS),$(CFLAGS)),)
 ifeq ($(REFERENCE_TERRAIN_RECORDS),0)
-ifneq ($(filter -DDOWNWELL_SCENE_COLLISION_BACKEND -DDOWNWELL_SCENE_VERIFY -DDOWNWELL_FIELD_VERIFY \
-	-DDOWNWELL_ENTRY_WIPE_VERIFY -DDOWNWELL_REPLAY_VERIFY -DDOWNWELL_COLLISION_OWNER,$(CFLAGS)),)
 CFLAGS += -DDOWNWELL_TERRAIN_SOURCE_RECORDS
 endif
+else
+CFLAGS += -DDOWNWELL_WORLD_ONE_ONLY
 endif
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
@@ -908,6 +913,13 @@ check:
 		command -v $$tool >/dev/null || { echo "missing Amiga tool: $$tool"; exit 1; }; \
 	done
 	@echo "Amiga 68000 toolchain OK"
+	@python3 $(REPO)/tools/amiga-knobs.py --check
+
+# WR.2: knob sets (shipping, gate, development, verify, profile, reference)
+# with their defaults; tools/amiga-knobs.py holds the classification.
+.PHONY: knobs
+knobs:
+	@python3 $(REPO)/tools/amiga-knobs.py
 
 .PHONY: FORCE_HUNK_OPTIONS
 # Audit even an up-to-date ELF: a rejected link remains on disk, and a
@@ -1366,6 +1378,8 @@ audit: $(OUT).elf
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'fieldBandPixels|fieldColumnWords'; then \
 		echo "*** gameplay field upload pixels must be scene-loaded, not linked"; exit 1; \
 	else echo "Field image source linkage audit: clean"; fi
+	@if [ -n '$(findstring DOWNWELL_WORLD_ONE_ONLY,$(CPPFLAGS))' ]; then \
+		OBJDUMP=$(OBJDUMP) python3 $(REPO)/tools/audit-amiga-world-one.py $(OUT).elf; fi
 	@python3 $(REPO)/tools/audit-amiga-scene-loads.py $(OUT).elf $(if $(filter 1,$(REPLAY_VERIFY) $(PLANE_VERIFY)),--reference-oracle)
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_game_pack'; then \
 		echo "*** gameplay CPU art must be scene-loaded, not linked"; exit 1; \

@@ -442,8 +442,12 @@ public:
     }
     const LimboShards* limboShards()const{return limboShards_;}
     bool bindLimboShards(LimboShards& instances){
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+        (void)instances;return false;
+#else
         if(limboShards_||!instances.valid()||instances.size())return false;
         limboShards_=&instances;return true;
+#endif
     }
     bool createLimboShardWithSourceId(std::uint32_t id,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
         bool lowSpec,downwell::InstanceHandle& child){
@@ -979,8 +983,12 @@ public:
     static constexpr unsigned skeletonCapacity=32;
     const Skeletons* skeletons()const{return skeletons_;}
     bool bindSkeletons(Skeletons& skeletons){
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+        (void)skeletons;return false;
+#else
         if(skeletons_||!skeletons.valid()||skeletons.size())return false;
         skeletons_=&skeletons;return true;
+#endif
     }
     bool createSkeletonWithSourceId(unsigned id,int x,int y,downwell::InstanceHandle& key){
         if(!run_.effectsSucceeded||!skeletons_||!skeletons_->create(id,x,y,key))return run_.effectsSucceeded=false;
@@ -2858,7 +2866,12 @@ private:
     RegisteredBlasts* registeredBlasts_=nullptr;
     RegisteredCorpse* registeredCorpses_=nullptr;
     ConsumptionParticles* consumptionParticles_=nullptr;
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+    // World-one builds never bind later-area families; their paths fold away.
+    static constexpr LimboShards* limboShards_=nullptr;
+#else
     LimboShards* limboShards_=nullptr;
+#endif
     RegisteredFlash* registeredFlash_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
@@ -2893,7 +2906,11 @@ private:
     bool ditherLowSpec_=false,ditherEnding_=false;
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+    static constexpr Skeletons* skeletons_=nullptr;
+#else
     Skeletons* skeletons_=nullptr;
+#endif
     Blood* blood_=nullptr;
     downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
