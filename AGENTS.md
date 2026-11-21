@@ -1,8 +1,11 @@
 # Downwell port working agreement
 
 This repository is a behavior-first port of the Windows Steam release of
-Downwell to an SDL host reference implementation and then to native Amiga 500
-68000 code.
+Downwell to an SDL host reference implementation and then to native Amiga
+code. The target machine is an unexpanded Amiga 1200 (68EC020, AGA, 2 MB
+Chip, no Fast RAM); the code stays 68000-compatible for now. The game must
+start on any Amiga with enough Chip memory for its DMA data and enough public
+memory (Chip or Fast) for everything else.
 
 ## Commits
 
@@ -47,14 +50,20 @@ Downwell.
   preparatory changes directly tied to integrating that replacement.
 - Before a performance change, identify the work it removes and estimate the
   saving from the native profile. Afterwards compare the same deterministic
-  A500 workload, including its worst frame, with the retained reference.
-  Correctness tests and added infrastructure are not performance wins. Revise
+  workload on the target machine, including its worst frame, with the
+  retained reference. Correctness tests and added infrastructure are not
+  performance wins. Revise
   or discard experiments that miss their practical target; a better average
   alone does not excuse worse gameplay stalls. Target <=20 ms during active
   gameplay. Judge scene handoffs by overall transition latency and visible
   stalls, not individual-frame limits: a few milliseconds or one or two fields
   of transition variation, including redistributed VBlank waiting, is not by
   itself a reason to reject a substantial overall improvement.
+- Keep the shipping executable as small as possible: link only the code the
+  shipped content uses, allocate only DMA data in Chip, and fit the whole
+  footprint (code, data, BSS, banks, buffers) into the target machine.
+  Debug, reference, verify and profile code belongs only in the development
+  builds that need it, never in the shipping build.
 
 ## Generated and copyrighted material
 
