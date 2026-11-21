@@ -4,11 +4,44 @@
 #include "AmigaImmutableUpload.h"
 #include <cstdint>
 
+// Builds whose field mode is fixed at columns or above have a prepared path
+// for every outline TimeFieldOutlines can emit (radius 24..26 or 128..130)
+// once the bank is bound, so the sparse fallback only ever sees empty shapes.
+// Their Ops sets referenceFallback=false to drop its 148 KB of word banks;
+// a visible shape reaching this stand-in fails prepare instead of drawing.
+struct AmigaAbsentTimeFieldReference {
+    bool present()const{return false;}
+    bool matches(UBYTE*,unsigned,const downwell::TimeFieldOutlines&)const{return false;}
+    template<class DirtyRow> bool touchesDirtyRows(DirtyRow)const{return false;}
+    void discard(){}
+    template<class DirtyRow> bool prepare(UBYTE*,unsigned,const downwell::TimeFieldOutlines& shape,bool,DirtyRow){
+        return !shape.visible;
+    }
+    void draw(){}
+};
+struct AmigaAbsentTimeFieldReferencePair {
+    AmigaAbsentTimeFieldReference overlays_[2];
+    AmigaAbsentTimeFieldReference& operator[](unsigned index){return overlays_[index];}
+};
+template<class Ops> constexpr auto amigaTimeFieldFallback(int)->decltype(bool(Ops::referenceFallback)){
+    return Ops::referenceFallback;
+}
+template<class Ops> constexpr bool amigaTimeFieldFallback(long){return true;}
+template<bool Fallback> struct AmigaTimeFieldReferenceSelect {
+    using Overlay=AmigaFieldOverlay<downwell::TimeFieldOutlines,true>;
+    using Pair=AmigaTimeFieldPair;
+};
+template<> struct AmigaTimeFieldReferenceSelect<false> {
+    using Overlay=AmigaAbsentTimeFieldReference;
+    using Pair=AmigaAbsentTimeFieldReferencePair;
+};
+template<class Ops> using AmigaTimeFieldReferenceOf=AmigaTimeFieldReferenceSelect<amigaTimeFieldFallback<Ops>(0)>;
+
 // Ops captures into a 64x56 two-plane backing and mask-blits from that layout
 // into a 384x320 game ring. Native Ops uses the shared Bitmap implementation;
 // the test backend independently copies pixels. Images never change at runtime.
 template<class Ops> class AmigaPreparedTimeFieldPair {
-    using Reference = AmigaFieldOverlay<downwell::TimeFieldOutlines,true>;
+    using Reference = typename AmigaTimeFieldReferenceOf<Ops>::Overlay;
     static unsigned word(const UBYTE* p) { return (unsigned(p[0])<<8)|p[1]; }
 public:
     static constexpr unsigned planeBytes=448, backingBytes=896, imageBytes=1344, headerBytes=1040;
@@ -199,7 +232,7 @@ public:
         bool preparedImage() const { return fast_; }
     };
 private:
-    AmigaTimeFieldPair reference_;
+    typename AmigaTimeFieldReferenceOf<Ops>::Pair reference_;
     Overlay overlays_[2]={Overlay(reference_[0]),Overlay(reference_[1])};
     UBYTE* residentRegion_=nullptr;
     const UBYTE* residentPack_=nullptr;

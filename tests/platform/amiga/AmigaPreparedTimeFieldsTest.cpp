@@ -94,6 +94,8 @@ struct Pixels {
                     "new field has pristine underlay");
     }
 };
+struct ShippingPixels:Pixels { static constexpr bool referenceFallback=false; };
+
 int main(){
     std::ifstream input("generated/amiga-field-images.bin",std::ios::binary);
     std::vector<UBYTE> pack((std::istreambuf_iterator<char>(input)),{});
@@ -395,6 +397,34 @@ int main(){
         require(actual[0]==expected[0],"pending fused replacement preserves pixels and fallback ownership");
     }
     std::cout<<"128 pending fused replacements preserve pixels and fallback ownership\n";
+    // Shipping Ops fixes columns mode and drops the sparse reference: every
+    // outline TimeFieldOutlines emits must stay on a prepared path.
+    using Shipping=AmigaPreparedTimeFieldPair<ShippingPixels>;
+    static_assert(sizeof(Shipping)+100000<sizeof(Pair),"shipping pair must not carry the reference banks");
+    auto shipping=std::make_unique<Shipping>();
+    {
+        downwell::TimeFieldOutlines field;field.visible=true;field.count=1;field.circles[0]={190,120,24*256};
+        require(!(*shipping)[0].prepare(actual[0].data(),0,field,true,clean),"unbound visible field must fail");
+        downwell::TimeFieldOutlines none;
+        require((*shipping)[0].prepare(actual[0].data(),0,none,true,clean)&&(*shipping)[0].draw(),"unbound empty field");
+    }
+    require(shipping->bind(storage.data(),storage.size(),pack.data(),pack.size(),terrain.data()),"shipping bind");
+    for(unsigned b=0;b<2;++b){(*reference)[b].discard();actual[b]=expected[b]=terrain;}
+    unsigned shippingVisible=0;
+    for(unsigned frame=0;frame<1200;++frame){
+        const unsigned b=frame&1,origin=(frame*13)%320;
+        downwell::TimeFieldOutlines shape;
+        shape.count=frame%9==0?0:1+next()%4;shape.visible=shape.count!=0;
+        for(unsigned i=0;i<shape.count;++i)shape.circles[i]={int(94+next()%196),int(next()%336)-26,
+            int((next()%5==0?128:24)*256+next()%512)};
+        require((*shipping)[b].prepare(actual[b].data(),origin,shape,true,clean),"shipping prepare");
+        require((*reference)[b].prepare(expected[b].data(),origin,shape,true,clean),"shipping oracle prepare");
+        require(!shape.visible||(*shipping)[b].preparedImage(),"shipping visible field left the prepared path");
+        shippingVisible+=shape.visible;
+        require((*shipping)[b].draw(),"shipping draw");(*reference)[b].draw();
+        require(actual[b]==expected[b],"shipping prepared pixels match the sparse oracle");
+    }
+    std::cout<<"1200 shipping frames without the sparse reference: "<<shippingVisible<<" visible, pixels match\n";
     std::cout<<"3600 double-buffered frames: "<<fast<<" prepared, "<<fallback<<" fallback; pixels match\n";
     std::cout<<"Field bank residency: no repeated upload, explicit overwrite invalidation, destination changes and level rebind pixels match\n";
 }

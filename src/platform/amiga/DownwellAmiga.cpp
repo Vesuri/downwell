@@ -124,6 +124,8 @@ struct PreparedFieldOps {
 #else
     static constexpr bool verify=false;
 #endif
+    // Only the verifier cycles modes below columns at run time.
+    static constexpr bool referenceFallback=verify||DOWNWELL_FIELD_MODE<4;
     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
     static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
     static bool columnsEnabled(){return gDownwellPreparedFieldMode>=4;}
