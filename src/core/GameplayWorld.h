@@ -213,6 +213,10 @@ public:
         std::uint32_t sourceId = 0;
         // Stable ownership slot, independent of the compacted traversal index.
         unsigned short identitySlot = 0xffffu;
+        // The tick this record last entered its room layer (Create while
+        // active, or activation). Runner layers insert at the head, so an
+        // unowned build draws same-depth enemies newest entry first.
+        std::uint32_t activatedTick = 0;
         int objectId;
         int spriteId;
         int maskId=-1; // Bat OBJT default; flying Step later copies sprite_index.
@@ -803,6 +807,8 @@ public:
         if(ditherAbove_||!actor.valid()||actor.handle().generation)return false;
         ditherAbove_=&actor;return true;
     }
+    // A build without a collision owner keeps object 61 in the world.
+    bool bindOwnedDitherAbove(){return bindDitherAbove(ownedDitherAbove_);}
     // Explicit authored-room admission until the complete controller Create,
     // Draw and collision stream is connected; never allocate a synthetic ID.
     bool createAuthoredDitherAbove(){
@@ -1544,9 +1550,12 @@ public:
             }
             return true;
         };
-        bool ok;
-        if constexpr(RetainOrder)ok=visitRoomActorsReadOnly(visitor);
-        else ok=visitRoomActors(visitor);
+        // Without a room owner there are no registered families to walk.
+        bool ok=!roomActorDraw_;
+        if(!ok){
+            if constexpr(RetainOrder)ok=visitRoomActorsReadOnly(visitor);
+            else ok=visitRoomActors(visitor);
+        }
         // Compact objDeadBody 263 and object-370 debris have no room actors:
         // draw them after them, in object order.
         if(ok&&compactCorpses_.size()&&!compactCorpses_.visitNewest([&](auto,const downwell::CorpseAnimation& corpse){
@@ -1671,7 +1680,9 @@ public:
             const auto slot=cursor.take();
             auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime({slot-first,identity(slot)}));
             if(!enemy||!run_.effectsSucceeded)return false;
-            downwell::advanceEnemyImageQ8(enemy->imagePhase,enemy->imageRemainder,enemy->imageSpeed);
+            // Step under pTimeStop set image_speed 0: this advance holds.
+            if(!enemy->frozen)
+                downwell::advanceEnemyImageQ8(enemy->imagePhase,enemy->imageRemainder,enemy->imageSpeed);
             // phaseIndex rejects this before the native no-op publisher too.
             if(enemy->imagePhase>0x7fffffffu)return run_.effectsSucceeded=false;
         }while(cursor.within(first,last));
@@ -1683,6 +1694,8 @@ public:
         for(unsigned i=0;i<enemyCount_;++i){
             auto& enemy=enemies_[i];
             if(enemy.identitySlot>=enemyCapacity||!active(enemy.identitySlot))continue;
+            // Step under pTimeStop set image_speed 0: this advance holds.
+            if(enemy.frozen)continue;
             downwell::advanceEnemyImageQ8(enemy.imagePhase,enemy.imageRemainder,enemy.imageSpeed);
             if(enemy.imagePhase>0x7fffffffu)return run_.effectsSucceeded=false;
         }
@@ -2854,6 +2867,7 @@ private:
     bool clearRoomTimeShards();
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
     downwell::GameplayDitherAbove* ditherAbove_=nullptr;
+    downwell::GameplayDitherAbove ownedDitherAbove_;
     downwell::GameplayBuilderController* builderController_=nullptr;
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     downwell::GameplayScattered* scattered_=nullptr;

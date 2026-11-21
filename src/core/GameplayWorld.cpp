@@ -749,6 +749,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     enemy.imageSpeed = downwell::enemyCreateProfile(objectId).animationRate;
     enemy.imageFrame = 0;
     enemy.active = active;
+    enemy.activatedTick = tick_;
     enemy.destroyRequested = false;
     enemy.takenImpactDamage = 0;
     enemy.awake = awake;
@@ -1250,7 +1251,9 @@ void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm, int cameraX, lo
 bool GameplayWorld::advanceEnemyRoomAnimation(downwell::InstanceHandle key){
     auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime(key));
     if(!run_.effectsSucceeded||!enemy)return run_.effectsSucceeded=false;
-    downwell::advanceEnemyImageQ8(enemy->imagePhase,enemy->imageRemainder,enemy->imageSpeed);
+    // Step under pTimeStop set image_speed 0: this advance holds.
+    if(!enemy->frozen)
+        downwell::advanceEnemyImageQ8(enemy->imagePhase,enemy->imageRemainder,enemy->imageSpeed);
     return publishEnemyImage(*enemy,enemy->imagePhase);
 }
 bool GameplayWorld::advanceBulletRoomAnimation(downwell::InstanceHandle key){
@@ -1684,6 +1687,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         [this](unsigned i) {
             if (!publishEnemyActivation(enemies_[i],true)) return false;
             enemies_[i].active = true;
+            enemies_[i].activatedTick = tick_;
             enemies_[i].activationPending = false;
             return true;
         }, true);

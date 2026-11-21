@@ -264,7 +264,17 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/GameplayCollisionOwner.h"
+// WR.5: the shipping world-1 build runs the compact world without the
+// runner emulation. Fixtures that exercise registered families, the scene
+// collision backend and COLLISION_OWNER=1 (the owned A/B reference) keep it.
+#if defined(DOWNWELL_SCENE_COLLISION_BACKEND) || defined(DOWNWELL_SCENE_VERIFY) || \
+    defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY) || \
+    defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_COLLISION_OWNER)
+#define DOWNWELL_GAMEPLAY_COLLISION_OWNER 1
 #include "core/GameplayEncounterSession.h"
+#else
+#include "core/EncounterSession.h"
+#endif
 #include "AmigaSpatialTreeStorage.h"
 #include "AmigaSpatialJournalStorage.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
@@ -2204,6 +2214,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         (unsigned long)(amiga_room_pack_end-amiga_room_pack));
     if(!objects.valid()||!collisionSprites.valid()||!rooms.valid())return 20;
     checkSceneStack(1);
+#ifdef DOWNWELL_GAMEPLAY_COLLISION_OWNER
     // Ownership precedes player construction and survives in-place run resets.
     // Keep these bounded tables off the AmigaDOS stack, like the world itself.
     alignas(downwell::GameplayCollisionOwner) static UBYTE collisionStorage[sizeof(downwell::GameplayCollisionOwner)];
@@ -2263,6 +2274,17 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     downwell::GameplayEncounterSession encounterSession(port,collisionOwner);
     if(!encounterSession.start())return 20;
+#else
+    // Native collision/painting uses occupancy; generation retains terrain
+    // identity runs. The world owns every family world 1 draws.
+    AmigaPortRuntime& port = *new (portRuntimeStorage)
+        AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,{},{},{},nullptr,&rooms,
+            GameplayWorld::PlayerBirthTiming::authoredRoom);
+    if(!port.effectsSucceeded()||!port.bindOwnedDitherAbove())return 20;
+    downwell::NoCollisionOwner noCollisionOwner;
+    downwell::UnownedEncounterSession encounterSession(port,noCollisionOwner);
+    if(!encounterSession.start())return 20;
+#endif
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
     {
         // Explicit-ID lifecycle fixture, not automatic production admission.
@@ -3114,7 +3136,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         }
 #endif
         if (sliceEnd.presented) { platform.waitVblank(); continue; }
-        downwell::GameplayEncounterSession::Frame encounterFrame(encounterSession);
+        decltype(encounterSession)::Frame encounterFrame(encounterSession);
         if(!encounterFrame.valid())break;
         DW_PROFILE_FRAME((unsigned)scenes.scene());
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
@@ -3190,7 +3212,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             fencedVblank = AmigaPlatform::vblankCount();
             fenceDisplay();
         }
+#ifdef DOWNWELL_GAMEPLAY_COLLISION_OWNER
         if(!collisionOwner.valid()){exitCode=downwellGameplayFailed(__LINE__);break;}
+#endif
         DW_PROFILE_PHASE(profileInput);
 #ifdef DOWNWELL_SCENE_VERIFY
         // Check AFTER the preceding iteration completed, not at its first

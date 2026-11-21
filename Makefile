@@ -3196,6 +3196,18 @@ test-amiga-gameplay-sprite-assignment: build/amiga-gameplay-sprite-assignment-te
 test: test-amiga-gameplay-sprite-assignment
 
 GAMEPLAY_DRAW_LIST_TEST_SOURCES := tests/platform/amiga/AmigaGameplayDrawListTest.cpp src/platform/amiga/AmigaGameplayDrawList.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp
+# WR.5: the shipping build runs the compact world without the collision owner.
+# Replaying each slice route both ways must give the same witnesses, sounds,
+# draw lists and effect-surface producers.
+.PHONY: test-world-one-ownership
+test-world-one-ownership: build/amiga-world-one-replay-test test-sound-routes
+	tools/compare-world-one-ownership.sh
+test: test-world-one-ownership
+# WR.5 host replay of the slice routes (see the source for its switches).
+WORLD_ONE_REPLAY_TEST_SOURCES := tests/platform/amiga/AmigaWorldOneReplayTest.cpp $(filter-out tests/platform/amiga/AmigaSceneRuntimeTest.cpp,$(AMIGA_SCENE_TEST_SOURCES)) src/platform/amiga/AmigaGameplayDrawList.cpp src/platform/amiga/AmigaRenderer.c
+build/amiga-world-one-replay-test: $(WORLD_ONE_REPLAY_TEST_SOURCES) tests/platform/amiga/AmigaSceneRuntimeTest.cpp $(HOST_CHECK_HEADERS) generated/downwell-area-titles.h
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(WORLD_ONE_REPLAY_TEST_SOURCES)
 CURRENCY_PROMOTION_TEST_SOURCES := tests/platform/amiga/AmigaCurrencyPromotionTest.cpp $(filter-out tests/platform/amiga/AmigaSceneRuntimeTest.cpp,$(AMIGA_SCENE_TEST_SOURCES)) src/platform/amiga/AmigaGameplayDrawList.cpp src/platform/amiga/AmigaRenderer.c
 build/amiga-currency-promotion-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/platform/amiga/AmigaSceneRuntimeTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

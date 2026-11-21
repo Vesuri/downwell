@@ -55,6 +55,9 @@ REFERENCE_CLEAR_HEADINGS ?= 0
 REFERENCE_CLEAR_MOTION ?= 0
 REFERENCE_ACTOR_PREFIX ?= 0
 REFERENCE_DRAW_LIST ?= 0
+# 1 keeps GameplayCollisionOwner and the registered-family session in the
+# normal build: the owned A/B reference for WR.5. 0 ships the compact world.
+COLLISION_OWNER ?= 0
 # Parked section 0 D candidate (counted destruction results, empty-family
 # admission, packed row debts); 0 is the production path.
 FRAME_WORK_CANDIDATE ?= 0
@@ -351,6 +354,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_DRAW_LIST
 endif
 ifeq ($(FRAME_WORK_CANDIDATE),1)
 CFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE
+endif
+ifeq ($(COLLISION_OWNER),1)
+CFLAGS += -DDOWNWELL_COLLISION_OWNER
 endif
 ifeq ($(REFERENCE_VALIDATION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_VALIDATION
@@ -775,6 +781,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DRAW_LIST)' >> $@.tmp
 	@printf '%s\n' '$(FRAME_WORK_CANDIDATE)' >> $@.tmp
+	@printf '%s\n' '$(COLLISION_OWNER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_VALIDATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_GENERATED_BOXES)' >> $@.tmp

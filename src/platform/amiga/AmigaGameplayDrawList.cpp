@@ -433,17 +433,6 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         }
         return true;
     };
-#ifndef DOWNWELL_REPLAY_VERIFY
-    for (unsigned index = 0; !port.hasRoomActorDraw() && index < port.enemyCount(); ++index) {
-        const auto& enemy = port.enemyAt(index);
-        if (!enemy.active || !enemy.awake) continue;
-        if (!append(
-                (UWORD)enemy.spriteId, (UWORD)enemy.drawFrame(),
-                downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
-                playerStartY + enemy.y - port.cameraOffsetY(),
-                enemy.objectId != 119 && enemy.facing < 0)) ready = false;
-    }
-#endif
 #ifdef DOWNWELL_FRAME_WORK_CANDIDATE
     if(port.shops().allocatedCount){
 #endif
@@ -546,8 +535,45 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             if (count == capacity) { failedSprite = gameplayRayMarker; return false; }
             actors[count++] = {gameplayRayMarker, 0, 0, 0, 0};
         }
+#ifndef DOWNWELL_REPLAY_VERIFY
+        // playerDraw ends with drawComboNumber(x, y - 11, comboCount).
+        if(port.comboCount()>=5&&!port.goalStopped()&&
+           !downwell::drawComboNumber(
+                downwellPlayfieldX+80+downwell::roundGameMakerQ8(port.player().offsetXFixed())-port.cameraOffsetX(),
+                playerStartY+downwell::roundGameMakerQ8(port.player().offsetYFixed())-port.cameraOffsetY()-11,
+                port.comboCount(),[&](unsigned sprite,unsigned frame,int x,int y){
+                    return append(UWORD(sprite),UWORD(frame),x,y,0);
+                }))return false;
+#endif
         return true;
     };
+    // objDitherAbove 61 Draw (depth -100000): black above its y, then the
+    // dither edge below it.
+    const auto drawDitherAbove=[&](const downwell::GameplayDitherAbove::Record* record){
+            std::int32_t x,y;
+            if(!record||!record->x.roundPixel(x)||!record->y.roundPixel(y))return false;
+            const std::int64_t sx=std::int64_t(x)-worldViewX+downwellPlayfieldX;
+            const std::int64_t sy=std::int64_t(y)-worldViewY;
+            if(sx+160<=downwellPlayfieldX||sx-160>=downwellPlayfieldX+downwellPlayfieldWidth||
+                sy+80<=0||sy-720>=downwellDisplayHeight)return true;
+            // Entire finite source rectangle, clipped before narrowing.
+            const int left=int(sx-160<downwellPlayfieldX?downwellPlayfieldX:sx-160);
+            const int right=int(sx+160>downwellPlayfieldX+downwellPlayfieldWidth?
+                downwellPlayfieldX+downwellPlayfieldWidth:sx+160);
+            const int top=int(sy-720<0?0:sy-720);
+            const int bottom=int(sy>downwellDisplayHeight?downwellDisplayHeight:sy);
+            if(bottom>top){
+                if(count==capacity)return false;
+                actors[count++]={gameplayBlackRectMarker,UWORD(right-left),left,top,bottom-top};
+            }
+            if(sy<downwellDisplayHeight&&sy+80>0){
+                int ax,ay,w,h;
+                if(!amigaRendererAssetBounds(pack,packEnd,gameplayDitherEdge,0,int(sx),int(sy),0,&ax,&ay,&w,&h)||
+                    w!=320||h!=80||count==capacity){failedSprite=gameplayDitherEdge;return false;}
+                actors[count++]={gameplayDitherEdge,0,int(sx),int(sy),0};
+            }
+            return true;
+        };
     if(port.hasRoomActorDraw()) {
         DW_PROFILE_SCOPE(profileActorLayerWalk);
         downwell::RunnerImageValue foregroundDepth;foregroundDepth.assign(downwell::MotionBinary64::fromInteger(-1000));
@@ -636,32 +662,8 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 return append(record->spriteId,frame,downwellPlayfieldX+x-worldViewX,
                     y-worldViewY,scale<0);
             }
-            if(kind==GameplayWorld::DrawActor::ditherAbove){
-                const auto* record=port.ditherAbove()?port.ditherAbove()->find(key):nullptr;
-                std::int32_t x,y;
-                if(!record||!record->x.roundPixel(x)||!record->y.roundPixel(y))return false;
-                const std::int64_t sx=std::int64_t(x)-worldViewX+downwellPlayfieldX;
-                const std::int64_t sy=std::int64_t(y)-worldViewY;
-                if(sx+160<=downwellPlayfieldX||sx-160>=downwellPlayfieldX+downwellPlayfieldWidth||
-                    sy+80<=0||sy-720>=downwellDisplayHeight)return true;
-                // Entire finite source rectangle, clipped before narrowing.
-                const int left=int(sx-160<downwellPlayfieldX?downwellPlayfieldX:sx-160);
-                const int right=int(sx+160>downwellPlayfieldX+downwellPlayfieldWidth?
-                    downwellPlayfieldX+downwellPlayfieldWidth:sx+160);
-                const int top=int(sy-720<0?0:sy-720);
-                const int bottom=int(sy>downwellDisplayHeight?downwellDisplayHeight:sy);
-                if(bottom>top){
-                    if(count==capacity)return false;
-                    actors[count++]={gameplayBlackRectMarker,UWORD(right-left),left,top,bottom-top};
-                }
-                if(sy<downwellDisplayHeight&&sy+80>0){
-                    int ax,ay,w,h;
-                    if(!amigaRendererAssetBounds(pack,packEnd,gameplayDitherEdge,0,int(sx),int(sy),0,&ax,&ay,&w,&h)||
-                        w!=320||h!=80||count==capacity){failedSprite=gameplayDitherEdge;return false;}
-                    actors[count++]={gameplayDitherEdge,0,int(sx),int(sy),0};
-                }
-                return true;
-            }
+            if(kind==GameplayWorld::DrawActor::ditherAbove)
+                return drawDitherAbove(port.ditherAbove()?port.ditherAbove()->find(key):nullptr);
             if(kind==GameplayWorld::DrawActor::entryDither){
                 const auto* record=port.entryDithers()?port.entryDithers()->find(key):nullptr;
                 std::int32_t sourceDepth;
@@ -868,32 +870,61 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             failedSprite=failedFrame=0;
             return append(effect.spriteId,frame,downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
         }))return false;
-    }
-    for (unsigned index = 0; !port.hasRoomActorDraw() && index < port.bulletSlotEnd(); ++index) {
-        const auto& bullet = port.bulletAt(index);
-        // The pack generator checks every possible nearest-pixel
-        // sample over 267..273 degrees for all twelve source frames:
-        // the spread-adjusted artwork equals this offline quarter
-        // turn. Other angles/guns need separately verified variants.
-        if (bullet.active && !append(bullet.sprite, bullet.drawFrame(),
-                downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
-                playerStartY + bullet.y - port.cameraOffsetY(), 0))
-            ready = false;
+    } else {
+        // Without a collision owner the world-1 room actors follow the
+        // runner's layer order directly: bullets (depth 0), the foreground
+        // effects, enemies by descending depth and, within a depth, newest
+        // layer entry first, then the player (-50000) and objDitherAbove
+        // (-100000). Bullets draw newest slot first.
+        for (unsigned index = port.bulletSlotEnd(); index-- > 0;) {
+            const auto& bullet = port.bulletAt(index);
+            // The pack generator checks every possible nearest-pixel
+            // sample over 267..273 degrees for all twelve source frames:
+            // the spread-adjusted artwork equals this offline quarter
+            // turn. Other angles/guns need separately verified variants.
+            if (bullet.active && !append(bullet.sprite, bullet.drawFrame(),
+                    downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
+                    playerStartY + bullet.y - port.cameraOffsetY(), 0))
+                ready = false;
+        }
+#ifndef DOWNWELL_REPLAY_VERIFY
+        unsigned char order[GameplayWorld::enemyCapacity];unsigned drawn=0;
+        const auto later=[&](unsigned a,unsigned b){
+            const auto& x=port.enemyAt(a);const auto& y=port.enemyAt(b);
+            const int dx=downwell::enemyDrawDepth(x.objectId),dy=downwell::enemyDrawDepth(y.objectId);
+            if(dx!=dy)return dx<dy;
+            if(x.activatedTick!=y.activatedTick)return x.activatedTick<y.activatedTick;
+            return x.lifetimeId<y.lifetimeId;
+        };
+        for (unsigned index = 0; index < port.enemyCount(); ++index) {
+            const auto& enemy = port.enemyAt(index);
+            if (!enemy.active || !enemy.awake) continue;
+            unsigned at=drawn++;
+            while(at&&later(order[at-1],index)){order[at]=order[at-1];--at;}
+            order[at]=static_cast<unsigned char>(index);
+        }
+        for (unsigned i = 0; i < drawn; ++i) {
+            const auto& enemy = port.enemyAt(order[i]);
+            if(downwell::enemyDrawDepth(enemy.objectId)<-1000&&!drawForeground())ready=false;
+            const int x=downwellPlayfieldX+80+enemy.x-port.cameraOffsetX();
+            const int y=playerStartY+enemy.y-port.cameraOffsetY();
+            if(!append(enemy.spriteId,enemy.drawFrame(),x,y,enemy.objectId!=119&&enemy.facing<0))ready=false;
+            int eye,mirror;
+            if(enemy.objectId==118&&port.redBallEye(enemy,eye,mirror)&&
+               !append(eye,enemy.drawFrame(),x,y-5,mirror<0))ready=false;
+        }
+#endif
+        if(!drawForeground()||!drawPlayer())ready=false;
+        if(const auto* above=port.ditherAbove()){
+            const auto* record=above->find(above->handle());
+            if(record&&record->active&&!record->destroyRequested&&!drawDitherAbove(record))ready=false;
+        }
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     if(port.compactGuns().textEnd&&!drawCompactGunTexts(port,append,false,worldViewX,worldViewY))ready=false;
 #endif
     if(!drawForeground())ready=false;
-    if(!port.hasRoomActorDraw()&&!drawPlayer())ready=false;
 #ifndef DOWNWELL_REPLAY_VERIFY
-    // playerDraw ends with drawComboNumber(x, y - 11, comboCount).
-    if(!port.hasRoomActorDraw()&&port.comboCount()>=5&&!port.goalStopped()&&
-       !downwell::drawComboNumber(
-            downwellPlayfieldX+80+downwell::roundGameMakerQ8(port.player().offsetXFixed())-port.cameraOffsetX(),
-            playerStartY+downwell::roundGameMakerQ8(port.player().offsetYFixed())-port.cameraOffsetY()-11,
-            port.comboCount(),[&](unsigned sprite,unsigned frame,int x,int y){
-                return append(UWORD(sprite),UWORD(frame),x,y,0);
-            }))ready=false;
     if(port.compactGuns().noticeEnd&&!drawCompactGunTexts(port,append,true,worldViewX,worldViewY))ready=false;
     if(port.compactShopSpeechLive()&&!drawCompactShopSpeech(port,worldViewX,worldViewY))ready=false;
 #endif
