@@ -18,6 +18,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
 #include "AmigaKeyboard.h"
+#include "AmigaSoundBanks.h"
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
 #include "AmigaEncounterResources.h"
 #endif
@@ -2362,6 +2363,11 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
+    // W2.5: Paula and the scene sound banks. Failure leaves the game silent.
+    // Static storage (no runtime for guarded statics); released explicitly.
+    alignas(downwell::AmigaSoundBanks) static UBYTE soundBankStorage[sizeof(downwell::AmigaSoundBanks)];
+    auto& soundBanks = *new (soundBankStorage) downwell::AmigaSoundBanks();
+    (void)soundBanks.acquire(platform);
     sceneBank = memory.assets() + sceneBankOffset;
     UBYTE* effectStamps=memory.sceneCache()+effectStampCacheOffset;
     memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
@@ -3303,6 +3309,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     releaseGameplayArt();
+                    // The run's sounds leave with its art.
+                    soundBanks.scene(downwell::AmigaSoundBanks::none);
+                    soundBanks.resident(downwell::AmigaSoundBanks::none);
                     frontPack = frontPackEnd = nullptr;
                     gameplayScene.invalidate();
                 }
@@ -3317,6 +3326,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                         ++gDownwellBuilderPatternReleases;
                     }
                     if (!frontPack && !loadFrontBank(platform)) break;
+                    // The front end's sounds, only while no run bank is resident.
+                    if (soundBanks.bank(downwell::AmigaPaulaAudio::resident) == downwell::AmigaSoundBanks::none)
+                        soundBanks.scene(downwell::AmigaSoundBanks::front);
                     // Front art is admitted only when a consumer enters. The
                     // garden planes are prepared once per entry, never during
                     // splash/gameplay or a direct style-selection shortcut.
@@ -3409,8 +3421,12 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
                     if(!encounterResources.acquire(platform)||!encounterResources.bind(encounterFrame)){exitCode=downwellGameplayFailed(__LINE__);break;}
 #endif
+                    // Free the front end's (or a results screen's) sounds before
+                    // the cavern atlas; the run bank follows the atlas.
+                    soundBanks.scene(downwell::AmigaSoundBanks::none);
                     if(!prepareInitialGameplay()){exitCode=downwellGameplayFailed(__LINE__);break;}
                     if (!acquireGameplayPlanes()) { exitCode=downwellGameplayFailed(__LINE__); break; }
+                    soundBanks.resident(downwell::AmigaSoundBanks::run);
 #ifdef DOWNWELL_PREPARED_FIELDS
                     // Terrain batching owns the prefix. Rebind after every
                     // front-bank reload, only after retiring its DMA.
@@ -3943,6 +3959,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     releaseGameplayArt();
+                    soundBanks.scene(downwell::AmigaSoundBanks::clear); // in the atlas's room
 #ifdef DOWNWELL_CLEAR_VERIFY
                     if(!clearOracle.acquire()){exitCode=downwellGameplayFailed(__LINE__);break;}
                     gDownwellClearOracleBytes=AmigaClearOracleBuffers::bytes;
@@ -3996,6 +4013,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaHardware::blitterDrain();
                     clear.invalidateDisplay();
                     upgradeSource.release();
+                    soundBanks.scene(downwell::AmigaSoundBanks::none); // before the atlas reloads
 #ifdef DOWNWELL_CLEAR_VERIFY
                     clearOracle.release();gDownwellClearOracleBytes=0;
 #endif
@@ -4236,6 +4254,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     const auto destination = port.restartFromResults(action == Menu::Action::retry ?
                         downwell::DeathMenuSequence::Action::Retry : downwell::DeathMenuSequence::Action::StyleSelect,
                         newRunSeed, initialRingOrigin);
+                    soundBanks.scene(downwell::AmigaSoundBanks::none);
                     if (!scenes.enterResultsDestination(destination)) break;
                     newRunWorldPending = true;
                     sceneResetRequested = true;
@@ -4376,6 +4395,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 // Frame timing supplies a live seed; fixtures call reset with explicit seeds.
                 newRunSeed = liveFrameCount;
                 const auto destination = port.restartFromResults(resultsAction, newRunSeed, initialRingOrigin);
+                soundBanks.scene(downwell::AmigaSoundBanks::none);
                 if (!scenes.enterResultsDestination(destination)) break;
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
                 gDownwellResultsRestartMask |= 1u << (static_cast<unsigned>(resultsAction) - 1);
@@ -4536,6 +4556,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_PROFILE_ENTRY
                 ++gDownwellEntryResultsFrames;
 #endif
+                if (!resultsWasActive) soundBanks.scene(downwell::AmigaSoundBanks::results);
 #ifndef DOWNWELL_REPLAY_VERIFY
                 if (!resultsWasActive) {
                     // saveStats ran at the first death movement; write it as
@@ -5557,6 +5578,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     encounterResources.releaseScene();
 #endif
     keyboard.release();
+    soundBanks.release();
     platform.restore();
     memory.release();
 #ifdef DOWNWELL_CLEAR_VERIFY

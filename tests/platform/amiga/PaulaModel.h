@@ -15,7 +15,8 @@ class PaulaModel {
 public:
     static constexpr std::uint32_t clock=3546895;
     struct Write { unsigned field,channel; char what; std::uint32_t value; };
-    explicit PaulaModel(const std::uint8_t* data):data_(data){}
+    // data, scene: each bank slot's sample data (PaulaBank::data()).
+    explicit PaulaModel(const std::uint8_t* data,const std::uint8_t* scene=nullptr):data_{data,scene}{}
     // PaulaSequencer's Regs.
     void dma(unsigned mask,bool on){
         for(unsigned c=0;c<4;++c)if((mask>>c)&1u){
@@ -25,8 +26,9 @@ public:
             else if(!on){ch.dma=false;ch.out=0;}
         }
     }
-    void sample(unsigned c,std::uint32_t offset,std::uint16_t words){
-        ch_[c].regSilent=false;ch_[c].regOffset=offset;ch_[c].regWords=words;log(c,'s',offset);
+    void sample(unsigned c,unsigned slot,std::uint32_t offset,std::uint16_t words){
+        ch_[c].regSilent=false;ch_[c].regSlot=slot&1u;ch_[c].regOffset=offset;ch_[c].regWords=words;
+        log(c,slot?'S':'s',offset);
     }
     void silence(unsigned c){ch_[c].regSilent=true;ch_[c].regWords=1;log(c,'z',0);}
     void period(unsigned c,std::uint16_t p){ch_[c].period=p<124?124:p;log(c,'p',p);}
@@ -36,6 +38,8 @@ public:
     const std::vector<Write>& writes()const{return writes_;}
     void clearWrites(){writes_.clear();}
     bool playingSample(unsigned c)const{return ch_[c].dma&&!ch_[c].liveSilent;}
+    // Whether a channel's DMA still fetches from a bank slot.
+    bool fetching(unsigned c,unsigned slot)const{return ch_[c].dma&&!ch_[c].liveSilent&&ch_[c].liveSlot==slot;}
     std::uint32_t liveOffset(unsigned c)const{return ch_[c].liveOffset;}
     // Advance `clocks` colour clocks, appending stereo frames at `rate`.
     void render(std::uint32_t clocks,unsigned rate,std::vector<std::int16_t>* out){
@@ -60,7 +64,7 @@ public:
                 const std::uint32_t per=std::uint32_t(ch.period)<<16;
                 while(ch.acc>=per){
                     ch.acc-=per;
-                    ch.out=ch.liveSilent?0:std::int8_t(data_[ch.liveOffset+ch.pos]);
+                    ch.out=ch.liveSilent?0:std::int8_t(data_[ch.liveSlot][ch.liveOffset+ch.pos]);
                     if(++ch.pos>=ch.liveWords*2u)latch(ch);
                 }
                 const int v=ch.out*int(ch.volume);
@@ -73,15 +77,16 @@ private:
     struct Channel {
         bool dma=false,regSilent=true,liveSilent=true;
         std::uint32_t regOffset=0,liveOffset=0,liveWords=1,pos=0,acc=0;
+        unsigned regSlot=0,liveSlot=0;
         std::uint16_t regWords=1,period=124;
         std::uint8_t volume=0;
         std::int8_t out=0;
     };
     void latch(Channel& ch){
-        ch.liveSilent=ch.regSilent;ch.liveOffset=ch.regOffset;ch.liveWords=ch.regWords?ch.regWords:65536u;ch.pos=0;
+        ch.liveSilent=ch.regSilent;ch.liveSlot=ch.regSlot;ch.liveOffset=ch.regOffset;ch.liveWords=ch.regWords?ch.regWords:65536u;ch.pos=0;
     }
     void log(unsigned c,char what,std::uint32_t value){writes_.push_back({field_,c,what,value});}
-    const std::uint8_t* data_;
+    const std::uint8_t* data_[2];
     Channel ch_[4]{};
     std::vector<Write> writes_;
     std::uint64_t pending_=0;

@@ -43,13 +43,14 @@ int main(){
     gPaulaProbeChipBank=DOWNWELL_SFX_BANK_BYTES;
     if(platform.loadFile("Downwell.sfx",bank,DOWNWELL_SFX_BANK_BYTES)!=LONG(DOWNWELL_SFX_BANK_BYTES))return fail(3);
     downwell::AmigaPaulaAudio audio;
-    if(audio.acquire(platform,bank,DOWNWELL_SFX_BANK_BYTES))return fail(4); // no pre-takeover admission
+    if(audio.acquire(platform))return fail(4); // no pre-takeover admission
+    if(!audio.bind(downwell::AmigaPaulaAudio::resident,bank,DOWNWELL_SFX_BANK_BYTES))return fail(4);
     auto* words=static_cast<UWORD*>(AllocMem(8,MEMF_CHIP|MEMF_CLEAR));
     if(!words)return fail(5);
     CopperList copper(words,4);
     if(!copper.move(color00,0)||!copper.finish()||!platform.takeover(copper,0x81,0xc1,44,300,0x38,0xd0))return fail(6);
     const ULONG chipBefore=AvailMem(MEMF_CHIP),fastBefore=AvailMem(MEMF_FAST);
-    if(!audio.acquire(platform,bank,DOWNWELL_SFX_BANK_BYTES)||
+    if(!audio.acquire(platform)||
        chipBefore-AvailMem(MEMF_CHIP)!=downwell::AmigaPaulaAudio::silentBytes)return fail(7);
     if((AmigaHardware::enabledDMAChannels()&(DMAF_AUD0|DMAF_AUD1|DMAF_AUD2|DMAF_AUD3))!=
        (DMAF_AUD0|DMAF_AUD1|DMAF_AUD2|DMAF_AUD3)||
@@ -125,7 +126,7 @@ int main(){
        AvailMem(MEMF_CHIP)!=chipBefore||AvailMem(MEMF_FAST)!=fastBefore)return fail(11);
     // A second acquisition after release works, and the platform's restore
     // retires a live mixer.
-    if(!audio.acquire(platform,bank,DOWNWELL_SFX_BANK_BYTES))return fail(12);
+    if(!audio.acquire(platform)||!audio.bind(downwell::AmigaPaulaAudio::resident,bank,DOWNWELL_SFX_BANK_BYTES))return fail(12);
     downwell::SoundRequest r;r.kind=downwell::SoundRequest::play;r.asset=3;r.voice=downwell::SoundVoices::firstVoice;
     r.priority=50;r.gainValue={0x3ff00000u,0};r.pitchValue={0x3ff00000u,0};
     audio.submit(r);audio.frame();

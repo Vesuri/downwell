@@ -160,6 +160,14 @@ style select, patched with the chosen style and hard mode.
     walkers never overlapping a solid's underside; find what writes the solid
     over the walker (incremental generation or a box/cell update) before
     adding any guard. A hang on a natural route is a ship blocker.
+13. **Results re-entry route breaks.** `make verify-amiga-results-restart`
+    fails with the executable returning 20 before its third results
+    destination. It fails the same way with the sound mixer not acquired
+    (found during W2.5 on 2026-11-21). The main loop leaves through a plain
+    `break` after the style-select re-entry has reached gameplay, and the
+    encounter session's `retire()` then fails at exit (gameplay failure
+    line 5576). Find which `break` fires: the route's Chip trace and bank
+    loads are clean up to that point.
 
 ### W2. Sound effects
 
@@ -254,8 +262,27 @@ area-1 patterns, and names every cut with its reason.
       exercises in FS-UAE and compares the recording with the host render.
       It runs in real time, so it needs a quiet host: under load the SDL
       disk capture drops chunks.
-    - The game still uses `AmigaWindAudio`, and nothing drains the request
-      rings yet.
+    - The normal build acquires the mixer after takeover, but nothing
+      drains the request rings yet. `AmigaWindAudio` lives only in the scene
+      collision candidate build (`AmigaEncounterResources`).
+  - **Scene banks (W2.5):** `AmigaSoundBanks` owns the mixer and four Chip
+    packs from `tools/pack-amiga-sfx.py`, each sound in exactly one:
+    - `Downwell.sndrun` (430,034 bytes): gameplay, shops and pause, plus
+      what they share with clear and results. Resident (slot 0) from
+      gameplay entry, after the cavern atlas, until the run leaves for the
+      front end, so across Retry, pause, shops, clear and results.
+    - `Downwell.sndfront` (51,020): the front end, only while no run bank is
+      resident.
+    - `Downwell.sndresults` (18,828) and `Downwell.sndclear` (7,108): loaded
+      over the run bank (slot 1) while those screens show; the clear bank is
+      freed before the next level reloads the atlas.
+
+    A pack loads only if the largest Chip block keeps 16 KiB beyond it, and
+    a failed load leaves that bank silent (`gDownwellSoundBankFailures`).
+    Measured at 1 MiB: 600,104 bytes free in the front end, 45,992 (largest
+    block 45,944) in gameplay, and 27,160 on the results screen.
+    `chip_memory_watch.gdb` prints `SOUND_BANKS` at every file load, and
+    `verify_scenes.gdb` and `verify_clear.gdb` assert the bank sequence.
 - **Memory:** measured on 2026-11-20 with the normal 1 MiB build in level
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
@@ -284,29 +311,18 @@ area-1 patterns, and names every cut with its reason.
    The floor material for footsteps and landings is approximated from three
    probes under the player. The pause menu's sounds are only on the native
    menus route (`tools/verify-menus-native.py`), not on a host route.
-5. **Scene-local banks.**
-   - **Gameplay bank:** loaded with the cavern banks and kept across Retry,
-     like the plane atlas. Pause sounds live in it.
-   - **Front-end bank:** title, garden, style select and menus.
-   - **Clear and results sounds:** in the gameplay bank or in those scenes'
-     transient banks, whichever the inventory favours.
-   - **Size:** the whole pack is 505,862 bytes, more than the ~465 KiB
-     free in level 1-1. Split it by scene (`scenes` in
-     `generated/amiga-sfx.json`), or pack per scene, and load each pack into
-     Chip with its scene. The mixer needs only an 8-byte silent word of its
-     own.
-   - **Gates:** measure free and largest Chip before and after
-     (`verify-amiga-memory`, `verify-amiga-startup`), and keep the 1 MiB
-     startup gate.
-   - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
-     It passed before W2.4's deferred voice setup. Since then, the native
-     probe's counters and timing pass, but two recordings under a load of 13+
-     lost audio chunks in the capture.
 6. **Wire world 1 by groups.** Each group is audible on a natural route and
    checked natively: GDB reads the voice table at the ticks the host log
    names.
    - **Replace the old audio:** `AmigaPaulaAudio` replaces `AmigaWindAudio`
      in `AmigaEncounterResources`. The wind becomes an ordinary bank sound.
+   - **Drain and frame:** `AmigaSoundBanks::audio()` is the mixer. A request
+     for a sound whose bank is not loaded counts as missing; replay each
+     route with the bank set its scenes load to confirm none are.
+   - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
+     It passed before W2.4's deferred voice setup. Since then, the native
+     probe's counters and timing pass, but two recordings under a load of 13+
+     lost audio chunks in the capture.
    - **Request contract:** drain `GameplayWorld::soundRequests()` and
      `AmigaSceneRuntime::sounds().requests()` once per frame into
      `AmigaPaulaAudio::submit`, then call `frame()` (a full ring drops its

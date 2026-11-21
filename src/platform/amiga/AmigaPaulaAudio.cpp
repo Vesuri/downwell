@@ -20,7 +20,7 @@ unsigned rasterLine(){
 }
 // PaulaSequencer's register interface on the hardware.
 struct AmigaPaulaAudio::Regs {
-    const UBYTE* data;
+    const UBYTE* data[2];
     const UBYTE* silent;
     static UWORD base(unsigned c){return UWORD(aud0ptr+c*16);}
     static void pointer(unsigned c,const UBYTE* p,UWORD words){
@@ -30,22 +30,42 @@ struct AmigaPaulaAudio::Regs {
         AmigaHardware::writeRegister(UWORD(base(c)+4),words);
     }
     void dma(unsigned mask,bool on){AmigaHardware::setDMAChannels(UWORD(mask&15u)|(on?DMAF_MASTER:0),on);}
-    void sample(unsigned c,std::uint32_t offset,std::uint16_t words){pointer(c,data+offset,words);}
+    void sample(unsigned c,unsigned slot,std::uint32_t offset,std::uint16_t words){pointer(c,data[slot&1u]+offset,words);}
     void silence(unsigned c){pointer(c,silent,1);}
     void period(unsigned c,std::uint16_t p){AmigaHardware::writeRegister(UWORD(base(c)+6),p);}
     void volume(unsigned c,std::uint8_t v){AmigaHardware::writeRegister(UWORD(base(c)+8),v);}
 };
 
-bool AmigaPaulaAudio::acquire(AmigaPlatform& platform,const void* pack,unsigned bytes){
+bool AmigaPaulaAudio::bind(Slot slot,const void* pack,unsigned bytes){
+    if(banks_[slot].ready())return false;
+    PaulaBank bank;
+    if(!bank.bind(pack,bytes)||!(TypeOfMem(const_cast<void*>(pack))&MEMF_CHIP))return false;
+    // The plan reads the slot only in the main loop, and the VBlank only
+    // from published commands: no command names an unbound slot.
+    banks_[slot]=bank;
+    return true;
+}
+
+void AmigaPaulaAudio::unbind(Slot slot){
+    if(!banks_[slot].ready())return;
+    if(installed_){
+        if(plan_.stopSlot(slot)){
+            frame();
+            // The next VBlank applies the stops (volume 0, DMA off); wait
+            // two so a VBlank already under way cannot be the one counted.
+            platform_->waitVblank();platform_->waitVblank();
+        }
+    }
+    banks_[slot]=PaulaBank{};
+}
+
+bool AmigaPaulaAudio::acquire(AmigaPlatform& platform){
     if(installed_)return platform_==&platform;
     if(platform_||current_)return false;
-    if(!bank_.bind(pack,bytes)||!(TypeOfMem(const_cast<UBYTE*>(bank_.data()))&MEMF_CHIP)){
-        bank_=PaulaBank{};return false;
-    }
     // Reserve the active platform service first. Before takeover this
     // rejects immediately, with nothing allocated or touched.
     if(!platform.attachVblankService(vblank,this,
-        [](void* self){static_cast<AmigaPaulaAudio*>(self)->release();})){bank_=PaulaBank{};return false;}
+        [](void* self){static_cast<AmigaPaulaAudio*>(self)->release();}))return false;
     platform_=&platform;
     silent_=static_cast<UBYTE*>(AllocMem(silentBytes,MEMF_CHIP|MEMF_CLEAR));
     if(!silent_){release();return false;}
@@ -60,7 +80,7 @@ bool AmigaPaulaAudio::acquire(AmigaPlatform& platform,const void* pack,unsigned 
         savedFilter_=(ciaPort()&2)!=0;ciaPort()|=2; // LED low-pass off
         AmigaHardware::clearInterruptRequests(audioIrq);
         for(auto& m:mailbox_)m=PaulaChannelCommand{};
-        Regs regs{bank_.data(),silent_};
+        Regs regs{{banks_[0].data(),banks_[1].data()},silent_};
         sequencer_.begin(regs);
         plan_.reset();
         lastField_=AmigaPlatform::vblankCount();
@@ -76,7 +96,7 @@ void AmigaPaulaAudio::release(){
         // Silence and DMA-off, then a whole VBlank before the silent word or
         // the caller's bank can be freed: nothing may still fetch them.
         Disable();
-        Regs regs{bank_.data(),silent_};
+        Regs regs{{banks_[0].data(),banks_[1].data()},silent_};
         sequencer_.end(regs);
         installed_=false;
         Enable();
@@ -93,7 +113,7 @@ void AmigaPaulaAudio::release(){
     if(platform_)platform_->detachVblankService(this);
     platform_=nullptr;
     if(silent_){FreeMem(silent_,silentBytes);silent_=nullptr;}
-    bank_=PaulaBank{};
+    banks_[0]=PaulaBank{};banks_[1]=PaulaBank{};
 }
 
 void AmigaPaulaAudio::frame(){
@@ -102,15 +122,16 @@ void AmigaPaulaAudio::frame(){
     plan_.advance(UWORD(now-lastField_));
     lastField_=now;
     Disable();
-    plan_.publish([this](unsigned c,const PaulaChannelCommand& m){mailbox_[c].merge(m);});
+    plan_.publish([this](unsigned c,const PaulaChannelCommand& m){mailbox_[c].merge(m);pending_=true;});
     Enable();
 }
 
 void AmigaPaulaAudio::vblank(void* self){static_cast<AmigaPaulaAudio*>(self)->serviceVblank();}
 void AmigaPaulaAudio::serviceVblank(){
-    if(!installed_)return;
+    if(!installed_||(!pending_&&!sequencer_.busy()))return; // idle: nothing to do
+    pending_=false;
     const unsigned first=rasterLine();
-    Regs regs{bank_.data(),silent_};
+    Regs regs{{banks_[0].data(),banks_[1].data()},silent_};
     sequencer_.vblank(mailbox_,regs);
     const unsigned lines=rasterLine()-first;
     if(lines<312&&lines>longestService_)longestService_=lines;

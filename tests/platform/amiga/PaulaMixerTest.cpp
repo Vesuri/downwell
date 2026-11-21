@@ -358,11 +358,66 @@ void replayRoute(const PaulaBank& bank, const char* path) {
 }
 }
 
+// W2.5 bank slots: a scene bank over the resident one, and its retirement.
+void testSlots() {
+    auto residentBytes = pack({{1, 424, 64, false, 32768, 8366}, {2, 424, 64, false, 32768, 8366}});
+    auto sceneBytes = pack({{2, 424, 40, false, 32768, 8366}, {3, 424, 64, true, 32768, 4000}});
+    PaulaBank resident, scene;
+    require(resident.bind(residentBytes.data(), residentBytes.size()), "resident bank");
+    downwell_test::PaulaModel model(resident.data(), nullptr);
+    PaulaSequencer seq; PaulaVoicePlan plan(resident, &scene);
+    PaulaChannelCommand mailbox[4]{};
+    seq.begin(model);
+    unsigned field = 0;
+    auto vblank = [&] {
+        plan.publish([&](unsigned c, const PaulaChannelCommand& m) { mailbox[c].merge(m); });
+        model.setField(++field); seq.vblank(mailbox, model); plan.advance(1);
+        model.render(PaulaVoicePlan::fieldClocks, 44100, nullptr);
+    };
+    auto fetching = [&](unsigned slot) { unsigned n = 0; for (unsigned c = 0; c < 4; ++c) n += model.fetching(c, slot); return n; };
+    // No scene bank bound: ids 1 and 2 come from the resident bank, 3 is missing.
+    plan.apply(play(3, V, 50));
+    require(plan.counters().missing == 1 && !plan.activeVoices(), "an unbound scene bank finds nothing");
+    require(scene.bind(sceneBytes.data(), sceneBytes.size()), "scene bank");
+    model = downwell_test::PaulaModel(resident.data(), scene.data());
+    seq.begin(model);
+    plan.apply(play(1, V + 1, 50));
+    plan.apply(play(2, V + 2, 50));
+    plan.apply(play(3, V + 3, 50));
+    vblank();
+    unsigned slot0 = 0, slot1 = 0;
+    for (unsigned c = 0; c < 4; ++c) {
+        const auto& v = plan.voice(c);
+        if (!v.active) continue;
+        if (v.asset == 1) require(v.slot == 0, "id 1 plays from the resident bank");
+        if (v.asset == 2) require(v.slot == 1 && v.volume == 40, "the scene bank's id 2 wins");
+        if (v.asset == 3) require(v.slot == 1 && v.loop, "id 3 plays from the scene bank");
+        (v.slot ? slot1 : slot0) += 1;
+    }
+    require(slot0 == 1 && slot1 == 2, "three voices over two banks");
+    model.render(1000, 44100, nullptr);
+    require(fetching(1) == 2 && fetching(0) == 1, "both banks sound");
+    // Retire the scene bank: its voices stop, the resident one plays on.
+    plan.stopSlot(1);
+    require(plan.activeVoices() == 1, "stopSlot leaves the resident voice");
+    vblank();
+    require(fetching(1) == 0 && fetching(0) == 1, "one VBlank later nothing fetches the scene bank");
+    // A fresh scene play stopped before it reached the hardware costs nothing.
+    plan.apply(play(3, V + 4, 50));
+    plan.stopSlot(1);
+    vblank(); vblank();
+    require(fetching(1) == 0, "a fresh scene voice never starts");
+    scene = PaulaBank{};
+    plan.apply(play(3, V + 5, 50));
+    require(plan.counters().missing == 2, "an unbound bank's sounds are missing again");
+}
+
 int main(int argc, char** argv) {
     testBank();
     testPlan();
     testMerge();
     testSequencer();
+    testSlots();
     testSchedule();
     std::cout << "Paula mixer unit checks passed\n";
     if (argc < 2) return 0;

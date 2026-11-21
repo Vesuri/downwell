@@ -124,6 +124,11 @@ while $word < 64
 end
 printf "SPLASH_PUBLICATION_OK: logo=180 credits=180 controls=240 fade-out=60 fade-in=60\n"
 printf "STYLE_SEQUENCE_OK: %lu frames, zero mismatches; 256-byte stack guard intact\n", gDownwellStyleReferenceFrames
+if gDownwellSoundBankFailures || !gDownwellSoundReady || gDownwellSoundResidentBank != 1 || gDownwellSoundSceneBank != 0 || gDownwellSoundBankLoads != 2
+    printf "SOUND_BANKS_FAILED ready=%lu resident=%lu scene=%lu loads=%lu failures=%lu\n", gDownwellSoundReady, gDownwellSoundResidentBank, gDownwellSoundSceneBank, gDownwellSoundBankLoads, gDownwellSoundBankFailures
+    quit 1
+end
+printf "W2.5 sound banks: the front bank in the front end, freed for gameplay, then the run bank: loads=%lu chip=%lu\n", gDownwellSoundBankLoads, gDownwellSoundChipBytes
 printf "DOWNWELL_GAMEPLAY_ACTIVE\n"
 downwell-chip-snapshot
 shell touch .run/gdb-ready.marker

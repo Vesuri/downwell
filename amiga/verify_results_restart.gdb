@@ -11,7 +11,7 @@ set $results_return_pc = *(unsigned long*)$sp
 tbreak *$results_return_pc
 commands
     silent
-    printf "Executable returned %lu before completing results reentry\n", $d0
+    printf "Executable returned %lu before completing results reentry (gameplay failure line %lu, sound banks resident=%lu scene=%lu failures=%lu)\n", $d0, gDownwellGameplayFailLine, gDownwellSoundResidentBank, gDownwellSoundSceneBank, gDownwellSoundBankFailures
     quit 1
 end
 break downwellStartupFailed

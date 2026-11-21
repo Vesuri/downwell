@@ -53,6 +53,9 @@ define downwell-chip-snapshot
     quit 1
   end
   printf "CHIP_CHECKPOINT free=%lu largest=%lu minimum_free=%lu changes=%lu file_loads=%lu\n", *$chip_free, $chip_largest, $chip_minimum, $chip_changes, $chip_files
+  # W2.5 sound banks (AmigaSoundBanks::Bank: 0 none, 1 run, 2 front,
+  # 3 results, 4 clear) as this checkpoint finds them.
+  printf "SOUND_BANKS ready=%lu resident=%lu scene=%lu chip=%lu loads=%lu failures=%lu\n", gDownwellSoundReady, gDownwellSoundResidentBank, gDownwellSoundSceneBank, gDownwellSoundChipBytes, gDownwellSoundBankLoads, gDownwellSoundBankFailures
 end
 downwell-chip-snapshot
 watch -l *$chip_free

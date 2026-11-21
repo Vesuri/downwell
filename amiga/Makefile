@@ -629,7 +629,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 COLLISION_PACK := $(REPO)/generated/downwell-sprites.dwsc
 COLLISION_MASK_PACK := $(REPO)/generated/downwell-sprite-masks.dwsm
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaWindAudio.o obj/AmigaPlayer.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaWindAudio.o obj/AmigaPaulaAudio.o obj/AmigaSoundBanks.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
@@ -652,7 +652,7 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).wind $(OUT).encountermasks
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).wind $(OUT).encountermasks $(OUT).sndrun $(OUT).sndfront $(OUT).sndresults $(OUT).sndclear
 
 $(OUT).entrymask: $(AMIGA_ENTRY_MASK)
 	@mkdir -p $(@D)
@@ -974,6 +974,18 @@ out/Downwell.sfx: $(REPO)/generated/amiga-sfx.bin
 
 $(REPO)/generated/amiga-sfx.bin $(REPO)/generated/amiga-sfx.h: $(REPO)/tools/pack-amiga-sfx.py
 	$(MAKE) -C $(REPO) generated/amiga-sfx.bin
+
+# W2.5 scene sound banks (AmigaSoundBanks), from the same pack run.
+$(REPO)/generated/amiga-sfx-%.bin: $(REPO)/generated/amiga-sfx.bin
+	@test -f $@
+$(OUT).snd%: $(REPO)/generated/amiga-sfx-%.bin
+	@mkdir -p $(@D)
+	cp $< $@
+
+obj/AmigaSoundBanks.o: $(AMIGA_SRC)/AmigaSoundBanks.cpp $(AMIGA_SRC)/AmigaSoundBanks.h $(AMIGA_SRC)/AmigaPaulaAudio.h $(AMIGA_SRC)/PaulaMixer.h $(REPO)/generated/amiga-sfx.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -I$(REPO)/generated -c -o $@ $<
+obj/DownwellAmiga.o: $(AMIGA_SRC)/AmigaSoundBanks.h $(AMIGA_SRC)/AmigaPaulaAudio.h $(AMIGA_SRC)/PaulaMixer.h
 
 obj/AmigaPaulaAudio.o: $(AMIGA_SRC)/AmigaPaulaAudio.cpp $(AMIGA_SRC)/AmigaPaulaAudio.h $(AMIGA_SRC)/PaulaMixer.h $(REPO)/src/core/SoundRequests.h
 	@mkdir -p $(@D)

@@ -108,6 +108,11 @@ if $encounter_clear
     end
     printf "Native encounter scope and run audio retained through both upgrades\n"
 end
+if gDownwellSoundBankFailures || !gDownwellSoundReady || gDownwellSoundResidentBank != 1 || gDownwellSoundSceneBank != 0 || gDownwellSoundBankLoads < 3
+    printf "SOUND_BANKS_FAILED ready=%lu resident=%lu scene=%lu loads=%lu failures=%lu\n", gDownwellSoundReady, gDownwellSoundResidentBank, gDownwellSoundSceneBank, gDownwellSoundBankLoads, gDownwellSoundBankFailures
+    quit 1
+end
+printf "W2.5 sound banks: run resident, the clear bank loaded for each clear and freed before the next level: loads=%lu chip=%lu\n", gDownwellSoundBankLoads, gDownwellSoundChipBytes
 printf "DOWNWELL_CLEAR_READY\n"
 shell touch .run/gdb-ready.marker
 detach

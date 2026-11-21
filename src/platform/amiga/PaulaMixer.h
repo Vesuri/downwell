@@ -3,7 +3,9 @@
 // W2.4: the four-voice Paula mixer's portable half. No Amiga headers: the
 // host tests it, renders its expected output, and replays route logs with it.
 //
-// - PaulaBank reads a DWSX pack (tools/pack-amiga-sfx.py).
+// - PaulaBank reads a DWSX pack (tools/pack-amiga-sfx.py). The plan reads
+//   two: slot 0 the resident bank (W2.5: the run's), slot 1 a scene's bank
+//   loaded over it (results, clear) or alone (the front end's).
 // - PaulaVoicePlan runs in the main loop: it turns SoundRequests into one
 //   pending command per channel (allocation, stealing, panning, one-shot
 //   expiry, fades, pitch and volume), with no knowledge of the hardware.
@@ -110,10 +112,11 @@ struct PaulaChannelCommand {
     Op op=none;
     bool cut=false;       // start: the channel may still be sounding, restart its DMA
     bool loop=false;      // start: keep the reload registers on the sample
+    std::uint8_t slot=0;  // start: the bank the sample is in
     bool periodDirty=false,volumeDirty=false;
     std::uint8_t volume=0;
     std::uint16_t period=0,words=0;
-    std::uint32_t offset=0; // start: sample offset from the bank's data
+    std::uint32_t offset=0; // start: sample offset from its bank's data
     // Fold a later command into an unconsumed one: a start or stop replaces
     // the operation (a start after anything unconsumed must cut), and a
     // later period or volume rides along with whatever is pending.
@@ -137,12 +140,13 @@ public:
     static constexpr std::uint32_t fieldClocks=71051; // a non-interlaced PAL frame: 313 lines x 227
     static constexpr std::uint16_t fieldHalfClocks=35525; // fieldClocks / 2, rounded down (expiry is late, never early)
     static constexpr std::uint16_t minPeriod=124;
+    static constexpr unsigned slots=2;
     // A play only claims its channel (fresh); publish materialises the
     // channel's final claimant once (bank entry, gain, pitch, period, length
     // and volume), so the plays a burst steals within one frame cost little.
     struct Voice {
         bool active=false,fresh=false,loop=false,paused=false,gainKnown=false;
-        std::uint8_t entry=0,priority=0,bankVolume=0,volume=0;
+        std::uint8_t entry=0,slot=0,priority=0,bankVolume=0,volume=0;
         std::int16_t asset=-1;
         int id=-1;
         std::uint16_t basePeriod=0,period=0,assetGainQ15=1,fadeFields=0;
@@ -152,7 +156,8 @@ public:
     };
     struct Counters { std::uint32_t plays=0,steals=0,drops=0,missing=0,music=0,expired=0,stops=0; };
 
-    explicit PaulaVoicePlan(const PaulaBank& bank):bank_(bank){}
+    // The banks may be unbound (a PaulaBank that is not ready finds nothing).
+    explicit PaulaVoicePlan(const PaulaBank& resident,const PaulaBank* scene=nullptr):banks_{&resident,scene}{}
     // Forget every voice, command and counter (a new acquisition).
     void reset(){
         for(unsigned c=0;c<channels;++c){voices_[c].active=voices_[c].fresh=false;pending_[c]=PaulaChannelCommand{};sounding_[c]=false;}
@@ -168,6 +173,17 @@ public:
     const Voice& voice(unsigned c)const{return voices_[c];}
     const Counters& counters()const{return counters_;}
     unsigned activeVoices()const{unsigned n=0;for(const auto& v:voices_)n+=v.active;return n;}
+    // Before a bank retires: stop every voice playing from it. Once the
+    // next published frame has reached a VBlank, nothing fetches the bank.
+    // True when a stop reached a channel the hardware plays (only then must
+    // the caller wait for a VBlank).
+    bool stopSlot(unsigned slot){
+        bool sounding=false;
+        for(unsigned c=0;c<channels;++c)if(voices_[c].active&&voices_[c].slot==slot){
+            sounding=sounding||sounding_[c];stopChannel(c);
+        }
+        return sounding;
+    }
 
     void apply(const SoundRequest& r){
         switch(r.kind){
@@ -230,7 +246,10 @@ private:
     }
     void play(const SoundRequest& r){
         if(r.category==5){++counters_.music;return;} // WM
-        const int entry=bank_.entry(r.asset);
+        // The scene's bank first, then the resident one.
+        std::uint8_t slot=1;
+        int entry=banks_[1]?banks_[1]->entry(r.asset):-1;
+        if(entry<0){slot=0;entry=banks_[0]->entry(r.asset);}
         if(entry<0){++counters_.missing;return;}
         const int c=choose(r.priority);
         if(c<0){++counters_.drops;return;}
@@ -238,7 +257,7 @@ private:
         if(v.active)++counters_.steals;
         ++counters_.plays;
         v.active=v.fresh=true;v.paused=v.gainKnown=false;v.fadeFields=0;
-        v.entry=std::uint8_t(entry);v.id=r.voice;v.asset=r.asset;v.priority=r.priority;v.serial=++serial_;
+        v.entry=std::uint8_t(entry);v.slot=slot;v.id=r.voice;v.asset=r.asset;v.priority=r.priority;v.serial=++serial_;
         v.gainRaw=r.gainValue;v.pitchRaw=r.pitchValue;
         lastSide_=side(unsigned(c));
     }
@@ -246,7 +265,7 @@ private:
         Voice& v=voices_[c];
         v.fresh=false;
         if(!v.active)return;
-        PaulaBank::Sound s;bank_.sound(v.entry,s);
+        PaulaBank::Sound s;banks_[v.slot]->sound(v.entry,s);
         v.loop=s.loop;v.bankVolume=s.volume;v.basePeriod=s.period;v.assetGainQ15=s.assetGainQ15;
         if(!v.gainKnown)v.gainQ16=clampGain(q16(v.gainRaw));
         v.pitchQ16=q16(v.pitchRaw);
@@ -257,7 +276,7 @@ private:
         v.remaining=length<0xffffffffu-fieldHalfClocks?length+fieldHalfClocks:0xffffffffu;
         v.volume=effectiveVolume(v);
         PaulaChannelCommand m;
-        m.op=PaulaChannelCommand::start;m.cut=sounding_[c];m.loop=s.loop;
+        m.op=PaulaChannelCommand::start;m.cut=sounding_[c];m.loop=s.loop;m.slot=v.slot;
         m.offset=s.offset;m.words=std::uint16_t(s.bytes/2);m.period=v.period;m.volume=v.volume;
         pending_[c].merge(m);
         sounding_[c]=true;
@@ -361,7 +380,7 @@ private:
         PaulaChannelCommand m;m.volumeDirty=true;m.volume=volume;
         pending_[c].merge(m);
     }
-    const PaulaBank& bank_;
+    const PaulaBank* banks_[slots];
     Voice voices_[channels]{};
     PaulaChannelCommand pending_[channels]{};
     bool sounding_[channels]{}; // the hardware plays (or was told to play) this channel's last start
@@ -417,9 +436,15 @@ public:
         if(on)regs.dma(on,true);
     }
     State state(unsigned c)const{return state_[c];}
+    // A VBlank with an empty mailbox changes nothing unless a channel waits
+    // for its silence reload or its deferred restart.
+    bool busy()const{
+        for(unsigned c=0;c<4;++c)if(state_[c]==oneShotStarted||state_[c]==stopped)return true;
+        return false;
+    }
 private:
     template<class Regs> void program(unsigned c,const PaulaChannelCommand& m,Regs& regs){
-        regs.sample(c,m.offset,m.words);regs.period(c,m.period);regs.volume(c,m.volume);
+        regs.sample(c,m.slot,m.offset,m.words);regs.period(c,m.period);regs.volume(c,m.volume);
         state_[c]=m.loop?playing:oneShotStarted;
     }
     State state_[4]{};
