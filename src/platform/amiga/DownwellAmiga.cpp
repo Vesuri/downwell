@@ -2692,7 +2692,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             appliedGainTenths = saveState.masterGainTenths;
             audio.setMasterQ16(appliedGainTenths * 65536u / 10u);
         }
+#ifndef DOWNWELL_REPLAY_VERIFY // The replay verifier has no scene runtime.
         audio.drain(scenes.sounds().requests());
+#endif
         audio.drain(port.soundRequests());
         audio.frame();
     };
@@ -3911,8 +3913,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_PROFILE_ENTRY
                 ++gDownwellEntryResultsFrames;
 #endif
-                if (!resultsWasActive) soundBanks.scene(downwell::AmigaSoundBanks::results);
 #ifndef DOWNWELL_REPLAY_VERIFY
+                if (!resultsWasActive) soundBanks.scene(downwell::AmigaSoundBanks::results);
                 if (!resultsWasActive) {
                     // saveStats ran at the first death movement; write it as
                     // DeathMenu opens (not mid-fall), with checkAreaLevel.
