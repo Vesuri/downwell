@@ -35,7 +35,7 @@ bool AmigaWindAudio::acquire(AmigaPlatform& platform){
     if(!platform.attachVblankService(vblank,this,
         [](void* self){static_cast<AmigaWindAudio*>(self)->release();}))return false;
     platform_=&platform;
-    source_=static_cast<std::uint8_t*>(AllocMem(DOWNWELL_WIND_BANK_BYTES,MEMF_FAST));
+    source_=static_cast<std::uint8_t*>(AllocMem(DOWNWELL_WIND_BANK_BYTES,MEMF_PUBLIC));
     chip_=static_cast<std::uint8_t*>(AllocMem(chipBytes,MEMF_CHIP|MEMF_CLEAR));
     if(source_&&chip_)AmigaHardware::blitterDrain();
     if(!source_||!chip_||platform.loadFile("Downwell.wind",source_,DOWNWELL_WIND_BANK_BYTES)!=DOWNWELL_WIND_BANK_BYTES||

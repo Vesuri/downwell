@@ -196,7 +196,6 @@ public:
             bool ok;
             if constexpr(PreparedGeometry){
                 if(operation.instance&0x80000000u){
-#ifndef DOWNWELL_REFERENCE_JOURNAL_GEOMETRY_DECODE
                     Math::PixelBox pixels;
                     ok=this->geometry_&&this->geometry_->pixels({operation.box.left.bits},pixels);
                     if(ok){
@@ -204,11 +203,6 @@ public:
                         if(pixels.bottom<pixels.top){const auto y=pixels.top;pixels.top=pixels.bottom;pixels.bottom=y;}
                         ok=tree_.insertPixels(pixels,operation.instance&0x7fffffffu);
                     }
-#else
-                    Box box;
-                    ok=this->geometry_&&this->geometry_->bounds({operation.box.left.bits},box,true)&&
-                        tree_.insert(box,operation.instance&0x7fffffffu);
-#endif
                 }else ok=operation.insert?tree_.insert(operation.box,operation.instance):
                     tree_.remove(operation.box,operation.instance,true,removed)&&removed;
             }else ok=operation.insert?tree_.insert(operation.box,operation.instance):

@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
 . "$FSUAE_COMMON"
+. ./machine.sh
 
 ROM="${1:-$KICKSTART}"
 EXE="${DOWNWELL_EXE:-out/Downwell.exe}"
@@ -44,15 +45,13 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$HOME/Pictures/Screenshots}"
 mkdir -p "$SHOTS"
 export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-# Model, memory, sound and window: fsuae_options in $FSUAE_COMMON.
-KICKSTART="$ROM" AMIGA_MODEL="${AMIGA_MODEL:-A500}"
-CHIP_KB="${CHIP_KB:-${CHIP_MEMORY:-1024}}" FAST_KB="${FAST_KB:-${FAST_MEMORY:-8192}}"
+# Model and memory: MACHINE (machine.sh). Sound and window: fsuae_options.
+downwell_machine || exit 1
+echo "machine: $(downwell_machine_description)"
+KICKSTART="$ROM"
 fsuae_options
-# Over 512 KiB of Chip needs the ECS 8372A Agnus (the target A500 has 1 MiB).
-RUN_CHIPSET=ocs
-[ "$CHIP_KB" -gt 512 ] && RUN_CHIPSET=ecs_agnus
 fsuae_exec \
-  --uae_chipset="$RUN_CHIPSET" \
+  --uae_chipset="$MACHINE_CHIPSET" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
   --window_width=760 --window_height=568 \

@@ -9,9 +9,6 @@ HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
-ifneq ($(filter-out 0,$(TERRAIN_RUN_STORE)),)
-$(error TERRAIN_RUN_STORE was removed; use the default registered-terrain reference)
-endif
 REFERENCE_RANDOM ?= 0
 REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
@@ -60,6 +57,9 @@ endif
 ifeq ($(REFERENCE_ENEMY_UPDATES),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
 endif
+# The host runs the parked frame-work candidate (section 0 D); the Amiga
+# build keeps the measured production path unless FRAME_WORK_CANDIDATE=1.
+CXXFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -1556,7 +1556,7 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp t
 FRAME_WORK_TEST_SOURCES = tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp
 build/frame-work-test build/frame-work-reference-test: $(FRAME_WORK_TEST_SOURCES) $(wildcard src/core/*.h tests/core/*.h)
 	@mkdir -p build
-	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FRAME_WORK_TEST $(if $(findstring reference,$@),-DDOWNWELL_REFERENCE_FRAME_WORK) -o $@ $(FRAME_WORK_TEST_SOURCES)
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FRAME_WORK_TEST $(if $(findstring reference,$@),-UDOWNWELL_FRAME_WORK_CANDIDATE) -o $@ $(FRAME_WORK_TEST_SOURCES)
 .PHONY: test-frame-work
 test-frame-work: build/frame-work-test build/frame-work-reference-test
 	./build/frame-work-test
@@ -1564,7 +1564,7 @@ test-frame-work: build/frame-work-test build/frame-work-reference-test
 
 build/gameplay-frame-test build/gameplay-frame-reference-test: tests/core/GameplayFrameTest.cpp src/core/GameplayFrame.h src/core/GameplayLimits.h src/core/PlayerMotion.h
 	@mkdir -p build
-	$(CXX) -Isrc $(CXXFLAGS) $(if $(findstring reference,$@),-DDOWNWELL_REFERENCE_FRAME_WORK) -o $@ $<
+	$(CXX) -Isrc $(CXXFLAGS) $(if $(findstring reference,$@),-UDOWNWELL_FRAME_WORK_CANDIDATE) -o $@ $<
 .PHONY: test-gameplay-frame
 test-gameplay-frame: build/gameplay-frame-test build/gameplay-frame-reference-test
 	./build/gameplay-frame-test

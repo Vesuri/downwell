@@ -50,6 +50,11 @@ bool AmigaPlatform::available() const
     return GfxBase != 0 && DOSBase != 0;
 }
 
+void AmigaPlatform::print(const char* text) const
+{
+    if (DOSBase && !active_) PutStr((CONST_STRPTR)text);
+}
+
 void AmigaPlatform::beginIo()
 {
     // Undo exactly what takeover changed for the OS: its VERTB servers, the

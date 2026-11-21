@@ -28,7 +28,7 @@ void AmigaTerrainRaster::invalidate(int first, int end) {
 }
 
 void AmigaTerrainRaster::invalidateShops(const downwell::ShopWorld& shops) {
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
     if(!shops.allocatedCount){
         if(shopRevisionsPopulated_){
             for(auto& revision:shopRevision_)revision=0;

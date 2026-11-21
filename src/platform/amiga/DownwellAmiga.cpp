@@ -415,7 +415,7 @@ public:
     ~UpgradeSource() { release(); }
     bool acquire() {
         if (bank_.view(TransientOwner::upgrade).data) return true;
-        if (!storage_) storage_ = static_cast<UBYTE*>(AllocMem(storageBytes, MEMF_FAST));
+        if (!storage_) storage_ = static_cast<UBYTE*>(AllocMem(storageBytes, MEMF_PUBLIC));
         if (!storage_ || !bank_.load(TransientOwner::upgrade, clearBankContract, storage_,
                 clearBankContract.bytes, readTransientBank, [](const UBYTE* data,unsigned bytes){
                     // Validate the full directory, including the CPU-resident
@@ -1964,6 +1964,69 @@ static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
 extern "C" __attribute__((noinline, used)) void downwellStartupFailed() {
     __asm__ volatile("" ::: "memory");
 }
+
+// WR.1: the most memory the game allocates beyond its loaded hunks, as
+// bytes of Chip (DMA data only) and of other public memory (Fast when
+// present, else Chip). Measured on the world-one route on the A500 with
+// Fast (2026-11-21): free memory after boot (out/FreeMemoryProbe) less the
+// route's low-water mark less the 4,139,108 loaded hunk bytes, rounded up
+// to whole KB. DOWNWELL_MEMORY_SAMPLE=1 on the native routes fails when
+// the use it sees exceeds these. The hunks themselves must already have
+// loaded for this check to run.
+extern "C" {
+// volatile keeps the objects (and the startup check's reads) through LTO
+// for the native routes, which read them by name.
+extern const volatile ULONG downwellChipRequirement;
+extern const volatile ULONG downwellPublicRequirement;
+__attribute__((used)) const volatile ULONG downwellChipRequirement = 940u * 1024u;
+__attribute__((used)) const volatile ULONG downwellPublicRequirement = 1585u * 1024u;
+}
+
+static char* appendKilobytes(char* out, ULONG bytes)
+{
+    ULONG kilobytes = (bytes + 1023) / 1024;
+    char digits[12];
+    unsigned n = 0;
+    do { digits[n++] = char('0' + kilobytes % 10); kilobytes /= 10; } while (kilobytes);
+    while (n) *out++ = digits[--n];
+    *out++ = ' '; *out++ = 'K'; *out++ = 'B';
+    return out;
+}
+
+static char* appendText(char* out, const char* text)
+{
+    while (*text) *out++ = *text++;
+    return out;
+}
+
+// Refuse before allocating anything, while the shell still shows output:
+// Chip must hold the DMA data, and Chip plus Fast must hold everything.
+static bool downwellMemoryFits(const AmigaPlatform& platform)
+{
+    const ULONG chip = AvailMem(MEMF_CHIP), any = AvailMem(MEMF_PUBLIC);
+    const ULONG anyNeeded = downwellChipRequirement + downwellPublicRequirement;
+    gDownwellStartupChipFree = chip;
+    if (chip >= downwellChipRequirement && any >= anyNeeded) return true;
+    char line[160];
+    char* out = appendText(line, "Downwell needs ");
+    if (chip < downwellChipRequirement) {
+        out = appendKilobytes(out, downwellChipRequirement);
+        out = appendText(out, " of Chip memory (");
+        out = appendKilobytes(out, chip);
+        out = appendText(out, " free)");
+        if (any < anyNeeded) out = appendText(out, " and ");
+    }
+    if (any < anyNeeded) {
+        out = appendKilobytes(out, anyNeeded);
+        out = appendText(out, " of memory in all (");
+        out = appendKilobytes(out, any);
+        out = appendText(out, " free)");
+    }
+    out = appendText(out, ".\n");
+    *out = 0;
+    platform.print(line);
+    return false;
+}
 extern "C" __attribute__((noinline)) void downwellGameplayRenderFailure() {
     __asm__ volatile("" ::: "memory");
 }
@@ -2310,6 +2373,11 @@ __attribute__((noinline)) static int runDownwell(void) {
         gDownwellStartupFailure = 1;
         downwellStartupFailed();
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
+    }
+    if (!downwellMemoryFits(platform)) {
+        gDownwellStartupFailure = 5;
+        downwellStartupFailed();
+        return 20;
     }
     UWORD* startupCopperWords =
         (UWORD*)AllocMem(4 * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
@@ -3062,7 +3130,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
         const unsigned oldWallTileCount=port.wallBackgroundTiles().size();
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
         int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
 #else
@@ -4324,7 +4392,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     activeEntryMask!=nullptr, terrainRaster.hasStorage())){
                 gDownwellSceneAdmissionFailure=2;exitCode=downwellGameplayFailed(__LINE__);break;
             }
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
             const AmigaPortFrame result = port.step(packedInput);
 #else
             gameplayResult=port.step(packedInput);
@@ -4404,7 +4472,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
             // Invalidate before selecting a precomposed side-room ring.
             invalidateShopRaster(port.shops());
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
             if(port.shops().allocatedCount)
 #endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
@@ -4447,7 +4515,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             gDownwellProfileCameraChange = result.cameraXDelta;
 #endif
             destroyedBlockCount = result.destroyedBlockCount;
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
             for (unsigned block = 0; block < destroyedBlockCount; ++block) {
                 destroyedBlockX[block] = result.blockX[block];
                 destroyedBlockY[block] = result.blockY[block];
@@ -4526,7 +4594,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 composeDeathFlash(&renderer, port.deathSequence().flashVisible());
             }
             const downwell::ShopWorld::Instance* activeShop = nullptr;
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
             if(port.shops().allocatedCount)
 #endif
             for (const auto& shop : port.shops().instances)
@@ -4768,7 +4836,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     top,bottom-top,downwellPlayfieldX,downwellPlayfieldWidth,true,1);
                 return terrainPaintSucceeded;
             }))terrainPaintSucceeded=false;
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
             if(port.shops().allocatedCount)
 #endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {

@@ -136,16 +136,21 @@ struct SaveFile {
         void text(const char* s) { while (*s) put(*s++); }
         void digits(std::uint64_t v) {
             char buffer[24]; unsigned n = 0;
-            // Base 65536 long division: 32-bit divisions only (no 64-bit
-            // helpers on the 68000).
+            // Base 65536 long division on 32-bit halves: 32-bit divisions
+            // and no variable 64-bit shifts (no 64-bit helpers on the 68000).
+            std::uint32_t high = std::uint32_t(v >> 32), low = std::uint32_t(v);
             do {
-                std::uint64_t q = 0; std::uint32_t r = 0;
-                for (int shift = 48; shift >= 0; shift -= 16) {
-                    const std::uint32_t part = (r << 16) | std::uint32_t((v >> shift) & 0xffff);
-                    q = (q << 16) | (part / 10); r = part % 10;
+                std::uint32_t r = 0, half[2] = {high, low};
+                for (auto& word : half) {
+                    const std::uint32_t upper = (r << 16) | (word >> 16);
+                    r = upper % 10;
+                    const std::uint32_t lower = (r << 16) | (word & 0xffff);
+                    r = lower % 10;
+                    word = ((upper / 10) << 16) | (lower / 10);
                 }
-                buffer[n++] = char('0' + r); v = q;
-            } while (v);
+                high = half[0]; low = half[1];
+                buffer[n++] = char('0' + r);
+            } while (high | low);
             while (n) put(buffer[--n]);
         }
         void real(const char* key, bool negative, std::uint64_t whole, unsigned tenths) {

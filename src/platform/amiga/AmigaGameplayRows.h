@@ -7,7 +7,7 @@ class Bitmap;
 // Independent debts to the private terrain backing for two display rings.
 // Physical row coordinates are used here, never camera/world coordinates.
 class AmigaGameplayRows {
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     unsigned char dirty_[downwellGameRingHeight]{};
 #else
     AmigaRowDebt<downwellGameRingHeight> debt_[2];
@@ -22,7 +22,7 @@ public:
     void reset();
     void damage(unsigned origin, unsigned y, unsigned height, unsigned char buffers = 3);
     bool dirty(unsigned row, unsigned buffer) const {
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
         return (dirty_[row] & (1u << buffer)) != 0;
 #else
         return debt_[buffer].contains(row);

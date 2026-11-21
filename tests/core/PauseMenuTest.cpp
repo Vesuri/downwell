@@ -3,6 +3,7 @@
 #include "downwell-palettes.h"
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -46,6 +47,13 @@ static void saveFile() {
     assert(std::strstr(out, "gems=\"3412.000000\"") && std::strstr(out, "masterGain=\"0.300000\""));
     assert(std::strstr(out, "nobgm=\"1.000000\"") && std::strstr(out, "showtimer=\"-1.000000\""));
     assert(s.format(out, 40) == 0);
+    // 64-bit gem totals print exactly (32-bit halves, no 64-bit helpers).
+    for (const char* digits : {"0", "65536", "4294967296", "18446744073709551615"}) {
+        SaveFile v; v.totalGems = std::strtoull(digits, nullptr, 10);
+        const unsigned m = v.format(out, sizeof out);
+        char expected[48]; std::snprintf(expected, sizeof expected, "gems=\"%s.000000\"", digits);
+        assert(m && std::strstr(out, expected));
+    }
     for (unsigned g = 0; g <= 10; ++g) {
         SaveFile v; v.masterGainTenths = g;
         const unsigned m = v.format(out, sizeof out);

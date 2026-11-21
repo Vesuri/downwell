@@ -12,7 +12,7 @@ template<class Lease> class AmigaSpatialJournalStorage {
     static Bank* acquire(void* context){
         auto& self=*static_cast<AmigaSpatialJournalStorage*>(context);
         if(self.bank_)return nullptr;
-        auto* memory=AllocMem(sizeof(Bank),MEMF_FAST);
+        auto* memory=AllocMem(sizeof(Bank),MEMF_PUBLIC);
         if(!memory)return nullptr;
         return self.bank_=new(memory) Bank;
     }

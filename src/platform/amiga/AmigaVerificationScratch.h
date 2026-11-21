@@ -16,7 +16,7 @@ public:
     public:
         Storage() {
             if (storage()) __builtin_trap();
-            storage()=static_cast<UBYTE*>(AllocMem(capacity,MEMF_FAST));
+            storage()=static_cast<UBYTE*>(AllocMem(capacity,MEMF_PUBLIC));
         }
         ~Storage() {
             if (borrowed()) __builtin_trap();

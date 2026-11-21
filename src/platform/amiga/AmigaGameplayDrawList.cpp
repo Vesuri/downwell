@@ -444,7 +444,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 enemy.objectId != 119 && enemy.facing < 0)) ready = false;
     }
 #endif
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
     if(port.shops().allocatedCount){
 #endif
     downwell::drawShopKeepers(port.shops(), [&](int sprite, unsigned frame, int x, int y) {
@@ -455,7 +455,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         if (!append( sprite, frame,
             downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) ready = false;
     });
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
     }
 #endif
 #ifndef DOWNWELL_REPLAY_VERIFY

@@ -45,6 +45,15 @@ class Debugger(Gdb):
         self.cmd(f'target remote 127.0.0.1:{port}',timeout=60)
 
 
+def storageSymbol(stem):
+    """The ELF's data symbol whose name is stem, with or without an LTO suffix."""
+    objdump=os.environ.get('OBJDUMP','m68k-amiga-elf-objdump')
+    table=subprocess.run([objdump,'-t',sys.argv[-1]],check=True,capture_output=True,text=True).stdout
+    names=[line.split()[-1] for line in table.splitlines() if line.split() and
+           re.fullmatch(re.escape(stem)+r'(\.lto_priv\.\d+)?',line.split()[-1])]
+    if len(names)!=1: raise RuntimeError(f'expected one {stem} symbol, found {names}')
+    return names[0]
+
 def main():
     script=Path(sys.argv[sys.argv.index('-x')+1]).read_text()
     port=int(re.search(r'target remote 127\.0\.0\.1:(\d+)',script)[1])
@@ -71,13 +80,51 @@ def main():
             if any(word in out for word in ('No symbol','not defined','Cannot','Error','error:')):
                 raise RuntimeError(command+'\n'+out)
             return out
-        checked("set $w=(GameplayWorld*)&'_ZL18portRuntimeStorage.lto_priv.0'")
-        checked("set $s=(AmigaSceneRuntime*)&'runDownwell()::sceneStorage'")
-        checked("set $a=(downwell::AmigaSoundBanks*)&'_ZZL11runDownwellvE16soundBankStorage.lto_priv.0'")
+        # LTO renames file-local statics (.lto_priv.N) from link to link.
+        checked(f"set $w=(GameplayWorld*)&'{storageSymbol(r'_ZL18portRuntimeStorage')}'")
+        checked(f"set $s=(AmigaSceneRuntime*)&'{storageSymbol(r'_ZZL11runDownwellvE12sceneStorage')}'")
+        checked(f"set $a=(downwell::AmigaSoundBanks*)&'{storageSymbol(r'_ZZL11runDownwellvE16soundBankStorage')}'")
         voiceFormat='printf "VOICES'+' %d %d %u'*4+'\\n"'+''.join(
             f',$a->audio_.plan_.voices_[{c}].active,$a->audio_.plan_.voices_[{c}].asset,$a->audio_.plan_.voices_[{c}].serial' for c in range(4))
         seenSerials=set()
         nativeStarts={}
+        # DOWNWELL_MEMORY_SAMPLE=1 (WR.1): the free bytes of every exec
+        # memory region at each input sample; the low-water marks give the
+        # game's peak Chip and public use. The first sample follows the
+        # executable's load, so add its hunks for the footprint.
+        memoryRegions=[]
+        memoryLow={}
+        if os.environ.get('DOWNWELL_MEMORY_SAMPLE')=='1':
+            node=int(checked('printf "%lu\\n", *(unsigned long*)(*(unsigned long*)4+322)').split()[-1])
+            while int(checked(f'printf "%lu\\n", *(unsigned long*){node}').split()[-1]):
+                attributes=int(checked(f'printf "%u\\n", *(unsigned short*)({node}+14)').split()[-1])
+                memoryRegions.append((node,attributes))
+                node=int(checked(f'printf "%lu\\n", *(unsigned long*){node}').split()[-1])
+            memoryFormat='printf "FREE'+' %lu'*len(memoryRegions)+'\\n"'+''.join(
+                f',*(unsigned long*)({node}+28)' for node,_ in memoryRegions)
+        def sampleMemory(tick,scene):
+            if not memoryRegions: return
+            free=list(map(int,re.search(r'FREE ([\d ]+)',checked(memoryFormat))[1].split()))
+            for (node,attributes),value in zip(memoryRegions,free):
+                low=memoryLow.get(node)
+                if low is None: memoryLow[node]=[value,value,tick,scene,attributes]
+                elif value<low[1]: low[1:4]=value,tick,scene
+        def reportMemory():
+            if not memoryRegions: return
+            use={'chip':0,'other':0}
+            for node,(first,low,tick,scene,attributes) in memoryLow.items():
+                kind='chip' if attributes&2 else 'fast' if attributes&4 else 'other'
+                use['chip' if kind=='chip' else 'other']+=first-low
+                print(f'MEMORY {kind} region={node:08x} first={first} low={low} use={first-low} at tick={tick} scene={scene}',flush=True)
+            chipNeed=int(checked('printf "%lu\\n", downwellChipRequirement').split()[-1])
+            publicNeed=int(checked('printf "%lu\\n", downwellPublicRequirement').split()[-1])
+            print(f"MEMORY peak chip={use['chip']} other={use['other']} declared chip={chipNeed} public={publicNeed}",flush=True)
+            # Region low-water marks need not coincide, so their sum bounds
+            # the peak from above. With Fast present Chip holds DMA data only.
+            if use['other'] and use['chip']>chipNeed:
+                raise RuntimeError('Chip use exceeds downwellChipRequirement')
+            if use['chip']+use['other']>chipNeed+publicNeed:
+                raise RuntimeError('memory use exceeds the declared requirements')
         def sampleVoices(tick):
             v=list(map(int,re.search(r'VOICES ([\d -]+)',checked(voiceFormat))[1].split()))
             for c in range(4):
@@ -133,9 +180,10 @@ def main():
                     raise TimeoutError('bounded world-one route')
                 stop=checked('continue')
                 if 'downwellWorldOneComplete' in stop:
-                    checkSounds()
                     state=checked('printf "END %d %d %u %d %u\\n", $w->run_.stage.area,$w->run_.stage.level,$w->tick_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
                     print(state,flush=True)
+                    reportMemory()
+                    checkSounds()
                     if not re.search(r'END 2 1 '+str(len(tape))+r' [1-9]\d* \d+',state):
                         raise RuntimeError('wrong slice destination or route length')
                     checked('delete breakpoints')
@@ -155,6 +203,7 @@ def main():
                 if not m: raise RuntimeError(state)
                 scene,tick,area,level,hp,good,resultPending=map(int,m.groups())
                 sampleVoices(tick)
+                sampleMemory(tick,scene)
                 if scene!=oldScene:
                     oldScene=scene;sceneFrame=0
                 sceneFrame+=1
@@ -169,6 +218,7 @@ def main():
                     if deathSamples%50==0: print(notice,flush=True)
                     stage=int(re.search(r'NOTICE (-?\d+)',notice)[1])
                     if 330 in nativeStarts:
+                        reportMemory()
                         # Without a gem seed no goal is reached: the bar's
                         # completion sound (sfxUiRetry 330) ends the results.
                         checkSounds()
@@ -176,6 +226,7 @@ def main():
                         Path('.run/gdb-ready.marker').touch()
                         return
                     if stage>=3:
+                        reportMemory()
                         checkSounds()
                         for _ in range(20): checked('continue')
                         checked('delete breakpoints')

@@ -33,9 +33,6 @@ CLEAR_VERIFY ?= 0
 NATURAL_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
-ifneq ($(filter-out 0,$(TERRAIN_RUN_STORE)),)
-$(error TERRAIN_RUN_STORE was removed; use the default native terrain owner)
-endif
 REFERENCE_RANDOM ?= 0
 REFERENCE_BOX_RANDOM ?= 0
 REFERENCE_PATTERNS ?= 0
@@ -58,7 +55,9 @@ REFERENCE_CLEAR_HEADINGS ?= 0
 REFERENCE_CLEAR_MOTION ?= 0
 REFERENCE_ACTOR_PREFIX ?= 0
 REFERENCE_DRAW_LIST ?= 0
-REFERENCE_FRAME_WORK ?= 1
+# Parked section 0 D candidate (counted destruction results, empty-family
+# admission, packed row debts); 0 is the production path.
+FRAME_WORK_CANDIDATE ?= 0
 REFERENCE_VALIDATION ?= 0
 REFERENCE_ANIMATION ?= 0
 REFERENCE_GENERATED_BOXES ?= 0
@@ -68,7 +67,9 @@ REFERENCE_ROOM_PREPARE ?= 0
 # 1 selects the retained per-span terrain owners, the oracle for the
 # source-record owner (see "Source-record terrain owner" in the audit).
 REFERENCE_TERRAIN_RECORDS ?= 0
-REFERENCE_ROW_PAINTING ?= 1
+# Parked section 0 C candidate (prepared pattern rows, paint-ahead); 0 is
+# the production row painter.
+PREPARED_PATTERN_ROWS ?= 0
 REFERENCE_FIELD_BANK ?= 0
 REFERENCE_FIELD_ADMISSION ?= 0
 REFERENCE_ENTRY_ASSETS ?= 0
@@ -140,6 +141,9 @@ ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL)$(PROFILE_CONTACT)$(PROFILE
 $(error PROFILE_OVERFLOW requires ordinary autorun with SKIP_TO_GAME=1 and no other tape)
 endif
 endif
+endif
+ifneq ($(REFERENCE_FRAME_WORK)$(REFERENCE_ROW_PAINTING),)
+$(error REFERENCE_FRAME_WORK and REFERENCE_ROW_PAINTING were renamed: use FRAME_WORK_CANDIDATE=1 and PREPARED_PATTERN_ROWS=1 for the candidates)
 endif
 # Keep the measured default; allow controlled compiler comparisons.
 AMIGA_OPTIMIZATION ?= -O3
@@ -345,8 +349,8 @@ endif
 ifeq ($(REFERENCE_DRAW_LIST),1)
 CFLAGS += -DDOWNWELL_REFERENCE_DRAW_LIST
 endif
-ifeq ($(REFERENCE_FRAME_WORK),1)
-CFLAGS += -DDOWNWELL_REFERENCE_FRAME_WORK
+ifeq ($(FRAME_WORK_CANDIDATE),1)
+CFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE
 endif
 ifeq ($(REFERENCE_VALIDATION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_VALIDATION
@@ -423,7 +427,7 @@ endif
 ifeq ($(REFERENCE_ENEMY_UPDATES),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
 endif
-ifeq ($(REFERENCE_ROW_PAINTING),0)
+ifeq ($(PREPARED_PATTERN_ROWS),1)
 CFLAGS += -DDOWNWELL_PREPARED_PATTERN_ROWS
 endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
@@ -770,7 +774,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DRAW_LIST)' >> $@.tmp
-	@printf '%s\n' '$(REFERENCE_FRAME_WORK)' >> $@.tmp
+	@printf '%s\n' '$(FRAME_WORK_CANDIDATE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_VALIDATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_GENERATED_BOXES)' >> $@.tmp
@@ -786,7 +790,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER_STORAGE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_PREPARE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_TERRAIN_RECORDS)' >> $@.tmp
-	@printf '%s\n' '$(REFERENCE_ROW_PAINTING)' >> $@.tmp
+	@printf '%s\n' '$(PREPARED_PATTERN_ROWS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_ADMISSION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp
@@ -962,6 +966,21 @@ out/WindAudioProbe.elf: obj/WindAudioProbe.o obj/WindAudioProbeDriver.o obj/Amig
 	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/WindAudioProbe.map $^ -o $@
 
 out/WindAudioProbe.exe: out/WindAudioProbe.elf
+	elf2hunk $< $@ -s
+
+# WR.1 free-memory probe: the budget after boot on the selected machine.
+.PHONY: free-memory-probe
+free-memory-probe: out/FreeMemoryProbe.exe
+
+obj/FreeMemoryProbe.o: $(REPO)/tests/platform/amiga/FreeMemoryProbe.cpp
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+out/FreeMemoryProbe.elf: obj/FreeMemoryProbe.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/FreeMemoryProbe.map $^ -o $@
+
+out/FreeMemoryProbe.exe: out/FreeMemoryProbe.elf
 	elf2hunk $< $@ -s
 
 # W2.4 Paula mixer listening probe; does not replace the game executable.

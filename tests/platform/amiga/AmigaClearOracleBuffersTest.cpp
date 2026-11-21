@@ -6,7 +6,7 @@ static unsigned allocations=0,releases=0;
 static bool reject=false;
 static void* live=nullptr;
 void* AllocMem(std::size_t bytes,unsigned flags){
-    assert(!live&&bytes==AmigaClearOracleBuffers::bytes&&flags==(MEMF_FAST|MEMF_CLEAR));
+    assert(!live&&bytes==AmigaClearOracleBuffers::bytes&&flags==(MEMF_PUBLIC|MEMF_CLEAR));
     ++allocations;return reject?nullptr:(live=std::calloc(1,bytes));
 }
 void FreeMem(void* memory,std::size_t bytes){

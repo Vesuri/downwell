@@ -12,7 +12,7 @@ void AmigaGameplayRows::reset() {
         first_[buffer] = downwellGameRingHeight;
         end_[buffer] = 0;
     }
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     for (auto& row : dirty_) row = 3;
 #else
     for(auto& debt:debt_)debt.reset();
@@ -30,7 +30,7 @@ void AmigaGameplayRows::damage(unsigned origin, unsigned y, unsigned height, uns
         if (end > end_[buffer]) end_[buffer] = end;
     }
     unsigned physical = (origin + y) % downwellGameRingHeight;
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     for (unsigned row = 0; row < height; ++row) {
         dirty_[physical] |= buffers;
         if (++physical == downwellGameRingHeight) physical = 0;
@@ -48,7 +48,7 @@ void AmigaGameplayRows::damage(unsigned origin, unsigned y, unsigned height, uns
 }
 
 void AmigaGameplayRows::copied(unsigned first, unsigned count, unsigned buffer) {
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     const unsigned char keep = static_cast<unsigned char>(~(1u << buffer));
     for (unsigned row = first; row < first + count; ++row){
         dirty_[row] &= keep;
@@ -62,7 +62,7 @@ void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigne
     DW_PROFILE_SCOPE(profileGameCopy);
     if (!pending_[buffer]) return;
     pending_[buffer] = false;
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     const unsigned char bit = static_cast<unsigned char>(1u << buffer);
 #endif
     unsigned row = first_[buffer];
@@ -70,7 +70,7 @@ void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigne
     first_[buffer] = downwellGameRingHeight;
     end_[buffer] = 0;
     while (row < end) {
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
 #ifdef DOWNWELL_ROW_SYNC_AUDIT
         ++amigaRowSyncVisited;
 #endif

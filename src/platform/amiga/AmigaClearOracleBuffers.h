@@ -10,7 +10,7 @@ class AmigaClearOracleBuffers {
 public:
     static constexpr unsigned bytes=3*(downwellGameRingBytes+downwellLayerBytes);
     bool acquire(){
-        if(!bytes_)bytes_=static_cast<UBYTE*>(AllocMem(bytes,MEMF_FAST|MEMF_CLEAR));
+        if(!bytes_)bytes_=static_cast<UBYTE*>(AllocMem(bytes,MEMF_PUBLIC|MEMF_CLEAR));
         return bytes_!=nullptr;
     }
     void release(){if(bytes_){FreeMem(bytes_,bytes);bytes_=nullptr;}}

@@ -13,6 +13,8 @@ public:
     ~AmigaPlatform();
 
     bool available() const;
+    // Before takeover only: write a line to the starting shell's output.
+    void print(const char* text) const;
     bool takeover(const CopperList& firstCopper,
                   UWORD hStart, UWORD hStop,
                   UWORD vStart, UWORD vStop,

@@ -1,4 +1,4 @@
 #ifndef DOWNWELL_TEST_EXEC_MEMORY_H
 #define DOWNWELL_TEST_EXEC_MEMORY_H
-constexpr unsigned MEMF_FAST=4,MEMF_CLEAR=1u<<16;
+constexpr unsigned MEMF_PUBLIC=1,MEMF_CLEAR=1u<<16;
 #endif

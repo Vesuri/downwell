@@ -40,7 +40,7 @@ public:
     bool acquire(AmigaPlatform& platform){
         if(ready())return true;
         if(!collision_){
-            auto* allocation=AllocMem(sizeof(Owner::NativeCollisionStorage),MEMF_FAST);
+            auto* allocation=AllocMem(sizeof(Owner::NativeCollisionStorage),MEMF_PUBLIC);
             if(!allocation)return false;
             collision_=new(allocation) Owner::NativeCollisionStorage;
             if(!owner_.bindNativeCollisionStorage(*collision_))return false;
@@ -48,12 +48,12 @@ public:
             ++gDownwellEncounterRunLoads;
 #endif
         }
-        masks_=static_cast<UBYTE*>(AllocMem(DOWNWELL_ENCOUNTER_MASK_BYTES,MEMF_FAST));
+        masks_=static_cast<UBYTE*>(AllocMem(DOWNWELL_ENCOUNTER_MASK_BYTES,MEMF_PUBLIC));
         if(!masks_||platform.loadFile("PROGDIR:Downwell.encountermasks",masks_,
                 DOWNWELL_ENCOUNTER_MASK_BYTES)!=DOWNWELL_ENCOUNTER_MASK_BYTES){releaseScene();return false;}
         maskView_=downwell::SpriteMaskPack(masks_,DOWNWELL_ENCOUNTER_MASK_BYTES);
         if(!maskView_.valid()){releaseScene();return false;}
-        auto* allocation=AllocMem(sizeof(Environment),MEMF_FAST);
+        auto* allocation=AllocMem(sizeof(Environment),MEMF_PUBLIC);
         if(!allocation){releaseScene();return false;}
         environment_=new(allocation) Environment(world_,owner_,maskView_,audio_,Room{&world_});
 #if defined(DOWNWELL_RESULTS_RESTART_VERIFY) || defined(DOWNWELL_CLEAR_VERIFY)

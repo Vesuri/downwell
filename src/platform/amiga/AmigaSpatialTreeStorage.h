@@ -15,7 +15,7 @@ template<unsigned Nodes> class AmigaSpatialTreeStorage {
     static Tree* acquire(void* context){
         auto& self=*static_cast<AmigaSpatialTreeStorage*>(context);
         if(self.tree_)return nullptr; // One borrower, no implicit shared tree.
-        auto* memory=AllocMem(sizeof(Tree),MEMF_FAST);
+        auto* memory=AllocMem(sizeof(Tree),MEMF_PUBLIC);
         if(!memory)return nullptr;
         return self.tree_=new(memory) Tree;
     }

@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
 . "$FSUAE_COMMON"
+. ./machine.sh
 
 GDB="${GDB:-m68k-amiga-elf-gdb}"
 ROM="$KICKSTART"
@@ -15,12 +16,15 @@ READY_MARKER="${READY_MARKER:-DOWNWELL_MENU_SPRITE_READY}"
 READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-120}"
 VERIFY_STACK_BYTES="${VERIFY_STACK_BYTES:-8192}"
-VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-1024}"
 VERIFY_PROGRAM="${VERIFY_PROGRAM:-out/Downwell}"
-case "$VERIFY_CHIP_KB" in
-  512|1024) ;;
+# VERIFY_CHIP_KB=512 is the older spelling of MACHINE=a500-512k.
+case "${VERIFY_CHIP_KB:-}" in
+  '') ;;
+  512) MACHINE="${MACHINE:-a500-512k}" ;;
+  1024) MACHINE="${MACHINE:-a500}" ;;
   *) echo "VERIFY_CHIP_KB must be 512 or 1024"; exit 1 ;;
 esac
+downwell_machine || exit 1
 if ! [[ "$VERIFY_STACK_BYTES" =~ ^[1-9][0-9]*$ ]]; then
   echo "VERIFY_STACK_BYTES must be a positive integer" >&2
   exit 1
@@ -77,7 +81,7 @@ trap 'exit 143' TERM
 VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 
 # Quiet debug run (no sound, window behind the others): fsuae_options in $FSUAE_COMMON.
-KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB="$VERIFY_CHIP_KB" FAST_KB=8192 WARP=1 DEBUG=1
+KICKSTART="$ROM" WARP=1 DEBUG=1
 # VERIFY_AUDIO_FILE (an absolute path): record Paula's output instead, in
 # real time, as raw 16-bit stereo through SDL's disk driver, with UAE's
 # output filter and interpolation off and full stereo separation.
@@ -88,13 +92,10 @@ if [ -n "${VERIFY_AUDIO_FILE:-}" ]; then
   export SDL_AUDIODRIVER=disk SDL_DISKAUDIOFILE="$VERIFY_AUDIO_FILE"
   EXTRA_ARGS="${EXTRA_ARGS:-} --audio_driver=sdl --uae_sound_filter=off --uae_sound_interpol=none --uae_sound_stereo_separation=10"
 fi
-echo "A500 verification: Chip=${CHIP_KB} KiB Fast=${FAST_KB} KiB"
-# 1 MiB Chip is an A500 with the ECS 8372A Agnus; 512 KiB keeps the OCS one.
-VERIFY_CHIPSET=ocs
-[ "$VERIFY_CHIP_KB" = 1024 ] && VERIFY_CHIPSET=ecs_agnus
+echo "verification machine: $(downwell_machine_description)"
 fsuae_options
 FSUAE_LOG="$RUN/fsuae-startup.log" fsuae_launch \
-  --uae_chipset="$VERIFY_CHIPSET" \
+  --uae_chipset="$MACHINE_CHIPSET" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
   --remote_debugger_trigger=Downwell \
@@ -158,4 +159,4 @@ grep -q "^${READY_MARKER}$" "$RUN/gdb-startup.log" || {
   exit 1
 }
 
-echo "normal A500 ${READY_DESCRIPTION} passed"
+echo "$MACHINE ${READY_DESCRIPTION} passed"

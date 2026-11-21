@@ -1632,7 +1632,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const unsigned oldShots = player_.shots();
     const int ammoBeforeStep=player_.ammo(); // scrShotSound reads stammo before the charge is spent
     bool bulletChanged = false;
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     unsigned destroyedBlockCount = 0;
     int destroyedBlockX[destroyedCapacity] = {0};
     int destroyedBlockY[destroyedCapacity] = {0};
@@ -2245,11 +2245,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     trajectory_.addU64(checkpoint_);
 #endif
 
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
     if(run_.shops.allocatedCount)
 #endif
         run_.shops.endStep(34 + downwell::floorQ8Coordinate(generationCameraY));
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     GameplayFrame frame = {};
 #endif
     // parentTimeField/goalTimeField/startTimeField Draw: no radius draw
@@ -2278,7 +2278,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         destroyedBlockY[destroyedBlockCount++]=sceneryRepaintY_[i];
     }
     sceneryRepaintCount_=0;
-#ifdef DOWNWELL_REFERENCE_FRAME_WORK
+#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     frame.destroyedBlockCount = destroyedBlockCount;
     for (unsigned index = 0; index < destroyedBlockCount; ++index) {
         frame.blockX[index] = destroyedBlockX[index];

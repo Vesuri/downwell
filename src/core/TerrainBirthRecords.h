@@ -68,11 +68,7 @@ public:
     unsigned size()const{return population_;}
     unsigned sourcePublicationCount()const{return published_;}
     bool canAppend(InstanceHandle first,unsigned count)const{
-#ifdef DOWNWELL_REFERENCE_SOURCE_ADMISSION_SCAN
-        return canAppendReference(first,count);
-#else
         return canAppendImpl<false>(first,count);
-#endif
     }
     bool canAppendReference(InstanceHandle first,unsigned count)const{
         return canAppendImpl<true>(first,count);

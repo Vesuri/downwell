@@ -548,7 +548,6 @@ private:
                 out=(out&~0xc208u)|(state->appearanceFlags&0xc208u);return true;
             }
             if(world_&&world_->nativeTerrainInstances()){
-#ifndef DOWNWELL_REFERENCE_TERRAIN_ELIGIBILITY
                 if(h.slot<View::terrainBase||h.slot>=View::timeFieldBase)return false;
                 GameplayWorld::NativeTerrain::EligibilityRead read;
                 if(!world_->nativeTerrainInstances()->readEligibility({h.slot-View::terrainBase,h.generation},read))return false;
@@ -556,17 +555,6 @@ private:
                 const bool registered=read.sourceOwned?read.sourceRoomActive:
                     (collisionConsumersAdmitted_||read.object==93)?table_.externalRegistered(h):room_.active(h.slot);
                 out=(definition->initialFlags&~8u)|read.spatial|(registered?0u:0x80000u);return true;
-#else
-                GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
-                if(View(*world_).readTerrain(h,id,active,destroyed)){
-                    const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
-                    std::uint32_t spatial;
-                    if(!world_->nativeTerrainInstances()->spatialFlags(id.handle,spatial))return false;
-                    const bool sourceOwned=world_->nativeTerrainInstances()->sourceOwned(id.handle);
-                    out=(definition->initialFlags&~8u)|spatial|
-                        (((collisionConsumersAdmitted_||id.object==93)&&!sourceOwned?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
-                }
-#endif
             }
             return false;
         }
@@ -752,9 +740,7 @@ private:
             const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
             RunnerImageValue cosine{},sine{};
             if(rotated){
-#ifndef DOWNWELL_REFERENCE_ACTOR_BOUNDS_TRIG
                 if(!PreparedActorBoundsTrig::at(sprite.angle,cosine,sine))
-#endif
                 {
                 RunnerImageValue radians;MotionBinary64 c,s;
                 if(!SmokeDirection::radians(sprite.angle,radians)||!smokeTrig(radians.promoted(),c,s)||
@@ -892,7 +878,6 @@ private:
         return check(okay&&recorded);
     }
     bool nativeCollisionVisual(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
-#ifndef DOWNWELL_REFERENCE_COLLISION_VISUAL
         if(native_&&h.slot>=View::terrainBase&&h.slot<View::timeFieldBase&&!wallQuery_){
             DW_PROFILE_COUNT(counterCachedCollisionReads);
             if(!check(collisionConsumersAdmitted_)||!world_||!world_->nativeTerrainInstances())return false;
@@ -910,7 +895,6 @@ private:
             sprite.spriteId=read.sprite==-2?definition->spriteId:read.sprite;sprite.maskId=definition->maskId;
             return sprite.imageIndex.assignInteger(read.imageIndex);
         }
-#endif
         return nativeCollisionVisualReference(h,state,sprite);
     }
     bool nativeCollisionVisualReference(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
@@ -2086,7 +2070,6 @@ public:
                 if(!world_||!world_->nativeTerrainInstances())return false;
                 const auto* terrain=world_->nativeTerrainInstances();
                 const InstanceHandle local{h.slot-View::terrainBase,h.generation};
-#ifndef DOWNWELL_REFERENCE_COLLECTION_TERRAIN_READS
                 // One synchronous owner read supplies the same cached geometry.
                 // Do not retain this across flush/query callbacks or mutations.
                 GameplayWorld::NativeTerrain::CollisionRead read;
@@ -2094,12 +2077,6 @@ public:
                 bool found,precise;RunnerImageValue x,y;
                 return nativeTerrainCachedBounds(read.identity,x,y,bounds,found,precise,
                     read.cachedSprite,read.cacheX,read.cacheY);
-#else
-                GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,found,precise;int cached;
-                RunnerImageValue x,y;
-                return terrain->read(local,id,active,destroyed)&&terrain->cachedSprite(local,cached)&&
-                    nativeTerrainCachedBounds(id,x,y,bounds,found,precise,cached);
-#endif
             },
             [&](Owner::Box box,auto visit){
 #ifdef DOWNWELL_COLLISION_QUERY_CENSUS
@@ -2910,7 +2887,7 @@ public:
             DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid()||self.combatAlarmPhaseInUse_||self.actorEndStepExecuting_)return self.check(false);
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
             // A retained player-only projection proves that no other captured
             // handler can arm an alarm. Test that admission before acquiring
             // phase workspaces/roster leases. Birth/registration changes dirty
@@ -5529,11 +5506,7 @@ private:
             }
             unregisteredTerrainCleanup_=false;
         }
-#ifdef DOWNWELL_REFERENCE_TYPED_TERRAIN_CLEANUP
-        return cleanupDestroyed([&](InstanceHandle shared,const View::Record& record){
-#else
         return cleanupDestroyed<true>([&](InstanceHandle shared,const View::Record& record){
-#endif
             View::Kind kind;InstanceHandle local;
             if(!View::decode(shared,kind,local))return false;
             switch(kind){

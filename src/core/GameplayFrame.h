@@ -14,7 +14,7 @@ struct GameplayFrame {
     unsigned destroyedBlockCount;
     int blockX[downwell::gameplayRepaintCapacity];
     int blockY[downwell::gameplayRepaintCapacity];
-#ifndef DOWNWELL_REFERENCE_FRAME_WORK
+#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
     GameplayFrame():playerMotion{},ammoChanged(false),healthChanged(false),currencyChanged(false),
         streakChanged(false),bulletChanged(false),scrolled(false),scrollDelta(0),
         cameraXChanged(false),cameraXDelta(0),destroyedBlockCount(0){}

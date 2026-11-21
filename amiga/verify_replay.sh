@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
 . "$FSUAE_COMMON"
+. ./machine.sh
 
 GDB="${GDB:-m68k-amiga-elf-gdb}"
 ROM="$KICKSTART"
@@ -53,11 +54,11 @@ trap cleanup EXIT INT TERM
 VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 
 # Quiet debug run (no sound, window behind the others): fsuae_options in $FSUAE_COMMON.
-# The target A500 has 1 MiB Chip behind the ECS 8372A Agnus.
-KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB=1024 FAST_KB=8192 WARP=1 DEBUG=1
+downwell_machine || exit 1
+KICKSTART="$ROM" WARP=1 DEBUG=1
 fsuae_options
 FSUAE_LOG="$RUN/fsuae-replay.log" fsuae_launch \
-  --uae_chipset=ecs_agnus \
+  --uae_chipset="$MACHINE_CHIPSET" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
   --remote_debugger_trigger=Downwell \

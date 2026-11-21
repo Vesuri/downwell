@@ -136,7 +136,7 @@ bool AmigaMemory::acquireFieldColumns(ULONG bytes)
 {
     if (!bytes) return false;
     if (fieldColumns_) return fieldColumnBytes_ == bytes;
-    fieldColumns_ = (UBYTE*)AllocMem(bytes, MEMF_FAST);
+    fieldColumns_ = (UBYTE*)AllocMem(bytes, MEMF_PUBLIC);
     fieldColumnBytes_ = fieldColumns_ ? bytes : 0;
     return fieldColumns_ != 0;
 }
@@ -152,8 +152,8 @@ bool AmigaMemory::acquireGameCatalogue(ULONG bytes)
 {
     if (!bytes) return false;
     if (gameCatalogue_) return gameCatalogueBytes_ == bytes;
-    // CPU-only art must never fall back into the DMA budget.
-    gameCatalogue_ = (UBYTE*)AllocMem(bytes, MEMF_FAST);
+    // CPU-only art: Fast when present; on an unexpanded A1200 it is Chip.
+    gameCatalogue_ = (UBYTE*)AllocMem(bytes, MEMF_PUBLIC);
     gameCatalogueBytes_ = gameCatalogue_ ? bytes : 0;
     return gameCatalogue_ != 0;
 }
@@ -169,7 +169,7 @@ bool AmigaMemory::acquireBuilderPatterns(ULONG bytes)
 {
     if (!bytes) return false;
     if (builderPatterns_) return builderPatternBytes_ == bytes;
-    builderPatterns_ = (UBYTE*)AllocMem(bytes, MEMF_FAST);
+    builderPatterns_ = (UBYTE*)AllocMem(bytes, MEMF_PUBLIC);
     builderPatternBytes_ = builderPatterns_ ? bytes : 0;
     return builderPatterns_ != 0;
 }
@@ -187,7 +187,7 @@ bool AmigaMemory::acquireTerrainRaster(ULONG bytes)
     if (terrainRaster_) return terrainRasterBytes_ == bytes;
     // Untouched clean rows historically read the zero-filled BSS image.
     // Preserve that contract once per lease, never as a per-frame clear.
-    terrainRaster_ = (UBYTE*)AllocMem(bytes, MEMF_FAST | MEMF_CLEAR);
+    terrainRaster_ = (UBYTE*)AllocMem(bytes, MEMF_PUBLIC | MEMF_CLEAR);
     terrainRasterBytes_ = terrainRaster_ ? bytes : 0;
     return terrainRaster_ != 0;
 }

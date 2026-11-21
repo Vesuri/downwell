@@ -73,17 +73,11 @@ public:
         });
     }
     template<class Visit> bool visitMarkedSourceRoomStates(Visit visit)const{
-#ifdef DOWNWELL_REFERENCE_SOURCE_CLEANUP_SCAN
-        return visitSourceRoomStates([&](unsigned slot,const RunnerRoomOrderState& room){
-            return room.list<0||!room.marked||visit(slot,room);
-        });
-#else
         // Initial source room state is never marked. Only the changed cell
         // can own a cleanup mark; do not reconstruct every source birth.
         return sources_.visitMutations([&](unsigned slot,const Cell& cell){
             return cell.room.list<0||!cell.room.marked||visit(slot,cell.room);
         });
-#endif
     }
     unsigned size()const{return Base::size()+sources_.size();}
     unsigned runCount()const{return Base::runCount()+sources_.runCount();}
@@ -181,16 +175,12 @@ public:
         Cursor cursor(*this);Identity id;while(cursor.take(id))if(!visit(id))return false;return true;
     }
     template<class Visit> bool visitRows(int first,int end,Visit visit)const{
-#ifdef DOWNWELL_REFERENCE_SOURCE_ROW_SCAN
-        return visitRowsReference(first,end,visit);
-#else
         if(first>=end)return true;
         // Reject whole source/retained runs before expanding identities, then
         // merge the remaining cursors in the same immutable birth order.
         SelectedCursor<true> cursor(*this,first,end);Identity id;
         while(cursor.take(id))if(!visit(id))return false;
         return true;
-#endif
     }
     template<class Visit> bool visitRowsReference(int first,int end,Visit visit)const{
         if(first>=end)return true;
