@@ -1,11 +1,39 @@
 # Amiga memory budget
 
-The CPU target is an A500/68000 with 1 MiB Chip RAM behind the ECS 8372A
-Agnus. The launchers add 8 MiB Fast RAM at `$200000`; that Fast size remains
-a development configuration, not a final memory requirement. Exec labels any
-slow RAM at `$C00000` `MEMF_FAST` as well, although its bus timing differs.
-Measurements below that predate the 1 MiB target were taken with 512 KiB Chip
-(OCS Agnus); `VERIFY_CHIP_KB=512` reproduces that machine.
+The target is an unexpanded A1200: 2 MiB Chip and no Fast RAM, so the
+executable's hunks, its BSS and every allocation share one pool. Only DMA
+data asks for `MEMF_CHIP`; everything else asks for `MEMF_PUBLIC` and uses
+Fast when present. The verification machine is still an A500 with 1 MiB
+Chip and 8 MiB Fast at `$200000` (`amiga/machine.sh`: `MACHINE=a500`, the
+default until the game fits, and `MACHINE=a1200`), which proves the
+placement. Exec labels any slow RAM at `$C00000` `MEMF_FAST` as well,
+although its bus timing differs.
+
+## Target budget
+
+Measured 2026-11-21 on the shipping build (`-Os` with hot paths at `-O2`,
+terrain raster ring, no source terrain records, no sparse field reference).
+An unexpanded A1200 booted to a shell has 1,963,176 bytes free (largest
+block 1,954,856; `make -C amiga free-memory-probe`).
+
+| Part | Bytes | Largest items |
+| --- | ---: | --- |
+| Loaded code and data | ~1,062,000 | `.text` 667,336, `.rodata` 321,068 (factored ammo tables about 100 KB), `.data` 73,970 |
+| BSS | 727,816 | `portRuntimeStorage` (`GameplayWorld`) 221,388, `nativeTerrainStorage` 145,888, `terrainIndex` 76,814, `actorFrames` 46,932, `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002 |
+| Public allocations (peak) | 676,672 | cavern CPU bank + entry mask 399,902, terrain raster 135,168, field columns 70,816, builder patterns 70,779 |
+| Chip allocations (gameplay) | ~960,000 | run sound bank 410,262, cavern plane atlas 175,094, linked Chip assets 167,266, menu planes 76,800, scene cache 66,704, game ring 30,720, HUD 27,264 |
+| Total | ~3,427,000 | about 1.46 MB over the target |
+
+The banks (sound, cavern CPU and plane art, linked Chip assets, menu planes)
+are about 1.23 MB; the rest, about 2.2 MB, is already more than the machine
+has. Fitting needs both: smaller code, BSS and buffers, and smaller banks.
+
+`amiga/probe_allocations.gdb` lists every exec `AllocMem`/`FreeMem` with its
+caller; `DOWNWELL_MEMORY_SAMPLE=1` on `tools/verify-world-one-native.py`
+reports the route's low-water marks; `tools/amiga-size-report.py` attributes
+sections to symbols and classes. The startup requirement
+(`downwellChipRequirement`, `downwellPublicRequirement`) comes from the
+route's peak use.
 
 ## Native terrain identities
 
@@ -48,7 +76,8 @@ pending/unpublished births are excluded. With no inactive entries, Draw cutoff
 queries return without walking terrain. The retained-run traversal remains the
 test oracle for earliest-key and interval queries.
 
-`nativeTerrainStorage` reserves 145,798 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 145,888 bytes of ordinary BSS on the 68000
+(412,184 with the source records that only collision-owner builds bind),
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded

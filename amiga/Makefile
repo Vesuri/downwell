@@ -1340,10 +1340,10 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 # WR.2 shipping size gate: `make size-gate STRIP=1` on the default
 # configuration. Ceilings sit just above the current build; lower them as
 # WR shrinks it. Verify, probe and profile builds are not shipping builds.
-SIZE_MAX_EXE ?= 1150000
-SIZE_MAX_TEXT ?= 690000
-SIZE_MAX_DATA ?= 425000
-SIZE_MAX_BSS ?= 1280000
+SIZE_MAX_EXE ?= 1110000
+SIZE_MAX_TEXT ?= 675000
+SIZE_MAX_DATA ?= 400000
+SIZE_MAX_BSS ?= 735000
 .PHONY: size-gate
 size-gate: $(OUT).exe
 	@if [ '$(STRIP)' != 1 ]; then echo "*** size-gate measures the stripped executable: use STRIP=1"; exit 1; fi

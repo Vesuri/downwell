@@ -1,73 +1,64 @@
 # Amiga backend
 
-Performance measurements: see `docs/amiga-profiling.md`. From the repository
-root, run `bash amiga/profile.sh fps` for lightweight frame-rate measurement
-or `bash amiga/profile.sh probes` for per-stage milliseconds. Runs are bounded
-and automatically restore the normal executable.
+The native Amiga port of the shared game in `src/core`. The target is an
+unexpanded A1200 (68EC020, AGA, 2 MiB Chip, no Fast RAM); the code stays
+68000-compatible, and the game starts on any Amiga with enough Chip memory
+for its DMA data and enough public memory for everything else
+(`downwellMemoryFits` checks both with `AvailMem` before allocating).
+Memory figures and the remaining budget: `docs/amiga-memory.md`. Unfinished
+work: `docs/open-work.md` (W and WR).
 
-This directory will contain the native Amiga implementation of the platform
-boundary used by `src/core`.
+## Status
 
-The display is specified in `docs/amiga-display.md`: a 380x284 visible canvas
-on a 384-pixel DMA backing raster, with PF1 assigned to the centred game well
-and PF2 assigned to the HUD and side panels.
+The normal build plays world 1: boot, splash, garden and style select, the
+three cavern levels with their shops, upgrades, results and level clears,
+the full HUD, the world-1 enemy families, Paula sound effects from scene
+banks and the hard-mode unlock. It reproduces the host's world-one route
+exactly (`tools/verify-world-one-native.py`: `END 2 1 8275 1 265269`).
+It does not fit the target machine yet; the verification machine is an
+A500 with 1 MiB Chip and 8 MiB Fast (`amiga/machine.sh`).
 
-The target uses the reusable dA JoRMaS Amiga framework layer: hardware access,
-bitmap views, copper lists, palettes, sprites, utilities, GCC runtime support,
-and a Rescue-style platform takeover/restore shell. Downwell keeps its own game
-runtime and memory layout; the demo-production timeline, `Part` hierarchy, and
-tracker player are applications of the framework rather than platform services.
-Provenance and the deliberate adaptations are tracked in `UPSTREAM.md`.
-As in Rescue on Fractalus, scene-specific copper-list classes own the gameplay,
-menu, and splash register programs; the main loop only builds and publishes the
-appropriate typed list.
+## Structure
 
-`AmigaRenderer` mirrors the important state transition in the shared renderer
-contract: setting a clip rectangle selects PF1 and limits game drawing to the
-central well; clearing the clip selects PF2 and restores the full 380x284 HUD
-canvas. Its drawing coordinates map directly to pixels 0..379 of each
-384-pixel-wide bitplane. The hardware fetch presents logical pixels 16..367:
-each bitplane pointer skips the first two bytes, a four-byte modulo skips the
-two bytes at each row's far edge, and `$30..$d8` fetches the intervening 22
-words. The backing geometry remains 384 pixels wide for direct host-to-Amiga
-coordinate mapping.
+- `DownwellAmiga.cpp`: startup, the memory check, scene sequencing and the
+  gameplay loop (`runDownwell`).
+- `framework/`: the shared JoRMaS layer (hardware, bitmaps, copper lists,
+  palettes, sprites, memory, platform takeover and restore; `UPSTREAM.md`).
+- Gameplay: `AmigaPortRuntime` is the shared `GameplayWorld`; the shipping
+  build runs it without the runner emulation (`UnownedEncounterSession`).
+  `AmigaGameplayGeneration` drives the area-one builder, and
+  `AmigaGameplayDrawList` collects actors in GameMaker's layer order for
+  `AmigaGameplayActors` (hardware sprites and blitter bobs).
+- Terrain: `AmigaTerrainPainter` composes rows, mostly from prepared
+  pattern pieces (`AmigaTerrainPrepared.s`, `AmigaPatternTransfer.s`), into
+  `AmigaTerrainRaster`, a 1,024-row ring per column in ordinary memory.
+  `AmigaGameplayRows` copies exposed rows into the Chip display rings.
+- Scenes: garden, style, upgrade, shop, pause, results and clear scenes,
+  each with its own copper list (`DownwellCopperLists`) and scene bank.
+- HUD: health, ammo, gems, timer and level titles compose on PF2 from
+  prepared tables.
+- Audio: `AmigaPaulaAudio` mixes requests from the run's sound ring onto
+  the four Paula channels; `AmigaSoundBanks` loads each scene's samples.
+- Banks: art and sound are `out/Downwell.*` files read whole per scene,
+  not linked into the executable.
 
-The current executable displays recovered area-one wall art on a 320-line
-circular PF1, the recovered 4:3 HUD on the fixed PF2, and the player on hardware
-sprite channel 0 in both the garden and gameplay. The garden foreground and
-background are precomposed into independent static bitplanes and moved by
-bitplane pointers and BPLCON1 while the player wakes above them. The vertical
-well-entry shaft is likewise a cached bitplane addressed directly by its camera
-position. It embeds and validates the recovered room, object/event, and
-builder-pattern packs with the same endian-safe readers as the SDL reference.
-The player alternates between recovered idle and air frames to make paired
-copper-list and sprite-pointer swaps visible. Port-1 joystick motion drives a
-small allocation-free 8.8 fixed-point player state: left/right accelerate and
-decelerate, the fire button jumps from the grounded state, releasing it shortens
-the jump, and later airborne press edges consume gunboot charge and add recoil.
-Landing restores all eight charges. This is the first target-specialized
-replacement for the host reference's floating-point GameMaker values. An
-airborne press emits a bounded downward bullet on a shared actor sprite
-channel and redraws both the side-panel ammo digit and its bottom-up vertical
-meter; channel 0 remains dedicated to the player. Collected physical gems also
-update the recovered 300-frame streak overlay on the fixed HUD playfield.
+## Builds
 
-Its machine lifecycle is owned by the shared-style `AmigaPlatform` class and
-follows Rescue on Fractalus: allocation and the two
-`WaitTOF()` calls which retire the Workbench display happen before takeover;
-the live program owns the raw VERTB vector, forbids multitasking, and waits on
-its own interrupt counter. The platform publishes completed copper programs
-through `AmigaHardware::setCopperList(list, false)`; hardware restarts them at
-the next VBlank. The interrupt handler only acknowledges VERTB and advances
-the counter. Each scene finishes its frame before another scene can publish.
-Teardown stops
-the display, restores `graphics.library`'s startup copper and the saved
-interrupt/DMA state, permits multitasking, and only then restores the View.
-It exits back to Workbench on a fresh left-mouse click.
+`cd amiga && . ./env.sh && make` builds the shipping configuration: `-Os`
+with the per-update hot paths at `-O2` (`AMIGA_HOT_OBJECTS`), no verify,
+probe or profile code. `make size-gate STRIP=1` checks its size. Verify
+builds (`*_VERIFY=1`), `COLLISION_OWNER=1` (the owned reference),
+`PROFILE_*`, `PROBES`, `FPSCOUNT` and `TRACE_FRAMES` are opt-ins for the
+gates and tools that need them. Measurement recipes: `docs/amiga-profiling.md`
+(`bash amiga/profile.sh quiet-fall`, `quiet-window`, `trace`, ...).
+`amiga/probe_allocations.gdb` lists every exec allocation with its caller.
 
-PAL timing is intentionally direct: one simulation step will run per 50 Hz
-VERTB. There is no 60-to-50 Hz catch-up scheduler, so the preserved per-step
-game behavior runs at five-sixths of the Windows version's wall-clock speed.
+The display is specified in `docs/amiga-display.md`: a 380x284 canvas on a
+384-pixel DMA backing raster, PF1 for the well and PF2 for the HUD and side
+panels. PAL timing is direct: one simulation step per 50 Hz VERTB, so the
+game runs at five-sixths of the Windows version's wall-clock speed.
+
+## Verifiers
 
 `make verify-cross-replay` replaces joystick sampling only in a temporary
 verification build, executes the shared 64-frame replay on an emulated A500,

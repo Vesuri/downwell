@@ -57,10 +57,11 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
   Amiga build on a natural route. Record the route (seed, input, build flags)
   and the native check in the commit. Helper-only or test-only commits do not
   close an item. The host route search (`DOWNWELL_VERIFY_WORLD_ONE_SLICE`)
-  binds the shipping collision owner and encounter session: without it,
-  same-object enemies step in activation-slot order instead of registration
-  order and the native replay drifts.
-  `tools/verify-world-one-native.py` replays the tape on the normal build;
+  binds the collision owner and encounter session; the shipping build runs
+  without them and must reproduce the same routes (`make
+  test-world-one-ownership` compares witnesses, sounds and draw lists on
+  all eight slice routes; `COLLISION_OWNER=1` builds the owned Amiga
+  reference). `tools/verify-world-one-native.py` replays the tape on the normal build;
   `DOWNWELL_DENSE_CHECK=from,to` checks every tick in a window.
 - **One item at a time,** in the listed order unless a dependency forces
   otherwise. Attach any newly discovered prerequisite to an existing item.
@@ -492,88 +493,61 @@ planes' ceiling is now 177 KiB.
 
 ### WR. Restructure for world 1
 
-The shipping executable is 2,161,412 bytes (2,031,936 stripped) and must
-shrink to fit the target machine: only world 1's code, no debug, reference
-or verify code, as small as possible, with W3 making it as fast as possible. Measured on 2026-11-21
-(`-O3`, `STRIP=1`, attributed to the defining class from `objdump -t -C`):
+The shipping executable must fit the target machine with only world 1's
+code and no debug, reference or verify code. Done so far: the A1200 and
+A500 machine configurations, DMA-only Chip placement and the startup memory
+check (WR.1); renamed candidates, dead reference macros removed and the
+size gate (WR.2); `-Os` with the hot paths at `-O2` (WR.3); the shipping
+build without the runner emulation and the terrain raster ring (WR.5);
+source terrain records only in owner builds, no sparse time-field
+reference, pooled actor frame parts, a 32-column breakable grid and a
+one-slot wall tile store on freestanding targets. At `-Os` the later-world
+code and the identical clones are already almost gone (skeleton code 302
+bytes, duplicate bodies 358 bytes).
 
-- `.text` 1,547,906, `.rodata` 350,564 (prepared ammo HUD, currency and
-  field tables), `.data` 67,836; `.bss` 2,173,844 (RAM, not file).
-- The runner emulation is about 605 KB of code (36%):
-  `RecordLifecycleBinding` 245 KB (409 per-family `bind` instantiations of
-  1.3-3 KB), `GameplayCollisionOwner` 241 KB, and about 120 KB of
-  `RunnerSpatialIndex`, `RunnerLogicalLayerOrder`, `RunnerLayerLifetimes`,
-  `RunnerSourceRoomMembership`, `NativeTerrainLifetimes`,
-  `GameplayCollisionView` and `GameplayRoomLayers`. It also owns 1.3 MB of
-  the `.bss` (`collisionStorage` 898 KB, `nativeTerrainStorage` 412 KB).
-- `GameplayWorld` 295 KB, `runDownwell` 63 KB, then the draw list, run
-  session, upgrade scene, HUDs and painter at 10-40 KB each.
-- Skeleton and bone code (later worlds) links 39 KB. Identical LTO clones
-  waste about 27 KB (`MotionBinary64::fromInteger` six times). The
-  source-exact binary64 arithmetic is about 6 KB: not worth touching.
-- Optimisation alone: `.text` is 1,289,782 at `-O2` and 713,236 at `-Os`
-  (stripped executable 1.19 MB). The `-Os` build does not link as-is:
-  `SaveFile::Writer::real`'s 64-bit shift becomes a `__lshrdi3` call (the
-  64-bit helper audit forbids it); the measurement stubbed it.
+**Budget** (`docs/amiga-memory.md`, 2026-11-21): the footprint is about
+3.43 MB against 1,963,176 bytes free on the unexpanded A1200: about
+1.06 MB of loaded code and data, 0.73 MB of BSS, 0.68 MB of public
+allocations and 0.96 MB of Chip. It must shrink by about 1.46 MB plus
+margin. The banks alone are about 1.23 MB and everything else about
+2.2 MB, so both must shrink. `MACHINE=a500` stays the gates' default until
+it fits.
 
-**Target:** the whole footprint fits an unexpanded A1200 booted to a shell,
-with margin: the loaded code and data, `.bss`, stack, Chip banks and display
-buffers. Today it is far over: about 2 MB of loaded hunks plus 2.17 MB of
-`.bss` (both in Fast on the verification machine) plus up to about 950 KB of
-Chip in gameplay. The interim aim is a stripped executable of at most 1 MB
-after WR.2-WR.4; WR.5 is required to fit, since the runner emulation alone
-holds 1.3 MB of RAM.
+1. **Shrink the BSS** (727,816 bytes), largest first:
+   - `GameplayWorld` 221,388: `breakables_` 46,080 (96-byte records; peak
+     149 of 512), `RunSession` about 22 KB, `scenery_` 22,288 (torch fires
+     14,848), `enemies_` 18,304 (304-byte records; peak 51 of 64),
+     `ownedDebrisEffects_` 8,716, `boxRewards_` 8,192, `gems_` 7,680 (peak
+     28 of 64), `steering_` 7,872. Lower a capacity only with a bound that
+     covers every world-1 level, not route peaks alone: overflow fails the
+     run. Narrower records (the 32-byte `SoundPlayState` per box) are safe.
+   - `nativeTerrainStorage` 145,888: runs sized for 2,048 cells; native
+     peaks 950 runs and 1,257 cells (`DOWNWELL_TERRAIN_SAMPLE=1`).
+   - `terrainIndex` 76,814: 128 x 512 byte cells over index x -512..1536;
+     objects only ever land at x 16..464. Narrowing it changes the
+     generated room plan (`amiga-room-terrain-plan.inc` bakes cell numbers;
+     `AmigaRoomTerrainPlan` asserts the geometry), the landing index's
+     128-column rows and the painter's column clamps.
+   - `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002.
+2. **Shrink the banks.** The run sound bank (410,262 Chip), the cavern CPU
+   bank (368,798 public) beside its 175,094-byte plane atlas, the 167,266
+   bytes of linked Chip assets and the 76,800-byte menu planes. Decide with
+   the user before reducing sample rates or art formats.
+3. **Code** (667,336 `.text`, 321,068 `.rodata`): `GameplayWorld` 214 KB, `runDownwell` and
+   free functions 99 KB, the draw list 33 KB, `RunSession` 27 KB.
+4. **Build profiles (rest of WR.2).** Move `*_VERIFY` and oracle code out of
+   the shipping sources (`DownwellAmiga.cpp` has about 280 conditionals) and
+   group the Amiga knobs into shipping, development, verify, profile and
+   reference sets. The shipping build already compiles them out; 56 GDB
+   hook variables (244 bytes) remain in it.
+5. **World-1 manifest (WR.4).** One manifest (areas, rooms, families,
+   upgrades, builders, banks) drives the admission points and a map-file
+   gate beside `audit` that fails when code outside it links.
+6. When it fits: lower the size-gate ceilings, switch
+   `DOWNWELL_DEFAULT_MACHINE` to a1200 and rerun every native gate there.
 
-1. **Target machine and memory placement.** Add an unexpanded A1200
-   configuration (A1200, Kickstart 3.x, 2 MB Chip, no Fast) to the launchers
-   and native gates, keeping a configuration with Fast RAM to prove
-   placement. Measure the free memory after boot on the unexpanded A1200:
-   that is the budget. Only DMA data (bitplanes, sprites, blitter sources,
-   Paula samples, copper lists) is allocated in Chip; everything else, the
-   hunks included, uses public memory, so Fast is used when present. At
-   startup, check the Chip and public requirements (largest blocks
-   included) with `AvailMem` before allocating, and refuse with a message
-   naming what is missing.
-2. **Build profiles.** Shipping: stripped, no trace hooks, no reference paths
-   and no debug code. A development build identical to shipping except for
-   the GDB hook surface the native routes read, so the routes still verify
-   shipping code. Verify, profile and reference builds stay separate
-   opt-ins: move `*_VERIFY` and oracle code out of the shipping sources
-   (`DownwellAmiga.cpp` has 281 conditionals) and group the Amiga build
-   knobs into shipping, development, verify, profile and reference sets.
-   Resolve the defaults that are on today: `REPLAY_FRAME_TRACE=1`,
-   `REFERENCE_FRAME_WORK=1` and `REFERENCE_ROW_PAINTING=1` (switch each off,
-   or rename it if it is the production path). Remove the `#if` tests of
-   `REFERENCE_*` macros nothing defines (`REFERENCE_ACTOR_BOUNDS_TRIG`,
-   `REFERENCE_COLLECTION_TERRAIN_READS`, `REFERENCE_COLLISION_VISUAL`,
-   `REFERENCE_JOURNAL_GEOMETRY_DECODE`,
-   `REFERENCE_SOURCE_{ADMISSION,CLEANUP,ROW}_SCAN`,
-   `REFERENCE_TERRAIN_ELIGIBILITY`, `REFERENCE_TYPED_TERRAIN_CLEANUP`) and
-   the `TERRAIN_RUN_STORE` stub, after confirming each is dead. Gate: a size
-   check on the shipping build beside `audit`.
-3. **`-Os` by default, speed only where it pays.** Fix the `__lshrdi3` use
-   first. Mark the measured hot paths (terrain painting, the actor draw
-   list, collision queries, the mixer and whatever the native profile
-   shows) for `-O2`/`-O3` per function, so it works under LTO. Choose them
-   from the native profile and judge them on W3's workloads: quiet-fall, the
-   world-one route and the worst frames, against the `-O3` build.
-4. **Link only world 1.** One world-1 manifest (areas, rooms, families,
-   upgrades, builders, banks) drives the existing admission points
-   (`AmigaGameplayAssetAdmission`, `RUNTIME_ROOMS`, `CAVERN_ROOTS`, family
-   storage) and decides what is compiled into the shipping link: the
-   skeleton and bone families, the catacomb builder pieces and the scene
-   collision backend drop out without moving files. A map-file gate beside
-   `audit` fails when code outside the manifest links.
-5. **Replace the runner emulation with world-1 ownership (with W3).** World 1
-   uses a fraction of what `GameplayCollisionOwner` and its bindings emulate.
-   Replace them with compact world-1 owners, removing most of the 605 KB of
-   code and 1.3 MB of RAM along with their per-update work. The new owners
-   must reproduce registration step order: the world-one native replay must
-   still end `END 2 1 8275 1 265269` and every sound route must pass.
-6. **Smaller items.** Fold identical clones and the duplicated
-   complete/base constructors (`GameplayWorld`'s is 14.5 KB twice), and
-   replace the stale `src/platform/amiga/README.md` with the current
-   structure and feature status.
+Pre-existing gate failure: `make verify-amiga-gameplay-cache` reports
+`raster=64 checks=156` (also before the raster ring).
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
@@ -1601,9 +1575,9 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 7. Establish memory fit and failure handling
 
-- Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
-  Establish the target machine's memory requirement (WR.1); expanded-emulator
-  runs do not prove stock-machine fit. Size the shop speech overlap reserve against repeated
+- Measure the task stack and peak transition usage (the gameplay footprint
+  and the startup requirement are in WR and `docs/amiga-memory.md`);
+  expanded-emulator runs do not prove stock-machine fit. Size the shop speech overlap reserve against repeated
   messages within the nested parent Step, not just one replacement per parent.
 - Budget further Chip residency against the measured 20,272-byte cavern
   minimum free space (126,840 bytes before gameplay); remeasure after pack
