@@ -16,5 +16,13 @@ int main(){
         assert(actual==expected&&source==original);
     }
     assert(downwellMemoryCopy(nullptr,nullptr,0)==nullptr);
-    std::puts("Memory copy: 262400 alignment/length cases, guards and source preservation passed");
+    for(unsigned to=0;to<16;++to)for(unsigned count=0;count<=1024;++count)for(int value:{0,0x5a,-1,0x1ff}){
+        actual.fill(0xa5);expected.fill(0xa5);
+        for(unsigned i=0;i<count;++i)expected[to+i]=static_cast<unsigned char>(value);
+        assert(downwellMemoryFill(actual.data()+to,value,count)==actual.data()+to);
+        assert(actual==expected);
+    }
+    assert(downwellMemoryFill(nullptr,0,0)==nullptr);
+    std::puts("Memory copy: 262400 alignment/length cases, guards and source preservation passed; "
+              "fill: 65600 cases passed");
 }

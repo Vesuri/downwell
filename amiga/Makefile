@@ -1310,7 +1310,7 @@ obj/AmigaFieldPrepared.o: $(AMIGA_SRC)/AmigaFieldPrepared.s $(REPO)/generated/am
 
 obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c Makefile
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -Dmemcpy=downwellToolchainMemcpy -c -o $@ $<
+	$(CC) $(CFLAGS) -Dmemcpy=downwellToolchainMemcpy -Dmemset=downwellToolchainMemset -c -o $@ $<
 
 obj/AmigaMemoryCopy.o: $(AMIGA_SRC)/AmigaMemoryCopy.cpp $(AMIGA_SRC)/AmigaMemoryCopy.h
 	@mkdir -p $(@D)
