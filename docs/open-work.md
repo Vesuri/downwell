@@ -7,8 +7,14 @@ not separate priority queues.
 
 Both SDL and Amiga must behave like the original Windows Steam game. VM assembly,
 serialized resources and original-runner evidence are the authority; port-to-port
-agreement alone is insufficient. Target Amiga 500/68000. Let gameplay run slower
-on PAL; do not add 60 Hz catch-up.
+agreement alone is insufficient. Let gameplay run slower on PAL; do not add
+60 Hz catch-up.
+
+**Target machine (set 2026-11-21, replacing the A500):** an unexpanded Amiga
+1200 (68EC020 at 14 MHz, AGA, 2 MB Chip, no Fast RAM). The code stays
+68000-compatible (`-m68000`) for now. The game must start on any Amiga with
+enough Chip memory for its DMA data and enough public memory (Chip or Fast)
+for everything else, and refuse with a clear message otherwise.
 
 ## Priority and scope
 
@@ -60,10 +66,12 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
   otherwise. Attach any newly discovered prerequisite to an existing item.
 - **Performance during W1/W2:** no 20 ms gate yet, but do not add per-frame
   work for features that are not present (no empty scans), and keep normal
-  1 MiB Chip startup and the `quiet-fall` landing witness passing. Note any
+  startup and the `quiet-fall` landing witness passing. Until WR fits the
+  unexpanded A1200, normal startup means today's 1 MiB Chip + Fast
+  configuration; afterwards it means the target machine. Note any
   large new cost in the commit for W3.
 - **Restructuring** steps (WR) must be behaviour-neutral and pass the existing
-  gates. WR.1-WR.3 come before W1.9; WR.4 runs with W3.
+  gates. WR.1-WR.4 come before W1.9; WR.5 runs with W3.
 
 ### W1. Gameplay and visuals
 
@@ -356,7 +364,7 @@ area-1 patterns, and names every cut with its reason.
   no per-update scans.
 - The world-one native replay still ends `END 2 1 8275 1 265269` (slice
   variant 119).
-- 1 MiB startup passes.
+- Normal startup passes (see "How to work W").
 - W3 costs are noted: IRQ and VBlank time per start, Chip and Fast bytes.
 
 ### WM. Music (deferred)
@@ -371,7 +379,11 @@ later.
 
 ### W3. Performance
 
-After W1 and W2: every gameplay update of world 1 within 20 ms on the A500.
+After W1 and W2: every gameplay update of world 1 within 20 ms on the
+unexpanded A1200. With no Fast RAM its code and data run from Chip and share
+the bus with display, blitter and audio DMA; the 68EC020's 256-byte
+instruction cache and 32-bit Chip bus help. The A500 numbers below and in
+sections 0 and 5 are relative evidence only; re-measure on the target.
 Start with the initial fall (section 0: D, then C, then E), then the rest of
 world 1: dense combat, shops, side rooms and time-stop, and scene handoffs
 judged by transition latency (section 5). Re-measure first; numbers recorded
@@ -481,8 +493,8 @@ planes' ceiling is now 177 KiB.
 ### WR. Restructure for world 1
 
 The shipping executable is 2,161,412 bytes (2,031,936 stripped) and must
-shrink: only world 1's code, no debug, reference or verify code, as small as
-possible, with W3 making it as fast as possible. Measured on 2026-11-21
+shrink to fit the target machine: only world 1's code, no debug, reference
+or verify code, as small as possible, with W3 making it as fast as possible. Measured on 2026-11-21
 (`-O3`, `STRIP=1`, attributed to the defining class from `objdump -t -C`):
 
 - `.text` 1,547,906, `.rodata` 350,564 (prepared ammo HUD, currency and
@@ -504,10 +516,25 @@ possible, with W3 making it as fast as possible. Measured on 2026-11-21
   `SaveFile::Writer::real`'s 64-bit shift becomes a `__lshrdi3` call (the
   64-bit helper audit forbids it); the measurement stubbed it.
 
-**Target:** a stripped shipping executable of at most 1 MB after WR.1-WR.3;
-WR.4 takes it well below that.
+**Target:** the whole footprint fits an unexpanded A1200 booted to a shell,
+with margin: the loaded code and data, `.bss`, stack, Chip banks and display
+buffers. Today it is far over: about 2 MB of loaded hunks plus 2.17 MB of
+`.bss` (both in Fast on the verification machine) plus up to about 950 KB of
+Chip in gameplay. The interim aim is a stripped executable of at most 1 MB
+after WR.2-WR.4; WR.5 is required to fit, since the runner emulation alone
+holds 1.3 MB of RAM.
 
-1. **Build profiles.** Shipping: stripped, no trace hooks, no reference paths
+1. **Target machine and memory placement.** Add an unexpanded A1200
+   configuration (A1200, Kickstart 3.x, 2 MB Chip, no Fast) to the launchers
+   and native gates, keeping a configuration with Fast RAM to prove
+   placement. Measure the free memory after boot on the unexpanded A1200:
+   that is the budget. Only DMA data (bitplanes, sprites, blitter sources,
+   Paula samples, copper lists) is allocated in Chip; everything else, the
+   hunks included, uses public memory, so Fast is used when present. At
+   startup, check the Chip and public requirements (largest blocks
+   included) with `AvailMem` before allocating, and refuse with a message
+   naming what is missing.
+2. **Build profiles.** Shipping: stripped, no trace hooks, no reference paths
    and no debug code. A development build identical to shipping except for
    the GDB hook surface the native routes read, so the routes still verify
    shipping code. Verify, profile and reference builds stay separate
@@ -524,31 +551,34 @@ WR.4 takes it well below that.
    `REFERENCE_TERRAIN_ELIGIBILITY`, `REFERENCE_TYPED_TERRAIN_CLEANUP`) and
    the `TERRAIN_RUN_STORE` stub, after confirming each is dead. Gate: a size
    check on the shipping build beside `audit`.
-2. **`-Os` by default, speed only where it pays.** Fix the `__lshrdi3` use
+3. **`-Os` by default, speed only where it pays.** Fix the `__lshrdi3` use
    first. Mark the measured hot paths (terrain painting, the actor draw
    list, collision queries, the mixer and whatever the native profile
    shows) for `-O2`/`-O3` per function, so it works under LTO. Choose them
-   from the A500 profile and judge them on W3's workloads: quiet-fall, the
+   from the native profile and judge them on W3's workloads: quiet-fall, the
    world-one route and the worst frames, against the `-O3` build.
-3. **Link only world 1.** One world-1 manifest (areas, rooms, families,
+4. **Link only world 1.** One world-1 manifest (areas, rooms, families,
    upgrades, builders, banks) drives the existing admission points
    (`AmigaGameplayAssetAdmission`, `RUNTIME_ROOMS`, `CAVERN_ROOTS`, family
    storage) and decides what is compiled into the shipping link: the
    skeleton and bone families, the catacomb builder pieces and the scene
    collision backend drop out without moving files. A map-file gate beside
    `audit` fails when code outside the manifest links.
-4. **Replace the runner emulation with world-1 ownership (with W3).** World 1
+5. **Replace the runner emulation with world-1 ownership (with W3).** World 1
    uses a fraction of what `GameplayCollisionOwner` and its bindings emulate.
    Replace them with compact world-1 owners, removing most of the 605 KB of
    code and 1.3 MB of RAM along with their per-update work. The new owners
    must reproduce registration step order: the world-one native replay must
    still end `END 2 1 8275 1 265269` and every sound route must pass.
-5. **Smaller items.** Fold identical clones and the duplicated
+6. **Smaller items.** Fold identical clones and the duplicated
    complete/base constructors (`GameplayWorld`'s is 14.5 KB twice), and
    replace the stale `src/platform/amiga/README.md` with the current
    structure and feature status.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
+
+(Measured on the A500; the target is now the unexpanded A1200, see the top
+of this file and W3.)
 
 **Part of W3 (performance); paused until W1 and W2 are done.** The target is the **no-input initial fall from the top of the well to
 the first platform**, updates 1–164. The goal is that every update fits one
@@ -1572,8 +1602,8 @@ Reference: [scene architecture](scene-architecture.md).
 ## 7. Establish memory fit and failure handling
 
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
-  Establish the A500 memory requirement; expanded-emulator runs do not prove
-  stock-machine fit. Size the shop speech overlap reserve against repeated
+  Establish the target machine's memory requirement (WR.1); expanded-emulator
+  runs do not prove stock-machine fit. Size the shop speech overlap reserve against repeated
   messages within the nested parent Step, not just one replacement per parent.
 - Budget further Chip residency against the measured 20,272-byte cavern
   minimum free space (126,840 bytes before gameplay); remeasure after pack
