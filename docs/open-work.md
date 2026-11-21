@@ -509,8 +509,8 @@ bytes, duplicate bodies 358 bytes).
 3.43 MB against 1,963,176 bytes free on the unexpanded A1200: about
 1.06 MB of loaded code and data, 0.73 MB of BSS, 0.68 MB of public
 allocations and 0.96 MB of Chip. It must shrink by about 1.46 MB plus
-margin. The banks alone are about 1.23 MB and everything else about
-2.2 MB, so both must shrink. `MACHINE=a500` stays the gates' default until
+margin. The banks alone are about 1.07 MB and everything else about
+2.36 MB, so both must shrink. `MACHINE=a500` stays the gates' default until
 it fits.
 
 1. **Shrink the BSS** (727,816 bytes), largest first:
@@ -530,8 +530,7 @@ it fits.
      128-column rows and the painter's column clamps.
    - `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002.
 2. **Shrink the banks.** The run sound bank (410,262 Chip), the cavern CPU
-   bank (368,798 public) beside its 175,094-byte plane atlas, the 167,266
-   bytes of linked Chip assets and the 76,800-byte menu planes. Decide with
+   bank (368,798 public) beside its 175,094-byte plane atlas, and the 76,800-byte menu planes. Decide with
    the user before reducing sample rates or art formats.
 3. **Code** (667,336 `.text`, 321,068 `.rodata`): `GameplayWorld` 214 KB, `runDownwell` and
    free functions 99 KB, the draw list 33 KB, `RunSession` 27 KB.

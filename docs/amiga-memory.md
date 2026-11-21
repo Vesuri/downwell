@@ -21,12 +21,15 @@ block 1,954,856; `make -C amiga free-memory-probe`).
 | Loaded code and data | ~1,062,000 | `.text` 667,336, `.rodata` 321,068 (factored ammo tables about 100 KB), `.data` 73,970 |
 | BSS | 727,816 | `portRuntimeStorage` (`GameplayWorld`) 221,388, `nativeTerrainStorage` 145,888, `terrainIndex` 76,814, `actorFrames` 46,932, `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002 |
 | Public allocations (peak) | 676,672 | cavern CPU bank + entry mask 399,902, terrain raster 135,168, field columns 70,816, builder patterns 70,779 |
-| Chip allocations (gameplay) | ~960,000 | run sound bank 410,262, cavern plane atlas 175,094, linked Chip assets 167,266, menu planes 76,800, scene cache 66,704, game ring 30,720, HUD 27,264 |
+| Chip allocations (gameplay) | ~960,000 | run sound bank 410,262, cavern plane atlas 175,094, effect surface + shared scene bank (front art, then gameplay field bands) 167,266, menu planes 76,800, scene cache 66,704, game ring 30,720, HUD 27,264 |
 | Total | ~3,427,000 | about 1.46 MB over the target |
 
-The banks (sound, cavern CPU and plane art, linked Chip assets, menu planes)
-are about 1.23 MB; the rest, about 2.2 MB, is already more than the machine
-has. Fitting needs both: smaller code, BSS and buffers, and smaller banks.
+The art and sound banks (run sounds, cavern CPU art and entry mask, cavern
+planes, menu planes) are about 1.07 MB; the rest, about 2.36 MB, is already
+more than the machine has. The menu planes are reused during gameplay (HUD,
+results, clear storage) and the run sound bank holds only sounds world 1 can
+play (14 of its 145 are not heard on the slice routes: upgrades, pause menu,
+explosions). Fitting needs both: smaller code, BSS and buffers, and smaller banks.
 
 `amiga/probe_allocations.gdb` lists every exec `AllocMem`/`FreeMem` with its
 caller; `DOWNWELL_MEMORY_SAMPLE=1` on `tools/verify-world-one-native.py`
