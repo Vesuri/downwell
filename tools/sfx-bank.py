@@ -44,7 +44,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "docs/sound-inventory.md"
 AUDIO = ROOT / "extracted/audio/manifest.json"
@@ -74,9 +74,10 @@ def kept_sounds():
     rows = []
     for line in INVENTORY.read_text().splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) != 8 or not cells[0].isdigit():
+        # ID, name, bytes, s, loop, scenes, played by, [observed, peak,] verdict
+        if len(cells) not in (8, 10) or not cells[0].isdigit():
             continue
-        verdict = cells[7]
+        verdict = cells[-1]
         if verdict.startswith("drop"):
             continue
         rows.append({"id": int(cells[0]), "name": cells[1].strip("`"),

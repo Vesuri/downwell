@@ -25,7 +25,7 @@ import pathlib
 import re
 import sys
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 UTMT = ROOT / 'extracted/utmt-0.9.2.0'
 CE = UTMT / 'CodeEntries'
@@ -111,9 +111,11 @@ NOT_ON_AMIGA = {
     'TextBox': 'PC release notes', 'TextBoxChoice': 'PC release notes',
     'releaseNotes': 'PC release notes',
 }
-# Scene per owner object; anything else is gameplay.
+# Scenes per owner object (a name or a tuple); anything else is gameplay.
+# objTransDither is also the gameplay exit dither (level ends, side rooms,
+# death to results).
 SCENES = {
-    'objTitle': 'front', 'PlayMenu': 'front', 'objTransDither': 'front',
+    'objTitle': 'front', 'PlayMenu': 'front', 'objTransDither': ('front', 'gameplay'),
     'EnterSequence': 'front', 'objEnterDither': 'front',
     'objPauseMenu': 'pause', 'ConfirmMenu': 'pause', 'ShaderMenu': 'pause',
     'OptionMenu': 'pause', 'OptionMenuPC': 'pause', 'RecordMenu': 'pause',
@@ -121,6 +123,13 @@ SCENES = {
     'Result': 'clear', 'DeathMenu': 'results',
     'Shop': 'shop', 'shopKeeper': 'shop', 'shopCase': 'shop', 'moduleText': 'shop',
 }
+
+
+def owner_scenes(owner):
+    scenes = SCENES.get(owner, 'gameplay')
+    return scenes if isinstance(scenes, tuple) else (scenes,)
+
+
 SCENE_ORDER = ['front', 'gameplay', 'shop', 'pause', 'clear', 'results']
 # Verdicts beyond "keep". Seconds are at the crop; the Amiga keeps all of
 # Chip for samples but nothing streams, so long sounds are cut or dropped.
@@ -329,8 +338,8 @@ def main():
         a = audio[i]
         s = sounds[i]
         owners_shown = sorted(o if not o.startswith('gml_') else o.split('_', 2)[-1] for o in s['owners'])
-        scenes = sorted({SCENES.get(o, 'gameplay') for o in s['owners']
-                         if o in reached_objects and o not in NOT_ON_AMIGA} or {'gameplay'},
+        scenes = sorted({scene for o in s['owners'] if o in reached_objects and o not in NOT_ON_AMIGA
+                         for scene in owner_scenes(o)} or {'gameplay'},
                         key=SCENE_ORDER.index)
         p = paula.get(i)
         size = p['bytes'] if p else None

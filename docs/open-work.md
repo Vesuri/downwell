@@ -202,7 +202,7 @@ area-1 patterns, and names every cut with its reason.
 
   | Scene | Short sounds |
   |---|---:|
-  | Gameplay | 284 KiB |
+  | Gameplay | 288 KiB |
   | Shop | 40 KiB |
   | Front end | 33 KiB |
   | Results | 23 KiB |
@@ -247,13 +247,11 @@ area-1 patterns, and names every cut with its reason.
   The Exploding Knees and decoy-balloon draws belong to W1.9. The other
   world-1 draws are consumed.
 - **What exists today:**
-  - `AmigaWindAudio` plays one mono sound through two 4,096-byte Chip
-    fragments, with VBlank and audio IRQs and a master gain.
   - `SoundPlayScript`, `TimeFieldWind`, `BulletWallSound` and the
     `RunSession` hooks drive the registered owners.
   - The compact world, shops, run session, pause menu, clear screen,
     results and front end write `SoundRequests` (W2.3).
-  - **The Paula mixer (W2.4)** is built and checked, but not yet wired:
+  - **The Paula mixer (W2.4)** plays every sound in the normal build (W2.6):
     - `PaulaMixer.h` holds the portable plan and sequencer, and
       `AmigaPaulaAudio` is the hardware driver. It plays the DWSX pack that
       `tools/pack-amiga-sfx.py` makes from the W2.2 bank.
@@ -262,16 +260,29 @@ area-1 patterns, and names every cut with its reason.
       exercises in FS-UAE and compares the recording with the host render.
       It runs in real time, so it needs a quiet host: under load the SDL
       disk capture drops chunks.
-    - The normal build acquires the mixer after takeover, but nothing
-      drains the request rings yet. `AmigaWindAudio` lives only in the scene
-      collision candidate build (`AmigaEncounterResources`).
+    - **Wiring (W2.6):** at the top of every main-loop iteration (after the
+      previous one's bank changes) and before a results restart,
+      `DownwellAmiga.cpp` drains the front end's ring, then the run's, into
+      `AmigaSoundBanks::audio()` and calls `frame()`; a silent mixer returns
+      at once. The pause menu's volume option (`masterGain`, 0.6 by default)
+      is the mixer's master gain. The scene collision candidate build's
+      goal-field winds go through the run's ring (`AmigaRunSoundAudio`);
+      `AmigaWindAudio` remains only in its probe
+      (`verify-amiga-wind-audio`).
+    - **Native checks:** `tools/verify-world-one-native.py` and
+      `tools/verify-menus-native.py` read the mixer's voice table at every
+      input sample and require that nothing is missing from the loaded
+      banks, that no pack fails and that every sound the host route plays
+      starts natively. The host route logs carry the bank set
+      (`SoundRequestLog::banks`), and `make test-paula-mixer` replays them
+      through those packs.
   - **Scene banks (W2.5):** `AmigaSoundBanks` owns the mixer and four Chip
     packs from `tools/pack-amiga-sfx.py`, each sound in exactly one:
-    - `Downwell.sndrun` (430,034 bytes): gameplay, shops and pause, plus
+    - `Downwell.sndrun` (434,226 bytes): gameplay, shops and pause, plus
       what they share with clear and results. Resident (slot 0) from
       gameplay entry, after the cavern atlas, until the run leaves for the
       front end, so across Retry, pause, shops, clear and results.
-    - `Downwell.sndfront` (51,020): the front end, only while no run bank is
+    - `Downwell.sndfront` (46,828): the front end, only while no run bank is
       resident.
     - `Downwell.sndresults` (18,828) and `Downwell.sndclear` (7,108): loaded
       over the run bank (slot 1) while those screens show; the clear bank is
@@ -279,8 +290,11 @@ area-1 patterns, and names every cut with its reason.
 
     A pack loads only if the largest Chip block keeps 16 KiB beyond it, and
     a failed load leaves that bank silent (`gDownwellSoundBankFailures`).
-    Measured at 1 MiB: 600,104 bytes free in the front end, 45,992 (largest
-    block 45,944) in gameplay, and 27,160 on the results screen.
+    Measured at 1 MiB in W2.5: 600,104 bytes free in the front end, 45,992
+    (largest block 45,944) in gameplay, and 27,160 on the results screen;
+    W2.6 moved `sfxDissipate` 187 (the gameplay exit dither plays it too)
+    from the front pack to the run pack, so gameplay and results have 4,192
+    bytes less and the front end 4,192 more.
     `chip_memory_watch.gdb` prints `SOUND_BANKS` at every file load, and
     `verify_scenes.gdb` and `verify_clear.gdb` assert the bank sequence.
 - **Memory:** measured on 2026-11-20 with the normal 1 MiB build in level
@@ -311,45 +325,36 @@ area-1 patterns, and names every cut with its reason.
    The floor material for footsteps and landings is approximated from three
    probes under the player. The pause menu's sounds are only on the native
    menus route (`tools/verify-menus-native.py`), not on a host route.
-6. **Wire world 1 by groups.** Each group is audible on a natural route and
-   checked natively: GDB reads the voice table at the ticks the host log
-   names.
-   - **Replace the old audio:** `AmigaPaulaAudio` replaces `AmigaWindAudio`
-     in `AmigaEncounterResources`. The wind becomes an ordinary bank sound.
-   - **Drain and frame:** `AmigaSoundBanks::audio()` is the mixer. A request
-     for a sound whose bank is not loaded counts as missing; replay each
-     route with the bank set its scenes load to confirm none are.
+6. **Cover and tune world 1's sounds.** The mixer is wired (see "What
+   exists today"); what remains:
+   - **Coverage:** the world-one, hard-mode death and menus routes (the
+     latter adds the pause menu's six; the death route with a 2,990-gem seed
+     adds the bar's celebration and goal sounds 327/329) start 104 of the
+     bank's 164 sounds natively. No route plays the other 60, so they are
+     not checked natively yet (a route per group, or a native probe that
+     triggers each sound through its game code):
+     - guns other than the starting one and their bullet hits (20, 22,
+       24, 25, 32-35, 41-47), `sndShotwall` 15, `sndGem` 4,
+       `sndCoinbounce1` 14, `sfxPlayerEat` 83, the gem boost 159/160, combo
+       2 and 3 (316/317), the upgrades 341-344 (gem shoot, gunpowder,
+       jetpack loop, rocket jump);
+     - the rock, metal and breakable footsteps and landings (50, 55-58, 60-62,
+       66, 68, 73-77, 79, 80), enemy explosions 91-93;
+     - the shop case break 10, the keeper's anger, hello, question mark,
+       welcome and what (94, 95, 98, 101, 102), buying a heart 106 and the
+       shop menu's select and back (107, 108);
+     - the void ambience `amb1` 191 and the winds 350-352.
+   - **Listening:** on the world-one host replay the plan steals 178 and
+     drops 73 of 1,771 plays (hard mode 135 and 42 of 1,921); natively, at
+     the A500's slower update rate, 20 and 9 of 1,838. Listen for drops and
+     cuts that matter and tune priorities if needed.
    - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
      It passed before W2.4's deferred voice setup. Since then, the native
      probe's counters and timing pass, but two recordings under a load of 13+
      lost audio chunks in the capture.
-   - **Request contract:** drain `GameplayWorld::soundRequests()` and
-     `AmigaSceneRuntime::sounds().requests()` once per frame into
-     `AmigaPaulaAudio::submit`, then call `frame()` (a full ring drops its
-     oldest request). Drain the run's ring before `restartFromResults` or any
-     world rebuild, which resets it.
-     - A play carries asset × script gain, pitch, priority, loop, cut and
-       the `OLchannel` category.
-     - A gain request may carry a fade time (`fadeMs`).
-     - Ids below `SoundVoices::firstVoice` name an asset (all its voices).
-     - Music requests (category 5, `levelBeginCue`) are counted for WM and
-       ignored.
-   - **Route replay:** the host plan steals 178 and drops 73 of the world-one
-     route's 1,771 plays (hard mode: 135 and 42 of 1,921). Listen for drops
-     that matter, and tune priorities if needed.
-
-   The groups:
-   1. player, guns (`bStatSound`, empty, recharge, low ammo), bullet hits,
-      stomps and gems, on the world-one route;
-   2. enemies, rock and box breaks, torches and gem chunks;
-   3. shops, the keeper's voice, module pickups (105/106) and the
-      `moduleText` letters (334), on the W1.8 shop route;
-   4. side rooms (void enter and exit 184/185, the ambience if kept),
-      time-stop and the winds;
-   5. combo, upgrade sounds (jetpack loop, rocket jump, gem shoot), the
-      clear screen, death, results, unlock notices, menus, palette, title
-      and the level-begin cue;
-   6. the master gain and the stored volume option.
+   - **Volume:** the option scales the mixer as `audio_master_gain` does,
+     so the default 0.6 plays at 60% of Paula's range; decide by ear whether
+     the Amiga should map 0.6 to full volume instead.
 
 **Gates for every step:**
 - Quiet-fall stays ≤ 197 fields: idle audio costs nothing but Paula DMA, with
@@ -465,6 +470,10 @@ W2.4's mixer costs, from the probe on the A500 (raster lines of about
   scans.
 - **Memory:** about 500 bytes of any memory for the plan, sequencer and
   mailbox, plus the 8-byte Chip silent word and the bank.
+- **Wired (W2.6):** the longest VBlank service on the world-one and
+  hard-mode death routes is 8 lines. Quiet-fall stays at 208 fields with
+  the drain and `frame()` in the loop (`frame()` returns at once while no
+  voice plays and nothing is published).
 
 The wall-kick pose (`sprPlayerWall`, frame 0 with mirrored, DMA and
 afterimage forms) takes the cavern CPU bank to 368,798 bytes (ceiling raised

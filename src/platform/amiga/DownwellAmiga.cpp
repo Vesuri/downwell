@@ -3006,8 +3006,26 @@ __attribute__((noinline)) static int runDownwell(void) {
     UWORD fencedVblank = AmigaPlatform::vblankCount();
     bool pauseFireLatch = false; // afterPause: a held confirm is not a jump
     downwell::Input pausePrior;
+    // W2.6: hand the sound requests to the Paula mixer and publish its
+    // commands for the next VBlank: the front end's ring, then the run's.
+    // Runs at the top of each iteration, so after the previous one's bank
+    // changes, and before a results restart, which rebuilds the run.
+    // The pause menu's volume option (option.masterGain in tenths, 0.6 by
+    // default) is audio_master_gain: it scales every voice.
+    unsigned appliedGainTenths = ~0u;
+    auto drainSounds = [&] {
+        auto& audio = soundBanks.audio();
+        if (saveState.masterGainTenths != appliedGainTenths) {
+            appliedGainTenths = saveState.masterGainTenths;
+            audio.setMasterQ16(appliedGainTenths * 65536u / 10u);
+        }
+        audio.drain(scenes.sounds().requests());
+        audio.drain(port.soundRequests());
+        audio.frame();
+    };
     for (;;) {
         if(!keyboardReady)break;
+        drainSounds();
 #ifndef DOWNWELL_REPLAY_VERIFY
         // W1.10: in gameplay Escape and P are objControlerN's pause input;
         // elsewhere (and at the slice end) Escape still leaves the game.
@@ -4251,6 +4269,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                     // RETRY and STYLE SELECT: ResetPlayer without saveStats.
                     newRunSeed = liveFrameCount;
+                    drainSounds();
                     const auto destination = port.restartFromResults(action == Menu::Action::retry ?
                         downwell::DeathMenuSequence::Action::Retry : downwell::DeathMenuSequence::Action::StyleSelect,
                         newRunSeed, initialRingOrigin);
@@ -4394,6 +4413,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 // An entropy boundary, separate from the gameplay RNG stream.
                 // Frame timing supplies a live seed; fixtures call reset with explicit seeds.
                 newRunSeed = liveFrameCount;
+                drainSounds();
                 const auto destination = port.restartFromResults(resultsAction, newRunSeed, initialRingOrigin);
                 soundBanks.scene(downwell::AmigaSoundBanks::none);
                 if (!scenes.enterResultsDestination(destination)) break;

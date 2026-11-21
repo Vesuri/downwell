@@ -173,6 +173,12 @@ public:
     const Voice& voice(unsigned c)const{return voices_[c];}
     const Counters& counters()const{return counters_;}
     unsigned activeVoices()const{unsigned n=0;for(const auto& v:voices_)n+=v.active;return n;}
+    // No voice and no command waiting: advance and publish have nothing to do.
+    bool idle()const{
+        for(unsigned c=0;c<channels;++c)
+            if(voices_[c].active||pending_[c].op!=PaulaChannelCommand::none||pending_[c].periodDirty||pending_[c].volumeDirty)return false;
+        return true;
+    }
     // Before a bank retires: stop every voice playing from it. Once the
     // next published frame has reached a VBlank, nothing fetches the bank.
     // True when a stop reached a channel the hardware plays (only then must

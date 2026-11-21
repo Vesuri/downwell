@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <map>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -326,35 +327,67 @@ void writeWav(const char* path, const std::vector<std::int16_t>& s) {
 
 // Route logs (tests/core/SoundRequestLog.h): replay the requests field by
 // field (two host ticks per 50 Hz field is not the game's pacing; one tick
-// per field is, at the A500's one update per field).
-void replayRoute(const PaulaBank& bank, const char* path) {
+// per field is, at the A500's one update per field). The log's bank lines
+// bind the scene packs AmigaSoundBanks holds at that point (a slot change
+// stops the slot's voices first, as unbind does); every play must find its
+// sound in them.
+struct ScenePacks {
+    std::map<std::string, std::vector<std::uint8_t>> bytes;
+    explicit ScenePacks(const std::string& full) {
+        const std::string stem = full.substr(0, full.size() - 4); // ".bin"
+        for (const char* name : {"run", "front", "results", "clear"}) bytes[name] = readFile((stem + "-" + name + ".bin").c_str());
+    }
+    PaulaBank bank(const std::string& name) const {
+        PaulaBank b;
+        if (name == "none") return b;
+        auto i = bytes.find(name);
+        require(i != bytes.end() && b.bind(i->second.data(), i->second.size()), "route bank " + name);
+        return b;
+    }
+};
+
+void replayRoute(const ScenePacks& packs, const char* path) {
     std::ifstream in(path);
     require(bool(in), std::string("open ") + path);
-    PaulaVoicePlan plan(bank);
-    std::string line; unsigned tick = 0, peak = 0; bool first = true;
+    PaulaBank resident, scene;
+    PaulaVoicePlan plan(resident, &scene);
+    std::string line, residentName = "none", sceneName = "none";
+    unsigned tick = 0, peak = 0, bankLines = 0; bool first = true;
+    std::map<int, unsigned> missing;
     static const char* names[] = {"play", "stop", "stopall", "pauseall", "resumeall", "gain", "pitch", "pause", "resume"};
     while (std::getline(in, line)) {
         std::istringstream f(line);
-        unsigned t; std::string kind; int asset, voice; unsigned priority, loop, cut; int category; double g, p; unsigned fade = 0;
-        f >> t >> kind >> asset >> voice >> priority >> loop >> cut >> category >> g >> p >> fade;
+        unsigned t; std::string kind; f >> t >> kind;
         if (first) { tick = t; first = false; }
         // The main loop publishes once per frame, then the next frame advances.
         if (t > tick) { plan.publish([](unsigned, const PaulaChannelCommand&) {}); plan.advance(t - tick); tick = t; }
+        if (kind == "bank") {
+            std::string r, s; f >> r >> s; ++bankLines;
+            if (r != residentName) { plan.stopSlot(0); resident = packs.bank(r); residentName = r; }
+            if (s != sceneName) { plan.stopSlot(1); scene = packs.bank(s); sceneName = s; }
+            continue;
+        }
+        int asset, voice; unsigned priority, loop, cut; int category; double g, p; unsigned fade = 0;
+        f >> asset >> voice >> priority >> loop >> cut >> category >> g >> p >> fade;
         SoundRequest r;
         unsigned k = 0; while (k < 9 && kind != names[k]) ++k;
         require(k < 9, "route log kind " + kind);
         r.kind = SoundRequest::Kind(k); r.asset = std::int16_t(asset); r.voice = voice; r.priority = std::uint8_t(priority);
         r.loop = loop; r.cut = cut; r.category = std::int8_t(category); r.gainValue = real(g); r.pitchValue = real(p);
         r.fadeMs = std::uint16_t(fade);
+        const auto before = plan.counters().missing;
         plan.apply(r);
+        if (plan.counters().missing != before) ++missing[asset];
         if (plan.activeVoices() > peak) peak = plan.activeVoices();
     }
     plan.publish([](unsigned, const PaulaChannelCommand&) {});
     const auto& c = plan.counters();
     std::cout << "Route " << path << ": plays " << c.plays << " steals " << c.steals << " drops " << c.drops
               << " missing " << c.missing << " music " << c.music << " expired " << c.expired
-              << " peak " << peak << " voices\n";
-    require(c.missing == 0, std::string(path) + ": every requested sound is in the bank");
+              << " stops " << c.stops << " peak " << peak << " voices\n";
+    for (const auto& m : missing) std::cout << "  missing sound " << m.first << " x" << m.second << "\n";
+    require(bankLines > 0, std::string(path) + ": the log names its bank sets");
+    require(c.missing == 0, std::string(path) + ": every requested sound is in a loaded bank");
 }
 }
 
@@ -375,8 +408,10 @@ void testSlots() {
         model.render(PaulaVoicePlan::fieldClocks, 44100, nullptr);
     };
     auto fetching = [&](unsigned slot) { unsigned n = 0; for (unsigned c = 0; c < 4; ++c) n += model.fetching(c, slot); return n; };
+    require(plan.idle(), "a new plan is idle");
     // No scene bank bound: ids 1 and 2 come from the resident bank, 3 is missing.
     plan.apply(play(3, V, 50));
+    require(plan.idle(), "a missing sound leaves the plan idle");
     require(plan.counters().missing == 1 && !plan.activeVoices(), "an unbound scene bank finds nothing");
     require(scene.bind(sceneBytes.data(), sceneBytes.size()), "scene bank");
     model = downwell_test::PaulaModel(resident.data(), scene.data());
@@ -384,6 +419,7 @@ void testSlots() {
     plan.apply(play(1, V + 1, 50));
     plan.apply(play(2, V + 2, 50));
     plan.apply(play(3, V + 3, 50));
+    require(!plan.idle(), "claimed voices are not idle");
     vblank();
     unsigned slot0 = 0, slot1 = 0;
     for (unsigned c = 0; c < 4; ++c) {
@@ -421,12 +457,13 @@ int main(int argc, char** argv) {
     testSchedule();
     std::cout << "Paula mixer unit checks passed\n";
     if (argc < 2) return 0;
-    const auto bytes = readFile(argv[1]);
-    PaulaBank bank; require(bank.bind(bytes.data(), bytes.size()), "the real pack binds");
     if (argc >= 3 && std::strcmp(argv[2], "--route") == 0) {
-        for (int i = 3; i < argc; ++i) replayRoute(bank, argv[i]);
+        const ScenePacks packs(argv[1]);
+        for (int i = 3; i < argc; ++i) replayRoute(packs, argv[i]);
         return 0;
     }
+    const auto bytes = readFile(argv[1]);
+    PaulaBank bank; require(bank.bind(bytes.data(), bytes.size()), "the real pack binds");
     std::vector<std::int16_t> audio;
     std::ofstream events(argc >= 3 ? std::string(argv[2]) + ".events" : std::string("/dev/null"));
     const Run run = runSchedule(bank, &audio, &events);

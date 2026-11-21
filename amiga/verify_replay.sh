@@ -35,7 +35,7 @@ cp -f out/Downwell.planes "$DH1/Downwell.planes"
 cp -f out/Downwell.game "$DH1/Downwell.game"
 cp -f out/Downwell.cavern "$DH1/Downwell.cavern"
 cp -f out/Downwell.cavernplanes "$DH1/Downwell.cavernplanes"
-for bank in results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain wind encountermasks; do
+for bank in results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear; do
   cp -f "out/Downwell.$bank" "$DH1/Downwell.$bank"
 done
 rm -f "$RUN"/state/*.uss "$RUN/gdb-out.log" "$RUN/fsuae-replay.log" \

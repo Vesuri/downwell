@@ -5,8 +5,11 @@ Use GDB=../tools/verify-menus-native.py with VERIFY_SAVE pointing at a seeded
 save.ini (style 1 unlocked, hard mode unlocked). Joystick and keyboard events
 only; GDB reads state, it never writes target memory. The route:
 style select (right to style 1, confirm), gameplay, P opens the pause menu,
-PALETTE (next palette), OPTIONS (Timer on), resume and watch the timer, then
-pause again and QUIT through the confirm menu. Captures land in
+PALETTE (next palette), OPTIONS (Timer on, volume 6 to 5), resume and watch
+the timer, then pause again and QUIT through the confirm menu. W2.6: GDB
+samples the Paula mixer's voices at every input sample; the front end's and
+the pause menu's sounds must each start natively, the volume press must set
+the mixer's master gain to 0.5 and the save's masterGain to 0.5. Captures land in
 captures/menus-<name>.<ext>; the written .run/dh1/save.ini is checked after
 the program exits.
 """
@@ -70,8 +73,30 @@ def main():
         checked("set $w=(GameplayWorld*)&'_ZL18portRuntimeStorage.lto_priv.0'")
         checked("set $s=(AmigaSceneRuntime*)&'runDownwell()::sceneStorage'")
         checked("set $m=(downwell::PauseMenu*)&'_ZL9pauseMenu.lto_priv.0'")
+        checked("set $a=(downwell::AmigaSoundBanks*)&'_ZZL11runDownwellvE16soundBankStorage.lto_priv.0'")
         checked("break *'AmigaInput::sample'")
         checked('break downwellGameplayFailed')
+        voiceFormat = 'printf "VOICES' + ' %d %d %u' * 4 + '\\n"' + ''.join(
+            f',$a->audio_.plan_.voices_[{c}].active,$a->audio_.plan_.voices_[{c}].asset,$a->audio_.plan_.voices_[{c}].serial'
+            for c in range(4))
+        seenSerials = set()
+        started = {}
+        def sampleVoices():
+            v = list(map(int, re.search(r'VOICES ([\d -]+)', checked(voiceFormat))[1].split()))
+            for c in range(4):
+                active, asset, serial = v[3 * c:3 * c + 3]
+                if active and serial not in seenSerials:
+                    seenSerials.add(serial); started[asset] = started.get(asset, 0) + 1
+        # Style select right (331) and confirm (332), the menu entry's fall
+        # (360); pause open (326), cursor (324), palette step (338), palette
+        # back (318), enter a sub-menu (322) and an option toggle (321).
+        def advance():
+            # Every extra stop is an input sample too: read the voices there.
+            stop = checked('continue')
+            if 'AmigaInput::sample' in stop: sampleVoices()
+            return stop
+        expectedSounds = {331, 332, 360, 326, 324, 338, 318, 322, 321}
+        masterChecked = False
 
         # Plan: (expected screen, wanted cursor, final press) steps after P.
         plan = [
@@ -80,6 +105,7 @@ def main():
             ('palette', 0, 'fire', None),          # back to pause (cursor 3)
             ('pause', 5, 'fire', None),            # OPTIONS
             ('options', 2, 'fire', 'options'),     # Timer: ON
+            ('options', 3, 'fire', None),          # volume 0.6 -> 0.5
             ('options', 0, 'fire', None),          # back (cursor 5)
             ('pause', 4, 'fire', 'pause'),         # STATS
             ('stats', 0, 'fire', 'stats'),         # back (cursor 4)
@@ -128,6 +154,7 @@ def main():
                 m = re.search(r'STATE (\d+) (\d+) (\d+) (-?\d+) (-?\d+) (-?\d+)', state)
                 if not m: raise RuntimeError(state)
                 scene, tick, screen, cursor, styleCursor, hp = map(int, m.groups())
+                sampleVoices()
                 if scene != oldScene: oldScene = scene; sceneFrame = 0
                 sceneFrame += 1
                 if frame % 100 == 0: print(state, stage, step, flush=True)
@@ -168,15 +195,15 @@ def main():
                     if cursor != wantCursor:
                         joystick(right=True); continue
                     if name and name.startswith('!'):
-                        for _ in range(30): checked('continue')
+                        for _ in range(30): advance()
                         shot(name[1:]); name = None
                     if press == 'right': joystick(right=True)
                     else: joystick(fire=True)
                     step += 1
                     if name:
                         # Let the press land and the overlay compose first.
-                        stop = checked('continue'); joystick()
-                        for _ in range(3): checked('continue')
+                        stop = advance(); joystick()
+                        for _ in range(3): advance()
                         shot(name)
                     if step == len(steps):
                         if stage == 'menu': stage = 'resumed'; resumedAt = tick
@@ -186,6 +213,11 @@ def main():
                     joystick()
                     if screen != SCREENS['closed']: raise RuntimeError('pause did not close: ' + state)
                     if tick - resumedAt == 40: shot('timer')
+                    if not masterChecked:
+                        master = checked('printf "MASTER %u\\n", $a->audio_.plan_.master_')
+                        print(master.strip(), flush=True)
+                        if 'MASTER 32768' not in master: raise RuntimeError('volume 0.5 is not the mixer master gain')
+                        masterChecked = True
                     if tick - resumedAt == 60:
                         controls.key(KEY_P, True); stage = 'reopening'
                     continue
@@ -200,13 +232,16 @@ def main():
             if stage != 'quitting': controls.release_all()
         if stage != 'quitting':
             raise RuntimeError('route did not reach QUIT: ' + stage)
+        print('SOUND started natively:', ' '.join(f'{a}x{n}' for a, n in sorted(started.items())), flush=True)
+        if expectedSounds - started.keys():
+            raise RuntimeError(f'menu sounds never started natively: {sorted(expectedSounds - started.keys())}')
         save = Path('.run/dh1/save.ini')
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline and not save.exists(): time.sleep(0.5)
         text = save.read_text() if save.exists() else ''
         print(text, flush=True)
         for key, value in (('style', '1.000000'), ('shader', '1.000000'), ('showtimer', '1.000000'),
-                           ('recordFurthestReached', '11.000000')):
+                           ('recordFurthestReached', '11.000000'), ('masterGain', '0.500000')):
             if f'{key}="{value}"' not in text:
                 raise RuntimeError(f'save.ini lacks {key}={value}')
         print('DOWNWELL_MENUS_READY', flush=True)

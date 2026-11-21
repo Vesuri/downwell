@@ -2542,6 +2542,9 @@ public:
         if (run_.timeStopped) { auto audio = run_.audio(); audio.pause(run_.backgroundMusicId); }
     }
     const downwell::SoundVoices& soundVoices() const { return run_.voices; }
+    // The Audio concept over the run's voices and ring for a call's
+    // OLchannel category and cut flag (encounter owners outside the step).
+    downwell::SoundRequestAudio runSoundAudio(int category, bool cut) { return run_.audio(category, cut); }
     template<class Body> bool withShopStepState(Body body){
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=body(run_.shops.inputState(),currencyAccount_)&&run_.effectsSucceeded;

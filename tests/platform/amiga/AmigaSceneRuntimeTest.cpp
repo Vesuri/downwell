@@ -2457,6 +2457,17 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     downwell_test::SoundRequestLog sounds(output+".sounds");
     require(sounds.good(),"open slice sound log");
     game.soundRequests().clear();
+    // The bank set DownwellAmiga.cpp has loaded when it drains the step's
+    // requests: run throughout; clear from the step that asks for the clear
+    // screen until the one that asks for the next level; results from the
+    // results' first frame (outside the exit dither) to the restart.
+    bool resultsBank=false;
+    auto drainSounds=[&]{
+        resultsBank=resultsBank||(game.deathResults().active&&!game.exitDither().active);
+        const bool clearBank=(game.levelResultRequested()||game.levelClearActive())&&!game.nextLevelRequested();
+        sounds.banks(game.soundRequests().tick(),"run",clearBank?"clear":resultsBank?"results":"none");
+        sounds.drain(game.soundRequests(),game.soundVoices());
+    };
     unsigned routePickups=0,routeNewGunShots=0;
     require(bool(tape),"open slice input tape");
     unsigned total=0;
@@ -2655,7 +2666,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 if(e.active&&e.health>0)liveEnemies.push_back(e.lifetimeId);}
             if(const char* at=std::getenv("DOWNWELL_SLICE_BREAK_TICK"))if(game.tick()==unsigned(std::atoi(at)))sliceBreak(&game);
             game.step(packed);
-            sounds.drain(game.soundRequests(),game.soundVoices());
+            drainSounds();
             if(!(frame.beginDraw(true)&&frame.finish())){
                 std::cerr<<"slice frame failure level="<<level<<" update="<<updates<<" tick="<<game.tick()
                     <<" effects="<<game.effectsSucceeded()<<" generation="<<game.generationSucceeded()<<'\n';
@@ -2870,7 +2881,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 downwell::GameplayEncounterSession::Frame frame(session);
                 require(frame.valid()&&frame.sampleInput(input),"death frame samples input");
                 game.step(packed);
-                sounds.drain(game.soundRequests(),game.soundVoices());
+                drainSounds();
                 require(frame.beginDraw(true)&&frame.finish(),"death frame completes");
                 if(sounds.plays(330))break; // DeathMenu Draw: the bar completed
             }
@@ -2911,7 +2922,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             downwell::GameplayEncounterSession::Frame frame(session);
             require(frame.valid()&&frame.sampleInput(input),"slice Result frame samples input");
             require(game.stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"slice Result Step");
-            sounds.drain(game.soundRequests(),game.soundVoices());
+            drainSounds();
             require(frame.beginDraw(true)&&frame.finish(),"slice Result frame completes");
         }
         require(game.nextLevelRequested(),"slice Result Alarm 1");

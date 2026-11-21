@@ -8,7 +8,10 @@
 // where kind is play/stop/stopall/pauseall/resumeall/gain/pitch/pause/resume
 // (voice is the voice or asset id the request names), category is
 // the OLchannel index (-1 for soundPlay), gain/pitch are decimal and fade is
-// a gain request's fade time in milliseconds.
+// a gain request's fade time in milliseconds. W2.6 bank lines, written
+// before the requests they cover when the Amiga's sound bank set changes,
+// are "tick bank resident scene" (each a pack name or none): the Paula route
+// replay binds those packs, as AmigaSoundBanks does at that point.
 //
 // The summary (asset count peak, one line per sound, then a total line) is
 // what route tests compare with the committed expectation in
@@ -38,6 +41,13 @@ public:
             auto& s=sounds_[v.first];if(v.second>s.peak)s.peak=v.second;total+=v.second;
         }
         if(total>peakVoices_)peakVoices_=total;
+    }
+    // The Amiga bank set for the requests drained next (only changes are
+    // written). The caller mirrors where DownwellAmiga.cpp switches banks.
+    void banks(std::uint32_t tick,const char* resident,const char* scene){
+        if(resident==resident_&&scene==scene_)return;
+        resident_=resident;scene_=scene;
+        out_<<tick<<" bank "<<resident<<' '<<scene<<'\n';
     }
     unsigned plays(int asset)const{auto i=sounds_.find(asset);return i==sounds_.end()?0:i->second.count;}
     unsigned peak(int asset)const{auto i=sounds_.find(asset);return i==sounds_.end()?0:i->second.peak;}
@@ -82,6 +92,8 @@ private:
     std::map<int,Sound> sounds_;
     unsigned requests_=0,kinds_[9]{},peakVoices_=0;
     std::uint32_t dropped_=0;
+    const char* resident_=nullptr;
+    const char* scene_=nullptr;
 };
 }
 #endif

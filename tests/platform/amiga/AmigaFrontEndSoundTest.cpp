@@ -29,6 +29,7 @@ int main() {
     unsigned ticks = 0;
     auto step = [&](const downwell::Input& input, downwell::ShopInteraction::Input edges) {
         scenes.step(input, edges);
+        sounds.banks(scenes.sounds().requests().tick(), "none", "front"); // AmigaSoundBanks in the front end
         sounds.drain(scenes.sounds().requests(), scenes.sounds().voices());
         require(scenes.sounds().good(), "front-end sound scripts succeed");
         ++ticks;

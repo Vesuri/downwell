@@ -119,8 +119,10 @@ void AmigaPaulaAudio::release(){
 void AmigaPaulaAudio::frame(){
     if(!installed_)return;
     const UWORD now=AmigaPlatform::vblankCount();
-    plan_.advance(UWORD(now-lastField_));
+    const UWORD fields=UWORD(now-lastField_);
     lastField_=now;
+    if(plan_.idle())return; // silence costs nothing beyond Paula's DMA
+    plan_.advance(fields);
     Disable();
     plan_.publish([this](unsigned c,const PaulaChannelCommand& m){mailbox_[c].merge(m);pending_=true;});
     Enable();

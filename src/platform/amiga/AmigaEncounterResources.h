@@ -1,6 +1,6 @@
 #ifndef DOWNWELL_AMIGA_ENCOUNTER_RESOURCES_H
 #define DOWNWELL_AMIGA_ENCOUNTER_RESOURCES_H
-#include "AmigaWindAudio.h"
+#include "AmigaRunSoundAudio.h"
 #include "framework/AmigaPlatform.h"
 #include "core/GameplayEncounterEnvironment.h"
 #include "core/GameplayEncounterSession.h"
@@ -16,8 +16,10 @@ volatile unsigned gDownwellEncounterRunLoads=0;
 #endif
 
 // Run-owned collision history is acquired before rmMain's first birth. The
-// immutable masks/audio and update environment are gameplay scene resources.
+// immutable masks and update environment are gameplay scene resources.
 // Neither is embedded in the executable or leased by the intro screens.
+// Sound goes to the run's request ring (AmigaRunSoundAudio), which the main
+// loop drains into the Paula mixer.
 class AmigaEncounterResources {
     struct Room {
         GameplayWorld* world;
@@ -27,14 +29,14 @@ class AmigaEncounterResources {
         }
     };
     using Owner=downwell::GameplayCollisionOwner;
-    using Environment=downwell::GameplayEncounterEnvironment<downwell::AmigaWindAudio,Room>;
+    using Environment=downwell::GameplayEncounterEnvironment<downwell::AmigaRunSoundAudio,Room>;
 public:
-    AmigaEncounterResources(GameplayWorld& world,Owner& owner):world_(world),owner_(owner){}
+    AmigaEncounterResources(GameplayWorld& world,Owner& owner):world_(world),owner_(owner),audio_(world){}
     ~AmigaEncounterResources(){
         releaseScene();
         if(collision_){collision_->~NativeCollisionStorage();FreeMem(collision_,sizeof(*collision_));}
     }
-    bool ready()const{return environment_&&audio_.ready();}
+    bool ready()const{return environment_!=nullptr;}
     bool acquire(AmigaPlatform& platform){
         if(ready())return true;
         if(!collision_){
@@ -50,14 +52,14 @@ public:
         if(!masks_||platform.loadFile("PROGDIR:Downwell.encountermasks",masks_,
                 DOWNWELL_ENCOUNTER_MASK_BYTES)!=DOWNWELL_ENCOUNTER_MASK_BYTES){releaseScene();return false;}
         maskView_=downwell::SpriteMaskPack(masks_,DOWNWELL_ENCOUNTER_MASK_BYTES);
-        if(!maskView_.valid()||!audio_.acquire(platform)){releaseScene();return false;}
+        if(!maskView_.valid()){releaseScene();return false;}
         auto* allocation=AllocMem(sizeof(Environment),MEMF_FAST);
         if(!allocation){releaseScene();return false;}
         environment_=new(allocation) Environment(world_,owner_,maskView_,audio_,Room{&world_});
 #if defined(DOWNWELL_RESULTS_RESTART_VERIFY) || defined(DOWNWELL_CLEAR_VERIFY)
         ++gDownwellEncounterSceneLoads;
 #endif
-        return audio_.stopAll();
+        return true;
     }
     bool bind(downwell::GameplayEncounterSession::Frame& frame){
         return ready()&&(world_.boundEncounterUpdate(environment_)||frame.bindUpdateEnvironment(*environment_));
@@ -67,7 +69,6 @@ public:
         if(environment_)++gDownwellEncounterSceneReleases;
 #endif
         if(environment_){environment_->~Environment();FreeMem(environment_,sizeof(Environment));environment_=nullptr;}
-        audio_.release();
         maskView_=downwell::SpriteMaskPack(nullptr,0);
         if(masks_){FreeMem(masks_,DOWNWELL_ENCOUNTER_MASK_BYTES);masks_=nullptr;}
     }
@@ -77,7 +78,7 @@ private:
     Owner::NativeCollisionStorage* collision_=nullptr;
     UBYTE* masks_=nullptr;
     downwell::SpriteMaskPack maskView_{nullptr,0};
-    downwell::AmigaWindAudio audio_;
+    downwell::AmigaRunSoundAudio audio_;
     Environment* environment_=nullptr;
 };
 #endif

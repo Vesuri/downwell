@@ -629,7 +629,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 COLLISION_PACK := $(REPO)/generated/downwell-sprites.dwsc
 COLLISION_MASK_PACK := $(REPO)/generated/downwell-sprite-masks.dwsm
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaWindAudio.o obj/AmigaPaulaAudio.o obj/AmigaSoundBanks.o obj/AmigaPlayer.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaPaulaAudio.o obj/AmigaSoundBanks.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
@@ -652,7 +652,7 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).wind $(OUT).encountermasks $(OUT).sndrun $(OUT).sndfront $(OUT).sndresults $(OUT).sndclear
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).encountermasks $(OUT).sndrun $(OUT).sndfront $(OUT).sndresults $(OUT).sndclear
 
 $(OUT).entrymask: $(AMIGA_ENTRY_MASK)
 	@mkdir -p $(@D)

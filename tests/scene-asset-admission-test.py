@@ -58,8 +58,12 @@ int main() {
             self.assertIsNotNone(loop, script)
             banks = loop.group(1).split()
             for bank in ('patterns', 'exitmask', 'selectionmask', 'hud',
-                         'entrymask', 'terrain', 'wind', 'encountermasks'):
+                         'entrymask', 'terrain', 'encountermasks',
+                         'sndrun', 'sndfront', 'sndresults', 'sndclear'):
                 self.assertEqual(banks.count(bank), 1, (script, bank))
+            # W2.6: the goal-field winds are run-bank sounds; the old wind
+            # stream pack is only the wind probe's.
+            self.assertNotIn('wind', banks, script)
         makefile = (ROOT / 'amiga/Makefile').read_text()
         self.assertIn('$(OUT).hud: $(AMIGA_HUD)', makefile)
         self.assertIn('HUD source must be scene-loaded, not linked', makefile)

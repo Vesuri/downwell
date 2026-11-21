@@ -102,11 +102,11 @@ if $encounter_clear
         printf "Encounter update scope missing after level transition\n"
         quit 1
     end
-    if gDownwellEncounterRunLoads != 1 || gDownwellEncounterSceneLoads != 1 || gDownwellEncounterSceneReleases != 0 || !downwell::AmigaWindAudio::current_
-        printf "Run audio/collision lease did not survive level transitions\n"
+    if gDownwellEncounterRunLoads != 1 || gDownwellEncounterSceneLoads != 1 || gDownwellEncounterSceneReleases != 0 || !downwell::AmigaPaulaAudio::current_
+        printf "Paula mixer or collision lease did not survive level transitions\n"
         quit 1
     end
-    printf "Native encounter scope and run audio retained through both upgrades\n"
+    printf "Native encounter scope and the Paula mixer retained through both upgrades\n"
 end
 if gDownwellSoundBankFailures || !gDownwellSoundReady || gDownwellSoundResidentBank != 1 || gDownwellSoundSceneBank != 0 || gDownwellSoundBankLoads < 3
     printf "SOUND_BANKS_FAILED ready=%lu resident=%lu scene=%lu loads=%lu failures=%lu\n", gDownwellSoundReady, gDownwellSoundResidentBank, gDownwellSoundSceneBank, gDownwellSoundBankLoads, gDownwellSoundBankFailures

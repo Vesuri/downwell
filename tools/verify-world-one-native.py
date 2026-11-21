@@ -4,6 +4,14 @@
 Use GDB=../tools/verify-world-one-native.py with the shared arm64 emulator.
 No target-memory writes, shortcuts, injected exits or altered health/RNG.
 The host route file is indexed by simulation tick (Draw-only frames repeat).
+
+W2.6 sound: at every input sample GDB also reads the Paula mixer's voice
+table (each channel's active flag, asset and play serial). A new serial is a
+sound the mixer started for the hardware. At the end the native starts are
+compared with the host route's sound log (<tape>.sounds): no request may be
+missing from the loaded banks, no pack load may fail, and every sound the
+host plays must have started natively at least once (a play stolen or
+expired before the next sample is not seen, so counts may differ).
 """
 import os
 from pathlib import Path
@@ -44,6 +52,10 @@ def main():
     # .inputs/.states suffix). DOWNWELL_ROUTE_DEATH=1 expects that route to
     # die: after the death it waits for the results' unlock notice (seed the
     # lifetime gems with VERIFY_SAVE) and captures captures/world-one-unlock.
+    # The hard-mode sound route (tmp/sound-route-hard-mode-death) needs a save
+    # with hardUnlocked and option hardMode set, so style select starts hard,
+    # and no gem seed (as on the host): it ends at the bar's completion sound
+    # (READY_MARKER=DOWNWELL_WORLD_ONE_RESULTS_READY).
     base=os.environ.get('DOWNWELL_ROUTE_TAPE','../tmp/world-one-gameplay')
     deathRoute=os.environ.get('DOWNWELL_ROUTE_DEATH')=='1'
     tape=Path(base+'.inputs').read_bytes()
@@ -61,6 +73,35 @@ def main():
             return out
         checked("set $w=(GameplayWorld*)&'_ZL18portRuntimeStorage.lto_priv.0'")
         checked("set $s=(AmigaSceneRuntime*)&'runDownwell()::sceneStorage'")
+        checked("set $a=(downwell::AmigaSoundBanks*)&'_ZZL11runDownwellvE16soundBankStorage.lto_priv.0'")
+        voiceFormat='printf "VOICES'+' %d %d %u'*4+'\\n"'+''.join(
+            f',$a->audio_.plan_.voices_[{c}].active,$a->audio_.plan_.voices_[{c}].asset,$a->audio_.plan_.voices_[{c}].serial' for c in range(4))
+        seenSerials=set()
+        nativeStarts={}
+        def sampleVoices(tick):
+            v=list(map(int,re.search(r'VOICES ([\d -]+)',checked(voiceFormat))[1].split()))
+            for c in range(4):
+                active,asset,serial=v[3*c:3*c+3]
+                if active and serial not in seenSerials:
+                    seenSerials.add(serial)
+                    first,count=nativeStarts.get(asset,(tick,0))
+                    nativeStarts[asset]=(first,count+1)
+        def checkSounds():
+            counters=checked('printf "SOUND plays=%u steals=%u drops=%u missing=%u music=%u expired=%u stops=%u\\n", $a->audio_.plan_.counters_.plays,$a->audio_.plan_.counters_.steals,$a->audio_.plan_.counters_.drops,$a->audio_.plan_.counters_.missing,$a->audio_.plan_.counters_.music,$a->audio_.plan_.counters_.expired,$a->audio_.plan_.counters_.stops')
+            banks=checked('printf "BANKS ready=%u loads=%u failures=%u longest=%u lines\\n", gDownwellSoundReady,gDownwellSoundBankLoads,gDownwellSoundBankFailures,$a->audio_.longestService_')
+            print(counters.strip(),flush=True);print(banks.strip(),flush=True)
+            host={}
+            for line in Path(base+'.sounds').read_text().splitlines():
+                f=line.split()
+                if f[1]=='play' and f[7]!='5': host[int(f[2])]=host.get(int(f[2]),0)+1
+            unseen=sorted(a for a in host if a not in nativeStarts)
+            extra=sorted(a for a in nativeStarts if a not in host)
+            print(f'SOUND host sounds {len(host)} ({sum(host.values())} plays), native started {len(nativeStarts)} sounds '
+                  f'({len(seenSerials)} starts seen); front-end or native-only {extra}',flush=True)
+            for a in unseen: print(f'SOUND not seen natively: {a} (host plays {host[a]})',flush=True)
+            if not re.search(r'missing=0 ',counters): raise RuntimeError('sound requests missing from the loaded banks')
+            if not re.search(r'ready=1 .*failures=0 ',banks): raise RuntimeError('sound banks not ready or a pack failed')
+            if unseen: raise RuntimeError(f'{len(unseen)} host sounds never started natively')
         # Break at the instruction entry, before volatile device loads. A
         # source-line breakpoint can stop after those loads in optimized code.
         checked("break *'AmigaInput::sample'")
@@ -92,6 +133,7 @@ def main():
                     raise TimeoutError('bounded world-one route')
                 stop=checked('continue')
                 if 'downwellWorldOneComplete' in stop:
+                    checkSounds()
                     state=checked('printf "END %d %d %u %d %u\\n", $w->run_.stage.area,$w->run_.stage.level,$w->tick_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
                     print(state,flush=True)
                     if not re.search(r'END 2 1 '+str(len(tape))+r' [1-9]\d* \d+',state):
@@ -112,6 +154,7 @@ def main():
                 m=re.search(r'STATE (\d+) (\d+) (\d+) (\d+) (-?\d+) (\d+) (\d+)',state)
                 if not m: raise RuntimeError(state)
                 scene,tick,area,level,hp,good,resultPending=map(int,m.groups())
+                sampleVoices(tick)
                 if scene!=oldScene:
                     oldScene=scene;sceneFrame=0
                 sceneFrame+=1
@@ -125,7 +168,15 @@ def main():
                     notice=checked('printf "NOTICE %d %u\\n", $w->run_.results.menu.goalNotice,$w->run_.results.progress.goal')
                     if deathSamples%50==0: print(notice,flush=True)
                     stage=int(re.search(r'NOTICE (-?\d+)',notice)[1])
+                    if 330 in nativeStarts:
+                        # Without a gem seed no goal is reached: the bar's
+                        # completion sound (sfxUiRetry 330) ends the results.
+                        checkSounds()
+                        print('DOWNWELL_WORLD_ONE_RESULTS_READY',flush=True)
+                        Path('.run/gdb-ready.marker').touch()
+                        return
                     if stage>=3:
+                        checkSounds()
                         for _ in range(20): checked('continue')
                         checked('delete breakpoints')
                         shot('world-one-unlock')

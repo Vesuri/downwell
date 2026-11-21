@@ -6,7 +6,7 @@ Sizes are signed 8-bit mono at 8,363 Hz after the -30 dB tail crop
 (`tools/convert-amiga-sfx.py`), before any per-sound rate or cut
 chosen in W2.2.
 
-- Tool 1.1.0; UTMT manifest sha256 `2f080abb3284884b`;
+- Tool 1.2.0; UTMT manifest sha256 `2f080abb3284884b`;
   audio manifest sha256 `2e3a26e9fd36b0b6`; Paula conversion sha256 `aac86ae6c2157b8b`.
 - 114 objects are reachable from the world-1 rooms; 181 sounds are referenced by their code, 164 of them kept or cut (1619.2 KiB before cuts).
 - Observed and Peak come from the W2.3 host sound routes in
@@ -22,7 +22,7 @@ A sound used in several scenes is counted in each.
 | Scene | Sounds | KiB | Long (> 2 s) or cut, KiB | The rest, KiB |
 |---|---:|---:|---:|---:|
 | front | 7 | 62.6 | 29.7 | 32.8 |
-| gameplay | 127 | 1484.7 | 1200.3 | 284.4 |
+| gameplay | 128 | 1488.7 | 1200.3 | 288.5 |
 | shop | 20 | 40.2 | 0.0 | 40.2 |
 | pause | 5 | 6.1 | 0.0 | 6.1 |
 | clear | 12 | 488.4 | 477.8 | 10.6 |
@@ -172,7 +172,7 @@ upgrade screen between levels), results (death and results).
 | 184 | `sfxVoidEnter` | 3,744 | 0.45 |  | gameplay | objPlayer_n | 16 | 1 | keep |
 | 185 | `sfxVoidExit` | 5,728 | 0.68 |  | gameplay | objPlayer_n | 12 | 1 | keep |
 | 186 | `sfxFalling` | 68,688 | 8.21 | yes | gameplay, clear | Result, enmBat, enmCrawler, enmEyefish, enmFrog, enmGroundTurtle +7 | 4 | 1 | cut: loop a short segment of the clear-screen whoosh |
-| 187 | `sfxDissipate` | 4,176 | 0.50 |  | front | objTransDither | 8 | 1 | keep |
+| 187 | `sfxDissipate` | 4,176 | 0.50 |  | front, gameplay | objTransDither | 8 | 1 | keep |
 | 188 | `sfxTitleAppear` | 30,448 | 3.64 |  | front | objTitle | 1 | 1 | cut: shorten the title sting |
 | 191 | `amb1` | 723,408 | 86.50 | yes | gameplay | voidAmbience |  |  | cut: loop a short segment of the void ambience, or drop |
 | 192 | `bgmShopCave` | – | – |  | shop | Shop |  |  | drop: music, deferred to WM |
