@@ -1,6 +1,6 @@
 # WR.5: every exec AllocMem/FreeMem the program makes until the quiet-fall
 # trace point (a profile.sh quiet-fall build). Each line names the size, the
-# flags and the calling function; summarise with tools/amiga-allocations.py.
+# flags and the calling function (FREE lines give the freed address).
 # GDB_SOURCE=probe_allocations.gdb READY_MARKER=DOWNWELL_ALLOCATIONS_READY
 # bash verify_startup.sh (VERIFY_PROGRAM defaults to out/Downwell).
 set pagination off

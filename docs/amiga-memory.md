@@ -1,35 +1,31 @@
 # Amiga memory budget
 
-The target is an unexpanded A1200: 2 MiB Chip and no Fast RAM, so the
-executable's hunks, its BSS and every allocation share one pool. Only DMA
-data asks for `MEMF_CHIP`; everything else asks for `MEMF_PUBLIC` and uses
-Fast when present. The verification machine is still an A500 with 1 MiB
-Chip and 8 MiB Fast at `$200000` (`amiga/machine.sh`: `MACHINE=a500`, the
-default until the game fits, and `MACHINE=a1200`), which proves the
-placement. Exec labels any slow RAM at `$C00000` `MEMF_FAST` as well,
-although its bus timing differs.
+The target is an A1200 with 4 MB Fast RAM (`MACHINE=a1200-4m`, the gates'
+default). Only DMA data asks for `MEMF_CHIP`; everything else, including
+the executable's hunks and BSS, goes to Fast. The game also starts on any
+other Amiga with enough Chip for its DMA data and enough public memory for
+the rest (`downwellMemoryFits`). `MACHINE=a500` (1 MiB Chip, 8 MiB Fast)
+and `MACHINE=a1200` (unexpanded) remain available. Exec labels any slow RAM
+at `$C00000` `MEMF_FAST` as well, although its bus timing differs.
 
 ## Target budget
 
-Measured 2026-11-21 on the shipping build (`-Os` with hot paths at `-O2`,
-terrain raster ring, no source terrain records, no sparse field reference).
-An unexpanded A1200 booted to a shell has 1,963,176 bytes free (largest
-block 1,954,856; `make -C amiga free-memory-probe`).
+Measured 2026-11-21 on the shipping build (`-Os` with hot paths at `-O2`).
+The A1200 with 4 MB Fast booted to a shell has 2,074,232 bytes of Chip and
+4,082,896 of Fast free (`FreeMemoryProbe`, `amiga/probe_free_memory.gdb`);
+the unexpanded A1200 has 1,963,176 in all.
 
-| Part | Bytes | Largest items |
-| --- | ---: | --- |
-| Loaded code and data | ~1,062,000 | `.text` 667,336, `.rodata` 321,068 (factored ammo tables about 100 KB), `.data` 73,970 |
-| BSS | 727,816 | `portRuntimeStorage` (`GameplayWorld`) 221,388, `nativeTerrainStorage` 145,888, `terrainIndex` 76,814, `actorFrames` 46,932, `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002 |
-| Public allocations (peak) | 676,672 | cavern CPU bank + entry mask 399,902, terrain raster 135,168, field columns 70,816, builder patterns 70,779 |
-| Chip allocations (gameplay) | ~960,000 | run sound bank 410,262, cavern plane atlas 175,094, effect surface + shared scene bank (front art, then gameplay field bands) 167,266, menu planes 76,800, scene cache 66,704, game ring 30,720, HUD 27,264 |
-| Total | ~3,427,000 | about 1.46 MB over the target |
+| Part | Bytes | Where | Largest items |
+| --- | ---: | --- | --- |
+| Loaded code and data | ~1,062,000 | Fast | `.text` 667,336, `.rodata` 321,068 (factored ammo tables about 100 KB), `.data` 73,970 |
+| BSS | 727,816 | Fast | `portRuntimeStorage` (`GameplayWorld`) 221,388, `nativeTerrainStorage` 145,888, `terrainIndex` 76,814, `actorFrames` 46,932, `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002 |
+| Public allocations (peak) | 676,672 | Fast | cavern CPU bank + entry mask 399,902, terrain raster 135,168, field columns 70,816, builder patterns 70,779 |
+| Chip allocations (gameplay) | ~961,000 | Chip | run sound bank 410,262, cavern plane atlas 175,094, effect surface + shared scene bank (front art, then gameplay field bands) 167,266, menu planes 76,800 (reused as HUD, results and clear storage), scene cache 66,704, game ring 30,720, HUD 27,264 |
+| Total | ~3,427,000 | | Fast about 2.47 MB of 4.08; Chip about 0.96 MB of 2.07 |
 
-The art and sound banks (run sounds, cavern CPU art and entry mask, cavern
-planes, menu planes) are about 1.07 MB; the rest, about 2.36 MB, is already
-more than the machine has. The menu planes are reused during gameplay (HUD,
-results, clear storage) and the run sound bank holds only sounds world 1 can
-play (14 of its 145 are not heard on the slice routes: upgrades, pause menu,
-explosions). Fitting needs both: smaller code, BSS and buffers, and smaller banks.
+End to end on the A500 route build, shell free minus the route's low-water
+marks is about 3.74 MB; that build carries 282 KB more BSS and 26 KB more
+`.rodata` than shipping.
 
 `amiga/probe_allocations.gdb` lists every exec `AllocMem`/`FreeMem` with its
 caller; `DOWNWELL_MEMORY_SAMPLE=1` on `tools/verify-world-one-native.py`

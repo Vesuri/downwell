@@ -1,7 +1,8 @@
 # Amiga backend
 
 The native Amiga port of the shared game in `src/core`. The target is an
-unexpanded A1200 (68EC020, AGA, 2 MiB Chip, no Fast RAM); the code stays
+A1200 with 4 MB Fast RAM (68EC020, AGA, 2 MiB Chip, 4 MiB Fast; `MACHINE=a1200-4m`,
+the default); the code stays
 68000-compatible, and the game starts on any Amiga with enough Chip memory
 for its DMA data and enough public memory for everything else
 (`downwellMemoryFits` checks both with `AvailMem` before allocating).

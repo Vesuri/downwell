@@ -10,8 +10,10 @@ serialized resources and original-runner evidence are the authority; port-to-por
 agreement alone is insufficient. Let gameplay run slower on PAL; do not add
 60 Hz catch-up.
 
-**Target machine (set 2026-11-21, replacing the A500):** an unexpanded Amiga
-1200 (68EC020 at 14 MHz, AGA, 2 MB Chip, no Fast RAM). The code stays
+**Target machine (set 2026-11-21, replacing the A500):** an Amiga 1200
+with 4 MB Fast RAM (68EC020 at 14 MHz, AGA, 2 MB Chip, 4 MB Fast;
+`MACHINE=a1200-4m`, the gates' default). The unexpanded A1200 was the
+first choice the same day, but the game needs about 3.4 MB. The code stays
 68000-compatible (`-m68000`) for now. The game must start on any Amiga with
 enough Chip memory for its DMA data and enough public memory (Chip or Fast)
 for everything else, and refuse with a clear message otherwise.
@@ -67,9 +69,8 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
   otherwise. Attach any newly discovered prerequisite to an existing item.
 - **Performance during W1/W2:** no 20 ms gate yet, but do not add per-frame
   work for features that are not present (no empty scans), and keep normal
-  startup and the `quiet-fall` landing witness passing. Until WR fits the
-  unexpanded A1200, normal startup means today's 1 MiB Chip + Fast
-  configuration; afterwards it means the target machine. Note any
+  startup and the `quiet-fall` landing witness passing. Normal startup means
+  the target machine. Note any
   large new cost in the commit for W3.
 - **Restructuring** steps (WR) must be behaviour-neutral and pass the existing
   gates. WR.1-WR.4 come before W1.9; WR.5 runs with W3.
@@ -381,9 +382,10 @@ later.
 ### W3. Performance
 
 After W1 and W2: every gameplay update of world 1 within 20 ms on the
-unexpanded A1200. With no Fast RAM its code and data run from Chip and share
-the bus with display, blitter and audio DMA; the 68EC020's 256-byte
-instruction cache and 32-bit Chip bus help. The A500 numbers below and in
+A1200 with 4 MB Fast RAM. Code, BSS and CPU-side data run from Fast; only
+DMA data shares the Chip bus with display, blitter and audio DMA. The
+68EC020's 256-byte instruction cache helps. `profile.sh` still defaults to
+the A500 (`VERIFY_CHIP_KB=1024`); move its baselines to the target. The A500 numbers below and in
 sections 0 and 5 are relative evidence only; re-measure on the target.
 Start with the initial fall (section 0: D, then C, then E), then the rest of
 world 1: dense combat, shops, side rooms and time-stop, and scene handoffs
@@ -493,64 +495,43 @@ planes' ceiling is now 177 KiB.
 
 ### WR. Restructure for world 1
 
-The shipping executable must fit the target machine with only world 1's
-code and no debug, reference or verify code. Done so far: the A1200 and
-A500 machine configurations, DMA-only Chip placement and the startup memory
-check (WR.1); renamed candidates, dead reference macros removed and the
-size gate (WR.2); `-Os` with the hot paths at `-O2` (WR.3); the shipping
-build without the runner emulation and the terrain raster ring (WR.5);
-source terrain records only in owner builds, no sparse time-field
-reference, pooled actor frame parts, a 32-column breakable grid and a
-one-slot wall tile store on freestanding targets. At `-Os` the later-world
-code and the identical clones are already almost gone (skeleton code 302
-bytes, duplicate bodies 358 bytes).
+The shipping executable carries only world 1's code and no debug,
+reference or verify code, and fits the target. Done: the machine
+configurations, DMA-only Chip placement and the startup memory check
+(WR.1); the size gate (WR.2); `-Os` with the hot paths at `-O2` (WR.3);
+the compact world without the runner emulation, the terrain raster ring and
+the BSS cuts (WR.5); `MACHINE=a1200-4m` as the gates' default.
 
-**Budget** (`docs/amiga-memory.md`, 2026-11-21): the footprint is about
-3.43 MB against 1,963,176 bytes free on the unexpanded A1200: about
-1.06 MB of loaded code and data, 0.73 MB of BSS, 0.68 MB of public
-allocations and 0.96 MB of Chip. It must shrink by about 1.46 MB plus
-margin. The banks alone are about 1.07 MB and everything else about
-2.36 MB, so both must shrink. `MACHINE=a500` stays the gates' default until
-it fits.
+**Budget** (`docs/amiga-memory.md`): about 0.96 MB of Chip against
+2,074,232 free and about 2.47 MB of Fast (code, data, BSS and CPU-side
+allocations) against 4,082,896 free on the A1200 with 4 MB Fast. Keep the
+size gate's ceilings just above the shipping build as it shrinks.
 
-1. **Shrink the BSS** (727,816 bytes), largest first:
-   - `GameplayWorld` 221,388: `breakables_` 46,080 (96-byte records; peak
-     149 of 512), `RunSession` about 22 KB, `scenery_` 22,288 (torch fires
-     14,848), `enemies_` 18,304 (304-byte records; peak 51 of 64),
-     `ownedDebrisEffects_` 8,716, `boxRewards_` 8,192, `gems_` 7,680 (peak
-     28 of 64), `steering_` 7,872. Lower a capacity only with a bound that
-     covers every world-1 level, not route peaks alone: overflow fails the
-     run. Narrower records (the 32-byte `SoundPlayState` per box) are safe.
-   - `nativeTerrainStorage` 145,888: runs sized for 2,048 cells; native
-     peaks 950 runs and 1,257 cells (`DOWNWELL_TERRAIN_SAMPLE=1`).
-   - `terrainIndex` 76,814: 128 x 512 byte cells over index x -512..1536;
-     objects only ever land at x 16..464. Narrowing it changes the
-     generated room plan (`amiga-room-terrain-plan.inc` bakes cell numbers;
-     `AmigaRoomTerrainPlan` asserts the geometry), the landing index's
-     128-column rows and the painter's column clamps.
-   - `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002.
-2. **Shrink the banks.** The run sound bank (410,262 Chip), the cavern CPU
-   bank (368,798 public) beside its 175,094-byte plane atlas, and the 76,800-byte menu planes. Decide with
-   the user before reducing sample rates or art formats.
-3. **Code** (667,336 `.text`, 321,068 `.rodata`): `GameplayWorld` 214 KB, `runDownwell` and
-   free functions 99 KB, the draw list 33 KB, `RunSession` 27 KB.
-4. **Build profiles (rest of WR.2).** Move `*_VERIFY` and oracle code out of
+Remaining:
+
+1. **Build profiles (rest of WR.2).** Move `*_VERIFY` and oracle code out of
    the shipping sources (`DownwellAmiga.cpp` has about 280 conditionals) and
    group the Amiga knobs into shipping, development, verify, profile and
    reference sets. The shipping build already compiles them out; 56 GDB
    hook variables (244 bytes) remain in it.
-5. **World-1 manifest (WR.4).** One manifest (areas, rooms, families,
+2. **World-1 manifest (WR.4).** One manifest (areas, rooms, families,
    upgrades, builders, banks) drives the admission points and a map-file
    gate beside `audit` that fails when code outside it links.
-6. When it fits: lower the size-gate ceilings, switch
-   `DOWNWELL_DEFAULT_MACHINE` to a1200 and rerun every native gate there.
+
+Further memory candidates, if the margin is needed later (each keeps
+behaviour): `terrainIndex` 76,814 (objects only land at index x 16..464 of
+-512..1536; narrowing changes the generated room plan, the landing index and
+the painter clamps), `GameplayWorld` record widths (`SoundPlayState` per
+box), `nativeTerrainStorage` runs (sized for 2,048 cells; native peak 950
+runs). Lower a capacity only with a bound covering every world-1 level:
+overflow fails the run.
 
 Pre-existing gate failure: `make verify-amiga-gameplay-cache` reports
 `raster=64 checks=156` (also before the raster ring).
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
-(Measured on the A500; the target is now the unexpanded A1200, see the top
+(Measured on the A500; the target is now the A1200 with 4 MB Fast, see the top
 of this file and W3.)
 
 **Part of W3 (performance); paused until W1 and W2 are done.** The target is the **no-input initial fall from the top of the well to
