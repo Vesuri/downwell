@@ -42,10 +42,11 @@ int main() {
         assert(result.ready&&result.bobCount==2); // No hardware conversion/lookup.
     }
     AmigaActorFrames::Frame prepared[5]{};
+    const UBYTE* partRecords[5][4]{};
     for(unsigned s=1;s<=4;++s){
-        auto& f=prepared[s];f.originX=130+s*36;f.originY=290;f.width=16*s;f.height=1;
-        f.pack=pack;f.end=pack+8;f.partCount[1]=s;
-        for(unsigned p=0;p<s;++p){records[s][p][0]=s;records[s][p][1]=p;f.parts[1][p]=records[s][p];}
+        auto& f=prepared[s];f.originX=WORD(130+s*36);f.originY=290;f.width=WORD(16*s);f.height=1;
+        f.pack=pack;f.end=pack+8;f.parts=partRecords[s];f.partCount[1]=UBYTE(s);
+        for(unsigned p=0;p<s;++p){records[s][p][0]=s;records[s][p][1]=p;partRecords[s][p]=records[s][p];}
     }
     unsigned cases=0;
     for(bool bound:{false,true})
