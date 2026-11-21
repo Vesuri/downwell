@@ -5,11 +5,11 @@ Use GDB=../tools/verify-menus-native.py with VERIFY_SAVE pointing at a seeded
 save.ini (style 1 unlocked, hard mode unlocked). Joystick and keyboard events
 only; GDB reads state, it never writes target memory. The route:
 style select (right to style 1, confirm), gameplay, P opens the pause menu,
-PALETTE (next palette), OPTIONS (Timer on, volume 6 to 5), resume and watch
+PALETTE (next palette), OPTIONS (Timer on, volume 10 to 9), resume and watch
 the timer, then pause again and QUIT through the confirm menu. W2.6: GDB
 samples the Paula mixer's voices at every input sample; the front end's and
 the pause menu's sounds must each start natively, the volume press must set
-the mixer's master gain to 0.5 and the save's masterGain to 0.5. Captures land in
+the mixer's master gain to 0.9 and the save's masterGain to 0.9. Captures land in
 captures/menus-<name>.<ext>; the written .run/dh1/save.ini is checked after
 the program exits.
 """
@@ -105,7 +105,7 @@ def main():
             ('palette', 0, 'fire', None),          # back to pause (cursor 3)
             ('pause', 5, 'fire', None),            # OPTIONS
             ('options', 2, 'fire', 'options'),     # Timer: ON
-            ('options', 3, 'fire', None),          # volume 0.6 -> 0.5
+            ('options', 3, 'fire', None),          # volume 1.0 -> 0.9
             ('options', 0, 'fire', None),          # back (cursor 5)
             ('pause', 4, 'fire', 'pause'),         # STATS
             ('stats', 0, 'fire', 'stats'),         # back (cursor 4)
@@ -216,7 +216,7 @@ def main():
                     if not masterChecked:
                         master = checked('printf "MASTER %u\\n", $a->audio_.plan_.master_')
                         print(master.strip(), flush=True)
-                        if 'MASTER 32768' not in master: raise RuntimeError('volume 0.5 is not the mixer master gain')
+                        if 'MASTER 58982' not in master: raise RuntimeError('volume 0.9 is not the mixer master gain')
                         masterChecked = True
                     if tick - resumedAt == 60:
                         controls.key(KEY_P, True); stage = 'reopening'
@@ -245,7 +245,7 @@ def main():
         text = save.read_text() if save.exists() else ''
         print(text, flush=True)
         for key, value in (('style', '1.000000'), ('shader', '1.000000'), ('showtimer', '1.000000'),
-                           ('recordFurthestReached', '11.000000'), ('masterGain', '0.500000')):
+                           ('recordFurthestReached', '11.000000'), ('masterGain', '0.900000')):
             if f'{key}="{value}"' not in text:
                 raise RuntimeError(f'save.ini lacks {key}={value}')
         print('DOWNWELL_MENUS_READY', flush=True)

@@ -17,7 +17,7 @@ struct Audio {
     std::vector<int> operations;
     bool operation(int kind){operations.push_back(kind);return operations.size()!=failOperation;}
     std::vector<MotionBinary64> gains;
-    MotionBinary64 expectedMaster{0x3fe33333u,0x33333333u};
+    MotionBinary64 expectedMaster{0x3ff00000u,0};
     unsigned stops=0,updates=0;int missing=-1;bool masterOkay=true;
     bool ready()const{return true;}
     bool hasResource(int id)const{return id!=missing;}

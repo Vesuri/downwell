@@ -70,7 +70,7 @@ int main(){
         auto session=std::make_unique<Session>(*game,*owner,audio);
         assert(session->start()&&game->startupShortcutApplied());
         assert(audio.stops==1);
-        assert(AudioSDLTestAccess::master(audio)==0x3f19999au);
+        assert(AudioSDLTestAccess::master(audio)==0x3f800000u);
         session->settings().masterGain={0x3fe00000u,0};
         assert(session->update({})&&AudioSDLTestAccess::master(audio)==0x3f000000u);
         Sink sink;

@@ -302,8 +302,9 @@ area-1 patterns, and names every cut with its reason.
       previous one's bank changes) and before a results restart,
       `DownwellAmiga.cpp` drains the front end's ring, then the run's, into
       `AmigaSoundBanks::audio()` and calls `frame()`; a silent mixer returns
-      at once. The pause menu's volume option (`masterGain`, 0.6 by default)
-      is the mixer's master gain. The scene collision candidate build's
+      at once. The pause menu's volume option (`masterGain`) is the mixer's
+      master gain. It defaults to 1.0 rather than the original's 0.6, so a
+      full-scale sound plays at Paula volume 64. The scene collision candidate build's
       goal-field winds go through the run's ring (`AmigaRunSoundAudio`);
       `AmigaWindAudio` remains only in its probe
       (`verify-amiga-wind-audio`).
@@ -340,17 +341,14 @@ area-1 patterns, and names every cut with its reason.
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
 
-6. **Check the recording and the default volume.** Every reachable sound
+6. **Rerun the recording check.** Every reachable sound
    plays on a natural route in the normal build (see "What exists today"),
    and a listening pass on 2026-11-21 found the plan's steals and drops
-   inaudible, so priorities stay as they are. What remains:
-   - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
-     It passed before W2.4's deferred voice setup. Since then, the native
-     probe's counters and timing pass, but two recordings under a load of 13+
-     lost audio chunks in the capture.
-   - **Volume:** the option scales the mixer as `audio_master_gain` does,
-     so the default 0.6 plays at 60% of Paula's range; decide by ear whether
-     the Amiga should map 0.6 to full volume instead.
+   inaudible, so priorities stay as they are. Rerun
+   `make verify-amiga-paula-mixer` on a quiet host. It passed before W2.4's
+   deferred voice setup. Since then, the native probe's counters and timing
+   pass, but two recordings under a load of 13+ lost audio chunks in the
+   capture.
 
 **Gates for every step:**
 - Quiet-fall stays ≤ 197 fields: idle audio costs nothing but Paula DMA, with

@@ -19,7 +19,7 @@ struct SaveFile {
     std::uint32_t bestCombo = 0;          // stats.recordMaxCombo
     std::int32_t fastestGame = -1;        // stats.recordFastestGame (frames)
     std::int32_t fastestGameHard = -1;    // stats.recordFastestGameHard
-    unsigned masterGainTenths = 6;        // option.masterGain (0.6)
+    unsigned masterGainTenths = 10;       // option.masterGain: 1.0 (the original 0.6)
     bool hardMode = false;                // option.hardMode (-1)
     bool showTimer = false;               // option.showtimer (-1)
 

@@ -6,7 +6,7 @@ namespace downwell {
 // separate admission; master gain must not replace the per-script gameVolume.
 struct EncounterSettings {
     MotionBinary64 gameVolume=MotionBinary64::fromInteger(1);
-    MotionBinary64 masterGain{0x3fe33333u,0x33333333u}; // ini default 0.6
+    MotionBinary64 masterGain{0x3ff00000u,0}; // 1.0 (the original ini default is 0.6)
     bool lowSpec=false,ending=false;
 };
 }

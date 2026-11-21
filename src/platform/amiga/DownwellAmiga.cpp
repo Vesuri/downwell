@@ -3010,8 +3010,9 @@ __attribute__((noinline)) static int runDownwell(void) {
     // commands for the next VBlank: the front end's ring, then the run's.
     // Runs at the top of each iteration, so after the previous one's bank
     // changes, and before a results restart, which rebuilds the run.
-    // The pause menu's volume option (option.masterGain in tenths, 0.6 by
-    // default) is audio_master_gain: it scales every voice.
+    // The pause menu's volume option (option.masterGain in tenths, 1.0 by
+    // default, so a full-scale sound plays at Paula volume 64) is
+    // audio_master_gain: it scales every voice.
     unsigned appliedGainTenths = ~0u;
     auto drainSounds = [&] {
         auto& audio = soundBanks.audio();

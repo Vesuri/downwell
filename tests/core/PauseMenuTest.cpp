@@ -25,7 +25,7 @@ static void saveFile() {
     SaveFile defaults = SaveFile::parse("", 0);
     assert(defaults == SaveFile{});
     assert(!defaults.noBgm && !defaults.hardUnlocked && !defaults.hardMode && !defaults.showTimer);
-    assert(defaults.masterGainTenths == 6 && defaults.fastestGame == -1);
+    assert(defaults.masterGainTenths == 10 && defaults.fastestGame == -1);
     // GameMaker's own text, CRLF, quotes, unknown keys and sections.
     const char* pc =
         "[stats]\r\ngems=\"3412.000000\"\r\nstyle=\"2.000000\"\r\nshader=\"5.000000\"\r\n"
@@ -145,7 +145,7 @@ static void options() {
     m.step(press('R'), save, unlock); m.step(press('F'), save, unlock);
     assert(save.showTimer);
     m.step(press('R'), save, unlock);
-    for (unsigned expected : {5u, 4u, 3u, 2u, 1u, 0u, 10u}) {
+    for (unsigned expected : {9u, 8u, 7u, 6u, 5u, 4u, 3u, 2u, 1u, 0u, 10u}) {
         m.step(press('F'), save, unlock);
         assert(save.masterGainTenths == expected);
     }
