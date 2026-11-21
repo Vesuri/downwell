@@ -19,10 +19,12 @@ compares envelopes, not samples:
    30 ms), and nothing may sound where the render is silent.
 
 The emulator writes slightly fewer frames than 882 per field (about 0.06%),
-so the alignment fits a line through eight separately aligned segments and
-refines each event by up to 40 ms. The whole-run envelope correlation per
-side is only a coarse guard (at least 0.9; residual alignment noise keeps it
-near 0.95); the per-event checks above are the criteria.
+and on a busy host its real-time capture drops whole 60 ms buffers, so the
+alignment follows the recording event by event (each event searched around
+the previous one's offset) and reports the steps it crossed. A dropout
+inside a sound still fails its duration check. The whole-run envelope
+correlation per side is only a coarse guard (at least 0.9); the per-event
+checks above are the criteria.
 
 --wav also writes the aligned recording as a WAV to listen to.
 """
@@ -34,7 +36,7 @@ import numpy as np
 
 RATE = 44100
 WINDOW = 441  # 10 ms
-SLACK = 15    # local alignment, in windows
+TRACK = 8     # an event's offset search around the previous one (a 60 ms gap is 6), in windows
 
 
 def envelopes(stereo):
@@ -86,6 +88,23 @@ def main():
     size = 1 << int(np.ceil(np.log2(sr.size + se.size)))
     corr = np.fft.irfft(np.fft.rfft(sr, size) * np.conj(np.fft.rfft(se, size)), size)[: sr.size - se.size + 1]
     lag = int(np.argmax(corr))
+    # Capture gaps smear the whole-run peak: anchor on the opening 10 s
+    # alone (normalised, so loud later material cannot win), near the end of
+    # boot; event tracking takes over from there.
+    head = se[:1000]
+    best = -2.0
+    for d in range(0, sr.size - head.size):
+        r = sr[d:d + head.size]
+        if r.std() == 0:
+            continue
+        c = float(np.corrcoef(r, head)[0, 1])
+        if c > best:
+            best, lag = c, d
+    # Dropped buffers shorten the recording: pad its envelope with silence
+    # so a lost tail fails as missing sound instead of misaligning.
+    need = lag + ee.shape[0] + TRACK + 60
+    if er.shape[0] < need:
+        er = np.vstack([er, np.zeros((need - er.shape[0], 2))])
     er_all = er
     er = er[lag: lag + ee.shape[0]]
     # Levels: scale the recording to the render by the median ratio over loud windows.
@@ -97,34 +116,34 @@ def main():
     active = ee.sum(axis=1) > floor
     evs = [(s, e) for s, e in events(active) if e - s >= 2]
     full = er_all * scale
-    # Drift: align eight segments separately around the global lag and fit
-    # a line through their offsets.
-    pieces = 8
-    span = ee.shape[0] // pieces
-    xs, ys = [], []
-    for k in range(pieces):
-        seg = ee[k * span:(k + 1) * span].sum(axis=1)
-        if seg.max() <= 0:
-            continue
-        best, off = -1.0, 0
-        for d in range(-60, 61):
-            a0 = lag + k * span + d
-            if a0 < 0 or a0 + span > full.shape[0]:
-                continue
-            r = full[a0:a0 + span].sum(axis=1)
-            c = float((r * seg).sum() / max(np.sqrt((r ** 2).sum() * (seg ** 2).sum()), 1e-9))
+    # Follow the recording event by event: FS-UAE's real-time capture drifts
+    # slightly and, on a busy host, drops whole buffers (fixed 60 ms steps)
+    # between sounds. Each event is aligned by normalised correlation over
+    # the event with 100 ms of context, searched around the previous event's
+    # offset, and the windows up to the next event use its offset.
+    def corr(d, p0, p1, ctx):
+        # Both sides in one vector, so a neighbour on the other side loses.
+        idx = np.clip(lag + np.arange(p0, p1) + d, 0, full.shape[0] - 1)
+        r = full[idx].T.ravel()
+        return float(np.corrcoef(r, ctx)[0, 1]) if r.std() > 0 and ctx.std() > 0 else -1.0
+    offsets, prev = [], 0
+    for s, e in evs:
+        p0, p1 = max(0, s - 10), min(ee.shape[0], e + 10)
+        ctx = ee[p0:p1].T.ravel()
+        best, off = -2.0, prev
+        for d in range(prev - TRACK, prev + TRACK + 1):
+            c = corr(d, p0, p1, ctx)
             if c > best:
                 best, off = c, d
-        xs.append(k * span + span / 2)
-        ys.append(off)
-    slope, intercept = np.polyfit(xs, ys, 1) if len(xs) >= 2 else (0.0, 0.0)
-
-    def drift(t):
-        return slope * t + intercept
-
-    # The recording's envelope mapped onto the render's windows.
-    index = lag + np.arange(ee.shape[0]) + np.rint(drift(np.arange(ee.shape[0]))).astype(int)
-    index = np.clip(index, 0, full.shape[0] - 1)
+        offsets.append(off)
+        prev = off
+    shift_at = np.zeros(ee.shape[0], dtype=int)
+    for (s, _), off in zip(evs, offsets):
+        shift_at[s:] = off
+    if evs:
+        shift_at[:evs[0][0]] = offsets[0]
+    gaps = [b - a for a, b in zip(offsets, offsets[1:]) if b != a]
+    index = np.clip(lag + np.arange(ee.shape[0]) + shift_at, 0, full.shape[0] - 1)
 
     def recorded(t0, t1, d=0):
         return full[np.clip(index[t0:t1] + d, 0, full.shape[0] - 1)]
@@ -140,7 +159,7 @@ def main():
         p0, p1 = max(0, s - 10), min(ee.shape[0], e + 10)
         ctx = ee[p0:p1].sum(axis=1)
         best, shift = -2.0, 0
-        for d in range(-4, 5):
+        for d in range(-2, 3):
             r = recorded(p0, p1, d).sum(axis=1)
             c = float(np.corrcoef(r, ctx)[0, 1]) if r.std() > 0 and ctx.std() > 0 else -1.0
             if c > best:
@@ -175,8 +194,8 @@ def main():
         first = np.nonzero(quiet)[0][np.nonzero(stray)[0][0]]
         problems.append(f"{int(stray.sum())} windows sound where the render is silent (first at {first / 100:.2f} s)")
     corr_side = [np.corrcoef(ee[:, i], er[:, i])[0, 1] for i in range(2)]
-    print(f"drift {slope * 1e4:+.1f} windows per 10,000 ({intercept:+.1f} at the start); "
-          f"aligned at {lag / 100:.2f} s, local shifts {min(shifts):+d}..{max(shifts):+d} windows; {len(evs)} events; "
+    print(f"aligned at {lag / 100:.2f} s; {len(gaps)} capture gaps or drift steps between events "
+          f"(net {offsets[-1] - offsets[0]:+d} windows); local shifts {min(shifts):+d}..{max(shifts):+d}; {len(evs)} events; "
           f"envelope correlation L {corr_side[0]:.3f} R {corr_side[1]:.3f}; "
           f"event levels {min(levels) - med:+.1f}..{max(levels) - med:+.1f} dB around the median")
     if a.wav:
