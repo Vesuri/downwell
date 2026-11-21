@@ -148,13 +148,24 @@ endif
 ifneq ($(REFERENCE_FRAME_WORK)$(REFERENCE_ROW_PAINTING),)
 $(error REFERENCE_FRAME_WORK and REFERENCE_ROW_PAINTING were renamed: use FRAME_WORK_CANDIDATE=1 and PREPARED_PATTERN_ROWS=1 for the candidates)
 endif
-# Keep the measured default; allow controlled compiler comparisons.
-AMIGA_OPTIMIZATION ?= -O3
+# WR.3: -Os by default, the per-update hot paths at -O2. On the A500 the
+# quiet fall takes 227 fields this way, 200 at -O3, 211 at -O2 and 261 at
+# -Os alone; the executable is less than two-thirds of -O3's.
+AMIGA_OPTIMIZATION ?= -Os
 ifneq ($(words $(AMIGA_OPTIMIZATION)),1)
 $(error AMIGA_OPTIMIZATION must be -O2, -O3 or -Os)
 endif
 ifneq ($(filter-out -O2 -O3 -Os,$(AMIGA_OPTIMIZATION)),)
 $(error AMIGA_OPTIMIZATION must be -O2, -O3 or -Os)
+endif
+# WR.3: objects compiled at AMIGA_HOT_OPTIMIZATION instead. GCC records the
+# level per function, so it survives the LTO link at AMIGA_OPTIMIZATION.
+AMIGA_HOT_OPTIMIZATION ?= -O2
+AMIGA_HOT_OBJECTS ?= obj/AmigaPortRuntime.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o \
+	obj/AmigaGameplayDrawList.o obj/AmigaGameplayRows.o obj/AmigaGameplayActors.o \
+	obj/AmigaGameplayGeneration.o obj/AmigaPaulaAudio.o
+ifneq ($(filter-out -O2 -O3 -Os,$(AMIGA_HOT_OPTIMIZATION)),)
+$(error AMIGA_HOT_OPTIMIZATION must be -O2, -O3 or -Os)
 endif
 ifeq ($(PROBES)$(FPSCOUNT),11)
 $(error Use PROBES or FPSCOUNT separately)
@@ -777,7 +788,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(AMIGA_HOT_OPTIMIZATION) $(AMIGA_HOT_OBJECTS)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DRAW_LIST)' >> $@.tmp
 	@printf '%s\n' '$(FRAME_WORK_CANDIDATE)' >> $@.tmp
@@ -1320,6 +1331,21 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
+# WR.2 shipping size gate: `make size-gate STRIP=1` on the default
+# configuration. Ceilings sit just above the current build; lower them as
+# WR shrinks it. Verify, probe and profile builds are not shipping builds.
+SIZE_MAX_EXE ?= 1150000
+SIZE_MAX_TEXT ?= 690000
+SIZE_MAX_DATA ?= 425000
+SIZE_MAX_BSS ?= 1280000
+.PHONY: size-gate
+size-gate: $(OUT).exe
+	@if [ '$(STRIP)' != 1 ]; then echo "*** size-gate measures the stripped executable: use STRIP=1"; exit 1; fi
+	@if [ -n '$(filter %_VERIFY -DDOWNWELL_PROBES -DDOWNWELL_FPSCOUNT -DDOWNWELL_PROFILE_%,$(CFLAGS))' ]; then \
+		echo "*** size-gate needs the shipping configuration, not $(filter %_VERIFY -DDOWNWELL_PROBES -DDOWNWELL_FPSCOUNT -DDOWNWELL_PROFILE_%,$(CFLAGS))"; exit 1; fi
+	OBJDUMP=$(OBJDUMP) python3 $(REPO)/tools/amiga-size-report.py $(OUT).elf --exe $(OUT).exe --top 0 --classes 0 \
+		--max-exe $(SIZE_MAX_EXE) --max-text $(SIZE_MAX_TEXT) --max-data $(SIZE_MAX_DATA) --max-bss $(SIZE_MAX_BSS)
+
 audit: $(OUT).elf
 	@if [ '$(ENTRY_WIPE_VERIFY)' != 1 ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_entry_mask'; then \
 		echo "*** entry mask must be scene-loaded, not linked"; exit 1; fi
@@ -1380,3 +1406,5 @@ clean:
 
 -include $(OBJECTS:.o=.d)
 -include obj/WindAudioProbe.d obj/WindAudioProbeDriver.d
+
+$(AMIGA_HOT_OBJECTS): CPPFLAGS += $(AMIGA_HOT_OPTIMIZATION)
