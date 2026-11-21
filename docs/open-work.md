@@ -245,6 +245,17 @@ area-1 patterns, and names every cut with its reason.
     `RunSession` hooks drive the registered owners.
   - The compact world, shops, run session, pause menu, clear screen,
     results and front end write `SoundRequests` (W2.3).
+  - **The Paula mixer (W2.4)** is built and checked, but not yet wired:
+    - `PaulaMixer.h` holds the portable plan and sequencer, and
+      `AmigaPaulaAudio` is the hardware driver. It plays the DWSX pack that
+      `tools/pack-amiga-sfx.py` makes from the W2.2 bank.
+    - `make test-paula-mixer` runs the unit checks and the route replays.
+    - `make verify-amiga-paula-mixer` plays every sound and the mixer
+      exercises in FS-UAE and compares the recording with the host render.
+      It runs in real time, so it needs a quiet host: under load the SDL
+      disk capture drops chunks.
+    - The game still uses `AmigaWindAudio`, and nothing drains the request
+      rings yet.
 - **Memory:** measured on 2026-11-20 with the normal 1 MiB build in level
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
@@ -273,44 +284,45 @@ area-1 patterns, and names every cut with its reason.
    The floor material for footsteps and landings is approximated from three
    probes under the player. The pause menu's sounds are only on the native
    menus route (`tools/verify-menus-native.py`), not on a host route.
-4. **Paula mixer.** It is also the first player of the W2.2 bank: listen
-   to the chosen set in FS-UAE before wiring.
-   - **Request contract:** drain `GameplayWorld::soundRequests()` and
-     `AmigaSceneRuntime::sounds().requests()` once per frame (nothing on the
-     Amiga drains them yet; a full ring drops its oldest request). Drain the
-     run's ring before `restartFromResults` or any world rebuild, which
-     resets it. A play carries asset × script gain, pitch, priority, loop,
-     cut and the `OLchannel` category; a gain request may carry a fade time
-     (`fadeMs`); ids below `SoundVoices::firstVoice` name an asset (all its
-     voices). Music requests (category 5, `levelBeginCue`) are logged for WM
-     and may be ignored.
-   - **Generalise `AmigaWindAudio`** into four voices, with commands
-     published by the main loop and applied in the VBlank, and no allocation
-     in IRQs.
-   - **Voice stealing:** take a free voice; otherwise steal the lowest
-     priority (the oldest on ties) when the new sound's priority is at least
-     as high; otherwise drop the sound.
-   - **Playback:** one-shots end on a silent word and loops repeat their
-     segment. The period comes from rate × pitch; the volume is asset ×
-     `gameVolume` × master, scaled to 0–64.
-   - **Panning:** each voice is hard-panned (Paula's 0 and 3 left, 1 and 2
-     right). Alternate sides between consecutive starts where that is free.
-   - **No streaming:** every sample is Chip-resident. Any long sound that is
-     kept (winds, ambience, the clear-screen whoosh) is cut to a short loop
-     or segment.
-   - **Music later:** let WM reserve some of the four voices.
 5. **Scene-local banks.**
    - **Gameplay bank:** loaded with the cavern banks and kept across Retry,
      like the plane atlas. Pause sounds live in it.
    - **Front-end bank:** title, garden, style select and menus.
    - **Clear and results sounds:** in the gameplay bank or in those scenes'
      transient banks, whichever the inventory favours.
+   - **Size:** the whole pack is 505,862 bytes, more than the ~465 KiB
+     free in level 1-1. Split it by scene (`scenes` in
+     `generated/amiga-sfx.json`), or pack per scene, and load each pack into
+     Chip with its scene. The mixer needs only an 8-byte silent word of its
+     own.
    - **Gates:** measure free and largest Chip before and after
      (`verify-amiga-memory`, `verify-amiga-startup`), and keep the 1 MiB
      startup gate.
+   - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
+     It passed before W2.4's deferred voice setup. Since then, the native
+     probe's counters and timing pass, but two recordings under a load of 13+
+     lost audio chunks in the capture.
 6. **Wire world 1 by groups.** Each group is audible on a natural route and
    checked natively: GDB reads the voice table at the ticks the host log
-   names. The groups:
+   names.
+   - **Replace the old audio:** `AmigaPaulaAudio` replaces `AmigaWindAudio`
+     in `AmigaEncounterResources`. The wind becomes an ordinary bank sound.
+   - **Request contract:** drain `GameplayWorld::soundRequests()` and
+     `AmigaSceneRuntime::sounds().requests()` once per frame into
+     `AmigaPaulaAudio::submit`, then call `frame()` (a full ring drops its
+     oldest request). Drain the run's ring before `restartFromResults` or any
+     world rebuild, which resets it.
+     - A play carries asset × script gain, pitch, priority, loop, cut and
+       the `OLchannel` category.
+     - A gain request may carry a fade time (`fadeMs`).
+     - Ids below `SoundVoices::firstVoice` name an asset (all its voices).
+     - Music requests (category 5, `levelBeginCue`) are counted for WM and
+       ignored.
+   - **Route replay:** the host plan steals 178 and drops 73 of the world-one
+     route's 1,771 plays (hard mode: 135 and 42 of 1,921). Listen for drops
+     that matter, and tune priorities if needed.
+
+   The groups:
    1. player, guns (`bStatSound`, empty, recharge, low ammo), bullet hits,
       stomps and gems, on the world-one route;
    2. enemies, rock and box breaks, torches and gem chunks;
@@ -422,6 +434,21 @@ W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
   plays.
 - Recover the gate before W3's 20 ms work, and move the player's rare-state
   bookkeeping behind a single test.
+
+W2.4's mixer costs, from the probe on the A500 (raster lines of about
+64 µs):
+- **VBlank service:** at most 6 lines.
+- **`submit` of a play:** about 2.4 lines on a free channel, or 4.9 when it
+  steals. A gain costs about 4.
+- **`frame()`:** about 6.6 lines for each channel whose sound changed, at
+  most four a frame. A play only claims a channel; the final sound's bank
+  entry, period, length and volume are worked out once, at publish.
+- **Worst case:** the world-one route's worst tick (17 plays) should cost
+  about 110 lines (7 ms) on that update. The mean tick is about 2 requests.
+- **Idle:** idle channels cost nothing but Paula DMA, with no per-update
+  scans.
+- **Memory:** about 500 bytes of any memory for the plan, sequencer and
+  mailbox, plus the 8-byte Chip silent word and the bank.
 
 The wall-kick pose (`sprPlayerWall`, frame 0 with mirrored, DMA and
 afterimage forms) takes the cavern CPU bank to 368,798 bytes (ceiling raised

@@ -3731,3 +3731,29 @@ test-sound-routes: build/amiga-front-end-sound-test generate-room-pack generate-
 	DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_OUTPUT=tmp/sound-route-world-one ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_SLICE_HARD=1 DOWNWELL_VERIFY_WORLD_ONE_SLICE=1 DOWNWELL_SLICE_OUTPUT=tmp/sound-route-hard-mode-death ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 test: test-sound-routes
+
+# W2.4 Paula mixer: the DWSX pack of the W2.2 bank, the mixer's unit checks,
+# the probe schedule's host render, the route logs replayed through the plan
+# (no requested sound missing), and the native probe recorded in FS-UAE and
+# compared with the render (verify-amiga-paula-mixer, real time: ~2 min).
+extracted/amiga-sfx/bank/manifest.json: tools/sfx-bank.py tools/sfx-bank-policy.json
+	python3 tools/sfx-bank.py --bank
+generated/amiga-sfx.bin: tools/pack-amiga-sfx.py extracted/amiga-sfx/bank/manifest.json extracted/audio/manifest.json
+	python3 tools/pack-amiga-sfx.py
+generated/amiga-sfx.h generated/amiga-sfx.json: generated/amiga-sfx.bin
+build/paula-mixer-test: tests/platform/amiga/PaulaMixerTest.cpp tests/platform/amiga/PaulaModel.h tests/platform/amiga/PaulaProbeSchedule.h src/platform/amiga/PaulaMixer.h $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -Itests/platform/amiga $(CXXFLAGS) -o $@ tests/platform/amiga/PaulaMixerTest.cpp
+.PHONY: test-paula-mixer verify-amiga-paula-mixer
+test-paula-mixer: build/paula-mixer-test generated/amiga-sfx.bin test-sound-routes
+	python3 tools/pack-amiga-sfx.py --check
+	./build/paula-mixer-test generated/amiga-sfx.bin tmp/paula-probe-expected.wav
+	./build/paula-mixer-test generated/amiga-sfx.bin --route tmp/menus-route.sounds tmp/sound-route-world-one.sounds tmp/sound-route-hard-mode-death.sounds
+test: test-paula-mixer
+verify-amiga-paula-mixer: build/paula-mixer-test generated/amiga-sfx.bin
+	@mkdir -p tmp captures
+	./build/paula-mixer-test generated/amiga-sfx.bin tmp/paula-probe-expected.wav
+	. amiga/env.sh && $(MAKE) -C amiga -j4 paula-mixer-probe
+	rm -f tmp/paula-probe.raw
+	cd amiga && VERIFY_PROGRAM=out/PaulaMixerProbe VERIFY_TIMEOUT_SECONDS=500 GDB_SOURCE=verify_paula_mixer.gdb READY_MARKER=DOWNWELL_PAULA_MIXER_READY READY_DESCRIPTION='Paula mixer schedule' VERIFY_AUDIO_FILE="$(CURDIR)/tmp/paula-probe.raw" bash verify_startup.sh
+	python3 tools/compare-paula-recording.py tmp/paula-probe.raw tmp/paula-probe-expected.wav --events tmp/paula-probe-expected.wav.events --wav captures/paula-probe.wav

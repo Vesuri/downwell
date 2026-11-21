@@ -53,6 +53,9 @@ done
 if [ "$VERIFY_PROGRAM" = out/WindAudioProbe ]; then
   cp -f out/Downwell.wind "$DH1/Downwell.wind"
 fi
+if [ "$VERIFY_PROGRAM" = out/PaulaMixerProbe ]; then
+  cp -f out/Downwell.sfx "$DH1/Downwell.sfx"
+fi
 # W1.10: verification starts from a fresh save unless VERIFY_SAVE seeds one.
 rm -f "$DH1/save.ini"
 if [ -n "${VERIFY_SAVE:-}" ]; then cp -f "$VERIFY_SAVE" "$DH1/save.ini"; fi
@@ -75,6 +78,16 @@ VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 
 # Quiet debug run (no sound, window behind the others): fsuae_options in $FSUAE_COMMON.
 KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB="$VERIFY_CHIP_KB" FAST_KB=8192 WARP=1 DEBUG=1
+# VERIFY_AUDIO_FILE (an absolute path): record Paula's output instead, in
+# real time, as raw 16-bit stereo through SDL's disk driver, with UAE's
+# output filter and interpolation off and full stereo separation.
+if [ -n "${VERIFY_AUDIO_FILE:-}" ]; then
+  case "$VERIFY_AUDIO_FILE" in /*) ;; *) echo "VERIFY_AUDIO_FILE must be absolute"; exit 1 ;; esac
+  rm -f "$VERIFY_AUDIO_FILE"
+  WARP=0 SOUND=1
+  export SDL_AUDIODRIVER=disk SDL_DISKAUDIOFILE="$VERIFY_AUDIO_FILE"
+  EXTRA_ARGS="${EXTRA_ARGS:-} --audio_driver=sdl --uae_sound_filter=off --uae_sound_interpol=none --uae_sound_stereo_separation=10"
+fi
 echo "A500 verification: Chip=${CHIP_KB} KiB Fast=${FAST_KB} KiB"
 # 1 MiB Chip is an A500 with the ECS 8372A Agnus; 512 KiB keeps the OCS one.
 VERIFY_CHIPSET=ocs

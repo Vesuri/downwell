@@ -964,6 +964,32 @@ out/WindAudioProbe.elf: obj/WindAudioProbe.o obj/WindAudioProbeDriver.o obj/Amig
 out/WindAudioProbe.exe: out/WindAudioProbe.elf
 	elf2hunk $< $@ -s
 
+# W2.4 Paula mixer listening probe; does not replace the game executable.
+.PHONY: paula-mixer-probe
+paula-mixer-probe: out/PaulaMixerProbe.exe out/Downwell.sfx
+
+out/Downwell.sfx: $(REPO)/generated/amiga-sfx.bin
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(REPO)/generated/amiga-sfx.bin $(REPO)/generated/amiga-sfx.h: $(REPO)/tools/pack-amiga-sfx.py
+	$(MAKE) -C $(REPO) generated/amiga-sfx.bin
+
+obj/AmigaPaulaAudio.o: $(AMIGA_SRC)/AmigaPaulaAudio.cpp $(AMIGA_SRC)/AmigaPaulaAudio.h $(AMIGA_SRC)/PaulaMixer.h $(REPO)/src/core/SoundRequests.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/PaulaMixerProbe.o: $(REPO)/tests/platform/amiga/PaulaMixerProbe.cpp $(REPO)/tests/platform/amiga/PaulaProbeSchedule.h $(AMIGA_SRC)/AmigaPaulaAudio.h $(AMIGA_SRC)/PaulaMixer.h $(REPO)/generated/amiga-sfx.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -I$(REPO)/generated -I$(REPO)/tests/platform/amiga -c -o $@ $<
+
+out/PaulaMixerProbe.elf: obj/PaulaMixerProbe.o obj/AmigaPaulaAudio.o obj/AmigaPlatform.o obj/AmigaHardware.o obj/CopperList.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/PaulaMixerProbe.map $^ -o $@
+
+out/PaulaMixerProbe.exe: out/PaulaMixerProbe.elf
+	elf2hunk $< $@ -s
+
 obj/AmigaProfile.o: $(AMIGA_SRC)/AmigaProfile.cpp $(AMIGA_SRC)/AmigaProfile.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
