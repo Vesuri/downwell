@@ -1826,9 +1826,11 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
     }
 #endif
     for (int x = mainViewX - 160; x <= mainViewX + 160; x += 160)
-        for (int y = 0; y < lastY; y += downwellDisplayHeight) {
-            int height = lastY - y;
+        for (int y = 0, height = 0; y < lastY; y += height) {
+            height = lastY - y;
             if (height > downwellDisplayHeight) height = downwellDisplayHeight;
+            if (unsigned(height) > AmigaTerrainRaster::contiguousRows(unsigned(y)))
+                height = int(AmigaTerrainRaster::contiguousRows(unsigned(y)));
             amigaRendererSetGameOrigin(renderer, 0);
 #if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER)
             // The raster is the destination, not a copy of scratch Chip RAM.
@@ -1979,8 +1981,8 @@ extern "C" __attribute__((noinline, used)) void downwellStartupFailed() {
 // bytes of Chip (DMA data only) and of other public memory (Fast when
 // present, else Chip). Measured on the world-one route on the A500 with
 // Fast (2026-11-21): free memory after boot (out/FreeMemoryProbe) less the
-// route's low-water mark less the 4,139,108 loaded hunk bytes, rounded up
-// to whole KB. DOWNWELL_MEMORY_SAMPLE=1 on the native routes fails when
+// route's low-water mark less the loaded hunks, rounded up to whole KB
+// (676,672 bytes of public memory with the ring terrain raster). DOWNWELL_MEMORY_SAMPLE=1 on the native routes fails when
 // the use it sees exceeds these. The hunks themselves must already have
 // loaded for this check to run.
 extern "C" {
@@ -1989,7 +1991,7 @@ extern "C" {
 extern const volatile ULONG downwellChipRequirement;
 extern const volatile ULONG downwellPublicRequirement;
 __attribute__((used)) const volatile ULONG downwellChipRequirement = 940u * 1024u;
-__attribute__((used)) const volatile ULONG downwellPublicRequirement = 1585u * 1024u;
+__attribute__((used)) const volatile ULONG downwellPublicRequirement = 661u * 1024u;
 }
 
 static char* appendKilobytes(char* out, ULONG bytes)

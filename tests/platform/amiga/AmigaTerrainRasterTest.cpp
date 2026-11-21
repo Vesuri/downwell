@@ -522,4 +522,35 @@ int main() {
         ++cases;
     }
     std::printf("Terrain raster: %u store/load/wrap/pipeline cases, exact pixels and preserved margins\n",cases);
+    {
+        // Ring storage: a slot holds one world row; claiming it dirties the
+        // previous holder, runs stop at a lap, and clean transfers that cross
+        // a lap read each row's own slot.
+        constexpr unsigned ring=AmigaTerrainRaster::ringRows;
+        auto ringRaster=std::make_unique<AmigaTerrainRaster>();
+        std::vector<UWORD> storage(AmigaTerrainRaster::storageBytes/2,0);
+        assert(ringRaster->bindStorage(storage.data(),AmigaTerrainRaster::storageBytes));
+        const unsigned lap=2*ring-8; // first row of the third lap
+        assert(AmigaTerrainRaster::contiguousRows(lap-40)==40&&AmigaTerrainRaster::contiguousRows(lap)==ring);
+        assert(!ringRaster->writeRows(1,lap-40,41));
+        for(unsigned y=lap-40;y<lap+40;++y){
+            auto* row=ringRaster->writeRows(1,y,1);
+            for(unsigned w=0;w<22;++w)row[w]=UWORD(y*7+w);
+        }
+        assert(ringRaster->runEnd(1,lap-40,lap+40)==lap&&ringRaster->runEnd(1,lap,lap+40)==lap+40);
+        AmigaGameplayRows debts;
+        std::vector<UBYTE> actual(downwellGameRingBytes,0x5a);
+        AmigaRenderer renderer{};renderer.game=actual.data();renderer.gameOrigin=290;
+        ringRaster->transfer(&renderer,1,int(lap-40),0,80,false,nullptr,nullptr,0,debts);
+        for(unsigned y=0;y<80;++y)for(unsigned p=0;p<2;++p){
+            const unsigned physical=(290+y)%320;
+            assert(std::memcmp(actual.data()+p*downwellGameRingPlaneBytes+physical*48+12,
+                ringRaster->readRow(1,lap-40+y,nullptr)+p*11,22)==0);
+        }
+        for(unsigned y=lap-40;y<lap+40;++y)assert(!ringRaster->dirty(1,y));
+        (void)ringRaster->writeRows(1,lap-40+ring,8);
+        for(unsigned y=lap-40;y<lap+40;++y)assert(ringRaster->dirty(1,y)==(y<lap-32));
+        assert(!ringRaster->dirty(1,lap-40+ring));
+        std::puts("Terrain raster ring: slot eviction, lap-bounded runs and cross-lap transfer passed");
+    }
 }

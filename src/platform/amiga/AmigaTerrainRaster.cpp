@@ -178,7 +178,6 @@ static void composeTerrainBand(const AmigaPatternRow& band,UBYTE* low,UBYTE* hig
 void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
     int worldY, int screenY, int height, bool store, Bitmap* terrainCopyTarget,
     const Bitmap* terrainCopyBacking, unsigned terrainCopyBuffer, AmigaGameplayRows& gameplayRows) {
-    UWORD* cachedRow = store?writeRows(column,worldY,height):&pixels_[column][worldY][0][0];
     unsigned physical = renderer->gameOrigin + screenY;
     if (physical >= downwellGameRingHeight) physical -= downwellGameRingHeight;
     if (!store) {
@@ -188,6 +187,8 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
             unsigned count = downwellGameRingHeight - physical;
             if (count > remaining) count = remaining;
             if (pipeline && count > 128) count = 128;
+            if (count > contiguousRows(unsigned(worldY))) count = contiguousRows(unsigned(worldY));
+            const UWORD* cachedRow = at(column, unsigned(worldY));
             UBYTE* row = renderer->game + physical * downwellBytesPerPlaneLine + x / 8;
 #ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
             if(initial_||patternBorrowed_){
@@ -215,7 +216,7 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
                     }else if(dirty_[column][worldY+done]&16){
                         const unsigned first=done;
                         do{++done;}while(done<count&&(dirty_[column][worldY+done]&16));
-                        composeTerrainRows(&pixels_[column][worldY+first][0][0],row+first*48,
+                        composeTerrainRows(at(column,unsigned(worldY)+first),row+first*48,
                             row+downwellGameRingPlaneBytes+first*48,done-first);
                     }else if(dirty_[column][worldY+done]&8){
                         const unsigned end=borrowedRunEnd(column,worldY+done,worldY+count)-worldY;
@@ -254,7 +255,6 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
                 gameplayRows.copied(physical, count, terrainCopyBuffer);
             }
             remaining -= count;
-            cachedRow += count * words * 2;
             worldY += count;
             physical += count;
             if (physical == downwellGameRingHeight) physical = 0;
@@ -262,6 +262,7 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
         return;
     }
     for (int y = 0; y < height; ++y) {
+        UWORD* const cachedRow = writeRows(column, unsigned(worldY + y), 1);
         for (unsigned plane = 0; plane < 2; ++plane) {
             UWORD* chip = (UWORD*)(renderer->game + plane * downwellGameRingPlaneBytes +
                 physical * downwellBytesPerPlaneLine + x / 8);
@@ -279,7 +280,6 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
             std::memcpy(cached, chip, words * sizeof(UWORD));
 #endif
         }
-        cachedRow += words * 2;
         if (++physical == downwellGameRingHeight) physical = 0;
     }
 }

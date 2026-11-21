@@ -6,11 +6,31 @@
 #include "core/ShopWorld.h"
 #include <cstring>
 class Bitmap;
-// Fast-RAM raster for the left room, well and right room. Transfer only
+// Ordinary-memory raster for the left room, well and right room. Transfer only
 // exposed/invalidated spans into the Chip-RAM circular backing/display rings.
+// Pixel storage is a ring of ringRows rows per column: world row y lives in
+// slot (y+8)%ringRows, so a ring lap starts on a 16-line band boundary and no
+// band or run that runEnd returns wraps. Claiming a slot marks the row that
+// held it dirty, so it is painted again before it is read.
 class AmigaTerrainRaster {
-    using PixelColumn = UWORD[8192][2][AmigaGameplayRows::terrainWords];
+public:
+    static constexpr unsigned ringRows = 1024;
+private:
+    using PixelColumn = UWORD[ringRows][2][AmigaGameplayRows::terrainWords];
     PixelColumn* pixels_=nullptr;
+    // World row + 1 whose pixels each slot holds; 0 when none.
+    UWORD owner_[3][ringRows]{};
+    static unsigned slot(unsigned y){return (y+8)&(ringRows-1);}
+    // Bits 1, 2 and 5 keep a row's pixels outside the slot storage.
+    static bool stored(unsigned char flags){return !(flags&38);}
+    UWORD* at(unsigned column,unsigned y){return &pixels_[column][slot(y)][0][0];}
+    const UWORD* at(unsigned column,unsigned y)const{return &pixels_[column][slot(y)][0][0];}
+    void claim(unsigned column,unsigned y){
+        auto& owner=owner_[column][slot(y)];
+        if(owner==y+1)return;
+        if(owner&&stored(dirty_[column][owner-1]))dirty_[column][owner-1]=1;
+        owner=UWORD(y+1);
+    }
     AmigaPatternRow* bands_=nullptr;
     // Bit 0: repaint required. Bit 1: current pixels belong to the immutable
     // initial-room dictionary, not pixels_. Bit 2: verified corridor row.
@@ -28,6 +48,7 @@ class AmigaTerrainRaster {
     bool shopRevisionsPopulated_=false;
 public:
     static constexpr unsigned rows = 8192, words = AmigaGameplayRows::terrainWords;
+    static_assert((ringRows&(ringRows-1))==0&&ringRows%16==0&&ringRows<=rows,"ring laps are whole bands");
 #if defined(DOWNWELL_PLATFORM_AMIGA) && !defined(DOWNWELL_PREPARED_PATTERN_ROWS)
     static constexpr unsigned bandStorageBytes=0;
 #else
@@ -45,6 +66,7 @@ public:
         fallbackFirst_=rows;fallbackEnd_=0;
         ++revision_;
         for(auto& column:dirty_)for(auto& row:column)row=0;
+        for(auto& column:owner_)for(auto& row:column)row=0;
         for(auto& revision:shopRevision_)revision=0;
         shopRevisionsPopulated_=false;
         return true;
@@ -56,13 +78,17 @@ public:
     static constexpr unsigned stagePaintRows = 16;
     enum StagePaint { stageFailed=0, stageInBacking=1, stageInCache=2 };
     bool ready = false;
+    // Rows that share one ring lap: a write of more rows would wrap.
+    static unsigned contiguousRows(unsigned y){return ringRows-slot(y);}
     UWORD* writeRows(unsigned column,unsigned y,unsigned height){
+        if(height>contiguousRows(y))return nullptr;
+        for(unsigned i=y;i<y+height;++i){
 #ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
-        for(unsigned i=y;i<y+height;++i)dirty_[column][i]&=1;
-#else
-        (void)height;
+            dirty_[column][i]&=1;
 #endif
-        return &pixels_[column][y][0][0];
+            claim(column,i);
+        }
+        return at(column,y);
     }
     UWORD* row(unsigned column, unsigned y) { return writeRows(column,y,1); }
     const UWORD* readRow(unsigned column,unsigned y,UWORD* scratch)const{
@@ -74,13 +100,13 @@ public:
         }
         if(dirty_[column][y]&16){
             AmigaPatternRow row;
-            std::memcpy(&row,&pixels_[column][y][0][0],sizeof row);
+            std::memcpy(&row,at(column,y),sizeof row);
             row.write(scratch,scratch+words);
             return scratch;
         }
         if(dirty_[column][y]&8){
             const unsigned char* source;
-            std::memcpy(&source,&pixels_[column][y][0][0],sizeof source);
+            std::memcpy(&source,at(column,y),sizeof source);
 #ifdef DOWNWELL_PLATFORM_AMIGA
             return reinterpret_cast<const UWORD*>(source);
 #else
@@ -89,16 +115,18 @@ public:
 #endif
         }
         if(dirty_[column][y]&4)return initial_->corridorRow(y,scratch);
-        return (dirty_[column][y]&2)?initial_->row(column,y,scratch):&pixels_[column][y][0][0];
+        return (dirty_[column][y]&2)?initial_->row(column,y,scratch):at(column,y);
     }
     // The immutable bank shares this gameplay lease. Reuse the row's existing
     // storage for its pointer; no parallel per-pixel ownership array is needed.
     void borrowPatternRow(unsigned column,unsigned y,const unsigned char* source){
-        std::memcpy(&pixels_[column][y][0][0],&source,sizeof source);
+        claim(column,y);
+        std::memcpy(at(column,y),&source,sizeof source);
         dirty_[column][y]=(dirty_[column][y]&1)|8;patternBorrowed_=true;
     }
     void borrowPatternRow(unsigned column,unsigned y,const AmigaPatternRow& source){
-        std::memcpy(&pixels_[column][y][0][0],&source,sizeof source);
+        claim(column,y);
+        std::memcpy(at(column,y),&source,sizeof source);
         dirty_[column][y]=(dirty_[column][y]&1)|16;patternBorrowed_=true;
     }
     // One immutable-art descriptor owns an entire admitted 16-line band.
@@ -122,11 +150,11 @@ public:
         }
         if(first>=end||!(dirty_[column][first]&8))return first;
         const unsigned char* source;
-        std::memcpy(&source,&pixels_[column][first][0][0],sizeof source);
+        std::memcpy(&source,at(column,first),sizeof source);
         unsigned next=first+1;
         for(;next<end&&(dirty_[column][next]&8);++next){
             const unsigned char* row;
-            std::memcpy(&row,&pixels_[column][next][0][0],sizeof row);
+            std::memcpy(&row,at(column,next),sizeof row);
             if(row!=source+(next-first)*words*2*sizeof(UWORD))break;
         }
         return next;
@@ -158,11 +186,13 @@ public:
             if(!(dirty_[column][y]&2))continue;
             const auto* source=initial_->row(column,y,scratch);
             if(!source)return false;
-            std::memcpy(&pixels_[column][y][0][0],source,AmigaInitialTerrain::rowBytes);
+            claim(column,y);
+            std::memcpy(at(column,y),source,AmigaInitialTerrain::rowBytes);
             dirty_[column][y]&=static_cast<unsigned char>(~2u);
         }
         return true;
     }
+    // Eviction sets the bit, so a clean stored row always owns its slot.
     bool dirty(unsigned column, unsigned y)const { return (dirty_[column][y]&1)!=0; }
     bool needsPatternMaterialization(unsigned y)const{
         return (dirty_[1][y]&33)==32&&bands_[(y+8)/16].tiles[0];
@@ -219,7 +249,7 @@ public:
         if(column>=3 || first>=end || end>rows)return first;
         const bool state=dirty(column,first);
         unsigned next=first+1;
-        while(next<end && dirty(column,next)==state)++next;
+        while(next<end && slot(next) && dirty(column,next)==state)++next;
         return next;
     }
     void invalidate(int first, int end);
