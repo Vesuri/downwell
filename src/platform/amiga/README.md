@@ -59,6 +59,13 @@ The display is specified in `docs/amiga-display.md`: a 380x284 canvas on a
 panels. PAL timing is direct: one simulation step per 50 Hz VERTB, so the
 game runs at five-sixths of the Windows version's wall-clock speed.
 
+Knobs fall into shipping, gate, development, verify, profile and reference
+sets (`make -C amiga knobs`; `tools/amiga-knobs.py` holds the
+classification and `make check` fails on an unclassified knob). Builds
+without the collision owner are world-one builds (`DOWNWELL_WORLD_ONE_ONLY`):
+`make -C amiga audit` fails if a later-area family named in
+`amiga/world-one-manifest.json` links.
+
 ## Verifiers
 
 `make verify-cross-replay` replaces joystick sampling only in a temporary

@@ -507,16 +507,17 @@ the BSS cuts (WR.5); `MACHINE=a1200-4m` as the gates' default.
 allocations) against 4,082,896 free on the A1200 with 4 MB Fast. Keep the
 size gate's ceilings just above the shipping build as it shrinks.
 
-Remaining:
+Also done: knob sets (shipping, gate, development, verify, profile,
+reference; `make knobs`, checked by `make check` through
+`tools/amiga-knobs.py`) and the world-one profile (WR.4): builds without the
+collision owner define `DOWNWELL_WORLD_ONE_ONLY`, later-area family
+bindings compile out, and `audit` runs `tools/audit-amiga-world-one.py`
+against `amiga/world-one-manifest.json`.
 
-1. **Build profiles (rest of WR.2).** Move `*_VERIFY` and oracle code out of
-   the shipping sources (`DownwellAmiga.cpp` has about 280 conditionals) and
-   group the Amiga knobs into shipping, development, verify, profile and
-   reference sets. The shipping build already compiles them out; 56 GDB
-   hook variables (244 bytes) remain in it.
-2. **World-1 manifest (WR.4).** One manifest (areas, rooms, families,
-   upgrades, builders, banks) drives the admission points and a map-file
-   gate beside `audit` that fails when code outside it links.
+Remaining (maintenance, no shipping effect): move the verifier code out of
+`DownwellAmiga.cpp` (192 of its 284 conditionals are `*_VERIFY`/`*_AUDIT`,
+32 reference, 22 profile). The shipping build already compiles all of it
+out; every moved verifier must still pass its own gate.
 
 Further memory candidates, if the margin is needed later (each keeps
 behaviour): `terrainIndex` 76,814 (objects only land at index x 16..464 of
