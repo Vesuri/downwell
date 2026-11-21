@@ -27,6 +27,14 @@ End to end on the A500 route build, shell free minus the route's low-water
 marks is about 3.74 MB; that build carries 282 KB more BSS and 26 KB more
 `.rodata` than shipping.
 
+Candidates if the margin is ever needed (each keeps behaviour):
+`terrainIndex` 76,814 (objects only land at index x 16..464 of -512..1536;
+narrowing changes the generated room plan, the landing index and the
+painter clamps), `GameplayWorld` record widths (the 32-byte
+`SoundPlayState` per box), `nativeTerrainStorage` runs (sized for 2,048
+cells; native peak 950 runs). Lower a capacity only with a bound covering
+every world-1 level: overflow fails the run.
+
 `amiga/probe_allocations.gdb` lists every exec `AllocMem`/`FreeMem` with its
 caller; `DOWNWELL_MEMORY_SAMPLE=1` on `tools/verify-world-one-native.py`
 reports the route's low-water marks; `tools/amiga-size-report.py` attributes

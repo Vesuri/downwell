@@ -7,7 +7,7 @@ the default); the code stays
 for its DMA data and enough public memory for everything else
 (`downwellMemoryFits` checks both with `AvailMem` before allocating).
 Memory figures and the remaining budget: `docs/amiga-memory.md`. Unfinished
-work: `docs/open-work.md` (W and WR).
+work: `docs/open-work.md` (W).
 
 ## Status
 
@@ -65,6 +65,10 @@ classification and `make check` fails on an unclassified knob). Builds
 without the collision owner are world-one builds (`DOWNWELL_WORLD_ONE_ONLY`):
 `make -C amiga audit` fails if a later-area family named in
 `amiga/world-one-manifest.json` links.
+
+Verifier code of `DownwellAmiga.cpp` lives in `DownwellAmiga*Verify.inc`
+fragments, one per verifier: each part is included at its original place
+inside that verifier's conditional and selected by `DOWNWELL_VERIFY_PART`.
 
 ## Verifiers
 

@@ -28,10 +28,11 @@ and feature complete in the normal Amiga executable. Work it in this order:
 2. sound effects (W2; music is deferred to WM);
 3. performance (W3, which absorbs section 0 and the world-1 part of section 5).
 
-Restructure the code (WR) so the shipping Amiga executable holds only what
-world 1 uses and is as small as possible, while W3 makes it as fast as
-possible; already-implemented later-world code stays available to other
-builds and the host tests.
+The shipping Amiga executable holds only what world 1 uses (the
+world-one profile and its link gate, `make -C amiga audit`) and fits the
+target; keep it as small as possible while W3 makes it as fast as possible.
+Already-implemented later-world code stays available to owner builds and the
+host tests.
 Only after W is complete, continue with what world 2 needs: the skeleton
 encounter tasks (section 1), the catacombs (section 2) and the remaining
 content (section 4).
@@ -72,8 +73,9 @@ skeletons, so the skeleton encounter (section 1) is not part of it.
   startup and the `quiet-fall` landing witness passing. Normal startup means
   the target machine. Note any
   large new cost in the commit for W3.
-- **Restructuring** steps (WR) must be behaviour-neutral and pass the existing
-  gates. WR.1-WR.4 come before W1.9; WR.5 runs with W3.
+- **Restructuring** must be behaviour-neutral and pass the existing gates;
+  verifier code goes into its `DownwellAmiga*Verify.inc` fragment, not
+  inline in `DownwellAmiga.cpp`.
 
 ### W1. Gameplay and visuals
 
@@ -493,43 +495,6 @@ afterimage forms) takes the cavern CPU bank to 368,798 bytes (ceiling raised
 to 361 KiB) and its plane atlas to 175,094 Chip bytes. The reference game
 planes' ceiling is now 177 KiB.
 
-### WR. Restructure for world 1
-
-The shipping executable carries only world 1's code and no debug,
-reference or verify code, and fits the target. Done: the machine
-configurations, DMA-only Chip placement and the startup memory check
-(WR.1); the size gate (WR.2); `-Os` with the hot paths at `-O2` (WR.3);
-the compact world without the runner emulation, the terrain raster ring and
-the BSS cuts (WR.5); `MACHINE=a1200-4m` as the gates' default.
-
-**Budget** (`docs/amiga-memory.md`): about 0.96 MB of Chip against
-2,074,232 free and about 2.47 MB of Fast (code, data, BSS and CPU-side
-allocations) against 4,082,896 free on the A1200 with 4 MB Fast. Keep the
-size gate's ceilings just above the shipping build as it shrinks.
-
-Also done: knob sets (shipping, gate, development, verify, profile,
-reference; `make knobs`, checked by `make check` through
-`tools/amiga-knobs.py`) and the world-one profile (WR.4): builds without the
-collision owner define `DOWNWELL_WORLD_ONE_ONLY`, later-area family
-bindings compile out, and `audit` runs `tools/audit-amiga-world-one.py`
-against `amiga/world-one-manifest.json`.
-
-Remaining (maintenance, no shipping effect): move the verifier code out of
-`DownwellAmiga.cpp` (192 of its 284 conditionals are `*_VERIFY`/`*_AUDIT`,
-32 reference, 22 profile). The shipping build already compiles all of it
-out; every moved verifier must still pass its own gate.
-
-Further memory candidates, if the margin is needed later (each keeps
-behaviour): `terrainIndex` 76,814 (objects only land at index x 16..464 of
--512..1536; narrowing changes the generated room plan, the landing index and
-the painter clamps), `GameplayWorld` record widths (`SoundPlayState` per
-box), `nativeTerrainStorage` runs (sized for 2,048 cells; native peak 950
-runs). Lower a capacity only with a bound covering every world-1 level:
-overflow fails the run.
-
-Pre-existing gate failure: `make verify-amiga-gameplay-cache` reports
-`raster=64 checks=156` (also before the raster ring).
-
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
 (Measured on the A500; the target is now the A1200 with 4 MB Fast, see the top
@@ -752,6 +717,16 @@ reintroduce per-span terrain structures on the generated path.
 
 ### Other regression work (after the fall)
 
+- `make verify-amiga-gameplay-cache` fails with `raster=64 checks=156`
+  (seen 2026-11-21, also before the terrain raster ring).
+- `make verify-cross-replay` stops at frame 5 on the Amiga with
+  `downwellGameplayFailed` at the `effectsSucceeded` check. The fixture world
+  (`GameplayWorld(300)` on the host, the reference-terrain world on the Amiga)
+  installs no wall-contact resolver, so `stepCasings` → `solidMeeting` clears
+  `effectsSucceeded` from frame 5 on both targets. Only the Amiga loop stops on
+  it; `tools/port-replay-reference.cpp` ignores it. Broken since the W1.4 casings
+  (2026-11-03). Frames 1–4 match. Give both fixture worlds the same empty
+  wall/platform resolver and make the host reference fail on lost effects.
 - Enforce scene/level-local residency and execution before adding content:
   1. Replace remaining resident
      gameplay tables/room catalogues and SDL collision masks with explicit
@@ -1557,7 +1532,7 @@ Reference: [scene architecture](scene-architecture.md).
 ## 7. Establish memory fit and failure handling
 
 - Measure the task stack and peak transition usage (the gameplay footprint
-  and the startup requirement are in WR and `docs/amiga-memory.md`);
+  and the startup requirement are in `docs/amiga-memory.md`);
   expanded-emulator runs do not prove stock-machine fit. Size the shop speech overlap reserve against repeated
   messages within the nested parent Step, not just one replacement per parent.
 - Budget further Chip residency against the measured 20,272-byte cavern
