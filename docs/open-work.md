@@ -340,13 +340,10 @@ area-1 patterns, and names every cut with its reason.
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
 
-6. **Listen and tune world 1's sounds.** Every reachable sound plays on a
-   natural route in the normal build (see "What exists today"); what remains
-   needs ears or a quiet host:
-   - **Listening:** on the world-one host replay the plan steals 179 and
-     drops 77 of 1,776 plays (hard mode 135 and 42 of 1,921); natively, at
-     the A500's slower update rate, far fewer (20 and 9 of 1,838 at W2.6).
-     Listen for drops and cuts that matter and tune priorities if needed.
+6. **Check the recording and the default volume.** Every reachable sound
+   plays on a natural route in the normal build (see "What exists today"),
+   and a listening pass on 2026-11-21 found the plan's steals and drops
+   inaudible, so priorities stay as they are. What remains:
    - **Recording:** rerun `make verify-amiga-paula-mixer` on a quiet host.
      It passed before W2.4's deferred voice setup. Since then, the native
      probe's counters and timing pass, but two recordings under a load of 13+
