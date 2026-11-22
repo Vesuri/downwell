@@ -27,6 +27,21 @@ int main() {
             return sprite==186&&scale==0;
         })&&still.facing==-1,"grounded idle turtle with zero xsp retains scale without a setter");
     }
+    {
+        // W1.12: y + vy still meets a wall's last row and y + 1 does not.
+        // The source counts on to the next solid below, however far...
+        const auto band = [](long, long y) { return (y > 0 && y < 640) || y >= 100 * 1280; };
+        WalkingEnemyMotion far; far.initialize(0, 0, 0, 0, false);
+        far.step(false, true, true, band);
+        require(far.vy == 99 * 1280 && far.y == 99 * 1280,
+                "the floor count reaches the next solid below, however far");
+        // ...and never returns without one: past floorLimit it keeps falling.
+        WalkingEnemyMotion none; none.initialize(0, 0, 0, 0, false);
+        none.step(false, true, true, [](long, long y) { return y > 0 && y < 640; },
+                  downwell::NoWalkingPresentation{}, 64 * 1280);
+        require(none.vy == 256 && none.y == 256 && !none.grounded,
+                "past floorLimit the walker keeps its fall instead of counting forever");
+    }
     WalkingEnemyMotion falling;
     falling.initialize(0, 0, 0, 0, false);
     for (long n = 1; n <= 30; ++n) {

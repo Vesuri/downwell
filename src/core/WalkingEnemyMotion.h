@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_WALKING_ENEMY_MOTION_H
 #define DOWNWELL_CORE_WALKING_ENEMY_MOTION_H
+#include <limits>
 #include "SolidCollision.h"
 #include "EnemyContact.h"
 namespace downwell {
@@ -27,8 +28,11 @@ struct BasicWalkingEnemyMotion {
         // Supported area-one terrain consists of aligned 16x16 cells.
         return solidCorners(solid,b.left,b.top,b.right-1,b.bottom-1);
     }
+    // floorLimit: a y below which no solid can be met (the world's lowest
+    // terrain). See the count to the floor below.
     template<class Meeting,class Presentation=NoWalkingPresentation>
-    bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation={}) {
+    bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation={},
+              Number floorLimit=std::numeric_limits<Number>::max()) {
         const Number zero{}, one = Math::pixels(1);
         vy += Math::fixed(256);
         if (vy >= Math::pixels(7)) vy = Math::pixels(7);
@@ -44,9 +48,20 @@ struct BasicWalkingEnemyMotion {
             if (vy > zero) {
                 if (meeting(x, y + one)) { vy = zero; grounded = true; }
                 else {
+                    // Counts to the floor. A walker that landed on a wall's
+                    // corner by its edge column slides down the wall's side
+                    // (its turning x rounds on and off the wall), and once
+                    // its top leaves the wall's last row y + vy still meets
+                    // it while y + 1 does not. The source then counts to the
+                    // next solid below, however far; with none it never
+                    // returns. Past floorLimit there is none: keep falling.
                     Number distance{};
-                    for (Number i = one; !meeting(x, y + i); i += one) distance += one;
-                    vy = distance;
+                    bool found = true;
+                    for (Number i = one; !meeting(x, y + i); i += one) {
+                        if (y + i > floorLimit) { found = false; break; }
+                        distance += one;
+                    }
+                    if (found) vy = distance;
                 }
             }
         } else grounded = meeting(x, y + one);

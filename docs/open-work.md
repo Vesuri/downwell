@@ -135,17 +135,6 @@ style select, patched with the chosen style and hard mode.
 Every world-1 upgrade works in play, each on an `upgrade-<ids>-v<variant>`
 route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
 
-12. **Walking enemy wedged in a solid hangs the compact world.** Found with the
-    W2.3 RNG stream: currency tape `--overflow` with startup seed 40 and
-    encounter route 0 (`SCAN_ROUTE`-style override of `amigaOverflowRoute`).
-    Around post-Step frame 831 a grounded `enmSnake`-family walker (object 111)
-    at offset (-34, 1706.6) is suddenly inside a solid band from y-20 to y,
-    with nothing below. `WalkingEnemyMotion::step` then takes its
-    `place_meeting(x, y + ysp)` branch, and the "count down to the floor" loop
-    never ends. The source has the same loop shape, so the original relies on
-    walkers never overlapping a solid's underside; find what writes the solid
-    over the walker (incremental generation or a box/cell update) before
-    adding any guard. A hang on a natural route is a ship blocker.
 13. **Results re-entry route breaks.** `make verify-amiga-results-restart`
     fails with the executable returning 20 before its third results
     destination. It fails the same way with the sound mixer not acquired

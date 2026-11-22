@@ -1211,7 +1211,7 @@ void StartupRuntime::updateMainEnemy(InstanceRecord& enemy) {
                     enemy.scaleX=static_cast<float>(scale);
                 }
                 return true;
-            }))return;
+            },enemy.walker.y+1280L*4096))return; // W1.12: as the compact resolver path
         enemy.preciseX = enemy.walker.x / 1280.0F;
         enemy.preciseY = enemy.walker.y / 1280.0F;
         enemy.velocityX = enemy.walker.vx / 1280.0F;

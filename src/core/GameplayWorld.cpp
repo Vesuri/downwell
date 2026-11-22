@@ -1347,14 +1347,18 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
             }
             return true;
         };
-        const auto walk=[&](auto solid){
+        const auto walk=[&](auto solid,EnemyMotionMath::Number floorLimit){
             return enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
                 [&](EnemyMotionMath::Number x, EnemyMotionMath::Number y) {
                     return enemy.walker.meetsTiles(x, y, turtle, solid);
-                },presentation);
+                },presentation,floorLimit);
         };
-        if(!(nativeSolidCells() ? walk(solidCells()) :
-             walk(downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_})))return false;
+        // The cell grid ends the terrain (W1.12); a resolver has no end, so
+        // its count stops 4,096 pixels down.
+        if(!(nativeSolidCells() ?
+             walk(solidCells(),EnemyMotionMath::pixels(int(solidCells_.height)-solidCells_.originY+32)) :
+             walk(downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_},
+                  enemy.walker.y+EnemyMotionMath::pixels(4096))))return false;
         using Math=EnemyMotionMath;
         enemy.preciseX = Math::floorQ8(enemy.walker.x);
         enemy.preciseY = Math::floorQ8(enemy.walker.y);

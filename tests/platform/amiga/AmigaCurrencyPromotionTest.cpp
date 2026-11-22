@@ -130,7 +130,7 @@ int main(int argc,char** argv){
                 require(opaque==bool(expected),"DMA opacity preserves black");
             }
             for(unsigned p=0;p<prepared->partCount[0];++p){
-                const auto* r=prepared->parts[0][p];
+                const auto* r=prepared->parts[p];
                 const int dx=x+signedWord(r+4),dy=y+signedWord(r+6);
                 if(dx<0||dx>=16||dy<0||unsigned(dy)>=word(r+10))continue;
                 const unsigned offset=word(r+16)*65536u+word(r+18);
