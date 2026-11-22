@@ -5,8 +5,6 @@ enum {
     fixedOne = 256,
     fineFixedOne = 65536,
     menuGroundY = 512 * fixedOne,
-    menuWellLeft = 300 * fixedOne,
-    menuWellRight = 356 * fixedOne,
     menuTeleportY = 625 * fixedOne
 };
 }
@@ -16,7 +14,7 @@ AmigaSceneRuntime::AmigaSceneRuntime()
       priorRight_(false), priorFire_(false), splashStage_(1),
       splashTimer_(10), splashDitherTenths_(110),
       menuTicks_(0), menuNapping_(true),
-      menuGrounded_(true), menuFallTicks_(0), menuTeleport_(false),
+      menuGrounded_(true), menuTeleport_(false),
       menuTitleDelay_(-1),
       menuTitleImage_(0), menuTitleRevealTicks_(0),
       menuTitleReadyTimer_(-1),
@@ -57,6 +55,7 @@ int AmigaSceneRuntime::roundedFinePixel(long value)
 
 unsigned AmigaSceneRuntime::menuPlayerFrame() const
 {
+    if (!menuNapping_) return garden_.spriteFrame();
     unsigned frame = positiveFloatFloor(menuImage_);
     unsigned count = 1;
     if (menuSprite_ == 12 || menuSprite_ == 27)
@@ -169,7 +168,6 @@ void AmigaSceneRuntime::enterMenu()
     menuTicks_ = 0;
     menuNapping_ = true;
     menuGrounded_ = true;
-    menuFallTicks_ = 0;
     menuTeleport_ = false;
     menuTitleDelay_ = -1;
     menuTitleImage_ = 0;
@@ -245,10 +243,10 @@ void AmigaSceneRuntime::stepSplash(bool firePressed)
     }
 }
 
-// soundFootstep/soundLand on rmMenu's objWall_n floor (foliage):
-// soundPlayOL(global.sfxFs[2] or sfxJl[2][irandom_range(1, 4)], 60, 0, 1,
-// "footsteps"). groundRoom() keeps the footstep's full gain.
-void AmigaSceneRuntime::playGardenFoliage(int first)
+// soundFootstep/soundLand: soundPlayOL(global.sfxFs or sfxJl of the surface
+// [irandom_range(1, 4)], 60, 0, 1, "footsteps"). groundRoom() keeps the
+// footstep's full gain.
+void AmigaSceneRuntime::playGardenTable(int first)
 {
     gardenSoundRandom_ ^= gardenSoundRandom_ << 13;
     gardenSoundRandom_ ^= gardenSoundRandom_ >> 17;
@@ -266,93 +264,38 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
         if (!controlsLocked &&
             (input.left || input.right || input.fire || input.pause)) {
             menuNapping_ = false;
-            menuY_ = menuGroundY;
-            menuSprite_ = 31;
-            menuImage_ = 0;
-            menuImageSpeed_ = 0x3dcccccdUL;
+            // playerSpriteControl's nap wake: napping = 0 where it slept,
+            // then soundLand while grounded.
+            garden_.wake(roundedPixel(menuX_), roundedPixel(menuY_), menuFacing_, input.fire);
+            menuSprite_ = garden_.spriteId();
             menuGrounded_ = true;
-            menuFallTicks_ = 0;
-            menuSpeedY_ = 0;
-            // playerSpriteControl's nap wake: napping = 0, then soundLand
-            // while grounded (sfxJumpLandFoliage 69-72).
-            playGardenFoliage(69);
+            menuSpeedX_ = menuSpeedY_ = 0;
+            playGardenTable(downwell::GardenGround::landingSound(
+                downwell::GardenGround::under(garden_.x(), garden_.y())));
         }
     } else if (!menuTeleport_) {
-        if (!controlsLocked && input.left != input.right) {
-            menuSpeedX_ += input.left ? -51 : 51;
-            if (input.left && menuSpeedX_ > 0) menuSpeedX_ -= 512;
-            if (input.right && menuSpeedX_ < 0) menuSpeedX_ += 512;
-            if (menuSpeedX_ < -512) menuSpeedX_ = -512;
-            if (menuSpeedX_ > 512) menuSpeedX_ = 512;
-            menuFacing_ = input.left ? -1 : 1;
-        } else if (menuSpeedX_ < 0) {
-            menuSpeedX_ += 102;
-            if (menuSpeedX_ > 0) menuSpeedX_ = 0;
-        } else if (menuSpeedX_ > 0) {
-            menuSpeedX_ -= 102;
-            if (menuSpeedX_ < 0) menuSpeedX_ = 0;
+        // W1.14: the full objPlayer_n Step (downwell::GardenMotion).
+        downwell::GardenMotion::Sound played[4];
+        const unsigned count = garden_.step(input, controlsLocked, played);
+        for (unsigned i = 0; i < count; ++i) {
+            if (played[i].table) playGardenTable(played[i].first);
+            else sounds_.play(played[i].first, played[i].priority, false, true);
         }
-        menuX_ += menuSpeedX_;
-        if (menuX_ < 16 * fixedOne) menuX_ = 16 * fixedOne;
-        if (menuX_ > 400 * fixedOne) menuX_ = 400 * fixedOne;
-        if (menuGrounded_ && menuX_ >= menuWellLeft && menuX_ <= menuWellRight)
-            menuGrounded_ = false;
-        if (menuGrounded_) {
-            menuFallTicks_ = 0;
-            menuY_ = menuGroundY;
+        menuX_ = garden_.xFixed();
+        menuY_ = garden_.yFixed();
+        menuSpeedX_ = garden_.speedXFixed();
+        menuFacing_ = garden_.facing();
+        menuGrounded_ = garden_.grounded();
+        menuSprite_ = garden_.spriteId();
+        // objTeleportMain's 160x32 touch area spans the bottom of the shaft.
+        if (menuY_ >= menuTeleportY && menuX_ >= 240 * fixedOne && menuX_ <= 400 * fixedOne) {
+            menuTeleport_ = true;
+            menuSpeedX_ = 0;
             menuSpeedY_ = 0;
-        } else {
-            ++menuFallTicks_;
-            menuSpeedY_ += 51;
-            if (menuSpeedY_ > 7 * fixedOne) menuSpeedY_ = 7 * fixedOne;
-            menuY_ += menuSpeedY_;
-            if (menuY_ > menuGroundY) {
-                if (menuX_ < menuWellLeft)
-                    menuX_ = menuWellLeft;
-                else if (menuX_ > menuWellRight)
-                    menuX_ = menuWellRight;
-            }
-            if (menuY_ >= menuTeleportY) {
-                menuTeleport_ = true;
-                menuSpeedX_ = 0;
-                menuSpeedY_ = 0;
-            }
-        }
-
-    }
-
-    // scrPlMovement: on the run sprite, soundFootstep when image_index has
-    // just reached frame 1 or 5 (sfxFsFoliage 51-54).
-    if (!menuNapping_ && menuGrounded_ && menuSprite_ == 27) {
-        const unsigned frame = positiveFloatFloor(menuImage_);
-        if ((frame == 1 || frame == 5) && frame != menuImageFloor_)
-            playGardenFoliage(51);
-    }
-
-    if (!menuNapping_) {
-        if (!menuGrounded_) {
-            menuSprite_ = 37;
-            menuImageSpeed_ = 0;
-            if (teleportWasActive || menuFallTicks_ < 5)
-                menuImage_ = 0x40000000UL;
-            else if (menuFallTicks_ < 10)
-                menuImage_ = 0x40400000UL;
-            else
-                menuImage_ = 0x40800000UL;
-        } else {
-            menuSprite_ = menuSpeedX_ == 0 ? 31 : 27;
-            menuImageSpeed_ = menuSpeedX_ == 0
-                                  ? 0x3dcccccdUL
-                                  : 0x3e99999aUL;
         }
     }
-
-    menuImageFloor_ = positiveFloatFloor(menuImage_);
-    if (menuImageSpeed_ != 0)
+    if (menuNapping_ && menuImageSpeed_ != 0)
         menuImage_ = addPositiveFloat(menuImage_, menuImageSpeed_);
-    if (!menuNapping_ && menuGrounded_ && menuSprite_ == 27 &&
-        positiveFloatFloor(menuImage_) >= 8)
-        menuImage_ = subtractEight(menuImage_);
 
     const bool inCameraLocker =
         menuX_ >= 238 * fixedOne && menuX_ <= 418 * fixedOne &&

@@ -769,6 +769,8 @@ int main() {
         auto bound=std::make_unique<downwell::Game>(&rooms,&objects,&builders,nullptr,owner->binding());
         auto plain=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
         require(owner->attach(bound->startup()),"production Game attaches before its first update");
+        // W1.14: the boot route keeps the pinned first world's garden walk.
+        const_cast<downwell::StartupRuntime&>(bound->startup()).useCaptureGarden(true);
         unsigned gameplay=0,splashStages=0;bool garden=false,style=false,gardenDrawChecked=false;
         for(unsigned frame=0;frame<4000&&gameplay<120;++frame){
             const auto& state=bound->startup();
@@ -1457,6 +1459,7 @@ int main() {
     }
     auto deathStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
     auto& naturalDeath = *deathStorage;
+    const_cast<downwell::StartupRuntime&>(naturalDeath.startup()).useCaptureGarden(true); // W1.14
     // This separate route retains natural startup and room-entry timing.
     unsigned combatTicks = 1;
     bool retried = false;

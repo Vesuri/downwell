@@ -59,7 +59,7 @@ static downwell::Input sceneVerificationInput(
     bool gameplayLanded, const AmigaPortRuntime& port) {
     downwell::Input input;
     if (scenes.scene() == AmigaScene::menu)
-        input.right = true;
+        input = downwell::gardenRouteInput(scenes.menuPlayerX());
     else if (scenes.scene() == AmigaScene::styleSelect &&
              scenes.styleYOffset() == 0 && styleFrameReported &&
              !scenes.styleSelected()) {

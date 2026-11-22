@@ -69,6 +69,7 @@ def main():
     deathRoute=os.environ.get('DOWNWELL_ROUTE_DEATH')=='1'
     retryRoute=deathRoute and os.environ.get('DOWNWELL_ROUTE_RETRY')=='1'
     retrySamples=-1;retryLive=0
+    gardenShot=os.environ.get('DOWNWELL_GARDEN_SHOT')=='1'
     tape=Path(base+'.inputs').read_bytes()
     witnesses={row[0]:row[1:] for row in
         (list(map(int,line.split())) for line in Path(base+'.states').read_text().splitlines())}
@@ -223,17 +224,25 @@ def main():
                     raise RuntimeError(checked('printf "GAMEPLAY FAIL line=%u tick=%u actor=%u/%u\\n", line,$w->tick_,gDownwellActorFailureSprite,gDownwellActorFailureFrame'))
                 if 'AmigaInput::sample' not in stop:
                     raise RuntimeError('unexpected native stop: '+stop)
-                state=checked('printf "STATE %d %u %d %d %d %d %d\\n", $s->scene_,$w->tick_,$w->run_.stage.area,$w->run_.stage.level,$w->health_,$w->generationSucceeded_,$w->run_.levelResultRequested&&!$w->run_.levelClearActive')
-                m=re.search(r'STATE (\d+) (\d+) (\d+) (\d+) (-?\d+) (\d+) (\d+)',state)
+                state=checked('printf "STATE %d %u %d %d %d %d %d %d\\n", $s->scene_,$w->tick_,$w->run_.stage.area,$w->run_.stage.level,$w->health_,$w->generationSucceeded_,$w->run_.levelResultRequested&&!$w->run_.levelClearActive,(int)(($s->menuX_+128)>>8)')
+                m=re.search(r'STATE (\d+) (\d+) (\d+) (\d+) (-?\d+) (\d+) (\d+) (-?\d+)',state)
                 if not m: raise RuntimeError(state)
-                scene,tick,area,level,hp,good,resultPending=map(int,m.groups())
+                scene,tick,area,level,hp,good,resultPending,gardenX=map(int,m.groups())
                 sampleVoices(tick)
                 sampleMemory(tick,scene)
                 if scene!=oldScene:
+                    # W1.14: the garden's own sounds (jump, hop, landings and
+                    # footsteps by surface) start before the run's first tick.
+                    if oldScene==1: print('GARDEN sounds '+' '.join(map(str,sorted(nativeStarts))),flush=True)
                     oldScene=scene;sceneFrame=0
                 sceneFrame+=1
                 if scene==0: packed=4 if sceneFrame%60==0 else 0
-                elif scene==1: packed=2 if sceneFrame>40 else 0
+                elif scene==1:
+                    # src/core/GardenMotion.h gardenRouteInput: right until over
+                    # the well, fire from x 240 (the rim stops a walk).
+                    packed=(2 if gardenX<300 else 0)|(4 if 240<=gardenX<300 else 0) if sceneFrame>40 else 0
+                    if gardenShot and gardenX>=272:
+                        gardenShot=False;shot('garden-jump')
                 elif scene==2: packed=4 if sceneFrame==120 else 0
                 elif retrySamples>=0:
                     # DOWNWELL_ROUTE_RETRY=1: after the results bar, fire takes

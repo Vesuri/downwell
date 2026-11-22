@@ -11,7 +11,7 @@ int main(){
     unsigned counts[4]{},confirmations=0,wellFrames=0;
     for(unsigned tick=0;tick<1200;++tick){
         const unsigned before=unsigned(scene.scene());
-        const auto input=tape.sample(before);
+        const auto input=tape.sample(before,scene.menuPlayerX());
         if(before==2&&input.fire){assert(scene.styleYOffset()==0);++confirmations;}
         if(before==1&&scene.menuEnterSequenceActive())++wellFrames;
         ++counts[before];

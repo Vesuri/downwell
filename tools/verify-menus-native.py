@@ -150,10 +150,10 @@ def main():
                     raise RuntimeError(checked('printf "GAMEPLAY FAIL line=%u\\n", line'))
                 if 'AmigaInput::sample' not in stop:
                     raise RuntimeError('unexpected native stop: ' + stop)
-                state = checked('printf "STATE %d %u %d %d %d %d\\n", $s->scene_,$w->tick_,(int)$m->screen,$m->cursor,$s->styleCursor_,$w->health_')
-                m = re.search(r'STATE (\d+) (\d+) (\d+) (-?\d+) (-?\d+) (-?\d+)', state)
+                state = checked('printf "STATE %d %u %d %d %d %d %d\\n", $s->scene_,$w->tick_,(int)$m->screen,$m->cursor,$s->styleCursor_,$w->health_,(int)(($s->menuX_+128)>>8)')
+                m = re.search(r'STATE (\d+) (\d+) (\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+)', state)
                 if not m: raise RuntimeError(state)
-                scene, tick, screen, cursor, styleCursor, hp = map(int, m.groups())
+                scene, tick, screen, cursor, styleCursor, hp, gardenX = map(int, m.groups())
                 sampleVoices()
                 if scene != oldScene: oldScene = scene; sceneFrame = 0
                 sceneFrame += 1
@@ -161,7 +161,9 @@ def main():
                 if scene == 0:
                     joystick(fire=sceneFrame % 60 == 0); continue
                 if scene == 1:
-                    joystick(right=sceneFrame > 40); continue
+                    # src/core/GardenMotion.h gardenRouteInput (the rim stops a walk).
+                    joystick(right=sceneFrame > 40 and gardenX < 300,
+                             fire=sceneFrame > 40 and 240 <= gardenX < 300); continue
                 if scene == 2:
                     # Style 1 is unlocked: right once, then confirm.
                     if sceneFrame == 90 and 'style' not in shotsTaken:

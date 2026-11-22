@@ -138,8 +138,11 @@ def owner_scenes(owner):
 
 
 # W2.6: sounds that rmMenu's objPlayer_n also plays in the garden: footsteps
-# on its objWall_n floor (foliage) and the nap wake's soundLand.
-GARDEN_SOUNDS = {51, 52, 53, 54, 69, 70, 71, 72}
+# on its objWall_n floor (foliage) and the nap wake's soundLand. W1.14 adds
+# the jump and wall kick (86), the hard-landing hop (88), and footsteps and
+# landings on the rim (rock: 55-58, 73-76) and the bench (metal: 59-62, 77-80).
+GARDEN_SOUNDS = {51, 52, 53, 54, 69, 70, 71, 72, 86, 88,
+                 *range(55, 63), *range(73, 81)}
 
 
 SCENE_ORDER = ['front', 'gameplay', 'shop', 'pause', 'clear', 'results']

@@ -74,6 +74,7 @@ int main(){
         session->settings().masterGain={0x3fe00000u,0};
         assert(session->update({})&&AudioSDLTestAccess::master(audio)==0x3f000000u);
         Sink sink;
+        const_cast<StartupRuntime&>(game->startup()).useCaptureGarden(true); // W1.14: pinned walk
         for(unsigned frame=0;frame<4096&&!game->startup().inMainRoom();++frame){
             Input input;
             if(game->startup().inMenu())input.right=true;

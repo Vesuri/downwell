@@ -352,6 +352,12 @@ MENU_TITLE_LEFT_PADDING = 8
 # - game: explicitly admitted gameplay records, currently resident throughout.
 # Unknown records fail admission; adding an exporter is not a residency policy.
 # Garden scenery keeps only the frames AmigaMenu's seed-2 creates select;
+# The garden player's hardware sprites: the nap (12), idle, run and air, and
+# W1.14's jump poses (spin 1, balancing 15, wall 20).
+GARDEN_PLAYER_SPRITES = (1, 12, 15, 20, 27, 31, 37)
+# PlayerMotion shows balancing frames 0-4 (its phase wraps at 20 quarters)
+# and the wall pose's frame 0 only.
+GARDEN_PLAYER_FRAMES = {15: 5, 20: 1}
 # amiga-menu-test checks every draw-list frame against the front bank.
 BOOT_BANK_IDS = {695, 696, 733, *range(65200, 65206)}
 FRONT_BANK_FRAMES = {
@@ -364,7 +370,7 @@ STYLE_RUN_IDS = {27: 65500, 25: 65504, 26: 65505, 28: 65506, 29: 65507}
 STYLE_TEXT_IDS = {*range(65021, 65025), *range(65026, 65031)}
 FRONT_BANK_IDS = {43, 44, 409, 65401, *range(65000, 65006), *range(65510, 65518),
                   *range(65500, 65508), *STYLE_TEXT_IDS, MENU_TITLE_ALIGNED_ID,
-                  *(64000 + ident for ident in (12, 27, 31, 37))}
+                  *(64000 + ident for ident in GARDEN_PLAYER_SPRITES)}
 # Copied into front because its scenes read them from the same bank: the
 # garden's well-surface tile, the style border tiles, and the player run
 # frames the verification-only style oracle draws.
@@ -1283,8 +1289,10 @@ def build_records(manifest, extracted, profile, language_path=None):
     if profile == "game":
         hardware = []
         for sprite, frame_index, dma_width, planar in encoded:
-            if sprite["id"] not in (12, 27, 31, 37) or frame_index >= 1024:
+            if sprite["id"] not in GARDEN_PLAYER_SPRITES or frame_index >= 1024:
                 continue  # afterimage pages stay gameplay BOBs
+            if frame_index >= GARDEN_PLAYER_FRAMES.get(sprite["id"], 1024):
+                continue
             width, height = sprite["width"], sprite["height"]
             stride = dma_width // 8
             plane_size = stride * height

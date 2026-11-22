@@ -185,6 +185,11 @@ CAVERN_IDS = frozenset(
 # CPU bytes: 511,294, past 499 KiB, and 9,092 Chip plane bytes: 200,592,
 # past 195 KiB.
 BANK_BUDGETS.update({'cavern': 500 * 1024, 'cavern-planes': 196 * 1024})
+# W1.14's garden jump poses (spin 1 frames 0-7, balancing 15 frames 0-4, the
+# wall pose 20 frame 0, as mirrored hardware sprites in two DMA copies) add
+# 8,288 bytes: 103,268 -> 111,556, past 108 KiB. The shared Chip region is
+# still sized by the prepared fields (about 146.8 KB), so no Chip is added.
+BANK_BUDGETS.update({'front': 109 * 1024})
 
 
 def require_budget(bank, size):

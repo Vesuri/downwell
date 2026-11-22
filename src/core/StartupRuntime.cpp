@@ -262,11 +262,13 @@ void StartupRuntime::skipToGameForTesting(bool (*collisionPass)(void*,StartupRun
     // skipped frames. Garden updates consume RNG (not just room Create), so
     // jumping straight to PlayMenu produces a different world from the native
     // checkpoint. Do not repair this by hard-coding a random-stream offset.
+    // The pinned first world was captured on the pre-W1.14 garden walk.
+    captureGarden_ = true;
     showSplash_ = 0;
     gotoRoom(menuRoomId);
     for (unsigned frame = 0; frame < 4096 && roomLoadSucceeded_ && !inMainRoom(); ++frame) {
         Input input;
-        if (inMenu()) input.right = true;
+        if (inMenu()) input.right = true; // the capture garden's walk
         if (inPlayMenu() && playMenuYOffset_ == 0 && !playMenuSelected_)
             input.fire = true;
         if(collisionPass){
@@ -647,10 +649,14 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
 }
 
-void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
-    if (!menuPlayerInitialized_)
-        return;
-
+// W1.14: the pre-W1.14 garden walk, kept as the capture path of the pinned
+// first-run checkpoints (seeds 2, 4 and 87 in src/platform/amiga): it walks
+// straight into the well through the rim, which the original's
+// objInvisWall rim does not allow, and draws its samples from the game
+// stream. Only skipToGameForTesting and tests that need the pinned world
+// select it; the Amiga front end draws no game RNG in the garden, so its
+// first world is that pinned state whatever the garden route.
+void StartupRuntime::updateCaptureGardenPlayer(InstanceRecord& instance) {
     if (menuPlayerNapping_) {
         if (anyInput_ && !controlsLocked_) {
             if (menuPlayerGrounded_)
@@ -754,6 +760,68 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
             menuPlayerImageIndex_ - menuPlayerImageSpeed_));
         if ((frame == 1 || frame == 5) && frame != priorFrame)
             random_.irandom(3); // soundFootstep foliage-sample selection.
+    }
+    instance.x = static_cast<std::int32_t>(std::round(menuPlayerX_));
+    instance.y = static_cast<std::int32_t>(std::round(menuPlayerY_));
+    instance.imageIndex = menuPlayerImageIndex_;
+    instance.imageSpeed = menuPlayerImageSpeed_;
+}
+
+void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
+    if (!menuPlayerInitialized_)
+        return;
+    if (captureGarden_) {
+        updateCaptureGardenPlayer(instance);
+        return;
+    }
+
+    if (menuPlayerNapping_) {
+        if (anyInput_ && !controlsLocked_) {
+            // playerSpriteControl's nap wake: the player stays where it
+            // slept, then soundLand while grounded (one sample draw).
+            if (menuPlayerGrounded_)
+                gardenRandom_.irandom(3);
+            menuPlayerNapping_ = false;
+            menuGarden_.wake(static_cast<int>(menuPlayerX_), static_cast<int>(menuPlayerY_),
+                             menuPlayerFacing_, inputFire_);
+            menuPlayerSpriteId_ = menuGarden_.spriteId();
+            menuPlayerImageIndex_ = 0.0F;
+            menuPlayerImageSpeed_ = 0.0F;
+            menuPlayerGrounded_ = true;
+            menuPlayerSpeedX_ = menuPlayerSpeedY_ = 0.0F;
+        }
+        if (menuPlayerImageSpeed_ > 0.0F)
+            menuPlayerImageIndex_ += menuPlayerImageSpeed_;
+    } else if (!menuPlayerGoalStop_) {
+        // W1.14: the full objPlayer_n Step on rmMenu's solids.
+        Input input;
+        input.left = inputLeft_;
+        input.right = inputRight_;
+        input.fire = inputFire_;
+        GardenMotion::Sound sounds[4];
+        const unsigned count = menuGarden_.step(input, controlsLocked_, sounds);
+        if (!menuGarden_.succeeded()) run_.effectsSucceeded = false;
+        for (unsigned i = 0; i < count; ++i) {
+            if (sounds[i].table) gardenRandom_.irandom(3); // soundLand/soundFootstep sample
+            else if (sounds[i].first == 86) gardenRandom_.chooseIndexSmall(1); // choose(86)
+        }
+        menuPlayerX_ = static_cast<float>(menuGarden_.xFixed()) / 256.0F;
+        menuPlayerY_ = static_cast<float>(menuGarden_.yFixed()) / 256.0F;
+        menuPlayerSpeedX_ = static_cast<float>(menuGarden_.speedXFixed()) / 256.0F;
+        menuPlayerGrounded_ = menuGarden_.grounded();
+        menuPlayerFacing_ = menuGarden_.facing();
+        menuPlayerSpriteId_ = menuGarden_.spriteId();
+        menuPlayerImageIndex_ = static_cast<float>(menuGarden_.spriteFrame());
+        menuPlayerImageSpeed_ = 0.0F;
+        // objTeleportMain's 160x32 touch area spans the bottom of the shaft.
+        if (!menuTeleportActive_ && menuPlayerY_ >= 625.0F &&
+            menuPlayerX_ >= 240.0F && menuPlayerX_ <= 400.0F) {
+            menuTeleportActive_ = true;
+            menuPlayerGoalStop_ = true;
+            controlsLocked_ = true;
+            menuPlayerSpeedX_ = 0.0F;
+            menuPlayerSpeedY_ = 0.0F;
+        }
     }
     instance.x = static_cast<std::int32_t>(std::round(menuPlayerX_));
     instance.y = static_cast<std::int32_t>(std::round(menuPlayerY_));

@@ -47,7 +47,7 @@ int main() {
     for (unsigned i = 0; i < 6000 && scenes.scene() == AmigaScene::menu; ++i) {
         downwell::Input input;
         if (scenes.menuPlayerNapping()) input.fire = i % 2 == 0;
-        else input.right = true;
+        else input = downwell::gardenRouteInput(scenes.menuPlayerX()); // W1.14: jump the rim
         step(input, {false, false, input.fire, false});
     }
     require(scenes.scene() == AmigaScene::styleSelect, "the garden's well enters style select");

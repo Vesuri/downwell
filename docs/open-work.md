@@ -131,16 +131,31 @@ static moments (results opening, pause close and its actions, style confirm,
 slice end and quit), not on every `ini_write_real`; the slice end counts as a
 run end for the records. The clear screen shows the style-0 poses for every
 style, and the first run after boot keeps the builder checkpoint taken before
-style select, patched with the chosen style and hard mode.
+style select, patched with the chosen style and hard mode. That first world
+is the pinned checkpoint whatever the garden route: in the original the
+garden's draws and duration shape it, but the Amiga front end draws no game
+RNG, and the host reference keeps the pre-W1.14 walk straight into the well
+(`useCaptureGarden`) only as the checkpoints' capture path.
 Every world-1 upgrade works in play, each on an `upgrade-<ids>-v<variant>`
 route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
 
-14. **Garden jump.** `rmMenu`'s player is the full `objPlayer_n`, so the
-    original garden player can jump (and land on the bench, metal). The
-    port's menu player only walks, falls into the well and wakes from the
-    nap, so the garden has no jump 86 or jump landings; its footsteps and
-    nap-wake landing play (W2.6). The front end has no game RNG, so the
-    sample choice can stay on the front end's own stream.
+15. **Jumping against a wall can be cancelled.** `PlayerMotion` tests a
+    horizontal move at the truncated pixel, so pushing into a wall lets x
+    creep to .5-.9 of the last free pixel. The upward probe rounds as
+    `place_meeting` does, meets the wall, and the jump's `ysp` becomes the
+    ceiling response (zero) in the same Step. In the original, `scrWallCol`'s
+    rounded test stops x below .5, so the jump goes ahead. W1.14 gives the
+    garden the rounded horizontal test (`configureRoundedHorizontal`);
+    gameplay keeps truncation, because changing it moves every gameplay
+    route. Confirm on the Windows build (jump while holding into a well wall
+    after a slow approach), then switch gameplay and search the routes again.
+16. **Garden gun.** No room check stops `scrPlayerShootN` in `rmMenu`, and
+    the garden's `objGrass` is a `parentShootableThing`, so an airborne
+    press that is neither a wall kick nor the hard-landing re-jump fires
+    the gun in the original. The port holds such a press back until fire is
+    released (`GardenMotion`). Confirm on the Windows build, then bring the
+    garden bullets, the gunshot sounds, the recharge on landing and the
+    grass reaction into the front end.
 
 ### WM. Music (deferred)
 

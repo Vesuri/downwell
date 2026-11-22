@@ -38,6 +38,7 @@
 #include "PlayerLifeRules.h"
 #include "Input.h"
 #include "PlayerMotion.h"
+#include "GardenMotion.h"
 #include "StoredTimeShardRegistration.h"
 #include "StoredLimboShardRegistration.h"
 #include "StoredCorpseRegistration.h"
@@ -100,6 +101,9 @@ enum class PlatformProfile {
 class StartupRuntime {
 public:
     void skipIntroForTesting();
+    // W1.14: walk the garden on the pinned checkpoints' capture path (see
+    // updateCaptureGardenPlayer) instead of the faithful garden.
+    void useCaptureGarden(bool value) { captureGarden_ = value; }
     void skipToGameForTesting(bool (*collisionPass)(void*,StartupRuntime&)=nullptr,void* context=nullptr);
     struct MainBulletState {
         float x = 0.0F;
@@ -3144,6 +3148,7 @@ private:
     void stepInternal(bool advancePressed, bool left, bool right, bool fire,
                       bool anyInput,bool cancel=false);
     void updateMenuPlayer(InstanceRecord& instance);
+    void updateCaptureGardenPlayer(InstanceRecord& instance);
     void updateMenuCamera();
     void updateMainPlayer(InstanceRecord& instance);
     void updateMainCamera(InstanceRecord& instance);
@@ -3393,6 +3398,9 @@ private:
     int menuPlayerSpriteId_ = 31;
     float menuPlayerImageIndex_ = 0.0F;
     float menuPlayerImageSpeed_ = 0.1F;
+    GardenMotion menuGarden_; // W1.14: the awake garden player
+    GameMakerRandom gardenRandom_; // W1.14: the garden's own sample stream
+    bool captureGarden_ = false; // updateCaptureGardenPlayer (skip shortcut, pinned tests)
     float menuCameraX_ = 112.0F;
     float menuCameraY_ = 512.0F;
     bool menuTitleFirstBoot_ = false;

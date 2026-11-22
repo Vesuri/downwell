@@ -36,6 +36,10 @@ public:
     typedef bool (*BreakBoxResolver)(void* context, long x, long y, bool& found);
     bool motionSucceeded() const { return motionSucceeded_; }
     void configureCollisionOrigin(int x,int y){collisionOriginX_=x;collisionOriginY_=y;}
+    // W1.14: test horizontal moves at GameMaker's rounded mask position, as
+    // the upward probe does. Truncation lets x creep to .5-.9 against a wall,
+    // where the rounded upward probe then meets the wall and cancels a jump.
+    void configureRoundedHorizontal(bool value){roundedHorizontal_=value;}
     void configureBreakBoxResolver(BreakBoxResolver resolver, void* context) {
         breakBoxResolver_ = resolver;
         breakBoxContext_ = context;
@@ -182,6 +186,7 @@ private:
     // World-owned coordinate adapter, rebound before each shared gameplay
     // step like the terrain callbacks; not an independently simulated field.
     int collisionOriginX_=0,collisionOriginY_=0;
+    bool roundedHorizontal_=false;
     static int fixedToPixel(long value);
     static unsigned integerSquareRoot(unsigned value);
     void beginSpin();

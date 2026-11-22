@@ -46,6 +46,8 @@ int main() {
 
     downwell::StartupRuntime normal(downwell::PlatformProfile::desktop, &rooms,
         &objects, downwell::StartupRuntime::defaultRandomSeed, &builders);
+    // W1.14: stepped play on the shortcut's (the pinned world's) garden walk.
+    normal.useCaptureGarden(true);
     downwell::Input input;
     for (int i = 0; i < 4096 && !normal.inMainRoom(); ++i) {
         input = {};

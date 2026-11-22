@@ -20,9 +20,13 @@ def verify(game_path, front_path):
     pack, front = game_path.read_bytes(), front_path.read_bytes()
     records, garden = directory(pack), directory(front)
     checked = 0
+    seen = set()
     for (sprite, frame), r in records.items():
-        if sprite not in (12, 27, 31, 37):
+        # generate-amiga-hud.py's GARDEN_PLAYER_SPRITES (W1.14 adds the
+        # jump poses: spin 1, balancing 15, wall 20).
+        if sprite not in (1, 12, 15, 20, 27, 31, 37) or frame >= {15: 5, 20: 1}.get(sprite, 1024):
             continue
+        seen.add(sprite)
         _, _, ox, oy, width, height, dma_width, _, offset, _ = r
         row_bytes = dma_width // 8
         plane_bytes = row_bytes * height
@@ -50,7 +54,7 @@ def verify(game_path, front_path):
                     struct.pack_into(">H", expected, 4 + y * 4 + plane * 2, bits)
             assert data == expected * 2, (sprite, frame, flip)
             checked += 1
-    assert checked == 50
+    assert seen == {1, 12, 15, 20, 27, 31, 37}, seen
     print(f"Garden hardware sprites: {checked} mirrored/frame variants, both DMA copies match")
 
 

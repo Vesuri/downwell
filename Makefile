@@ -1077,7 +1077,7 @@ build/encounter-coverage-test: tests/platform/amiga/GameplayEncounterCoverageTes
 verify-encounter-coverage: build/encounter-coverage-test
 	./$<
 test: verify-encounter-coverage
-build/entry-profile-input-test: tests/platform/amiga/AmigaEntryProfileInputTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/GameplayEntryProfileInput.h
+build/entry-profile-input-test: tests/platform/amiga/AmigaEntryProfileInputTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/PlayerMotion.cpp src/core/GameplayEntryProfileInput.h
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
@@ -2089,12 +2089,17 @@ test: build/standard-bullet-test
 test: build/crawler-motion-test
 test: build/snail-motion-test
 test: build/walking-enemy-test
+test: build/garden-motion-test
 test: build/enemy-motion-math-test
 
 test: test-gameplay-capture-comparison
 .PHONY: test-gameplay-capture-comparison
 test-gameplay-capture-comparison:
 	python3 tests/compare-gameplay-captures-test.py
+
+build/garden-motion-test: tests/core/GardenMotionTest.cpp src/core/GardenMotion.h src/core/GardenGround.h src/core/PlayerMotion.cpp src/core/PlayerMotion.h
+	@mkdir -p build
+	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/GardenMotionTest.cpp src/core/PlayerMotion.cpp
 
 build/walking-enemy-test: tests/core/WalkingEnemyMotionTest.cpp src/core/WalkingEnemyMotion.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
@@ -2832,6 +2837,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/crawler-motion-test
 	./build/snail-motion-test
 	./build/walking-enemy-test
+	./build/garden-motion-test
 	./build/enemy-motion-math-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
@@ -3071,7 +3077,7 @@ test-amiga-selection-layer: generate-amiga-clear build/amiga-selection-layer-tes
 test: test-amiga-selection-layer
 
 .PHONY: test-amiga-style-scene
-build/amiga-style-scene-test: tests/platform/amiga/AmigaStyleSceneTest.cpp src/platform/amiga/AmigaStyleScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp $(HOST_CHECK_HEADERS)
+build/amiga-style-scene-test: tests/platform/amiga/AmigaStyleSceneTest.cpp src/platform/amiga/AmigaStyleScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/PlayerMotion.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX_LINK) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_REFERENCE_STYLE_SPRITES -o $@ $(filter %.cpp,$^)
 test-amiga-style-scene: build/amiga-style-scene-test
@@ -3091,7 +3097,7 @@ test-amiga-splash-scenes: build/amiga-splash-scenes-test
 test: test-amiga-splash-scenes
 
 .PHONY: test-amiga-garden-scene
-build/amiga-garden-scene-test: tests/platform/amiga/AmigaGardenSceneTest.cpp src/platform/amiga/AmigaGardenScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaMenuScroll.cpp $(HOST_CHECK_HEADERS)
+build/amiga-garden-scene-test: tests/platform/amiga/AmigaGardenSceneTest.cpp src/platform/amiga/AmigaGardenScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/PlayerMotion.cpp src/platform/amiga/AmigaMenuScroll.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX_LINK) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 test-amiga-garden-scene: build/amiga-garden-scene-test
@@ -3290,7 +3296,7 @@ test-amiga-terrain-raster: build/amiga-terrain-raster-test
 test: test-amiga-terrain-raster
 
 .PHONY: test-amiga-style-retained
-build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/PlayerMotion.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX_LINK) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
 test-amiga-style-retained: generate-amiga-game build/amiga-style-retained-test
@@ -3769,9 +3775,9 @@ SOUND_COVERAGE_ROUTES := world-one-v106-tour hard-mode-death-v80-tour hard-mode-
 # tests/data/sound-routes/<route>.summary (DOWNWELL_WRITE_SOUND_ROUTES=1
 # rewrites them; tools/sound-inventory.py reads them).
 .PHONY: test-sound-routes
-build/amiga-front-end-sound-test: tests/platform/amiga/AmigaFrontEndSoundTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaSceneRuntime.h tests/core/SoundRequestLog.h $(wildcard src/core/*.h) generated/sound-durations.inc generated/sound-gains.inc
+build/amiga-front-end-sound-test: tests/platform/amiga/AmigaFrontEndSoundTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/PlayerMotion.cpp src/platform/amiga/AmigaSceneRuntime.h tests/core/SoundRequestLog.h $(wildcard src/core/*.h) generated/sound-durations.inc generated/sound-gains.inc
 	@mkdir -p $(@D)
-	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaFrontEndSoundTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp
+	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaFrontEndSoundTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/PlayerMotion.cpp
 test-sound-routes: build/amiga-front-end-sound-test generate-room-pack generate-object-pack generate-builder-pattern-pack $(AMIGA_SCENE_TEST_TARGET)
 	@mkdir -p tmp
 	./build/amiga-front-end-sound-test

@@ -2875,7 +2875,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #ifdef DOWNWELL_PROFILE_ENTRY
             static downwell::GameplayEntryProfileInput entryProfileInput;
-            liveInput=entryProfileInput.sample(static_cast<unsigned>(scenes.scene()));
+            liveInput=entryProfileInput.sample(static_cast<unsigned>(scenes.scene()),scenes.menuPlayerX());
 #endif
 #ifdef DOWNWELL_PROFILE_SHOP
             liveInput=downwell::unpackReplayInput(shopProfileInput.packed(port.runStage().level,

@@ -5,6 +5,7 @@
 #include "core/ShopInteraction.h"
 #include "core/ResultsDestination.h"
 #include "core/FrontEndSounds.h"
+#include "core/GardenMotion.h"
 #include <cstdint>
 
 enum class AmigaScene {
@@ -99,7 +100,6 @@ private:
     unsigned menuTicks_;
     bool menuNapping_;
     bool menuGrounded_;
-    unsigned menuFallTicks_;
     bool menuTeleport_;
     int menuTitleDelay_;
     std::uint32_t menuTitleImage_;
@@ -141,8 +141,9 @@ private:
     // has no game RNG (the first run starts from the builder checkpoint), so
     // irandom_range(1, 4) uses its own stream; it only picks the sample.
     std::uint32_t gardenSoundRandom_ = 0x2545f491u;
-    unsigned menuImageFloor_ = 0;
-    void playGardenFoliage(int first);
+    void playGardenTable(int first);
+    // W1.14: the awake garden player (objPlayer_n's Step on rmMenu's solids).
+    downwell::GardenMotion garden_;
 };
 
 #endif

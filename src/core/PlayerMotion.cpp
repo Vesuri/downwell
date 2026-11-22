@@ -6,6 +6,7 @@
 #include "core/MachineGunProfile.h"
 #include "core/ForcedPlayerJump.h"
 #include "core/PlayerBoxContact.h"
+#include "core/GameMakerRounding.h"
 
 namespace {
 enum {
@@ -338,7 +339,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             if (movement < -fixedOne) movement = -fixedOne;
             if (movement > fixedOne) movement = fixedOne;
             const long nextX = x_ + movement;
-            const int nextPixelX = fixedToPixel(nextX);
+            // place_meeting rounds the moved mask like the upward probe below
+            // (opt-in; the gameplay adapter still truncates).
+            const int nextPixelX = roundedHorizontal_
+                ? static_cast<int>(downwell::roundGameMakerQ8(nextX + collisionOriginX_ * 256L) - collisionOriginX_)
+                : fixedToPixel(nextX);
             if (solidMaskAt(nextPixelX, pixelY_)) {
                 speedX_ = 0;
                 horizontalCollision = true;

@@ -201,6 +201,11 @@ void requireNear(float actual, float expected, float tolerance,
     }
 }
 
+// W1.14: the garden's natural route (the rim stops a walk).
+downwell::Input gardenRoute(const AmigaSceneRuntime& runtime) {
+    return downwell::gardenRouteInput(runtime.menuPlayerX());
+}
+
 void compareMenu(const AmigaSceneRuntime& amiga,
                  const downwell::StartupRuntime& reference) {
     require(reference.inMenu(), "reference remains in menu during comparison");
@@ -225,7 +230,10 @@ void compareMenu(const AmigaSceneRuntime& amiga,
     require(amiga.menuPlayerSprite() == reference.menuPlayerSpriteId(),
             "menu player sprite follows decoded runtime");
     unsigned referenceFrames = 1;
-    if (reference.menuPlayerSpriteId() == 12 ||
+    // W1.14: awake, both run the shared GardenMotion; its frame is exact.
+    if (!reference.menuPlayerNapping())
+        referenceFrames = 1000;
+    else if (reference.menuPlayerSpriteId() == 12 ||
         reference.menuPlayerSpriteId() == 27)
         referenceFrames = 8;
     else if (reference.menuPlayerSpriteId() == 31)
@@ -972,8 +980,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     right.right = true;
     for (int tick = 0; tick < 500 && reference.inMenu(); ++tick) {
         parityFrame = 30 + tick;
-        amiga.step(right);
-        reference.step(right, false);
+        const downwell::Input garden = gardenRoute(amiga);
+        amiga.step(garden);
+        reference.step(garden, false);
         if (!reference.inMenu() || amiga.scene() != AmigaScene::menu)
             break;
         compareMenu(amiga, reference);
@@ -3768,10 +3777,14 @@ int main(int argc, char** argv) {
         runtime.step(right);
     require(runtime.menuPlayerX() == 123,
             "menu acceleration reaches the recovered ten-tick position");
-    for (int tick = 0; tick < 600 && runtime.scene() == AmigaScene::menu; ++tick)
+    for (int tick = 0; tick < 150; ++tick)
         runtime.step(right);
+    require(runtime.menuPlayerX() == 260 && runtime.menuPlayerY() == 512,
+            "the well's rim stops a walking player");
+    for (int tick = 0; tick < 600 && runtime.scene() == AmigaScene::menu; ++tick)
+        runtime.step(gardenRoute(runtime));
     require(runtime.scene() == AmigaScene::styleSelect,
-            "walking into the well reaches style select");
+            "jumping into the well reaches style select");
     require(runtime.menuTeleportActive() && !runtime.menuPlayerVisible() &&
             runtime.menuTitleFrame() == 9,
             "well transition hides the player and completes the title");

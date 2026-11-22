@@ -21,7 +21,7 @@ A sound used in several scenes is counted in each.
 
 | Scene | Sounds | KiB | Long (> 2 s) or cut, KiB | The rest, KiB |
 |---|---:|---:|---:|---:|
-| front | 15 | 76.8 | 29.7 | 47.1 |
+| front | 33 | 99.9 | 29.7 | 70.2 |
 | gameplay | 124 | 779.1 | 493.8 | 285.2 |
 | shop | 18 | 36.0 | 0.0 | 36.0 |
 | pause | 5 | 6.1 | 0.0 | 6.1 |
@@ -76,14 +76,14 @@ upgrade screen between levels), results (death and results).
 | 52 | `sfxFootstepFoliage2` | 1,264 | 0.15 |  | front, gameplay | objPlayer_n | 35 | 1 | keep |
 | 53 | `sfxFootstepFoliage3` | 1,152 | 0.14 |  | front, gameplay | objPlayer_n | 41 | 1 | keep |
 | 54 | `sfxFootstepFoliage4` | 1,216 | 0.15 |  | front, gameplay | objPlayer_n | 38 | 1 | keep |
-| 55 | `sfxFsRock1` | 544 | 0.07 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 56 | `sfxFsRock2` | 576 | 0.07 |  | gameplay | objPlayer_n | 3 | 1 | keep |
-| 57 | `sfxFsRock3` | 560 | 0.07 |  | gameplay | objPlayer_n | 4 | 1 | keep |
-| 58 | `sfxFsRock4` | 528 | 0.06 |  | gameplay | objPlayer_n | 6 | 1 | keep |
-| 59 | `sfxFsMetal1` | 640 | 0.08 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 60 | `sfxFsMetal2` | 608 | 0.07 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 61 | `sfxFsMetal3` | 640 | 0.08 |  | gameplay | objPlayer_n | 5 | 1 | keep |
-| 62 | `sfxFsMetal4` | 624 | 0.07 |  | gameplay | objPlayer_n | 4 | 1 | keep |
+| 55 | `sfxFsRock1` | 544 | 0.07 |  | front, gameplay | objPlayer_n | 1 | 1 | keep |
+| 56 | `sfxFsRock2` | 576 | 0.07 |  | front, gameplay | objPlayer_n | 3 | 1 | keep |
+| 57 | `sfxFsRock3` | 560 | 0.07 |  | front, gameplay | objPlayer_n | 4 | 1 | keep |
+| 58 | `sfxFsRock4` | 528 | 0.06 |  | front, gameplay | objPlayer_n | 6 | 1 | keep |
+| 59 | `sfxFsMetal1` | 640 | 0.08 |  | front, gameplay | objPlayer_n | 2 | 1 | keep |
+| 60 | `sfxFsMetal2` | 608 | 0.07 |  | front, gameplay | objPlayer_n | 2 | 1 | keep |
+| 61 | `sfxFsMetal3` | 640 | 0.08 |  | front, gameplay | objPlayer_n | 5 | 1 | keep |
+| 62 | `sfxFsMetal4` | 624 | 0.07 |  | front, gameplay | objPlayer_n | 4 | 1 | keep |
 | 63 | `sfxFsThin1` | 400 | 0.05 |  | gameplay | objPlayer_n | 17 | 1 | keep |
 | 64 | `sfxFsThin2` | 288 | 0.03 |  | gameplay | objPlayer_n | 12 | 1 | keep |
 | 65 | `sfxFsThin3` | 288 | 0.03 |  | gameplay | objPlayer_n | 18 | 1 | keep |
@@ -94,19 +94,19 @@ upgrade screen between levels), results (death and results).
 | 70 | `sfxJumpLandFoliage2` | 2,112 | 0.25 |  | front, gameplay | objPlayer_n | 313 | 1 | keep |
 | 71 | `sfxJumpLandFoliage3` | 2,560 | 0.31 |  | front, gameplay | objPlayer_n | 290 | 1 | keep |
 | 72 | `sfxJumpLandFoliage4` | 3,024 | 0.36 |  | front, gameplay | objPlayer_n | 288 | 1 | keep |
-| 73 | `sfxJumpLandRock1` | 2,144 | 0.26 |  | gameplay | objPlayer_n | 3 | 1 | keep |
-| 74 | `sfxJumpLandRock2` | 2,288 | 0.27 |  | gameplay | objPlayer_n | 2 | 1 | keep |
-| 75 | `sfxJumpLandRock3` | 1,856 | 0.22 |  | gameplay | objPlayer_n | 4 | 1 | keep |
-| 76 | `sfxJumpLandRock4` | 2,192 | 0.26 |  | gameplay | objPlayer_n | 3 | 1 | keep |
-| 77 | `sfxJlMetal1` | 1,952 | 0.23 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 78 | `sfxJlMetal2` | 2,272 | 0.27 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 79 | `sfxJlMetal3` | 1,888 | 0.23 |  | gameplay | objPlayer_n | 1 | 1 | keep |
-| 80 | `sfxJlMetal4` | 2,160 | 0.26 |  | gameplay | objPlayer_n | 1 | 1 | keep |
+| 73 | `sfxJumpLandRock1` | 2,144 | 0.26 |  | front, gameplay | objPlayer_n | 3 | 1 | keep |
+| 74 | `sfxJumpLandRock2` | 2,288 | 0.27 |  | front, gameplay | objPlayer_n | 2 | 1 | keep |
+| 75 | `sfxJumpLandRock3` | 1,856 | 0.22 |  | front, gameplay | objPlayer_n | 4 | 1 | keep |
+| 76 | `sfxJumpLandRock4` | 2,192 | 0.26 |  | front, gameplay | objPlayer_n | 3 | 1 | keep |
+| 77 | `sfxJlMetal1` | 1,952 | 0.23 |  | front, gameplay | objPlayer_n | 1 | 1 | keep |
+| 78 | `sfxJlMetal2` | 2,272 | 0.27 |  | front, gameplay | objPlayer_n | 1 | 1 | keep |
+| 79 | `sfxJlMetal3` | 1,888 | 0.23 |  | front, gameplay | objPlayer_n | 1 | 1 | keep |
+| 80 | `sfxJlMetal4` | 2,160 | 0.26 |  | front, gameplay | objPlayer_n | 1 | 1 | keep |
 | 81 | `sfxJlThin1` | 1,120 | 0.13 |  | gameplay | objPlayer_n | 38 | 1 | keep |
 | 82 | `sfxJlThin2` | 1,056 | 0.13 |  | gameplay | objPlayer_n | 29 | 1 | keep |
 | 83 | `sfxPlayerEat` | 4,672 | 0.56 |  | gameplay | objDeadBody | 18 | 1 | keep |
-| 86 | `sfxPlayerJump1` | 1,360 | 0.16 |  | gameplay | objPlayer_n | 2,015 | 1 | keep |
-| 88 | `sfxPlayerTurn` | 816 | 0.10 |  | gameplay | objPlayer_n | 878 | 1 | keep |
+| 86 | `sfxPlayerJump1` | 1,360 | 0.16 |  | front, gameplay | objPlayer_n | 2,015 | 1 | keep |
+| 88 | `sfxPlayerTurn` | 816 | 0.10 |  | front, gameplay | objPlayer_n | 878 | 1 | keep |
 | 89 | `sfxDeath` | 10,032 | 1.20 |  | gameplay | objPlayer_n | 6 | 1 | keep |
 | 90 | `sfxNotifLowAmmo` | 944 | 0.11 |  | gameplay | objControlerN, objPlayer_n | 2,835 | 1 | keep |
 | 91 | `sfxEnmExplode1` | 3,360 | 0.40 |  | gameplay | Scattered16, TorchFire, bulletExplosion1, enmBat, enmEyefish, enmFrog +4 | 90 | 1 | keep |
