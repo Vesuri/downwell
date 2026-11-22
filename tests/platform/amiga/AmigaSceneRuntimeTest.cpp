@@ -3065,6 +3065,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(18,upgradeWitness["rocket"]!=0,"Rocket Jump's blast appears at a jump");
         need(9,sounds.plays(47)!=0,"the Drone follows the player and fires (sound 47)");
         need(5,sounds.plays(342)!=0,"a Gunpowder Block fires its shot (sound 342)");
+        need(11,sounds.plays(83)!=0,"Knife and Fork eats a dead body (sound 83)");
         need(3,upgradeWitness["explosion"]!=0&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,
             "a shot-down Rest in Pieces corpse explodes (bulletExplosion1, sounds 91-93)");
     }

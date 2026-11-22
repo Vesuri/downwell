@@ -3221,6 +3221,15 @@ private:
     void advanceCompactDroneAnimation(){if(drone_.live)++drone_.phaseHalves;}
     bool advanceCompactDroneAlarm();
     void stepCompactDrone();
+    // fxBlood 223: Knife and Fork's drops at the player (sprWaterSplash 92).
+    downwell::CompactBloodRecord bloods_[downwell::gameplayCompactBloodCapacity];
+    unsigned bloodEnd_=0;
+    bool createCompactBlood(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    bool eatCompactCorpses();
+    bool advanceCompactBloodAnimation();
+    bool stepCompactBlood();
+    bool collideCompactBlood();
+    bool checkKnifeAndFork();
     downwell::CompactScenery scenery_;
     int sceneryRepaintX_[downwell::gameplaySceneryRepaintCapacity]{};
     int sceneryRepaintY_[downwell::gameplaySceneryRepaintCapacity]{};
@@ -3310,6 +3319,7 @@ public:
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}
     const downwell::CompactBlastRecord* compactBlasts(unsigned& end)const{end=blastEnd_;return blasts_;}
+    const downwell::CompactBloodRecord* compactBlood(unsigned& end)const{end=bloodEnd_;return bloods_;}
     const downwell::CompactDroneRecord& compactDrone()const{return drone_;}
     // Effect-surface producers among the W1.9 owners.
     bool compactSurfaceUpgrades()const{

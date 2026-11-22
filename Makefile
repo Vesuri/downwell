@@ -5,7 +5,7 @@ CXX := clang++
 # Define this before any prerequisite list expands it. Several host checks
 # compile multiple sources in one invocation; their .d file covers only the
 # final source and cannot replace these explicit header dependencies.
-HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc generated/sound-durations.inc generated/sound-gains.inc
+HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc generated/sound-durations.inc generated/sound-gains.inc generated/downwell-rising-texts.h
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
@@ -700,6 +700,8 @@ generated/downwell-title-glyphs.h: tools/generate-title-glyphs.py extracted/utmt
 	python3 tools/generate-title-glyphs.py
 generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.ini
 	python3 tools/generate-area-titles.py
+# The same run writes the compact world's fixed rising texts.
+generated/downwell-rising-texts.h: generated/downwell-area-titles.h
 generated/downwell-shop-text.h: tools/generate-shop-text.py data/language.ini
 	python3 tools/generate-shop-text.py
 generated/downwell-shop-speech.h: generated/downwell-shop-text.h
@@ -3733,7 +3735,7 @@ test: verify-terrain-ownership
 # W1.9 upgrade routes: upgrade-<ids>-v<variant> picks the first offered ID of
 # the list at each clear (DOWNWELL_SLICE_PICK) and checks those upgrades'
 # effects instead of the default route's coverage.
-UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58
+UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58 upgrade-11-v18
 # W2.6 coverage routes: other slice variants (DOWNWELL_SLICE_VARIANT; -tour
 # adds DOWNWELL_SLICE_SHOP_TOUR, a climb onto the shop's cases after the
 # visit), picked so that every world-1 sound the core requests plays on some

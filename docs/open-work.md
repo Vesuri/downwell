@@ -135,18 +135,17 @@ style select, patched with the chosen style and hard mode.
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
    selectable. Exploding Knees (0), Rest in Pieces (3), Gunpowder Blocks
-   (5), Drone (9) and Rocket Jump (18) are in, with routes
-   `upgrade-0-18-v72`, `upgrade-3-v58` and `upgrade-5-9-v96`. Still to do:
-   the Heart Balloon's decoy (15) that steering enemies chase (they now
-   always chase the player), Hot Casing (8, damaging casings), Reverse
-   Engineering (1, `pugEngineer` on gun pickups), Laser Sight's beam against
-   the new guns' spread (its `bdirRand` and `decTimer` changes are in), Time
-   Field Damage (`pugTime`: `scrTypicalDamage` from the time fields), Knife
-   and Fork (11) and the Safety Jetpack (22). Their sounds come with them
-   (the bank holds them): `sfxPlayerEat` 83 (Knife and Fork: the compact
-   world has no corpse/player collision), `sfxEnmExplode1-3` 91-93 from the
-   decoy, and the jetpack loop 343. Routes that pick an unwired upgrade (1,
-   8, 11, 15, 17 or 22) need re-searching as these land.
+   (5), Drone (9), Knife and Fork (11) and Rocket Jump (18) are in, with
+   routes `upgrade-0-18-v72`, `upgrade-3-v58`, `upgrade-5-9-v96` and
+   `upgrade-11-v18`. Still to do: the Heart Balloon's decoy (15) that
+   steering enemies chase (they now always chase the player), Hot Casing
+   (8, damaging casings), Reverse Engineering (1, `pugEngineer` on gun
+   pickups), Laser Sight's beam against the new guns' spread (its
+   `bdirRand` and `decTimer` changes are in), Time Field Damage (`pugTime`:
+   `scrTypicalDamage` from the time fields) and the Safety Jetpack (22).
+   Their sounds come with them (the bank holds them): `sfxEnmExplode1-3`
+   91-93 from the decoy, and the jetpack loop 343. Routes that pick an
+   unwired upgrade (1, 8, 15, 17 or 22) need re-searching as these land.
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the

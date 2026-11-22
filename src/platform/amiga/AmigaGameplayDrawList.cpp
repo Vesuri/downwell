@@ -1,3 +1,4 @@
+#include "../../../generated/downwell-rising-texts.h"
 #include "AmigaGameplayDrawList.h"
 #include "AmigaProfile.h"
 #include "core/ShopFixtures.h"
@@ -267,6 +268,14 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
         if(turn!=0&&turn!=3&&!(turn==1&&e.spriteId==605)){failedSprite=UWORD(e.spriteId);return false;}
         if(!place(e.x,e.y,e.spriteId,turn*256+e.drawFrame()))return false;
     }
+    {   // fxBlood 223 (Knife and Fork): sprWaterSplash 92, default Draw.
+        unsigned end=0;const auto* blood=port.compactBlood(end);
+        for(unsigned i=0;i<end;++i){const auto& b=blood[i];unsigned frame;
+            if(!b.live)continue;
+            if(!b.effect.drawFrame(frame))return false;
+            if(!place(b.effect.x,b.effect.y,92,frame))return false;
+        }
+    }
     for(unsigned i=0;i<fx.movingCount();++i){
         const auto& e=fx.moving(i).effect;unsigned turn=0;
         if(!e.valid)return false;
@@ -367,6 +376,16 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactGunTexts(const Gam
     for(unsigned i=0;i<g.noticeEnd;++i){const auto& n=g.notices[i];
         if(!n.live||!n.visible())continue;
         const int x=n.left(viewX,160),y=n.pixelY();
+        if(n.fixedText==downwell::CompactItemNoticeRecord::omnom){
+            // fxRisingText omnomText: centred eight-pixel cells, no icon.
+            const char* word=downwell::rising_texts::omnom;
+            const int cells=int(sizeof(downwell::rising_texts::omnom))-1;
+            const int left=n.left(viewX,160,8*cells);
+            for(int k=0;k<cells;++k)
+                if(word[k]!=' '&&!glyph(borderGlyph(word[k]),downwellPlayfieldX+left-4*cells+8*k+4-viewX,y-5-viewY,1))
+                    return false;
+            continue;
+        }
         if(n.empty){
             // fxRisingText "EMPTY!": six centred cells, no icon.
             static const char word[]="EMPTY!";

@@ -291,6 +291,7 @@ struct RunSession {
     AmmoGaugeRows ammoGauge;
     Consumables consumables;
     UpgradeInventory upgrades;
+    unsigned bodiesEaten=0; // global.bodiesEaten (Knife and Fork)
     ShopWorld shops;
     // Wall tiles come only from the reference runner's stored wall
     // collision (StartupRuntime) and host owner fixtures. Freestanding
@@ -1090,6 +1091,7 @@ struct RunSession {
         ammoGauge = {};
         consumables = {};
         upgrades = {};
+        bodiesEaten = 0;
         shops.reset();
         wallBackground.clear();
         flashEffects.clear();

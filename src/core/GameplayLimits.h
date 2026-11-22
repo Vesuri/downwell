@@ -25,6 +25,9 @@ constexpr unsigned gameplayCompactCorpseCapacity = 16;
 // one Rest in Pieces corpse makes four, a popped balloon six; each lives
 // 14 to 48 updates.
 constexpr unsigned gameplayCompactBlastCapacity = 24;
+// Compact fxBlood 223 (W1.9 Knife and Fork): five per eaten body, each
+// living until a wall or 120 updates; a full store drops the drop.
+constexpr unsigned gameplayCompactBloodCapacity = 20;
 // Compact fxTimeShard 238: shardLimit 20 plus one Begin Step's two bursts.
 constexpr unsigned gameplayCompactShardCapacity = 32;
 // Beyond rmMain's serialized 300000-pixel height, but safe when multiplied

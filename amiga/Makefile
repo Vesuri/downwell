@@ -746,6 +746,8 @@ $(REPO)/generated/downwell-area-titles.h: $(REPO)/tools/generate-area-titles.py 
 	python3 $(REPO)/tools/generate-area-titles.py --output $@
 
 obj/DownwellAmiga.o: $(REPO)/generated/downwell-area-titles.h
+$(REPO)/generated/downwell-rising-texts.h: $(REPO)/generated/downwell-area-titles.h
+obj/AmigaGameplayDrawList.o: $(REPO)/generated/downwell-rising-texts.h
 
 # W1.8 merchant speech strings (the same tool writes the full shop table).
 $(REPO)/generated/downwell-shop-speech.h: $(REPO)/tools/generate-shop-text.py $(REPO)/data/language.ini

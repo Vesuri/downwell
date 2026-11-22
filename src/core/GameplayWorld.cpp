@@ -1614,6 +1614,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),
             [](auto,downwell::CorpseAnimation& corpse){return corpse.advanceImage();},hooks))run_.effectsSucceeded=false;}
     if(blastEnd_)advanceCompactBlastAnimation();
+    if(bloodEnd_&&!advanceCompactBloodAnimation())return {};
     advanceCompactDroneAnimation();
     }
     if(!run_.effectsSucceeded)return {};
@@ -1685,6 +1686,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         else if(!run_.gemHigh&&wasHigh&&!death_.active)run_.soundPlay(160,90,false,true);
     }
     run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
+    if(!checkKnifeAndFork())return {};
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     run_.results.beginStep(input,encounterInput_?&encounterInput_->publication():nullptr);
     run_.playResultsStepSounds();
@@ -2054,6 +2056,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepDamageNumbers(damageNumberStepPhase);
+    // fxBlood 223 follows the damage numbers (221).
+    if(bloodEnd_&&!stepCompactBlood())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,226)){
         run_.effectsSucceeded=false;return {};
     }
@@ -2206,6 +2210,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         !run_.collideGoalFieldWind(enemyRandom_,240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
             176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),player_.facing())) return {};
     // Blasts and explosions (272-276) precede scenery 289.
+    // Collision events in object order: fxBlood 223, objDeadBody 263, the
+    // blasts 272-276, then the scenery.
+    if (bloodEnd_ && !collideCompactBlood()) return {};
+    if (!dead() && !eatCompactCorpses()) return {};
     if (blastEnd_ && !collideCompactBlasts()) return {};
     if (!scenery_.empty() && !collideCompactScenery()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),

@@ -169,7 +169,11 @@ struct CompactModuleTextRecord {
 // fxRisingText has the same motion, alarms and view clamp; `empty` selects
 // scrPlayerShootN's centred "EMPTY!" without an icon.
 struct CompactItemNoticeRecord {
+    // A fixed fxRisingText from the language strings, drawn by the platform
+    // (W1.9 Knife and Fork's omnomText); `empty` keeps its own layout.
+    enum FixedText : unsigned char { noFixedText, omnom };
     bool live = false, empty = false;
+    unsigned char fixedText = noFixedText;
     int x = 0, type = 0, amount = 0;
     long y = 0, ysp = -(3L << 16); // Q16
     int alarm[2] = {90, 60};
@@ -191,7 +195,9 @@ struct CompactItemNoticeRecord {
     }
     // text width "+ n": eight pixels per character.
     int left(int viewLeft, int viewWidth) const {
-        const int width = empty ? 48 : amount >= 10 ? 32 : 24;
+        return left(viewLeft, viewWidth, empty ? 48 : amount >= 10 ? 32 : 24);
+    }
+    int left(int viewLeft, int viewWidth, int width) const {
         int xxx = x;
         const int over = x + width / 2 - (viewLeft + viewWidth);
         const int under = x - width / 2 - viewLeft;
