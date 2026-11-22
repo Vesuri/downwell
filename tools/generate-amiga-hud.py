@@ -177,6 +177,9 @@ SELECTIONS = {
         526: None,   # sprDecoyBalloon (Heart Balloon before its first held Step)
         700: None,   # sprHeartBalloonPull
         701: None,   # sprHeartBalloon
+        21: None,    # sprJetL (Safety Jetpack flame)
+        22: None,    # sprJetM
+        23: None,    # sprJetS
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: None,   # registered case: intact, flashing and opened frames

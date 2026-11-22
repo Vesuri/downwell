@@ -1594,6 +1594,18 @@ public:
             if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
                (!assets.balloon(unsigned(balloon_.sprite),balloon_.frame(),asset)||!emit(asset,x,y)))return false;
           }
+          // playerDraw's jetpack flame (the player's depth, -50000): sprite by
+          // thirds of jetFrame (sprJetL, M, S), image jetFrame, at (x, y + 16).
+          if(ok&&object==272&&player_.jetpacking()&&!goalStopped()){
+            const unsigned third=player_.jetHalves()/60;
+            const unsigned sprite=third==0?21:third==1?22:23;
+            const auto x=downwell::MotionBinary64::fromInteger(240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())));
+            const auto y=downwell::MotionBinary64::fromInteger(176+16+int(downwell::roundGameMakerQ8(player_.offsetYFixed())));
+            downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
+            if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
+            if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
+               (!assets.jetFlame(sprite,(player_.jetHalves()/2)%3,asset)||!emit(asset,x,y)))return false;
+          }
           for(unsigned i=blastEnd_;ok&&i-->0;){
             const auto& b=blasts_[i];
             if(!b.live||b.object!=object)continue;
@@ -3228,6 +3240,7 @@ private:
     // objDrone 249 (Drone) and bulletDrone 266 (its shot, Gunpowder Blocks').
     downwell::CompactDroneRecord drone_;
     bool firedThisStep_=false; // global.pFired as objDrone's Step sees it
+    int jetSound_=-1; // objPlayer_n.jetpacksnd (Safety Jetpack's loop)
     bool createCompactCompanions(int x,int y);
     BulletState* createDroneBullet(int x,int y,int degrees,int damage);
     void advanceCompactDroneAnimation(){if(drone_.live)++drone_.phaseHalves;}
@@ -3348,7 +3361,7 @@ public:
     const downwell::CompactBalloonRecord& compactBalloon()const{return balloon_;}
     // Effect-surface producers among the W1.9 owners.
     bool compactSurfaceUpgrades()const{
-        if(drone_.live||balloon_.live)return true;
+        if(drone_.live||balloon_.live||player_.jetpacking())return true;
         for(unsigned i=0;i<blastEnd_;++i)if(blasts_[i].live&&blasts_[i].object!=276)return true;
         return false;
     }

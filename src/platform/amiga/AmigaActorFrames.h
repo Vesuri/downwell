@@ -31,11 +31,12 @@ private:
     // afterimages): 1,274 cavern and 1,298 reference frames, resolving 747
     // and 805 hardware sprite parts (most frames are CPU-drawn, with none).
     static constexpr unsigned sprites=741,pages=8,capacity=1408,partCapacity=1024;
-    // W1.9's explosions (463, 470), drone (131) and balloon (526, 700, 701) are drawn only on the CPU
+    // W1.9's explosions (463, 470), drone (131), balloon (526, 700, 701) and jetpack flame (21-23) are drawn only on the CPU
     // effect surface, which resolves them from the pack itself
     // (tools/amiga_scene_contract.py SURFACE_ONLY_IDS): no actor frames.
     static bool surfaceOnly(unsigned sprite){
-        return sprite==463||sprite==470||sprite==131||sprite==526||sprite==700||sprite==701;
+        return sprite==463||sprite==470||sprite==131||sprite==526||sprite==700||sprite==701||
+            (sprite>=21&&sprite<=23);
     }
     // Frames of sprite s, page p occupy [base_[k],base_[k+1]), k=s*pages+p.
     UWORD base_[sprites*pages+1]{};

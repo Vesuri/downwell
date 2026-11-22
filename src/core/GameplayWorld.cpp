@@ -1756,6 +1756,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // happens inside a room.
     player_.setRocketJump(run_.upgrades.levels[18]!=0);
     player_.setBallooning(balloonHeld());
+    player_.setJetpack(run_.upgrades.levels[22]!=0);
+    // objPlayer_n Begin Step: the jetpack loop follows last Step's jetpacking
+    // (soundPlay(343, 80, 1, 1) once; stopped and forgotten otherwise).
+    if(player_.jetpacking()){if(jetSound_<0)jetSound_=run_.soundPlay(343,80,true,true);}
+    else if(jetSound_>=0){run_.stopSound(jetSound_);jetSound_=-1;}
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,

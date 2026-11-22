@@ -14,6 +14,7 @@ void GameplayWorld::clearCompactUpgrades(){
     for(unsigned i=0;i<blastEnd_;++i)blasts_[i]={};
     blastEnd_=0;
     drone_={};firedThisStep_=false;balloon_={};
+    if(jetSound_>=0){run_.stopSound(jetSound_);jetSound_=-1;}
     for(unsigned i=0;i<bloodEnd_;++i)bloods_[i]={};
     bloodEnd_=0;
 }

@@ -257,6 +257,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         // global.pBulDelayKill == 1 only; nonAuto always clears.
         if (!gunRules_ || gunDelayKill_) shotDelay_ = 0;
         nonAuto_ = false;
+        jetpacking_ = false;
     }
 
     const bool wasSpinning = spinJumping_;
@@ -417,6 +418,20 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         if (!groundedBlock) airborneShot_ = true; // scrPlMovement's !grounded pFired branch
         shotFired = true;
     }
+    // scrUpButtonFunctions' pugJet block (Safety Jetpack): airborne with Up
+    // held, not nonAuto and out of charge, jetFrame (halves here) climbs by
+    // 0.5 to jetMax 90 and caps the fall at jetPower = 3 * jetFrame / 90,
+    // jetHalves / 60 pixels: 64/3 fifths per half, floored to the lattice.
+    if (jetpackOwned_ && !controlsLocked && !dead && input.fire && !groundedBlock && !nonAuto_) {
+        if (jetHalves_ < 180 && ammo_ <= 0) {
+            jetpacking_ = true;
+            ++jetHalves_;
+            const long limit = static_cast<long>(jetHalves_) * 64 / 3;
+            if (speedYFifths() > limit) setVerticalSpeedFifths(limit);
+        } else {
+            jetpacking_ = false;
+        }
+    }
 
     // scrPlMovement's grounded block, after the jump decisions: the landing
     // block (the hard-landing hop or soundLand), comboDone and the footstep.
@@ -444,6 +459,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             airborneShot_ = false;
         }
         if (comboCompletion_ && !comboTimeStopped_) comboCompletion_(comboContext_);
+        jetpacking_ = false; jetHalves_ = 0;
         // sprite_index == spriteRun (imgsprun 0.3) entering frame 1 or 5.
         if (running_ && playStyle_ != 2 && playStyle_ != 3 &&
             ((runPhaseTenths_ >= 10 && runPhaseTenths_ < 13) || (runPhaseTenths_ >= 50 && runPhaseTenths_ < 53)))

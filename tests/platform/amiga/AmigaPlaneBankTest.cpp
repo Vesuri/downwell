@@ -25,7 +25,7 @@ static void check(const char* sourcePath,const char* bankPath,unsigned expectedB
         if(u16(r+14)!=3)continue;
         // tools/amiga_scene_contract.py SURFACE_ONLY_IDS: CPU effect-surface
         // art that the Chip plane bank leaves out.
-        static const unsigned surfaceOnly[]={463,62463,470,62470,131,526,700,701};
+        static const unsigned surfaceOnly[]={463,62463,470,62470,131,526,700,701,21,22,23};
         bool surface=false;for(unsigned id:surfaceOnly)surface=surface||u16(r)==id;
         if(surface)continue;
         const unsigned size=u16(r+12)/8*u16(r+10);

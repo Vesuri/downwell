@@ -2774,6 +2774,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                         ++upgradeWitness["moduleReversed"];
                         if(g.modules[i].obtainable)++upgradeWitness["moduleReversedObtainable"];}
                 }
+                if(game.player().jetpacking())++upgradeWitness["jetpacking"]; // W1.9 Safety Jetpack
                 {   // W1.9 Heart Balloon: held frames, and a pop (live to gone) within a level.
                     static unsigned balloonLevel=0;static bool balloonWasLive=false;
                     const auto& b=game.compactBalloon();
@@ -3102,6 +3103,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(11,sounds.plays(83)!=0,"Knife and Fork eats a dead body (sound 83)");
         need(8,upgradeWitness["hotCasing"]&&upgradeWitness["hotCasingEnemy"],"a Hot Casing touches an enemy");
         need(17,upgradeWitness["timeoutField"]!=0,"Timeout leaves a time field where the player is hurt");
+        need(22,upgradeWitness["jetpacking"]&&sounds.plays(343)!=0,"the Safety Jetpack thrusts out of charge (loop 343)");
         need(1,upgradeWitness["moduleReversed"]&&upgradeWitness["moduleReversedObtainable"],
             "Reverse Engineering rerolls a shot-down gun module");
         need(15,upgradeWitness["balloonHeld"]&&upgradeWitness["balloonPop"]&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,

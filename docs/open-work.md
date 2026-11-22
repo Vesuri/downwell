@@ -136,13 +136,12 @@ style select, patched with the chosen style and hard mode.
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
    selectable. Exploding Knees (0), Reverse Engineering (1), Rest in Pieces
    (3), Gunpowder Blocks (5), Hot Casing (8), Drone (9), Knife and Fork (11),
-   Heart Balloon (15), Timeout (17) and Rocket Jump (18) are in, with routes
-   `upgrade-0-18-v72`, `upgrade-1-v682-shot`, `upgrade-3-v58`,
-   `upgrade-5-9-v96`, `upgrade-8-v5`, `upgrade-11-v18`, `upgrade-15-v2` and
-   `upgrade-17-v16`. Still to do: Laser Sight's beam against the new guns'
-   spread (its `bdirRand` and `decTimer` changes are in) and the Safety
-   Jetpack (22) with its loop 343, which the bank holds. Routes that pick
-   22 need re-searching when it lands.
+   Heart Balloon (15), Timeout (17), Rocket Jump (18) and Safety Jetpack
+   (22) are in, with routes `upgrade-0-18-v72`, `upgrade-1-v682-shot`,
+   `upgrade-3-v58`, `upgrade-5-9-v96`, `upgrade-8-v5`, `upgrade-11-v18`,
+   `upgrade-15-v2`, `upgrade-17-v16` and `upgrade-22-v25`. Still to do:
+   Laser Sight's beam against the new guns' spread (its `bdirRand` and
+   `decTimer` changes are in).
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the
@@ -293,6 +292,10 @@ reference game CPU bank to 495,612 (485 KiB). With the upgrade, every update
 steps the balloon (a string climb of up to 21 point tests and five binary64
 divisions) and tests it against every active enemy. The string draws as
 one-pixel white fills, one per column it crosses.
+The Safety Jetpack's flame (21-23, effect surface only) adds 1,320 bytes to
+the cavern CPU bank (485,108; ceiling 474 KiB) and takes the reference game
+CPU bank to 496,932 (486 KiB). Its thrust is a few comparisons in the
+player's Step; the flame is one more effect-surface stamp while thrusting.
 
 W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
 197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about

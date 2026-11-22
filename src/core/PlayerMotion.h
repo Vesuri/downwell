@@ -88,6 +88,11 @@ public:
     bool spinJumping() const { return spinJumping_; }
     // global.ballooning as scrGravity_n reads it in this player's Step.
     void setBallooning(bool value) { ballooning_ = value; }
+    // global.pugJet (Safety Jetpack), read at each Step; jetFrame resets with
+    // the player (scrPlayerInit) and on the ground.
+    void setJetpack(bool value) { jetpackOwned_ = value; }
+    bool jetpacking() const { return jetpacking_; }
+    unsigned jetHalves() const { return jetHalves_; }
     int ammo() const { return ammo_; }
     int ammoCapacity() const { return ammoCapacity_; }
     // scrRechargeGem: round(getAmount / 2), capped at capacity. This is not
@@ -256,6 +261,8 @@ private:
     unsigned dustCount_ = 0;
     int playStyle_ = 0;
     bool ballooning_ = false;
+    bool jetpackOwned_ = false, jetpacking_ = false;
+    unsigned jetHalves_ = 0; // jetFrame * 2
     unsigned gravityThirds_ = 0; // style 3's 512/3-fifth gravity, 171+171+170
     bool wallColliding_ = false; // scrWallCol's previous-Step xcollision
     void addDust(bool jump, long x, long y, int emitTo) {
