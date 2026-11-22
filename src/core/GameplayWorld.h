@@ -3104,6 +3104,7 @@ private:
     int playerFloorMaterial() const;
     void playShotSound(int ammoBefore);
     bool playPlayerHurt();
+    bool compactTimeoutField();
     void playEnemySound(int sound,int roomY);
     void soundPlayOLAt(int sound,int priority,bool loop,bool cut,const char* channel,int roomY);
     void compactLevelBeginMusic();

@@ -2701,6 +2701,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             downwell::GameplayEncounterSession::Frame frame(session);
             require(frame.valid()&&frame.sampleInput(input),"slice encounter frame samples input");
             const int healthBefore=game.health();
+            const unsigned fieldsBefore=game.timeFields().size();
             std::vector<std::uint32_t> liveSteering;
             for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
                 if((e.objectId==115||e.objectId==118)&&e.active)liveSteering.push_back(e.lifetimeId);}
@@ -2916,6 +2917,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     std::cerr<<'\n';
                 }
             }
+            // W1.9 Timeout: damage leaves a new time field at the player.
+            if(game.health()<healthBefore&&game.timeFields().size()>fieldsBefore)++upgradeWitness["timeoutField"];
             if(std::getenv("DOWNWELL_TRACE_SLICE_DAMAGE")&&game.health()<healthBefore){
                 std::cerr<<"DAMAGE level="<<level<<" update="<<updates<<" hp="<<game.health()<<" player="<<x<<','<<y
                     <<" stuck="<<stuck<<" ammo="<<game.player().ammo()<<" below="<<below<<" steer="<<steer;
@@ -3098,6 +3101,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(5,sounds.plays(342)!=0,"a Gunpowder Block fires its shot (sound 342)");
         need(11,sounds.plays(83)!=0,"Knife and Fork eats a dead body (sound 83)");
         need(8,upgradeWitness["hotCasing"]&&upgradeWitness["hotCasingEnemy"],"a Hot Casing touches an enemy");
+        need(17,upgradeWitness["timeoutField"]!=0,"Timeout leaves a time field where the player is hurt");
         need(1,upgradeWitness["moduleReversed"]&&upgradeWitness["moduleReversedObtainable"],
             "Reverse Engineering rerolls a shot-down gun module");
         need(15,upgradeWitness["balloonHeld"]&&upgradeWitness["balloonPop"]&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,

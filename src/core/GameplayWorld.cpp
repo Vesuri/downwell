@@ -2206,7 +2206,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         [this](int x,int y) {
             compactDamageSlowdown();
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
-                x,y,240,176)&&playPlayerHurt();
+                x,y,240,176)&&playPlayerHurt()&&compactTimeoutField();
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
     if (steeringPopulation_ && !collideSteeringEnemies()) return {};
     run_.startRechargeSounds(player_); // stomps and contact knockback (scrFjump)
@@ -2742,7 +2742,7 @@ bool GameplayWorld::collideSteeringEnemies(){
             [&](int x,int y){
                 compactDamageSlowdown();
                 return succeeded=run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
-                    x,y,240,176)&&playPlayerHurt();
+                    x,y,240,176)&&playPlayerHurt()&&compactTimeoutField();
             },downwell::NoContactRetirement{},stompY);
         if(!succeeded||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
         if(result==downwell::EnemyContact::stomp){
@@ -3402,6 +3402,14 @@ bool GameplayWorld::emitPlayerBullets(int muzzleX,int muzzleY,int playerY,int an
 bool GameplayWorld::playPlayerHurt(){
     run_.soundPlay(5,90,false,false);
     return run_.effectsSucceeded;
+}
+
+// scrTypicalDamage's pugTime block (Timeout): a parentTimeField at the
+// player's position, unless global.pTimeStop is already on.
+bool GameplayWorld::compactTimeoutField(){
+    if(!run_.upgrades.levels[17]||timeStop_.player.stopped)return run_.effectsSucceeded;
+    return run_.createTimeField(240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
+        176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),enemyRandom_);
 }
 
 // soundPlayOL from a caller at room y against the published view (top,
