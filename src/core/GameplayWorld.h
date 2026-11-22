@@ -2406,12 +2406,14 @@ public:
     downwell::LaserSightRay traceLaserSight(downwell::LaserSightRay::Coordinate x,
         downwell::LaserSightRay::Coordinate y, downwell::LaserSightRay::Coordinate bottom,
         std::uint32_t speedTurns, std::uint32_t aimTurns = 0) const;
-    downwell::LaserSightRay laserSightEndpoint() const {
+    downwell::LaserSightRay laserSightEndpoint(bool aimed = true) const {
         using Ray = downwell::LaserSightRay;
         return traceLaserSight(Ray::fromQ8(player_.offsetXFixed(), 240),
             Ray::fromQ8(player_.offsetYFixed(), 176),
             Ray::fromQ8(viewCameraYQ8(), 176 + 142),
-            Ray::turnsFromQ8Degrees(player_.speedXFixed()));
+            Ray::turnsFromQ8Degrees(player_.speedXFixed()),
+            // playerDraw's ll = 270 + aimAngle (scrAimControl's spread guns).
+            Ray::turnsFromQ8Degrees(aimed ? aimAngle_*256 : 0));
     }
     const PlayerMotion& player() const { return player_; }
     unsigned tick() const { return tick_; }

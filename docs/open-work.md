@@ -131,18 +131,9 @@ slice end and quit), not on every `ini_write_real`; the slice end counts as a
 run end for the records. The clear screen shows the style-0 poses for every
 style, and the first run after boot keeps the builder checkpoint taken before
 style select, patched with the chosen style and hard mode.
+Every world-1 upgrade works in play, each on an `upgrade-<ids>-v<variant>`
+route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
 
-9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
-   (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
-   selectable. Exploding Knees (0), Reverse Engineering (1), Rest in Pieces
-   (3), Gunpowder Blocks (5), Hot Casing (8), Drone (9), Knife and Fork (11),
-   Heart Balloon (15), Timeout (17), Rocket Jump (18) and Safety Jetpack
-   (22) are in, with routes `upgrade-0-18-v72`, `upgrade-1-v682-shot`,
-   `upgrade-3-v58`, `upgrade-5-9-v96`, `upgrade-8-v5`, `upgrade-11-v18`,
-   `upgrade-15-v2`, `upgrade-17-v16` and `upgrade-22-v25`. Still to do:
-   Laser Sight's beam against the new guns' spread (its `bdirRand` and
-   `decTimer` changes are in).
-   Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the
     records' +100), but its area-1 spawner sets (`hardSet1`, already in

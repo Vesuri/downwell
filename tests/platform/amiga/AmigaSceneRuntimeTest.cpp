@@ -2774,6 +2774,14 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                         ++upgradeWitness["moduleReversed"];
                         if(g.modules[i].obtainable)++upgradeWitness["moduleReversedObtainable"];}
                 }
+                if(game.upgrades().levels[12]&&!game.goalStopped()){ // W1.9 Laser Sight's beam
+                    ++upgradeWitness["laserBeam"];
+                    if(game.aimAngle()!=0){
+                        const auto aimed=game.laserSightEndpoint(),straight=game.laserSightEndpoint(false);
+                        ++upgradeWitness["laserAimed"];
+                        if(aimed.x.pixel!=straight.x.pixel||aimed.x.fraction!=straight.x.fraction)++upgradeWitness["laserBent"];
+                    }
+                }
                 if(game.player().jetpacking())++upgradeWitness["jetpacking"]; // W1.9 Safety Jetpack
                 {   // W1.9 Heart Balloon: held frames, and a pop (live to gone) within a level.
                     static unsigned balloonLevel=0;static bool balloonWasLive=false;
@@ -3104,6 +3112,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(8,upgradeWitness["hotCasing"]&&upgradeWitness["hotCasingEnemy"],"a Hot Casing touches an enemy");
         need(17,upgradeWitness["timeoutField"]!=0,"Timeout leaves a time field where the player is hurt");
         need(22,upgradeWitness["jetpacking"]&&sounds.plays(343)!=0,"the Safety Jetpack thrusts out of charge (loop 343)");
+        need(12,upgradeWitness["laserBeam"]!=0,"Laser Sight draws its beam");
+        need(12,upgradeWitness["laserAimed"]==0||upgradeWitness["laserBent"]!=0,
+            "an aiming gun (NOPPY's aimAngle) bends the Laser Sight beam");
         need(1,upgradeWitness["moduleReversed"]&&upgradeWitness["moduleReversedObtainable"],
             "Reverse Engineering rerolls a shot-down gun module");
         need(15,upgradeWitness["balloonHeld"]&&upgradeWitness["balloonPop"]&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,
