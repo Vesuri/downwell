@@ -3126,6 +3126,26 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
         r.objHp-=damage;r.hit=1; // parentShootableThing's hitEffect stays 0.
         consumed=true;return true;
     }
+    // objDeadBody (maskDead 599) is shootable only with Rest in Pieces: its
+    // objHp is 0 otherwise. Its Create sets hitEffect, as Scattered16's does.
+    if(!run_.upgrades.levels[3]||!compactCorpses_.size())return true;
+    bool met=false,ok=true;
+    struct Hooks{} hooks;
+    if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
+        if(met)return true;
+        std::int32_t cx,cy;
+        if(!corpse.x.promoted().roundPixel(cx)||!corpse.y.promoted().roundPixel(cy))return false;
+        if(!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(cx,cy,1,1,599)))return true;
+        met=true;
+        int order;
+        if(!downwell::compareRunnerReal(corpse.health,{},order))return false;
+        if(order<=0)return true;
+        if(!corpse.health.add(downwell::MotionBinary64::fromInteger(-damage)))return false;
+        downwell::RunnerImageValue angle;
+        ok=downwell::ProjectilePublication::angle(bulletDirection(bullet),angle)&&
+           compactEffects_.spawnNoLoop(bx.promoted(),by.promoted(),605,{0x3fd99999u,0x9999999au},angle.promoted(),{});
+        consumed=true;return ok;
+    },hooks))return run_.effectsSucceeded=false;
     return true;
 }
 
@@ -4249,8 +4269,8 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         bool sprite(std::uint32_t,const downwell::CorpseAnimation&){return true;}
         bool facing(std::uint32_t,const downwell::CorpseAnimation&){return true;}
     } hooks{*this};
-    // Rest in Pieces (pugRip) and its exploding corpses belong to W1.9.
-    return compactCorpses_.createFromDeath(source,sprite,impact,102,false,enemyRandom_,hooks)||
+    // global.pugRip (Rest in Pieces): the corpse takes objHp 1 once active.
+    return compactCorpses_.createFromDeath(source,sprite,impact,102,run_.upgrades.levels[3]!=0,enemyRandom_,hooks)||
         (run_.effectsSucceeded=false);
 }
 
@@ -4271,7 +4291,10 @@ bool GameplayWorld::compactCorpseMeeting(downwell::MotionBinary64 x,downwell::Mo
 }
 
 // objDeadBody Step: TimeStopBound motion against sParentSolid, or the held
-// alarms; dflash in both. Rest in Pieces never applies here (W1.9).
+// alarms; dflash in both. With Rest in Pieces (global.pugRip, upgrade 3) a
+// shot-down active corpse becomes bulletExplosion1 272 and three
+// explosionSmall 274 at (x, yy); the compact blast records keep whole
+// pixels, so yy is rounded.
 bool GameplayWorld::stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase){
     using Real=downwell::MotionBinary64;
     struct Events {
@@ -4279,8 +4302,11 @@ bool GameplayWorld::stepCompactCorpses(decltype(compactCorpses_.beginPhase()) ph
         bool meeting(Real x,Real y,bool& hit){return world.compactCorpseMeeting(x,y,true,hit);}
         bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
         int area(){return world.run_.stage.area;}
-        int restInPieces(){return 0;}
-        bool create(int,Real,Real){return false;}
+        int restInPieces(){return world.run_.upgrades.levels[3];}
+        bool create(int object,Real x,Real y){
+            std::int32_t px,py;
+            return (object==272||object==274)&&x.roundPixel(px)&&y.roundPixel(py)&&world.createCompactBlast(object,px,py);
+        }
         void destroy(){}
     } events{*this};
     struct Hooks{} hooks;

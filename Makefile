@@ -3733,12 +3733,12 @@ test: verify-terrain-ownership
 # W1.9 upgrade routes: upgrade-<ids>-v<variant> picks the first offered ID of
 # the list at each clear (DOWNWELL_SLICE_PICK) and checks those upgrades'
 # effects instead of the default route's coverage.
-UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96
+UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58
 # W2.6 coverage routes: other slice variants (DOWNWELL_SLICE_VARIANT; -tour
 # adds DOWNWELL_SLICE_SHOP_TOUR, a climb onto the shop's cases after the
 # visit), picked so that every world-1 sound the core requests plays on some
 # route. The pause menu's sounds are on the native menus route.
-SOUND_COVERAGE_ROUTES := world-one-v38-tour hard-mode-death-v16-tour hard-mode-death-v110-tour hard-mode-death-v336-tour hard-mode-death-v383 hard-mode-death-v228 hard-mode-death-v29-tour \
+SOUND_COVERAGE_ROUTES := world-one-v106-tour hard-mode-death-v16-tour hard-mode-death-v110-tour hard-mode-death-v336-tour hard-mode-death-v383 hard-mode-death-v228 hard-mode-death-v29-tour \
 	$(UPGRADE_ROUTES)
 # W2.3 sound routes: each route's SoundRequests summary against
 # tests/data/sound-routes/<route>.summary (DOWNWELL_WRITE_SOUND_ROUTES=1

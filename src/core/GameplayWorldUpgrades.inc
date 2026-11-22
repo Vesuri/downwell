@@ -215,6 +215,21 @@ bool GameplayWorld::blastShootables(downwell::CompactBlastRecord& blast,const do
         if(r.live&&r.masked&&downwell::contactBoundsOverlap(bounds,downwell::contactPixelBounds(r.x,r.y,1,1,710))&&
            !hit(blastHitFire|i,r.objHp))return false;
     }
+    // Rest in Pieces' corpses (objHp 1 once active): one blast sets off the
+    // next, as the source's chain does.
+    if(!run_.upgrades.levels[3]||!compactCorpses_.size())return run_.effectsSucceeded;
+    struct Hooks{} hooks;
+    if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](std::uint32_t handle,downwell::CorpseAnimation& corpse){
+        std::int32_t cx,cy;
+        if(!corpse.x.promoted().roundPixel(cx)||!corpse.y.promoted().roundPixel(cy))return false;
+        if(!downwell::contactBoundsOverlap(bounds,downwell::contactPixelBounds(cx,cy,1,1,599))||
+           !blast.remember(blastHitCorpse|(handle&0x0fffffffu)))return true;
+        int order;
+        if(!downwell::compareRunnerReal(corpse.health,{},order))return false;
+        if(order<=0)return true;
+        return corpse.health.add(downwell::MotionBinary64::fromInteger(-50))&&
+            run_.emitFlash<1,0,0>(UpgradeReal::fromInteger(blast.x),UpgradeReal::fromInteger(blast.y),enemyRandom_);
+    },hooks))return run_.effectsSucceeded=false;
     return run_.effectsSucceeded;
 }
 
