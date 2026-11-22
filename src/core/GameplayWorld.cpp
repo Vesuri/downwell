@@ -2214,6 +2214,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // blasts 272-276, then the scenery.
     if (bloodEnd_ && !collideCompactBlood()) return {};
     if (!dead() && !eatCompactCorpses()) return {};
+    if (run_.upgrades.levels[8] && guns_.casingEnd && !collideHotCasings()) return {};
     if (blastEnd_ && !collideCompactBlasts()) return {};
     if (!scenery_.empty() && !collideCompactScenery()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
@@ -3422,6 +3423,7 @@ bool GameplayWorld::firePlayerGun(int playerX,int playerY,int muzzleX,int muzzle
     auto* casing=downwell::CompactGuns::append(guns_.casings,guns_.casingEnd);
     if(!casing)return run_.effectsSucceeded=false;
     casing->create(enemyRandom_,playerX+240,playerY+176,player_.facing());casing->birth=tick_;
+    if(run_.upgrades.levels[8])casing->makeHot(run_.upgrades.levels[8]);
     if(gun.burst){
         if(gun.burstRate>0){
             if(int(burstCount_)<gun.burstAmount){burstAlarm_=gun.burstRate;++burstCount_;}
@@ -3445,6 +3447,7 @@ bool GameplayWorld::burstFire(){
     auto* casing=downwell::CompactGuns::append(guns_.casings,guns_.casingEnd);
     if(!casing)return run_.effectsSucceeded=false;
     casing->create(enemyRandom_,x+240,y+176,player_.facing());casing->birth=tick_;
+    if(run_.upgrades.levels[8])casing->makeHot(run_.upgrades.levels[8]);
     if(int(burstCount_)<gun.burstAmount){burstAlarm_=gun.burstRate;++burstCount_;}
     else burstCount_=0;
     return run_.effectsSucceeded;
@@ -3476,33 +3479,39 @@ bool GameplayWorld::bulletEnemyContact(BulletState& bullet,const downwell::Proje
             enemy.imageScaleY(),
             downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)};
         if(!enemy.active||enemy.health<=0||!path.intersects(contact))continue;
-        consumed=true;
-        // scrTypicalBulletDamage: soundPlay(29, 90, 0, 1) after the damage
-        // (a compact death runs inside the damage below, so it plays first).
-        if(enemy.objectId!=112)run_.soundPlay(29,90,false,true);
-        if(enemy.objectId==115||enemy.objectId==118)
-            return hitSteeringEnemy(enemy,bulletDirection(bullet),bullet.damage)||(run_.effectsSucceeded=false);
         downwell::RunnerImageValue bx,by;
         if(!downwell::ProjectilePublication::coordinate(path.x,240,bx)||
            !downwell::ProjectilePublication::coordinate(path.y,176,by))return run_.effectsSucceeded=false;
-        // scrBulletImpact precedes the (here immediate) death's scrDeadBody.
-        if(enemy.objectId!=112)enemy.takenImpactDamage=bullet.damage;
-        const auto impact=downwell::applyBulletDamage(
-            enemy,run_.kills,enemyRandom_,
-            [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
-            bullet.damage,bulletDirection(bullet),
-            [this](const EnemyState& record){return publishEnemyActivation(record,false);});
-        if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
-        if(impact.kind==downwell::BulletImpactKind::immune){
-            if(!compactImmuneSpark(bx.promoted(),by.promoted()))return false;
-            run_.soundPlay(impact.sound,50,false,true); // choose(30, 31)
-        }
-        if((impact.kind==downwell::BulletImpactKind::damaged||impact.kind==downwell::BulletImpactKind::defeated)&&
-           !compactBulletImpact(enemy,bx.promoted(),by.promoted(),bulletDirection(bullet),bullet.damage,false))return false;
-        consumed=impact.kind!=downwell::BulletImpactKind::ignored;
-        return run_.effectsSucceeded;
+        return typicalBulletDamage(enemy,bullet.damage,bulletDirection(bullet),bx.promoted(),by.promoted(),consumed);
     }
     return true;
+}
+
+// scrTypicalBulletDamage from a shot (or a Hot Casing) at (x, y) room pixels.
+bool GameplayWorld::typicalBulletDamage(EnemyState& enemy,int damage,std::uint32_t direction,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& consumed){
+    consumed=true;
+    // soundPlay(29, 90, 0, 1) after the damage (a compact death runs inside
+    // the damage below, so it plays first).
+    if(enemy.objectId!=112)run_.soundPlay(29,90,false,true);
+    if(enemy.objectId==115||enemy.objectId==118)
+        return hitSteeringEnemy(enemy,direction,damage)||(run_.effectsSucceeded=false);
+    // scrBulletImpact precedes the (here immediate) death's scrDeadBody.
+    if(enemy.objectId!=112)enemy.takenImpactDamage=damage;
+    const auto impact=downwell::applyBulletDamage(
+        enemy,run_.kills,enemyRandom_,
+        [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
+        damage,direction,
+        [this](const EnemyState& record){return publishEnemyActivation(record,false);});
+    if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
+    if(impact.kind==downwell::BulletImpactKind::immune){
+        if(!compactImmuneSpark(x,y))return false;
+        run_.soundPlay(impact.sound,50,false,true); // choose(30, 31)
+    }
+    if((impact.kind==downwell::BulletImpactKind::damaged||impact.kind==downwell::BulletImpactKind::defeated)&&
+       !compactBulletImpact(enemy,x,y,direction,damage,false))return false;
+    consumed=impact.kind!=downwell::BulletImpactKind::ignored;
+    return run_.effectsSucceeded;
 }
 
 bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed){
@@ -3822,7 +3831,7 @@ bool GameplayWorld::stepCasings(){
         if(!c.live||c.birth==tick_)continue;
         c.beginStep();
         bool wall=false;
-        if(!solidMeeting(457,GunReal::fromInteger(int((c.x+c.xsp+(1L<<15))>>16)),
+        if(!solidMeeting(c.sprite(),GunReal::fromInteger(int((c.x+c.xsp+(1L<<15))>>16)),
                          GunReal::fromInteger(int((c.y+(1L<<15))>>16)),false,wall))return false;
         if(wall)c.xsp=-(c.xsp*7)/10;
         if(c.xsp>-3277&&c.xsp<3277)c.xsp=c.xsp>0?3277:c.xsp<0?-3277:0; // 0.05
@@ -3844,7 +3853,7 @@ bool GameplayWorld::stepCasings(){
             if(block>=0&&path.intersects(breakables_[block].x-8,breakables_[block].x+8,breakables_[block].y-8,breakables_[block].y+8))hit=true;
         }
         if(hit){c.live=false;continue;}
-        if(timeStopBound(457,int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16))){c.x+=c.xsp;c.y+=c.ysp;}
+        if(timeStopBound(c.sprite(),int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16))){c.x+=c.xsp;c.y+=c.ysp;}
     }
     return true;
 }
@@ -4523,3 +4532,24 @@ void GameplayWorld::drawCompactAfterImages(){
 }
 
 #include "GameplayWorldUpgrades.inc"
+
+// bulletCasing's subparentEnemy collision with Hot Casing: scrTypicalBulletDamage
+// at bdmg 5 and the inherited bDir 0; the casing lives on.
+bool GameplayWorld::collideHotCasings(){
+    for(unsigned i=0;i<guns_.casingEnd;++i){const auto& c=guns_.casings[i];
+        if(!c.live||!c.hot)continue;
+        const int cx=int((c.x+(1L<<15))>>16),cy=int((c.y+(1L<<15))>>16);
+        const auto casing=downwell::contactPixelBounds(cx,cy,1,1,467);
+        for(unsigned e=0;e<enemyCount_;++e){auto& enemy=enemies_[e];
+            if(!enemy.active||enemy.destroyRequested||enemy.health<=0)continue;
+            const auto target=downwell::contactWorldBounds({(enemy.x+240L)*256,(enemy.y+176L)*256,
+                enemy.objectId==117?enemy.motionState:enemy.facing,enemy.imageScaleY(),
+                downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
+            if(!downwell::contactBoundsOverlap(casing,target))continue;
+            bool consumed=false;
+            if(!typicalBulletDamage(enemy,c.damage,downwell::RangedShot::degreesToTurns(0),
+                GunReal::fromInteger(cx),GunReal::fromInteger(cy),consumed))return false;
+        }
+    }
+    return run_.effectsSucceeded;
+}

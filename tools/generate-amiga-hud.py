@@ -159,6 +159,7 @@ SELECTIONS = {
         278: None,   # sprCrawler
         369: None,   # bgNightsky
         457: None,   # sprBulletLeak: bulletCasing
+        467: None,   # sprLeakBullet: bulletCasing with Hot Casing (W1.9)
         458: None,   # sprBulScatter2 (six-frame gem-high projectile)
         459: None,   # sprBulScatter1 (six-frame usual gunboot projectile)
         460: None,   # sprSkeletonBone
@@ -792,7 +793,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
                     458, 459, 460, 461, 463, 470, 471, 485, 486, 487, 496, 497, 602, 603, 605,
-                    83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457, 112, 94, 95):
+                    83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457, 467, 112, 94, 95):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -859,7 +860,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                     # fxSmoke also leaves image_xscale at its default +1.
                     # Room effects (sparkles, flash, splash, fire, small
                     # smoke) never set image_xscale either.
-                    facings = (False,) if gun_spread or w14_turned or sprite_id in (111, 112, 95, 457, 83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
+                    facings = (False,) if gun_spread or w14_turned or sprite_id in (111, 112, 95, 457, 467, 83, 84, 85, 101, 118, 485, 486, 487, 496, 497, 571, 572,
                                                                        605, 704, 711, 712) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant

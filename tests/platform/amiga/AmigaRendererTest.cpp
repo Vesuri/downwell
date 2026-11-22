@@ -1677,7 +1677,7 @@ int main(int argc, char** argv) {
     // offline atlas shares planes. Enforce the actual banks' fixed ceilings.
     require(gamePack.size()==DOWNWELL_GAME_BANK_BYTES&&gamePack.size()<=482u*1024u, // tools/amiga_scene_contract.py
             "CPU gameplay art stays within its fixed scene lease budget");
-    require(DOWNWELL_GAME_PLANE_BYTES<=190u*1024u, // tools/amiga_scene_contract.py
+    require(DOWNWELL_GAME_PLANE_BYTES<=191u*1024u, // tools/amiga_scene_contract.py
             "DMA gameplay atlas stays within its fixed Chip lease budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;

@@ -333,7 +333,7 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactGuns(const Gamepla
     }
     // bulletCasing: draw_self while dFlash is positive; never mirrored.
     for(unsigned i=0;i<g.casingEnd;++i){const auto& c=g.casings[i];
-        if(c.live&&c.visible()&&!place(457,c.frame(),int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16),0))return false;
+        if(c.live&&c.visible()&&!place(c.sprite(),c.frame(),int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16),0))return false;
     }
     // fxLaserTrail: image_angle bDir + 90 = 360 for the vertical laser.
     for(unsigned i=0;i<g.trailEnd;++i){const auto& t=g.trails[i];

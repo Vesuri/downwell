@@ -3253,6 +3253,9 @@ private:
     bool advanceBulletAnimation(BulletState& bullet);
     bool stepRangedBullet(BulletState& bullet,long generationCameraY);
     bool stepLaserBullet(BulletState& bullet,long generationCameraY);
+    bool typicalBulletDamage(EnemyState& enemy,int damage,std::uint32_t direction,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& consumed);
+    bool collideHotCasings();
     bool bulletEnemyContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed);
     bool bulletSolidContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed);
     bool createGunModule(const downwell::DeferredCreateInstance& command);

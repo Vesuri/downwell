@@ -23,6 +23,8 @@ GAME_IDS = frozenset({
     # W1.4 guns: modules, letters, casing, laser/spread shots, muzzle,
     # pickup effect and notice icon.
     111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
+    # W1.9 Hot Casing's sprLeakBullet.
+    467,
     # W1.6 corpses (bat, snake, snail, crawler, turtle; frog 172 above) and
     # the bullet-immune spark.
     112, 158, 165, 179, 281, 337,
@@ -81,8 +83,10 @@ SURFACE_ONLY_IDS = frozenset({463, 62463, 470, 62470, 131})
 # the full-catalogue reference oracles load it; production gameplay leases
 # the cavern banks below.
 # W2.3's wall-kick pose takes the reference game planes past 176 KiB.
+# W1.9 Hot Casing's sprLeakBullet 467 planes take them from 194,270 to
+# 194,590 bytes, past 190 KiB.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 102 * 1024,
-                'game': 482 * 1024, 'game-planes': 190 * 1024}
+                'game': 482 * 1024, 'game-planes': 191 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -98,6 +102,8 @@ CAVERN_ROOTS = frozenset({
     471, 480, 481, 482, 485, 486, 487, 496, 497, 550, 551, 568, 569,
     570, 571, 572, 602, 603, 605, 702, 703, 704, 707, 711, 712, 83, 118,
     111, 140, 141, 457, 465, 466, 472, 473, 601, 713,
+    # W1.9 Hot Casing's sprLeakBullet.
+    467,
     # W1.5 fxTimeShard 238 draws sprite 91 (shared with area-four debris).
     91,
     # W1.6 objDeadBody 263 sprites, the bullet-immune spark 112 and the
@@ -149,7 +155,9 @@ CAVERN_IDS = frozenset(
 # in four turns and both facings, and the drone) adds 94,346 CPU bytes and
 # no Chip: 386,310 -> 480,656 (cavern planes 188,872). It is Fast RAM data
 # on the A1200 target; W3 can trim the turns no route draws.
-BANK_BUDGETS.update({'cavern': 470 * 1024, 'cavern-planes': 186 * 1024})
+# W1.9 Hot Casing's sprLeakBullet 467 (eight frames) adds 420 CPU bytes:
+# 481,112 -> 481,532, past 470 KiB.
+BANK_BUDGETS.update({'cavern': 472 * 1024, 'cavern-planes': 186 * 1024})
 
 
 def require_budget(bank, size):

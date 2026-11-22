@@ -23,7 +23,13 @@ struct CompactCasingRecord {
     bool flashing = false;
     int dFlash = 1;
     std::uint32_t birth = 0;
-    static constexpr int frames = 8; // sprBulletLeak 457
+    // Hot Casing (upgrade 8, global.pugLeak): bdmg 5, Alarm 0 = 30 * level
+    // and sprLeakBullet 467 (also its mask), after the rest of Create.
+    bool hot = false;
+    int damage = 0;
+    void makeHot(int level) { hot = true; damage = 5; alarm[0] = 30 * level; }
+    int sprite() const { return hot ? 467 : 457; }
+    static constexpr int frames = 8; // sprBulletLeak 457 and sprLeakBullet 467
     template<class Random> void create(Random& random, int px, int py, int facing) {
         x = long(px) << 16; y = long(py) << 16;
         // floor(word * width / 2^16) in 32-bit steps (68000: no 64-bit helpers).

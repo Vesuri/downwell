@@ -135,17 +135,17 @@ style select, patched with the chosen style and hard mode.
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
    selectable. Exploding Knees (0), Rest in Pieces (3), Gunpowder Blocks
-   (5), Drone (9), Knife and Fork (11) and Rocket Jump (18) are in, with
-   routes `upgrade-0-18-v72`, `upgrade-3-v58`, `upgrade-5-9-v96` and
-   `upgrade-11-v18`. Still to do: the Heart Balloon's decoy (15) that
-   steering enemies chase (they now always chase the player), Hot Casing
-   (8, damaging casings), Reverse Engineering (1, `pugEngineer` on gun
+   (5), Hot Casing (8), Drone (9), Knife and Fork (11) and Rocket Jump (18)
+   are in, with routes `upgrade-0-18-v72`, `upgrade-3-v58`,
+   `upgrade-5-9-v96`, `upgrade-8-v5` and `upgrade-11-v18`. Still to do: the
+   Heart Balloon's decoy (15) that steering enemies chase (they now always
+   chase the player), Reverse Engineering (1, `pugEngineer` on gun
    pickups), Laser Sight's beam against the new guns' spread (its
    `bdirRand` and `decTimer` changes are in), Time Field Damage (`pugTime`:
    `scrTypicalDamage` from the time fields) and the Safety Jetpack (22).
    Their sounds come with them (the bank holds them): `sfxEnmExplode1-3`
    91-93 from the decoy, and the jetpack loop 343. Routes that pick an
-   unwired upgrade (1, 8, 15, 17 or 22) need re-searching as these land.
+   unwired upgrade (1, 15, 17 or 22) need re-searching as these land.
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the
@@ -285,6 +285,11 @@ Cavern CPU bank 480,656, planes 188,872. Smoke grows from 32 to 48 records
 and debris from 24 to 48; 24 blast records and the drone are new. Every
 update now runs the blast and drone steps (empty loops without the
 upgrades), and the unowned enemy step order costs an insertion pass.
+Hot Casing's sprLeakBullet 467 adds 420 bytes to the cavern CPU bank
+(481,532, past the old 470 KiB ceiling, now 472) and takes the reference game
+planes to 194,590 (ceiling 191 KiB). With the upgrade, every update tests
+each live hot casing against every active enemy (casings times enemies
+bounds tests).
 
 W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
 197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about

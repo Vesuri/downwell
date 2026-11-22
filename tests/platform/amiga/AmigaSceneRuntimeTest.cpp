@@ -2762,6 +2762,18 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                                     ((b.hits[h]>>28)==1?"Enemy":"Object")];
                     }
                 }
+                {   // W1.9 Hot Casing: a hot casing overlapping a live enemy (the collision it damages through).
+                    const auto& g=game.compactGuns();
+                    for(unsigned i=0;i<g.casingEnd;++i){const auto& c=g.casings[i];if(!c.live||!c.hot)continue;
+                        ++upgradeWitness["hotCasing"];
+                        const auto casing=downwell::contactPixelBounds(int((c.x+(1L<<15))>>16),int((c.y+(1L<<15))>>16),1,1,467);
+                        for(unsigned e=0;e<game.enemyCount();++e){const auto& enemy=game.enemyAt(e);
+                            if(!enemy.active||enemy.health<=0)continue;
+                            const auto target=downwell::contactWorldBounds({(enemy.x+240L)*256,(enemy.y+176L)*256,
+                                enemy.objectId==117?enemy.motionState:enemy.facing,enemy.imageScaleY(),
+                                downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
+                            if(downwell::contactBoundsOverlap(casing,target))++upgradeWitness["hotCasingEnemy"];}}
+                }
                 bool wallHit=false,dust=false,emptyText=false;
                 for(unsigned i=0;i<fx.noLoopCount();++i){const int id=fx.noLoop(i).effect.spriteId;
                     wallHit|=id==101||id==96;dust|=id==94||id==95||id==62094;}
@@ -3066,6 +3078,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(9,sounds.plays(47)!=0,"the Drone follows the player and fires (sound 47)");
         need(5,sounds.plays(342)!=0,"a Gunpowder Block fires its shot (sound 342)");
         need(11,sounds.plays(83)!=0,"Knife and Fork eats a dead body (sound 83)");
+        need(8,upgradeWitness["hotCasing"]&&upgradeWitness["hotCasingEnemy"],"a Hot Casing touches an enemy");
         need(3,upgradeWitness["explosion"]!=0&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,
             "a shot-down Rest in Pieces corpse explodes (bulletExplosion1, sounds 91-93)");
     }
