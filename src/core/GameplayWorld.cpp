@@ -3769,13 +3769,12 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
             const downwell::ProjectileSegment point(shot.x,shot.y,0,0);
             if(!hitGemChunk(point,bullet.damage,hit,consumed))return false;
         }else{
-            // scrEffectSpawn(x, y, hitWallFx 96, 0.5, 0, -10000), then
-            // soundPlay(15, 30, 0, 1). The scrSmokefx(x, y, 1, 0) between
-            // them is still missing (open-work W1.11: its draws reshuffle
-            // every route).
+            // scrEffectSpawn(x, y, hitWallFx 96, 0.5, 0, -10000),
+            // scrSmokefx(x, y, 1, 0), then soundPlay(15, 30, 0, 1).
             destroy=true;
             const auto wx=downwell::MotionBinary64::fromInteger(x+240),wy=downwell::MotionBinary64::fromInteger(py+176);
             if(!compactWallEffect(wx,wy,96,-10000))return false;
+            if(!emitBoxSmoke(wx,wy))return run_.effectsSucceeded=false;
             run_.soundPlay(15,30,false,true);
         }
     }else{
@@ -4600,13 +4599,15 @@ void GameplayWorld::advanceCompactHudDraw(){
     if(liveRewards_)for(auto& r:compactRewards_)if(r.live)r.advanceDraw();
 }
 
-// scrPlayerInit: nine records of sprite 31, subimage 0, xscale 1 at x/y.
+// scrPlayerInit: nine records of sprite 31, subimage 0, xscale 1 at x/y,
+// and flickerTime 0.
 void GameplayWorld::resetCompactAfterImages(int x,int y){
     const long xFixed=long(x-240)<<8,yFixed=long(y-176)<<8;
     for(auto& a:afterImages_)a={31,0,1,xFixed,yFixed};
     presentedPose_={31,0,1,xFixed,yFixed};
     afterImageHead_=0;
     afterImagesDrawn_=0;
+    flickerTime_=0;lowHealthRed_=false; // flickerTime = 0
 }
 
 // playerDraw while gemStreak >= gemStreakThreshold and !global.death:
@@ -4619,16 +4620,31 @@ void GameplayWorld::drawCompactAfterImages(){
         presentedPose_={player_.spriteId(deadPose),player_.spriteFrame(deadPose,death_.animation),
             player_.facing(),player_.offsetXFixed(),player_.offsetYFixed()};
     }
-    if(currencyAccount_.streak<downwell::CompactGemStreakHud::threshold||
-       !playerInstance_.lifetimeId||run_.goalStopped||dead())return;
-    const unsigned timer=currencyAccount_.timer;
-    unsigned amount=timer>=300?8:unsigned(downwell::CompactGemStreakHud::roundRatio(8UL*timer,300));
-    if(amount>8)amount=8;
-    for(int i=int(amount);i>=0;--i){
-        afterImageDx_[i]=int(enemyRandom_.irandomSmall(2))-1;
-        afterImageDy_[i]=int(enemyRandom_.irandomSmall(3))-2;
+    lowHealthRed_=false;
+    if(!playerInstance_.lifetimeId||run_.goalStopped)return;
+    if(currencyAccount_.streak>=downwell::CompactGemStreakHud::threshold&&!dead()){
+        const unsigned timer=currencyAccount_.timer;
+        unsigned amount=timer>=300?8:unsigned(downwell::CompactGemStreakHud::roundRatio(8UL*timer,300));
+        if(amount>8)amount=8;
+        for(int i=int(amount);i>=0;--i){
+            afterImageDx_[i]=int(enemyRandom_.irandomSmall(2))-1;
+            afterImageDy_[i]=int(enemyRandom_.irandomSmall(3))-2;
+        }
+        afterImagesDrawn_=amount+1;
     }
-    afterImagesDrawn_=amount+1;
+    // Then, through !dFlash at global.playerHp == 1: flickerTime counts
+    // Draws; from flickerAt 45 two shaderPlayerRed copies replace the
+    // player, and at flickerAt + flickerDur (51) the count restarts. Each
+    // draw_sprite_ext evaluates its arguments right to left: y's
+    // irandom_range(-1,1), then x's irandom_range(-2,2).
+    if(!playerVisible()||health_!=1)return;
+    if(++flickerTime_<45)return;
+    if(flickerTime_>=51)flickerTime_=0;
+    for(unsigned i=0;i<2;++i){
+        lowHealthDy_[i]=int(enemyRandom_.irandomSmall(2))-1;
+        lowHealthDx_[i]=int(enemyRandom_.irandomSmall(4))-2;
+    }
+    lowHealthRed_=true;
 }
 
 #include "GameplayWorldUpgrades.inc"

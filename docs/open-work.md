@@ -135,16 +135,6 @@ style select, patched with the chosen style and hard mode.
 Every world-1 upgrade works in play, each on an `upgrade-<ids>-v<variant>`
 route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
 
-11. **Low-health flicker.** At 1 HP `playerDraw` replaces the player, on 7 of
-    every 52 Draws, by two `shaderPlayerRed` copies (white and red texels red,
-    black transparent) jittered by `irandom_range(-2,2)` and
-    `irandom_range(-1,1)`. The draws feed the world RNG, so adding it reshuffles
-    the route. Re-search the routes once for this and for the laser's missing
-    wall smoke: `bulletLaser` Step's wall branch runs `scrSmokefx(x, y, 1, 0)`
-    (`emitBoxSmoke`) between its effect and `sndShotwall` 15, and its draws
-    reshuffle every route that fires the laser at a wall (world one's among
-    them). Re-searching means new slice variants, the sound-route summaries
-    and the native replays.
 12. **Walking enemy wedged in a solid hangs the compact world.** Found with the
     W2.3 RNG stream: currency tape `--overflow` with startup seed 40 and
     encounter route 0 (`SCAN_ROUTE`-style override of `amigaOverflowRoute`).
@@ -283,6 +273,13 @@ and its planes from 194,590 to 196,726 (193 KiB). EnemyState grows by
 24 bytes per record (the eyefish's binary64 xx, yy and xsp). A live eyefish
 runs scrCheckCollisionWith's wall tests every update; the neon ball costs
 what a red ball does, plus its collision test against every enemy.
+W1.11 (the 1-HP flicker and the laser's wall smoke): a red silhouette page
+for every living player pose, both facings, adds 20,654 bytes to the cavern
+CPU bank (511,294; ceiling 500 KiB) and 9,092 Chip plane bytes (200,592;
+ceiling 196 KiB); the reference game bank goes to 523,114 (511 KiB) and its
+planes to 205,818 (201 KiB). `AmigaActorFrames` widens from 8 to 10
+256-frame pages, 2,964 more bytes of span table. At 1 HP each Draw adds a
+counter and, on 7 Draws in 51, four RNG words and two BOBs in place of one.
 
 W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
 197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about

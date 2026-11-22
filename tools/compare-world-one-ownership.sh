@@ -8,9 +8,9 @@ out=tmp/ownership
 mkdir -p "$out"
 packs="generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp"
 fail=0
-for route in world-one world-one-v106-tour hard-mode-death hard-mode-death-v36 hard-mode-death-v80-tour hard-mode-death-v195 \
-    hard-mode-death-v16-tour hard-mode-death-v66-tour hard-mode-death-v75-tour \
-    upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58 upgrade-11-v18 upgrade-8-v5 upgrade-15-v2 upgrade-1-v682-shot upgrade-17-v16 upgrade-22-v25 upgrade-12-v155; do
+for route in world-one world-one-v106-tour hard-mode-death hard-mode-death-v80-tour hard-mode-death-v195 \
+    hard-mode-death-v514 hard-mode-death-v294-tour hard-mode-death-v325-tour \
+    upgrade-0-18-v58 upgrade-5-9-v96 upgrade-3-v58 upgrade-11-v18 upgrade-8-v17 upgrade-15-v2 upgrade-1-v682-shot upgrade-17-v16 upgrade-22-v25 upgrade-12-v155; do
   hard=; case $route in hard*) hard=1;; esac
   for mode in owned unowned; do
     unowned=; [ $mode = unowned ] && unowned=1

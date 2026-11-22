@@ -564,6 +564,18 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
 #endif
         // The pose the world evaluated at this update's Draw boundary.
         const auto& pose = port.presentedPlayerPose();
+#ifndef DOWNWELL_REPLAY_VERIFY
+        if (port.lowHealthRed()) {
+            // W1.11 at 1 HP: two shaderPlayerRed copies (red silhouette
+            // pages 2048 + 256 * mirrored, drawn unflipped) replace it.
+            const unsigned page = 2048u + (pose.facing < 0 ? 256u : 0u) + pose.frame;
+            for (unsigned i = 0; i < 2; ++i)
+                if (!append((UWORD)pose.sprite, UWORD(page),
+                        downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraOffsetX() + port.lowHealthDx(i),
+                        playerStartY + downwell::roundGameMakerQ8(pose.yFixed) - port.cameraOffsetY() + port.lowHealthDy(i),
+                        0)) return false;
+        } else
+#endif
         if (port.playerVisible() && !append(
                 (UWORD)pose.sprite, (UWORD)pose.frame,
                 downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraOffsetX(),

@@ -96,8 +96,10 @@ SURFACE_ONLY_IDS = frozenset({463, 62463, 470, 62470, 131, 526, 700, 701, 21, 22
 # W1.10 hard mode's eyefish, its corpse and the neon red ball take it to
 # 502,464, past 486 KiB, and the reference game planes from 194,590 to
 # 196,726, past 191 KiB.
+# W1.11's low-health red silhouettes (every living player pose, both facings)
+# take it to 523,114, past 510 KiB, and its planes to 205,818, past 200 KiB.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 102 * 1024,
-                'game': 491 * 1024, 'game-planes': 193 * 1024}
+                'game': 511 * 1024, 'game-planes': 201 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -178,7 +180,11 @@ CAVERN_IDS = frozenset(
 # red ball 352 (four frames), with mirrored and DMA forms, add 5,532 CPU
 # bytes: 490,640, past 474 KiB, and take the cavern planes to 191,500 Chip
 # bytes, past 186 KiB.
-BANK_BUDGETS.update({'cavern': 480 * 1024, 'cavern-planes': 188 * 1024})
+# W1.11 playerDraw's low-health flicker: a shaderPlayerRed silhouette page
+# (frames 2048 + 256 * mirrored) for every living player pose adds 20,654
+# CPU bytes: 511,294, past 499 KiB, and 9,092 Chip plane bytes: 200,592,
+# past 195 KiB.
+BANK_BUDGETS.update({'cavern': 500 * 1024, 'cavern-planes': 196 * 1024})
 
 
 def require_budget(bank, size):

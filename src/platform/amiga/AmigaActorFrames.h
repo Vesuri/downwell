@@ -5,7 +5,7 @@
 // Immutable render ownership, prepared before the first gameplay frame. This
 // bank remains in ordinary memory: only the existing channel buffers use DMA.
 // Frame numbers have sparse 256-frame variant pages (0, 256 and 768, and
-// W1.7's afterimage pages 1024..2047).
+// W1.7's afterimage pages 1024..2047, W1.11's low-health red 2048..2559).
 class AmigaActorFrames {
 public:
     struct Frame {
@@ -30,7 +30,9 @@ private:
     // reference frames. W1.10 per-style player art (styles 1-4, with
     // afterimages): 1,274 cavern and 1,298 reference frames, resolving 747
     // and 805 hardware sprite parts (most frames are CPU-drawn, with none).
-    static constexpr unsigned sprites=741,pages=8,capacity=1408,partCapacity=1024;
+    // W1.11's low-health red pages (250 frames): 1,579 cavern and 1,603
+    // reference frames, no new parts.
+    static constexpr unsigned sprites=741,pages=10,capacity=1664,partCapacity=1024;
     // W1.9's explosions (463, 470), drone (131), balloon (526, 700, 701) and jetpack flame (21-23) are drawn only on the CPU
     // effect surface, which resolves them from the pack itself
     // (tools/amiga_scene_contract.py SURFACE_ONLY_IDS): no actor frames.

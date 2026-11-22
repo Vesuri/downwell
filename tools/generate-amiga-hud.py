@@ -384,7 +384,7 @@ def scene_banks(encoded):
         if ident in DROPPED_IDS:
             continue
         if ident in AFTERIMAGE_PLAYER_IDS and frame >= 1024:
-            banks["game"].append(item)  # W1.7 afterimages: gameplay only
+            banks["game"].append(item)  # W1.7 afterimages, W1.11 red: gameplay only
             continue
         if ident in BOOT_BANK_IDS:
             banks["boot"].append(item)
@@ -952,6 +952,24 @@ def build_records(manifest, extracted, profile, language_path=None):
                                        originY=sprite["originY"] - bounds[1])
                         encoded.append((variant, 1024 + 512 * flipped + 256 * parity + frame_index,
                                         cropped_width, cropped_data))
+                    # W1.11 playerDraw's low-health flicker (shaderPlayerRed):
+                    # white and red texels become red, black is transparent.
+                    # Frame 2048 + 256 * mirrored, cropped with the same anchor.
+                    red = Image.new("RGBA", source.size, (0, 0, 0, 0))
+                    for y in range(source.height):
+                        for x in range(source.width):
+                            if pixel_to_pen(source.getpixel((x, y))) in (1, 2):
+                                red.putpixel((x, y), (255, 0, 0, 255))
+                    bounds = red.getbbox() or (0, 0, 1, 1)
+                    cropped = red.crop(bounds)
+                    pens = [pixel_to_pen(pixel) for pixel in cropped.get_flattened_data()]
+                    cropped_width, cropped_data = encode_planar(pens, cropped.width, cropped.height)
+                    require(decode_planar(cropped_data, cropped.width, cropped.height,
+                                          cropped_width) == pens, "low-health red round trip failed")
+                    variant = dict(sprite, id=sprite_id, width=cropped.width, height=cropped.height,
+                                   originX=origin_x - bounds[0], originY=sprite["originY"] - bounds[1])
+                    encoded.append((variant, 2048 + 256 * flipped + frame_index,
+                                    cropped_width, cropped_data))
             if profile == "game" and sprite_id in (27, 43, 44, 25, 26, 28, 29):
                 # Style bobs contain large transparent margins. Trim offline
                 # while retaining exactly the same world-space anchor.

@@ -2496,6 +2496,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     unsigned routeSideStops=0,routeFrozen=0,routeDoused=0,routeShards=0,routeFireViews=0;
     unsigned routeCorpses=0,routeWallHits=0,routeDust=0;
     unsigned routeTitles=0,routeRewards=0,routeGemHigh=0;
+    // W1.11: Draws with the 1-HP red pair; updates with a laser's wall hit (96).
+    unsigned routeLowHealthRed=0,routeLaserWall=0;
     // W1.8: a shop visit with a funded, a sold-out and an insufficient press,
     // then Leave with the farewell; merchant speech, prompt and reactions.
     unsigned routeShops=0,routeFunded=0,routeSoldOut=0,routePoor=0,routeFarewells=0;
@@ -2814,9 +2816,12 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                                 downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
                             if(downwell::contactBoundsOverlap(casing,target))++upgradeWitness["hotCasingEnemy"];}}
                 }
-                bool wallHit=false,dust=false,emptyText=false;
+                bool wallHit=false,dust=false,emptyText=false,laserWall=false;
                 for(unsigned i=0;i<fx.noLoopCount();++i){const int id=fx.noLoop(i).effect.spriteId;
-                    wallHit|=id==101||id==96;dust|=id==94||id==95||id==62094;}
+                    wallHit|=id==101||id==96;laserWall|=id==96;dust|=id==94||id==95||id==62094;}
+                routeLaserWall+=laserWall;routeLowHealthRed+=game.lowHealthRed();
+                if(std::getenv("DOWNWELL_TRACE_SLICE_FLICKER")&&(laserWall||game.lowHealthRed()))
+                    std::cerr<<"FLICKER tick="<<game.tick()<<" red="<<game.lowHealthRed()<<" laserWall="<<laserWall<<'\n';
                 for(unsigned i=0;i<game.compactGuns().noticeEnd;++i)
                     emptyText|=game.compactGuns().notices[i].live&&game.compactGuns().notices[i].empty;
                 wallHitFrames+=wallHit;dustFrames+=dust;emptyTextFrames+=emptyText;
@@ -3107,6 +3112,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     std::string reason;
     if(died)require(sounds.plays(89)&&sounds.plays(5)&&sounds.plays(319)&&sounds.plays(328),
         "the death route hurts, dies, opens the results and fills the bar");
+    std::cout<<"Slice lowHealthRed="<<routeLowHealthRed<<" laserWall="<<routeLaserWall<<std::endl;
     if(hardRoute){
         std::cout<<"Slice hard enemies";
         for(const char* k:{"eyefish","eyefishDead","neon","neonDead"})std::cout<<' '<<k<<'='<<hardWitness[k];

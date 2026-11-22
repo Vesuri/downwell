@@ -3215,6 +3215,10 @@ private:
     unsigned afterImageHead_=0;
     int afterImageDx_[afterImageCount]={},afterImageDy_[afterImageCount]={};
     unsigned afterImagesDrawn_=0;
+    // playerDraw's low-health flicker: flickerTime and this Draw's red pair.
+    unsigned flickerTime_=0;
+    bool lowHealthRed_=false;
+    int lowHealthDx_[2]={},lowHealthDy_[2]={};
     void compactLevelBeginCue();
     bool createCompactComboReward();
     void advanceCompactHudAlarms();
@@ -3413,6 +3417,11 @@ public:
     // The player's sprite, subimage, xscale and room position as this
     // update's Draw shows them (set at the Draw boundary).
     const CompactAfterImage& presentedPlayerPose()const{return presentedPose_;}
+    // At 1 HP this Draw's two shaderPlayerRed copies (white and red texels
+    // red, black transparent) replace the player at (x + dx, y + dy).
+    bool lowHealthRed()const{return lowHealthRed_;}
+    int lowHealthDx(unsigned i)const{return lowHealthDx_[i];}
+    int lowHealthDy(unsigned i)const{return lowHealthDy_[i];}
     int afterImageDx(unsigned i)const{return afterImageDx_[i];}
     int afterImageDy(unsigned i)const{return afterImageDy_[i];}
     // global.pTimeStop, room_speed and the sleep() milliseconds requested
