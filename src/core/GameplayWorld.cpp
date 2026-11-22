@@ -1107,9 +1107,20 @@ bool GameplayWorld::captureEnemyStepOrder(){
     if(enemyOrderCapture_){
         if(!enemyOrderCapture_(enemyOrderContext_,enemyStepOrder_))return run_.effectsSucceeded=false;
     }else{
-        // Unbound component worlds have no external registration owner.
-        for(unsigned i=0;i<enemyCount_;++i){const auto& e=enemies_[i];
-            if(e.active&&!enemyStepOrder_.append(e.identitySlot,e.lifetimeId,e.objectId))return run_.effectsSucceeded=false;
+        // Unbound component worlds have no external registration owner. The
+        // runner appends an instance to its object's list on Create and again
+        // on instance_activate, so step active records by their last entry
+        // (activatedTick), then by creation order. The array is compacted in
+        // creation order, and activation sweeps it in that order.
+        unsigned short order[enemyCapacity];unsigned count=0;
+        for(unsigned i=0;i<enemyCount_;++i){
+            if(!enemies_[i].active)continue;
+            const auto tick=enemies_[i].activatedTick;unsigned at=count++;
+            while(at&&enemies_[order[at-1]].activatedTick>tick){order[at]=order[at-1];--at;}
+            order[at]=static_cast<unsigned short>(i);
+        }
+        for(unsigned n=0;n<count;++n){const auto& e=enemies_[order[n]];
+            if(!enemyStepOrder_.append(e.identitySlot,e.lifetimeId,e.objectId))return run_.effectsSucceeded=false;
         }
     }
     enemyStepOrder_.sort();
