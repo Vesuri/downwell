@@ -97,6 +97,12 @@ make test
 make run
 ```
 
+`make` runs a third of the machine's cores in parallel by default;
+`make DOWNWELL_JOBS=1` runs serially. Test programs share one object per
+source and flag set under `build/obj/` (`tools/cxx-objects.py`), so a header
+change recompiles only what includes it. Recipes that rebuild `amiga/` or run
+the emulator take one lock (`tmp/amiga.lock`) and never overlap.
+
 The host build uses `-O2` with debug symbols and floating-point contraction
 disabled (no fast-math). For instruction-by-instruction debugging, use
 `make HOST_OPT=-O0`. Changing this option automatically rebuilds the SDL objects.
