@@ -86,6 +86,8 @@ public:
     bool shotDelayed() const { return shotDelay_ != 0; }
     bool airborneShot() const { return airborneShot_; }
     bool spinJumping() const { return spinJumping_; }
+    // global.ballooning as scrGravity_n reads it in this player's Step.
+    void setBallooning(bool value) { ballooning_ = value; }
     int ammo() const { return ammo_; }
     int ammoCapacity() const { return ammoCapacity_; }
     // scrRechargeGem: round(getAmount / 2), capped at capacity. This is not
@@ -253,6 +255,7 @@ private:
     Dust dust_[3] = {};
     unsigned dustCount_ = 0;
     int playStyle_ = 0;
+    bool ballooning_ = false;
     unsigned gravityThirds_ = 0; // style 3's 512/3-fifth gravity, 171+171+170
     bool wallColliding_ = false; // scrWallCol's previous-Step xcollision
     void addDust(bool jump, long x, long y, int emitTo) {

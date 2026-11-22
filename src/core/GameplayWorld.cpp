@@ -1,6 +1,9 @@
 #include "GameplayWorld.h"
 #include "GameplayCollisionOwner.h"
 #include "PlayerBoxContact.h"
+#include "PlayerHorizontalBinary64.h"
+#include "DivideBinary64.h"
+#include "UnitSequenceFrames.h"
 #include "GameplayPlayerStep.h"
 #include "core/MainRoomLifetime.h"
 #include "core/MainRoomActivation.h"
@@ -1364,7 +1367,9 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         DW_PROFILE_SCOPE(profileEnemyBat);
         bat.collisionMask=downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
         const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
-            enemy.x, enemy.y, bat.collisionMask, player_.frameStartXFixed(),
+            enemy.x, enemy.y, bat.collisionMask,
+            balloonHeld()?(balloon_.x-240)*256L:player_.frameStartXFixed(),
+            balloonHeld()?(balloon_.y-176)*256L:player_.frameStartYFixed(),
             player_.frameStartYFixed(), enemyRandom_,
             downwell::SolidCornerQuery{solidResolver_,solidResolverContext_,solidCorners_},[this,&enemy](int scale){
                 if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
@@ -1616,6 +1621,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(blastEnd_)advanceCompactBlastAnimation();
     if(bloodEnd_&&!advanceCompactBloodAnimation())return {};
     advanceCompactDroneAnimation();
+    if(balloon_.live&&!advanceCompactBalloonAnimation())return {};
     }
     if(!run_.effectsSucceeded)return {};
     {
@@ -1749,6 +1755,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // scrPlayerInit reads pugRocket at each room's player Create; no grant
     // happens inside a room.
     player_.setRocketJump(run_.upgrades.levels[18]!=0);
+    player_.setBallooning(balloonHeld());
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,
@@ -2114,6 +2121,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     // objDrone 249 follows currency (248).
     stepCompactDrone();
+    // decoyBalloon 256 follows the Drone, before the usual bullet (261).
+    if(balloon_.live&&!stepCompactBalloon())return {};
     // A shot born in player Begin Step is eligible here; one born during this
     // ordinary Step is not. Currency (248) precedes the usual bullet (261).
     {
@@ -2210,9 +2219,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         !run_.collideGoalFieldWind(enemyRandom_,240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
             176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),player_.facing())) return {};
     // Blasts and explosions (272-276) precede scenery 289.
-    // Collision events in object order: fxBlood 223, objDeadBody 263, the
-    // blasts 272-276, then the scenery.
+    // Collision events in object order: fxBlood 223, decoyBalloon 256,
+    // objDeadBody 263, the blasts 272-276, then the scenery.
     if (bloodEnd_ && !collideCompactBlood()) return {};
+    if (balloon_.live && !collideCompactBalloon()) return {}; // decoyBalloon 256
     if (!dead() && !eatCompactCorpses()) return {};
     if (run_.upgrades.levels[8] && guns_.casingEnd && !collideHotCasings()) return {};
     if (blastEnd_ && !collideCompactBlasts()) return {};
@@ -2383,10 +2393,15 @@ struct GameplayWorld::SteeringOps {
     }
     bool playerX(Real& value){return player(false,value);}
     bool playerY(Real& value){return player(true,value);}
-    // eplx/eply alias plx/ply unless pugDecoy has a nonzero ballooning
-    // instance. This world admits no balloon, so ballooning stays zero.
-    bool enemyPlayerX(Real& value){return player(false,value);}
-    bool enemyPlayerY(Real& value){return player(true,value);}
+    // eplx/eply alias plx/ply unless pugDecoy has a held balloon.
+    bool enemyPlayerX(Real& value){
+        if(world.balloonHeld()){value=Real::fromInteger(world.balloon_.x);return true;}
+        return player(false,value);
+    }
+    bool enemyPlayerY(Real& value){
+        if(world.balloonHeld()){value=Real::fromInteger(world.balloon_.y);return true;}
+        return player(true,value);
+    }
     bool pointDirection(Real x,Real y,Real targetX,Real targetY,Real& value){
         return downwell::RunnerPointDirection::evaluate(x,y,targetX,targetY,value,
             [](Real dy,Real dx,Real& radians){return downwell::portableAtan(dy,dx,radians);});

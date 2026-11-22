@@ -156,9 +156,14 @@ def main():
             banks=checked('printf "BANKS ready=%u loads=%u failures=%u longest=%u lines\\n", gDownwellSoundReady,gDownwellSoundBankLoads,gDownwellSoundBankFailures,$a->audio_.longestService_')
             print(counters.strip(),flush=True);print(banks.strip(),flush=True)
             host={}
-            for line in Path(base+'.sounds').read_text().splitlines():
-                f=line.split()
-                if f[1]=='play' and f[7]!='5': host[int(f[2])]=host.get(int(f[2]),0)+1
+            # soundPlayOL's cutPrv stops the channel's previous sound at once,
+            # so a play cut by a later play on its channel in the same tick is
+            # never audible (six gunwall explosions in one tick leave one).
+            plays=[line.split() for line in Path(base+'.sounds').read_text().splitlines()]
+            plays=[f for f in plays if len(f)>7 and f[1]=='play' and f[7]!='5']
+            for i,f in enumerate(plays):
+                if any(g[0]==f[0] and g[7]==f[7] and g[6]=='1' for g in plays[i+1:i+16]):continue
+                host[int(f[2])]=host.get(int(f[2]),0)+1
             unseen=sorted(a for a in host if a not in nativeStarts)
             extra=sorted(a for a in nativeStarts if a not in host)
             print(f'SOUND host sounds {len(host)} ({sum(host.values())} plays), native started {len(nativeStarts)} sounds '

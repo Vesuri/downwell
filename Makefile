@@ -3735,7 +3735,7 @@ test: verify-terrain-ownership
 # W1.9 upgrade routes: upgrade-<ids>-v<variant> picks the first offered ID of
 # the list at each clear (DOWNWELL_SLICE_PICK) and checks those upgrades'
 # effects instead of the default route's coverage.
-UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58 upgrade-11-v18 upgrade-8-v5
+UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58 upgrade-11-v18 upgrade-8-v5 upgrade-15-v2
 # W2.6 coverage routes: other slice variants (DOWNWELL_SLICE_VARIANT; -tour
 # adds DOWNWELL_SLICE_SHOP_TOUR, a climb onto the shop's cases after the
 # visit), picked so that every world-1 sound the core requests plays on some

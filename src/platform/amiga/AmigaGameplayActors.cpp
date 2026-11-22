@@ -51,11 +51,12 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
 #endif
     for (unsigned i = 0; i < count; ++i) {
         const GameplayBob& bob = bobs[i];
-        if(bob.sprite==gameplayBlackRectMarker){
+        if(bob.sprite==gameplayBlackRectMarker||bob.sprite==gameplayWhiteRectMarker){
+            const int pen=bob.sprite==gameplayBlackRectMarker?3:1;
             AmigaHardware::blitterDrain();
-            amigaRendererFillRect(&renderer,bob.x,bob.y,bob.frame,bob.flip,3);
+            amigaRendererFillRect(&renderer,bob.x,bob.y,bob.frame,bob.flip,pen);
 #ifdef DOWNWELL_SCENE_VERIFY
-            amigaRendererFillRect(&oracle,bob.x,bob.y,bob.frame,bob.flip,3);
+            amigaRendererFillRect(&oracle,bob.x,bob.y,bob.frame,bob.flip,pen);
 #endif
             rows.damage(origin,bob.y,bob.flip,(UBYTE)(1u<<buffer));
             continue;

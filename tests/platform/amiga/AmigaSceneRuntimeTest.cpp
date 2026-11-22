@@ -2762,6 +2762,13 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                                     ((b.hits[h]>>28)==1?"Enemy":"Object")];
                     }
                 }
+                {   // W1.9 Heart Balloon: held frames, and a pop (live to gone) within a level.
+                    static unsigned balloonLevel=0;static bool balloonWasLive=false;
+                    const auto& b=game.compactBalloon();
+                    if(b.live&&b.held)++upgradeWitness["balloonHeld"];
+                    if(balloonWasLive&&!b.live&&balloonLevel==level)++upgradeWitness["balloonPop"];
+                    balloonWasLive=b.live;balloonLevel=level;
+                }
                 {   // W1.9 Hot Casing: a hot casing overlapping a live enemy (the collision it damages through).
                     const auto& g=game.compactGuns();
                     for(unsigned i=0;i<g.casingEnd;++i){const auto& c=g.casings[i];if(!c.live||!c.hot)continue;
@@ -3079,6 +3086,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(5,sounds.plays(342)!=0,"a Gunpowder Block fires its shot (sound 342)");
         need(11,sounds.plays(83)!=0,"Knife and Fork eats a dead body (sound 83)");
         need(8,upgradeWitness["hotCasing"]&&upgradeWitness["hotCasingEnemy"],"a Hot Casing touches an enemy");
+        need(15,upgradeWitness["balloonHeld"]&&upgradeWitness["balloonPop"]&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,
+            "an enemy pops the held Heart Balloon (sfxEnmExplode)");
         need(3,upgradeWitness["explosion"]!=0&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,
             "a shot-down Rest in Pieces corpse explodes (bulletExplosion1, sounds 91-93)");
     }

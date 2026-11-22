@@ -4363,7 +4363,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         if (actor.sprite == gameplayRayMarker) continue;
                         int x, y, w, h;
                         bool bounded;
-                        if(actor.sprite==gameplayBlackRectMarker){
+                        if(actor.sprite==gameplayBlackRectMarker||actor.sprite==gameplayWhiteRectMarker){
                             x=actor.x;y=actor.y;w=actor.frame;h=actor.flip;bounded=true;
                         }else bounded=amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
                             actor.sprite, actor.frame, actor.x, actor.y, actor.flip, &x,&y,&w,&h);

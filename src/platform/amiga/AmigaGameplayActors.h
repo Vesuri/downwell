@@ -17,6 +17,9 @@ static constexpr UWORD gameplayBlackRectMarker = 65533;
 // scrDrawBorderTextBlack glyph: frame=offline glyph ID (origin (4,0)), x/y
 // its anchor, flip the fill pen. Four black neighbours, then the fill.
 static constexpr UWORD gameplayGlyphMarker = 65532;
+// Clipped opaque-white (pen 1) rectangle, laid out as the black one: the
+// Heart Balloon's string in one-pixel runs.
+static constexpr UWORD gameplayWhiteRectMarker = 65531;
 // Offline font-2 border glyph IDs (origin (4,0)).
 inline unsigned amigaBorderGlyph(char c){
     if(c>='0'&&c<='9')return 65100u+unsigned(c-'0');

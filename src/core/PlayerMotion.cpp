@@ -238,8 +238,10 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ -= 5;
         }
     }
-    if (speedY_ >= fallMaximum) {
-        speedY_ = fallMaximum;
+    // scrGravity_n: a held Heart Balloon (global.ballooning) lowers maxgrav by 1.
+    const long fallLimit = ballooning_ ? fallMaximum - fixedOne : fallMaximum;
+    if (speedY_ >= fallLimit) {
+        speedY_ = fallLimit;
         gravityRemainder_ = 0;
     }
     // scrPlMovement calls scrUpButtonFunctions only when noControl is false.

@@ -174,6 +174,9 @@ SELECTIONS = {
         463: None,   # sprExplosion32RedOutline
         470: None,   # sprExplosion16Outline
         131: None,   # sprDrone
+        526: None,   # sprDecoyBalloon (Heart Balloon before its first held Step)
+        700: None,   # sprHeartBalloonPull
+        701: None,   # sprHeartBalloon
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: None,   # registered case: intact, flashing and opened frames

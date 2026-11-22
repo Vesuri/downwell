@@ -69,13 +69,14 @@ GAME_IDS = frozenset({
     20, 62020, 63020,
     # W1.9 Rocket Jump's bulletBlast (spSplosion1) and its mirrored form.
     461, 62461,
-    # W1.9 effect-surface art: explosions (both facings) and the drone.
-    463, 62463, 470, 62470, 131,
+    # W1.9 effect-surface art: explosions (both facings), the drone and the
+    # Heart Balloon.
+    463, 62463, 470, 62470, 131, 526, 700, 701,
 })
 
 # Art drawn only on the CPU effect surface (drawFx), never by the blitter:
 # the Chip plane bank leaves it out.
-SURFACE_ONLY_IDS = frozenset({463, 62463, 470, 62470, 131})
+SURFACE_ONLY_IDS = frozenset({463, 62463, 470, 62470, 131, 526, 700, 701})
 
 # Ceilings are reviewed inputs, never inferred from generated payload sizes.
 # DMA gameplay currently uses 115806 bytes; its ceiling leaves 2754 bytes
@@ -85,8 +86,10 @@ SURFACE_ONLY_IDS = frozenset({463, 62463, 470, 62470, 131})
 # W2.3's wall-kick pose takes the reference game planes past 176 KiB.
 # W1.9 Hot Casing's sprLeakBullet 467 planes take them from 194,270 to
 # 194,590 bytes, past 190 KiB.
+# W1.9 Heart Balloon's surface-only art takes the reference game CPU bank
+# from 493,356 to 495,612 bytes, past 482 KiB.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 102 * 1024,
-                'game': 482 * 1024, 'game-planes': 191 * 1024}
+                'game': 485 * 1024, 'game-planes': 191 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -118,8 +121,8 @@ CAVERN_ROOTS = frozenset({
     25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
     # W2.3 the wall-kick pose.
     20,
-    # W1.9 Rocket Jump's blast, the explosions and the drone.
-    461, 463, 470, 131,
+    # W1.9 Rocket Jump's blast, the explosions, the drone and the balloon.
+    461, 463, 470, 131, 526, 700, 701,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
@@ -156,8 +159,9 @@ CAVERN_IDS = frozenset(
 # no Chip: 386,310 -> 480,656 (cavern planes 188,872). It is Fast RAM data
 # on the A1200 target; W3 can trim the turns no route draws.
 # W1.9 Hot Casing's sprLeakBullet 467 (eight frames) adds 420 CPU bytes:
-# 481,112 -> 481,532, past 470 KiB.
-BANK_BUDGETS.update({'cavern': 472 * 1024, 'cavern-planes': 186 * 1024})
+# 481,112 -> 481,532, past 470 KiB. The Heart Balloon's 526, 700 and 701
+# (four frames each, effect surface only) add 2,256: 483,788, past 472 KiB.
+BANK_BUDGETS.update({'cavern': 473 * 1024, 'cavern-planes': 186 * 1024})
 
 
 def require_budget(bank, size):

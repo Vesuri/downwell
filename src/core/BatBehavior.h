@@ -26,10 +26,12 @@ bool finishBatFields(const BatActivity& state,int sprite,Mask mask,Scale scale,R
 
 // enmBat Step: support discovery precedes hit handling. Waking in the inactive
 // branch changes art immediately, but pursuit starts on the following Step.
+// Pursuit aims at global.eplx/eply (target); waking tests global.ply (wakeY).
+// They differ only while a Heart Balloon is held.
 template<class Random, class Solid,class Scale=NoBatScale>
 BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& state,
     int publishedX, int publishedY, int previousMask,
-    long targetX, long targetY, Random& random, Solid solid,Scale scale={}) {
+    long targetX, long targetY, long wakeY, Random& random, Solid solid,Scale scale={}) {
     const auto meeting = [&](int x, int y) {
         const auto b = contactWorldBounds({x * 256L, y * 256L, bat.facing, 1, previousMask});
         return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
@@ -52,13 +54,20 @@ BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& st
     const bool consumed=active.hit;
     unsigned sounds = 0;
     if (!pursuit) {
-        if (targetY > (publishedY - 4L) * 256) { state.flying = true; ++sounds; }
+        if (wakeY > (publishedY - 4L) * 256) { state.flying = true; ++sounds; }
         // hang is a GML numeric boolean: -1 selects the left-wall branch.
         const bool support = state.hang == -10 ? meeting(publishedX, publishedY - 16)
             : meeting(publishedX + (state.hang > 0 ? 16 : -16), publishedY);
         if (!support) { state.flying = true; ++sounds; }
     }
     return {consumed, sounds, batPresentation(state, hit)};
+}
+template<class Random, class Solid,class Scale=NoBatScale>
+BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& state,
+    int publishedX, int publishedY, int previousMask,
+    long targetX, long targetY, Random& random, Solid solid,Scale scale={}) {
+    return stepBatBehavior(bat, hit, state, publishedX, publishedY, previousMask,
+        targetX, targetY, targetY, random, solid, scale);
 }
 }
 #endif

@@ -1583,8 +1583,18 @@ public:
         if(ok&&compactDebris_.size()&&!compactDebris_.visitNewest([&](auto,const downwell::DebrisAnimation& effect){
             if(ok&&!downwell::DebrisDraw::surface(effect,assets,view,emit))ok=false;
         }))return false;
+        // decoyBalloon (depth -10000) sits between explosionSmall and
+        // bulletExplosion1; its string is the platform's line.
         static const int explosionObjects[]={274,272};
-        for(int object:explosionObjects)for(unsigned i=blastEnd_;ok&&i-->0;){
+        for(int object:explosionObjects){
+          if(ok&&object==272&&balloon_.live){
+            const auto x=downwell::MotionBinary64::fromInteger(balloon_.x),y=downwell::MotionBinary64::fromInteger(balloon_.y);
+            downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
+            if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
+            if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
+               (!assets.balloon(unsigned(balloon_.sprite),balloon_.frame(),asset)||!emit(asset,x,y)))return false;
+          }
+          for(unsigned i=blastEnd_;ok&&i-->0;){
             const auto& b=blasts_[i];
             if(!b.live||b.object!=object)continue;
             const auto x=downwell::MotionBinary64::fromInteger(b.x),y=downwell::MotionBinary64::fromInteger(b.y);
@@ -1595,6 +1605,7 @@ public:
             const bool mirrored=b.xscale<0;
             const unsigned turn=unsigned(mirrored?(4-b.turn)&3:b.turn);
             if(!assets.explosion(unsigned(b.sprite),mirrored,turn,b.frame(),asset)||!emit(asset,x,y))return false;
+          }
         }
         return ok;
     }
@@ -3221,6 +3232,14 @@ private:
     void advanceCompactDroneAnimation(){if(drone_.live)++drone_.phaseHalves;}
     bool advanceCompactDroneAlarm();
     void stepCompactDrone();
+    // decoyBalloon 256 (Heart Balloon): held on a string; global.ballooning
+    // is a live, held balloon.
+    downwell::CompactBalloonRecord balloon_;
+    bool balloonHeld()const{return balloon_.live&&balloon_.held;}
+    bool stepCompactBalloon();
+    bool advanceCompactBalloonAnimation();
+    bool collideCompactBalloon();
+    bool compactSolidPoint(int x,int y)const;
     // fxBlood 223: Knife and Fork's drops at the player (sprWaterSplash 92).
     downwell::CompactBloodRecord bloods_[downwell::gameplayCompactBloodCapacity];
     unsigned bloodEnd_=0;
@@ -3324,9 +3343,10 @@ public:
     const downwell::CompactBlastRecord* compactBlasts(unsigned& end)const{end=blastEnd_;return blasts_;}
     const downwell::CompactBloodRecord* compactBlood(unsigned& end)const{end=bloodEnd_;return bloods_;}
     const downwell::CompactDroneRecord& compactDrone()const{return drone_;}
+    const downwell::CompactBalloonRecord& compactBalloon()const{return balloon_;}
     // Effect-surface producers among the W1.9 owners.
     bool compactSurfaceUpgrades()const{
-        if(drone_.live)return true;
+        if(drone_.live||balloon_.live)return true;
         for(unsigned i=0;i<blastEnd_;++i)if(blasts_[i].live&&blasts_[i].object!=276)return true;
         return false;
     }

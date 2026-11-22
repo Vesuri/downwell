@@ -81,16 +81,20 @@ struct CompactDroneRecord {
 
 // decoyBalloon 256 (Heart Balloon, upgrade 15). The player holds it from its
 // first Step; enemies then chase it (global.eplx/eply) until one touches it.
+// xx/yy are the Step's VM doubles; x/y their rounded builtin position.
 struct CompactBalloonRecord {
     bool live = false, held = false;
-    long xx = 0, yy = 0, ysp = 0; // Q16
+    MotionBinary64 xx{}, yy{}, ysp{};
     int x = 0, y = 0, sprite = 526, stringLength = 20;
     RunnerImageValue imageIndex{}, imageSpeed{0x3da3d70au}; // imgSp 0.08
     // mask_index 526 (sprDecoyBalloon).
     ContactBounds bounds() const { return contactPixelBounds(x, y, 1, 1, 526); }
     unsigned frame() const {
+        std::int32_t whole = 0;
         const unsigned exponent = (imageIndex.bits >> 23) & 255u;
-        return exponent < 127 ? 0 : (((imageIndex.bits & 0x7fffffu) | 0x800000u) >> (150u - exponent)) & 3u;
+        if (exponent >= 127)
+            whole = std::int32_t((((imageIndex.bits & 0x7fffffu) | 0x800000u) >> (150u - exponent)));
+        return unsigned(whole) & 3u;
     }
 };
 

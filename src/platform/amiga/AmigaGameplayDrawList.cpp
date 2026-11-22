@@ -511,7 +511,36 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             return true;
         });
     };
+    // W1.9 decoyBalloon Draw (depth -10000, behind the player): its white
+    // string to global.plx/ply while held, else hanging stringLength + 4
+    // pixels, as one-pixel vertical runs. The balloon itself is on the
+    // effect surface.
+    const auto drawBalloonString=[&](){
+        const auto& b=port.compactBalloon();
+        if(!b.live)return true;
+        const int x0=downwellPlayfieldX+b.x-worldViewX,y0=b.y-worldViewY;
+        const int x1=b.held?downwellPlayfieldX+240+int(downwell::roundGameMakerQ8(port.player().frameStartXFixed()))-worldViewX:x0;
+        const int y1=b.held?176+int(downwell::roundGameMakerQ8(port.player().frameStartYFixed()))-worldViewY:y0+b.stringLength+4;
+        bool ok=true;int runX=0,runTop=0,runBottom=-1;
+        const auto flush=[&](){
+            if(runBottom<runTop)return;
+            if(count==capacity){failedSprite=gameplayWhiteRectMarker;ok=false;return;}
+            actors[count++]={gameplayWhiteRectMarker,1,runX,runTop,runBottom-runTop+1};
+            runBottom=runTop-1;
+        };
+        downwell::LaserSightLine{x0,y0,x1,y1}.draw([&](int x,int y){
+            if(!ok||x<downwellPlayfieldX||x>=downwellPlayfieldX+downwellPlayfieldWidth||
+               y<0||y>=downwellDisplayHeight)return;
+            if(runBottom>=runTop&&x==runX&&(y==runBottom+1||y==runTop-1)){
+                if(y<runTop)runTop=y;else runBottom=y;return;
+            }
+            flush();runX=x;runTop=runBottom=y;
+        });
+        if(ok)flush();
+        return ok;
+    };
     const auto drawPlayer=[&](){
+        if(!drawBalloonString())return false;
 #ifndef DOWNWELL_REPLAY_VERIFY
         // playerDraw's gem-high afterimages, oldest first, behind the player
         // and drawn through the hit blink. Each pose has two red striped

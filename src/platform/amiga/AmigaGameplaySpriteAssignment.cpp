@@ -33,7 +33,7 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
         --index;
         const auto& actor=actors[index];
         if(actor.sprite==gameplayRayMarker)break;
-        if(actor.sprite==gameplayBlackRectMarker){
+        if(actor.sprite==gameplayBlackRectMarker||actor.sprite==gameplayWhiteRectMarker){
             if(!retain({actor.x,actor.y,actor.x+actor.frame,actor.y+actor.flip}))break;
             continue;
         }
@@ -69,7 +69,8 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
     while (result.bobCount > 0) {
         const auto& actor = actors[result.bobCount - 1];
         if (actor.sprite == gameplayRayMarker || actor.sprite == gameplayDamageTextMarker ||
-            actor.sprite == gameplayGlyphMarker || actor.sprite == gameplayBlackRectMarker || actor.sprite == gameplayDitherEdge) break;
+            actor.sprite == gameplayGlyphMarker || actor.sprite == gameplayBlackRectMarker ||
+            actor.sprite == gameplayWhiteRectMarker || actor.sprite == gameplayDitherEdge) break;
         if (controller && result.bobCount<=count-controllerSuffix) {
             int x,y,width,height;
             if (!amigaRendererAssetBounds(pack,packEnd,actor.sprite,actor.frame,
