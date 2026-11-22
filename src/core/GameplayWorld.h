@@ -3288,6 +3288,7 @@ private:
     bool retireCompactGuns(long viewTopQ12);
     bool drawCompactGunTexts();
     bool hitGunModule(const downwell::ContactBounds& shot,int damage,bool& consumed);
+    bool reverseEngineerModule(downwell::CompactGunModuleRecord& m);
     // Compact time-stop (W1.5): objPlayer_n's checkStop/pTimeStop block,
     // scrTimeShard's fxTimeShard 238 and fxTimeChange 211's room-speed ramp.
     // Field queries use integer contact rectangles against the serialized

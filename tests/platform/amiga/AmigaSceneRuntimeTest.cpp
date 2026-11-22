@@ -2453,6 +2453,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):119u;
     const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
     const bool shopTour=std::getenv("DOWNWELL_SLICE_SHOP_TOUR")!=nullptr;
+    // W1.9 coverage (DOWNWELL_SLICE_MODULE_SHOT): with Reverse Engineering,
+    // jump onto a resting GunModule and shoot it down before collecting it.
+    const bool moduleShot=std::getenv("DOWNWELL_SLICE_MODULE_SHOT")!=nullptr;
     std::vector<unsigned> slicePicks;
     if(const char* picks=std::getenv("DOWNWELL_SLICE_PICK"))
         for(const char* p=picks;*p;){char* end=nullptr;slicePicks.push_back(unsigned(std::strtoul(p,&end,10)));
@@ -2580,7 +2583,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 {const auto& g=game.compactGuns();
                 for(unsigned i=0;!scenery&&i<g.moduleEnd;++i){const auto& m=g.modules[i];
                     if(m.live&&m.ysp==0&&!abandoned.count({m.x,m.y})&&m.y>=y-64&&m.y<=y+24&&std::abs(m.x-x)<=220)
-                        {scenery=module=true;sx=m.x;sy=m.y;}}}
+                        {scenery=module=true;sx=m.x;sy=m.y;
+                         // Shoot it like a gem chunk until it has been rerolled.
+                         if(moduleShot&&game.upgrades().levels[1]&&m.objHp>0&&m.objHp<9999)module=false;}}}
                 for(unsigned i=0;!scenery&&i<sc.gemChunkEnd;++i){const auto& r=sc.gemChunks[i];
                     if(r.live&&!r.opened&&!abandoned.count({r.x,r.y})&&
                        (detourX==r.x&&detourY==r.y?std::abs(r.y-y)<=48:r.y>=y-16&&r.y<=y+120&&std::abs(r.x-x)<=200))
@@ -2761,6 +2766,12 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                                 ++upgradeWitness[std::string(b.sprite==471?"knees":b.sprite==461?"rocket":"explosion")+
                                     ((b.hits[h]>>28)==1?"Enemy":"Object")];
                     }
+                }
+                {   // W1.9 Reverse Engineering: a rerolled module (objHp 9999) and its later pickup.
+                    const auto& g=game.compactGuns();
+                    for(unsigned i=0;i<g.moduleEnd;++i)if(g.modules[i].live&&g.modules[i].objHp==9999){
+                        ++upgradeWitness["moduleReversed"];
+                        if(g.modules[i].obtainable)++upgradeWitness["moduleReversedObtainable"];}
                 }
                 {   // W1.9 Heart Balloon: held frames, and a pop (live to gone) within a level.
                     static unsigned balloonLevel=0;static bool balloonWasLive=false;
@@ -3056,8 +3067,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         routeName=hardRoute?"hard-upgrade":"upgrade";
         for(unsigned id:slicePicks)routeName+="-"+std::to_string(id);
     }
-    if(variant!=119u||shopTour||upgradeRoute)routeName+="-v"+std::to_string(variant);
+    if(variant!=119u||shopTour||moduleShot||upgradeRoute)routeName+="-v"+std::to_string(variant);
     if(shopTour)routeName+="-tour";
+    if(moduleShot)routeName+="-shot";
     sounds.flush(); // complete even when a check below fails (route sweeps)
     std::cout<<"World one slice sounds: "<<sounds.requests()<<" requests, "<<sounds.kinds(downwell::SoundRequest::play)
         <<" plays, peak "<<sounds.peakVoices()<<" voices, dropped "<<sounds.dropped()<<'\n';
@@ -3086,6 +3098,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         need(5,sounds.plays(342)!=0,"a Gunpowder Block fires its shot (sound 342)");
         need(11,sounds.plays(83)!=0,"Knife and Fork eats a dead body (sound 83)");
         need(8,upgradeWitness["hotCasing"]&&upgradeWitness["hotCasingEnemy"],"a Hot Casing touches an enemy");
+        need(1,upgradeWitness["moduleReversed"]&&upgradeWitness["moduleReversedObtainable"],
+            "Reverse Engineering rerolls a shot-down gun module");
         need(15,upgradeWitness["balloonHeld"]&&upgradeWitness["balloonPop"]&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,
             "an enemy pops the held Heart Balloon (sfxEnmExplode)");
         need(3,upgradeWitness["explosion"]!=0&&sounds.plays(91)+sounds.plays(92)+sounds.plays(93)!=0,

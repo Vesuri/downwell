@@ -134,17 +134,17 @@ style select, patched with the chosen style and hard mode.
 
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
-   selectable. Exploding Knees (0), Rest in Pieces (3), Gunpowder Blocks
-   (5), Hot Casing (8), Drone (9), Knife and Fork (11), Heart Balloon (15)
-   and Rocket Jump (18) are in, with routes `upgrade-0-18-v72`,
-   `upgrade-3-v58`, `upgrade-5-9-v96`, `upgrade-8-v5`, `upgrade-11-v18` and
-   `upgrade-15-v2`. Still to do: Reverse Engineering (1, `pugEngineer` on gun
-   pickups), Laser Sight's beam against the new guns' spread (its
+   selectable. Exploding Knees (0), Reverse Engineering (1), Rest in Pieces
+   (3), Gunpowder Blocks (5), Hot Casing (8), Drone (9), Knife and Fork (11),
+   Heart Balloon (15) and Rocket Jump (18) are in, with routes
+   `upgrade-0-18-v72`, `upgrade-1-v682-shot`, `upgrade-3-v58`,
+   `upgrade-5-9-v96`, `upgrade-8-v5`, `upgrade-11-v18` and `upgrade-15-v2`.
+   Still to do: Laser Sight's beam against the new guns' spread (its
    `bdirRand` and `decTimer` changes are in), Time Field Damage (`pugTime`:
    `scrTypicalDamage` from the time fields) and the Safety Jetpack (22).
    Their sounds come with them (the bank holds them): the jetpack loop
-   343. Routes that pick an unwired upgrade (1, 17 or 22) need re-searching
-   as these land.
+   343. Routes that pick an unwired upgrade (17 or 22) need re-searching as
+   these land.
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the

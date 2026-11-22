@@ -3835,8 +3835,27 @@ bool GameplayWorld::stepGunModules(){
         }
         m.yy+=m.ysp;
         m.y=int((m.yy+(1L<<15))>>16);
+        if(run_.upgrades.levels[1]&&m.objHp<=0&&!reverseEngineerModule(m))return false;
     }
     return true;
+}
+
+// GunModule Step's pugEngineer block (Reverse Engineering): a shot-down
+// module puffs (scrSmokefx 1, scrFlashballfx 1) at its position, hops (ysp
+// -2), is unobtainable for 30 Steps, and rerolls its type (choose(0, 1)) and
+// gun (irandom(bulletMaxNum) until it differs). objHp 9999 keeps it whole.
+bool GameplayWorld::reverseEngineerModule(downwell::CompactGunModuleRecord& m){
+    const auto x=GunReal::fromInteger(m.x);
+    GunReal y=GunReal::fromInteger(int(m.yy>>16)),fraction;
+    if((m.yy&0xffff)&&(!downwell::divideBinary64(GunReal::fromInteger(int(m.yy&0xffff)),GunReal::fromInteger(65536),fraction)||
+       !y.add(fraction)))return run_.effectsSucceeded=false;
+    if(!emitBoxSmoke(x,y)||!run_.emitFlash<1,0,0>(x,y,enemyRandom_))return false;
+    m.obtainable=false;m.alarm0=30;m.ysp=-(2L<<16);
+    m.type=int(enemyRandom_.chooseIndexSmall(2));
+    int gun;
+    do gun=int(enemyRandom_.irandomSmall(downwell::gunMaximumNumber));while(gun==m.gun);
+    m.gun=gun;m.objHp=9999;
+    return run_.effectsSucceeded;
 }
 
 // bulletCasing Step: flash, gravity, wall bounce, scrBulCheckSolid, motion.
