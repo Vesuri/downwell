@@ -5,10 +5,22 @@ Downwell app 360740. The directory is ignored by Git.
 
 ## Fingerprints
 
+The files the Amiga slice's converter reads ([amiga-input-inventory.md](amiga-input-inventory.md)).
+
 | File | SHA-256 |
 |---|---|
 | `data/data.win` | `c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8` |
 | `data/Downwell.exe` | `340b43dae1a18d2861cba9f6a9cdbb92f3754699854e0dc1a1ca367a8cd11085` |
+| `data/language.ini` | `b56ff8dc2f9ff012fcab1af8757d2e765a3a2c1f972c1ba41ae405e8bd4e4c68` |
+| `data/sfxfalling.ogg` | `7b82aa294300209ba772acd3a21af1bb6695d0421491b22c400a1d5e4f2e4209` |
+| `data/amb1.ogg` | `bb1a6440193ecaf4160f5b1e5a773f054c1289554dd6adf43cfbbe42d0b37b7f` |
+| `data/sfxbossfirsthit.ogg` | `07a3a0444fcfb2d57fc369ea93a360802e5e6a9afa923018aec048455772494e` |
+| `data/audiogroup1.dat` | `c0d53595a4fcf7b8ca5d08d8deb4db4cb9a893c96b17954518c938a200cfce81` |
+| `data/audiogroup2.dat` | `168eab2e92bf47f9b1354b2d44b22094c69ed039c891f172a63215a48d590d88` |
+| `data/audiogroup3.dat` | `042188e65c982d15a6183e1fc3a7f70cfe811ed63fe30601e5cea6af90ccd6ea` |
+| `data/audiogroup4.dat` | `dc972711b0e4e5747d196eff5692fc5502f9ec735fb0a9bae98002d1dc205083` |
+| `data/audiogroup5.dat` | `3df0bc4ea1f8625be1363b6a71d4fb6f802da179f36d2d96a23c72dbb922aac2` |
+| `data/audiogroup6.dat` | `6fe5a5ae2c328f348d1a3870cdb3a7002d89d98606b44d2e7f4764e0123a5893` |
 
 ## GameMaker identification
 

@@ -178,13 +178,15 @@ our own files: the player provides the game.
 
 **What the player provides.** Their own Windows Steam copy of Downwell
 (app 360740, version 1.0.5), the files this repo uses as `data/`. The
-world 1 slice needs `data.win` (SHA-256 in
-[source-inventory.md](source-inventory.md)); its 334 sound effects are RIFF
-WAV entries and 14 Ogg entries (the wind among them) in `data.win`'s AUDO
-chunk. `audiogroup1-6.dat` hold only the Ogg songs, which WM defers, and
-`amb1.ogg`, `sfxfalling.ogg` and `sfxbossfirsthit.ogg` are loose Oggs;
-WI.2 confirms which of them the slice really reads. The installer checks
-every file it reads by SHA-256 and refuses any other version.
+inventory ([amiga-input-inventory.md](amiga-input-inventory.md),
+`make verify-amiga-inputs`) lists what the slice reads: `data.win` (AUDO,
+CODE, FONT, OBJT, ROOM, SHDR, SOND, SPRT, TPAG, TXTR), `language.ini`,
+the runner `Downwell.exe` (its trig path, for `smoke-trig.inc` and
+`contact-motion.inc`) and the loose `sfxfalling.ogg` (sound 186, in the run
+bank). `sound-durations.inc` also needs the lengths, and only the lengths,
+of the songs in `audiogroup1-6.dat`, `amb1.ogg` and `sfxbossfirsthit.ogg`.
+SHA-256s are in [source-inventory.md](source-inventory.md). The installer
+checks every file it reads by SHA-256 and refuses any other version.
 
 **Why it needs a converter.** Unlike the WHDLoad siblings, which run the
 original files, the Amiga build runs on data converted on the host
@@ -193,7 +195,7 @@ itself `.incbin`s and `#include`s derived tables and art (rooms, objects,
 sprites and their masks, HUD and health art, text, palettes), so even the
 executable cannot be distributed today. The user chose a native converter
 (2026-11-22): `DownwellInstallData`, run by the Installer on the Amiga,
-builds every derived file from the player's `data.win`.
+builds every derived file from the player's files.
 
 Stages, in order:
 
@@ -207,26 +209,23 @@ Stages, in order:
    `verify_startup.sh` (the installed `data/` layout) with
    `tools/verify-workbench-start.py`, and the same driver from the Shell
    (the flat layout).
-2. **WI.2 Inventory.** Classify each of the 64 `generated/` inputs of the
-   Amiga build: our own computation (for example `atan-q16.inc` and the
-   motion tables) stays linked; everything derived from `data.win` or
-   `language.ini` gets its source chunks and its generator recorded.
-3. **WI.3 Derived data out of the executable.** Load every derived table
-   and asset from installed files at startup or scene load. A release
+2. **WI.3 Derived data out of the executable.** Load the 23 linked
+   inputs the inventory classes as derived from installed files, at
+   startup or scene load. A release
    check (the siblings' `tools/check_release.py`: no 64-byte block of
    `data.win`, forward or reversed, at any offset of any member) proves
    the executable and the archive hold no original bytes. Note the W3 cost
    of any new load.
-4. **WI.4 Portable converter.** One C implementation of the generators
+3. **WI.4 Portable converter.** One C implementation of the generators
    that the host build also uses, so the Python and ffmpeg path stops being
    a second authority: FORM chunk parsing streamed from disk (`data.win`
    is 28 MB; the target has 4 MB Fast), zlib inflate for the texture PNGs,
    our own resampler in place of ffmpeg's `swr`, an Ogg Vorbis decoder for
-   the 14 Ogg effects, then every bank. Host tests compare its output with
+   the 11 Ogg effects in the banks (and the songs' lengths), then every bank. Host tests compare its output with
    the current `generated/` files; where the resampler changes samples, the
    sound and route gates rerun. Then a 68020 build of the converter, timed
    and fitted in memory on the target.
-5. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
+4. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
    siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
    an existing drawer (saves preserved), Use existing or Replace the
    converted data, the player's Steam drawer, `DownwellInstallData` into a
@@ -235,7 +234,7 @@ Stages, in order:
    `tools/check_release.py` on AmigaXDev's `amigaxdev.release`, icons from
    the siblings. An emulated install test covers fresh, keep, replace,
    wrong files and the start from both icon and Shell.
-6. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
+5. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
    little memory, a missing or wrong data file) says why: on the Shell's
    output, or in a requester when started from Workbench.
 

@@ -743,6 +743,14 @@ test: test-shop-text
 verify-sound-inventory:
 	python3 tools/sound-inventory.py --check
 
+# WI.2: every generated/ input of the shipping Amiga build is classified
+# (docs/amiga-input-inventory.md). The clean build makes amiga/obj/*.d the
+# shipping build's, not a verify build's.
+.PHONY: verify-amiga-inputs
+verify-amiga-inputs:
+	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j$(DOWNWELL_JOBS)' ; } && \
+	python3 tools/amiga-input-inventory.py --check
+
 # W2.3: generated/sound-durations.inc (each sound's source length in steps,
 # for SoundVoices' audio_is_playing) and sound-gains.inc (asset volumes)
 # match the extracted audio.
