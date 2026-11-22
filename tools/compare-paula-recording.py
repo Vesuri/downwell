@@ -18,13 +18,25 @@ compares envelopes, not samples:
    (left share within 0.15), lasting as long (to -40 dB of its peak, within
    30 ms), and nothing may sound where the render is silent.
 
-The emulator writes slightly fewer frames than 882 per field (about 0.06%),
-and on a busy host its real-time capture drops whole 60 ms buffers, so the
-alignment follows the recording event by event (each event searched around
-the previous one's offset) and reports the steps it crossed. A dropout
-inside a sound still fails its duration check. The whole-run envelope
-correlation per side is only a coarse guard (at least 0.9); the per-event
-checks above are the criteria.
+Render events closer than 30 ms are one sound (a decaying tail that dips
+under -40 dB and rises again is not a faint event of its own).
+
+The emulator's real-time capture drifts and drops whole 60 ms buffers, at
+times one every 2-3 s (25 in a 94 s run on 2026-11-22, 2 in the next). So
+the alignment follows the recording event by event (each event searched
+around the previous one's offset) and reports the drops (steps of 40 ms or
+more) and drift steps it crossed:
+- A missing, truncated or quiet event next to a drop is reported as capture
+  loss, not failed. A sound lost whole in a drop shows its step at the
+  following event, so missing sounds look one event further.
+- Sound in the render's silence fails unless it is silent under the offset of
+  the event before or the one after (a drop between them may sit anywhere);
+  a stuck voice sounds under both.
+- More than 3% of the render lost in drops fails.
+Capture loss can hide a sound, so when a run excuses some, record again: each
+excused sound must match in another run. The whole-run envelope correlation
+per side is only a coarse guard (at least 0.9); the per-event checks are the
+criteria.
 
 --wav also writes the aligned recording as a WAV to listen to.
 """
@@ -37,6 +49,9 @@ import numpy as np
 RATE = 44100
 WINDOW = 441  # 10 ms
 TRACK = 8     # an event's offset search around the previous one (a 60 ms gap is 6), in windows
+DROP = 4      # an offset step this large between events is a dropped capture buffer
+MERGE = 3     # render events closer than this (in windows) are one sound
+MAX_LOSS = 0.03  # more lost capture than this and the recording proves nothing
 
 
 def envelopes(stereo):
@@ -83,8 +98,12 @@ def main():
     er, ee = envelopes(rec), envelopes(exp)
     # Align: the recording starts at boot, so the render sits somewhere in it.
     sr, se = er.sum(axis=1), ee.sum(axis=1)
-    if sr.size < se.size:
-        sys.exit(f"recording is {sr.size / 100:.1f} s, shorter than the render's {se.size / 100:.1f} s")
+    if sr.size < se.size + 1000:
+        # Dropped buffers can leave less than boot plus render: pad with
+        # silence, so a lost tail fails as missing sound.
+        print(f"recording is {sr.size / 100:.1f} s against the render's {se.size / 100:.1f} s; padding")
+        er = np.vstack([er, np.zeros((se.size + 1000 - sr.size, 2))])
+        sr = er.sum(axis=1)
     size = 1 << int(np.ceil(np.log2(sr.size + se.size)))
     corr = np.fft.irfft(np.fft.rfft(sr, size) * np.conj(np.fft.rfft(se, size)), size)[: sr.size - se.size + 1]
     lag = int(np.argmax(corr))
@@ -114,7 +133,15 @@ def main():
     peak = ee.sum(axis=1).max()
     floor = peak * 10 ** (-40 / 20)
     active = ee.sum(axis=1) > floor
-    evs = [(s, e) for s, e in events(active) if e - s >= 2]
+    # A decaying tail can dip under -40 dB for a window or two and rise
+    # again: one sound, not a faint second event whose level is noise.
+    merged = []
+    for s, e in events(active):
+        if merged and s - merged[-1][1] < MERGE:
+            merged[-1] = (merged[-1][0], e)
+        else:
+            merged.append((s, e))
+    evs = [(s, e) for s, e in merged if e - s >= 2]
     full = er_all * scale
     # Follow the recording event by event: FS-UAE's real-time capture drifts
     # slightly and, on a busy host, drops whole buffers (fixed 60 ms steps)
@@ -152,7 +179,17 @@ def main():
     problems = []
     levels = []
     shifts = []
-    for s, e in evs:
+    steps = [b - a for a, b in zip(offsets, offsets[1:])]
+
+    def dropped(i, ahead=1):
+        # A buffer dropped between the previous event's start and the next
+        # one's. A sound lost whole in a dropped buffer leaves nothing to
+        # track, so that step shows at the following event: look one further.
+        return any(0 <= j < len(steps) and abs(steps[j]) >= DROP for j in range(i - 1, i + ahead))
+
+    capture = []  # problems next to a dropped buffer: capture loss, not the mixer
+    for i, (s, e) in enumerate(evs):
+        problems_before = len(problems)
         ex = ee[s:e]
         # Refine by +-4 windows on the event with 100 ms of context, by
         # normalised correlation (so a louder neighbour cannot win).
@@ -169,8 +206,10 @@ def main():
         ex_e, rc_e = (ex ** 2).sum(), (rc ** 2).sum()
         if rc_e < ex_e * 10 ** (-12 / 10):
             problems.append(f"{s / 100:7.2f} s: missing or far too quiet ({10 * np.log10(max(rc_e, 1e-12) / ex_e):.1f} dB)")
+            if dropped(i, 2):
+                capture.append(problems.pop())
             continue
-        levels.append(10 * np.log10(rc_e / ex_e))
+        levels.append((i, 10 * np.log10(rc_e / ex_e)))
         ex_l = (ex[:, 0] ** 2).sum() / max(ex_e, 1e-12)
         rc_l = (rc[:, 0] ** 2).sum() / max(rc_e, 1e-12)
         if abs(ex_l - rc_l) > 0.15:
@@ -184,33 +223,53 @@ def main():
         rc_len = int(rc_loud[-1] - rc_loud[0]) if rc_loud.size else -1
         if abs(rc_len - ex_len) > 3:
             problems.append(f"{s / 100:7.2f} s: lasts {rc_len} windows, render {ex_len}")
-    med = float(np.median(levels)) if levels else 0.0
-    for (s, _), lv in zip([ev for ev in evs], levels):
+        if dropped(i):
+            capture.extend(problems[problems_before:])
+            del problems[problems_before:]
+    med = float(np.median([lv for _, lv in levels])) if levels else 0.0
+    for i, lv in levels:
         if abs(lv - med) > 3:
-            problems.append(f"{s / 100:7.2f} s: level {lv - med:+.1f} dB against the median event")
+            line = f"{evs[i][0] / 100:7.2f} s: level {lv - med:+.1f} dB against the median event"
+            (capture if dropped(i) else problems).append(line)
     quiet = ~np.convolve(active, np.ones(7), "same").astype(bool)
-    stray = er.sum(axis=1)[quiet] > floor * 4
-    if stray.any():
-        first = np.nonzero(quiet)[0][np.nonzero(stray)[0][0]]
-        problems.append(f"{int(stray.sum())} windows sound where the render is silent (first at {first / 100:.2f} s)")
+    # A buffer dropped somewhere between two events: the silence before the
+    # next one may follow either offset. Sound under both is stray, whether or
+    # not a buffer dropped there (a stuck voice sounds under any offset).
+    starts_at = np.array([s for s, _ in evs])
+    after = np.searchsorted(starts_at, np.arange(ee.shape[0]), side="right")  # next event's index
+    nxt = np.array(offsets + [offsets[-1]])[np.minimum(after, len(offsets) - 1)] if evs else np.zeros(ee.shape[0], int)
+    alt = full[np.clip(lag + np.arange(ee.shape[0]) + nxt, 0, full.shape[0] - 1)]
+    loud = (er.sum(axis=1) > floor * 4) & (alt.sum(axis=1) > floor * 4) & quiet
+    if loud.any():
+        problems.append(f"{int(loud.sum())} windows sound where the render is silent (first at {np.nonzero(loud)[0][0] / 100:.2f} s)")
+    lost = -sum(x for x in steps if x <= -DROP) / max(1, ee.shape[0])
+    if lost > MAX_LOSS:
+        problems.append(f"capture lost {100 * lost:.1f}% in dropped buffers (more than {100 * MAX_LOSS:.0f}%)")
     corr_side = [np.corrcoef(ee[:, i], er[:, i])[0, 1] for i in range(2)]
-    print(f"aligned at {lag / 100:.2f} s; {len(gaps)} capture gaps or drift steps between events "
+    drops = sum(1 for x in steps if abs(x) >= DROP)
+    print(f"aligned at {lag / 100:.2f} s; {drops} dropped capture buffers and "
+          f"{len(gaps) - drops} drift steps between events "
           f"(net {offsets[-1] - offsets[0]:+d} windows); local shifts {min(shifts):+d}..{max(shifts):+d}; {len(evs)} events; "
           f"envelope correlation L {corr_side[0]:.3f} R {corr_side[1]:.3f}; "
-          f"event levels {min(levels) - med:+.1f}..{max(levels) - med:+.1f} dB around the median")
+          f"event levels {min(lv for _, lv in levels) - med:+.1f}..{max(lv for _, lv in levels) - med:+.1f} dB around the median")
     if a.wav:
         seg = rec[lag * WINDOW: (lag + ee.shape[0]) * WINDOW]
         with wave.open(a.wav, "wb") as w:
             w.setnchannels(2); w.setsampwidth(2); w.setframerate(RATE); w.writeframes(seg.astype("<i2").tobytes())
-    if problems or min(corr_side) < 0.9:
-        for line in problems[:40]:
+    def show(lines, prefix):
+        for line in lines[:40]:
             t = float(line.split(" s:")[0]) if starts and " s:" in line else None
             if t is not None:
-                near = [a for f, a in starts if abs(f / 50 - t) < 0.1]
-                line += f"  (sound {', '.join(map(str, near)) or '?'})"
-            print("  " + line)
+                named = [a for f, a in starts if abs(f / 50 - t) < 0.1]
+                line += f"  (sound {', '.join(map(str, named)) or '?'})"
+            print(prefix + line)
+    if capture:
+        print(f"{len(capture)} differences next to a dropped capture buffer (capture loss, not the mixer):")
+        show(capture, "  capture: ")
+    if problems or min(corr_side) < 0.9:
+        show(problems, "  ")
         sys.exit(f"{len(problems)} problems; correlation {min(corr_side):.3f}")
-    print("recording matches the render")
+    print("recording matches the render" + (" apart from capture loss" if capture else ""))
 
 
 if __name__ == "__main__":
