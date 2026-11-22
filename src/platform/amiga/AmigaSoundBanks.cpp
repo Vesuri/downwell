@@ -16,10 +16,10 @@ namespace {
 struct Pack { const char* file; ULONG bytes; };
 Pack pack(AmigaSoundBanks::Bank bank){
     switch(bank){
-    case AmigaSoundBanks::run:return {"PROGDIR:Downwell.sndrun",DOWNWELL_SFX_RUN_BYTES};
-    case AmigaSoundBanks::front:return {"PROGDIR:Downwell.sndfront",DOWNWELL_SFX_FRONT_BYTES};
-    case AmigaSoundBanks::results:return {"PROGDIR:Downwell.sndresults",DOWNWELL_SFX_RESULTS_BYTES};
-    case AmigaSoundBanks::clear:return {"PROGDIR:Downwell.sndclear",DOWNWELL_SFX_CLEAR_BYTES};
+    case AmigaSoundBanks::run:return {"Downwell.sndrun",DOWNWELL_SFX_RUN_BYTES};
+    case AmigaSoundBanks::front:return {"Downwell.sndfront",DOWNWELL_SFX_FRONT_BYTES};
+    case AmigaSoundBanks::results:return {"Downwell.sndresults",DOWNWELL_SFX_RESULTS_BYTES};
+    case AmigaSoundBanks::clear:return {"Downwell.sndclear",DOWNWELL_SFX_CLEAR_BYTES};
     default:return {nullptr,0};
     }
 }
@@ -56,7 +56,7 @@ void AmigaSoundBanks::set(AmigaPaulaAudio::Slot slot,Bank bank){
         UBYTE* memory=nullptr;
         if(AvailMem(MEMF_CHIP|MEMF_LARGEST)>=p.bytes+chipMargin)
             memory=static_cast<UBYTE*>(AllocMem(p.bytes,MEMF_CHIP));
-        if(memory&&platform_->loadFile(p.file,memory,p.bytes)==LONG(p.bytes)&&
+        if(memory&&platform_->loadData(p.file,memory,p.bytes)==LONG(p.bytes)&&
            audio_.bind(slot,memory,p.bytes)){
             slots_[slot]={bank,memory,p.bytes};
             ++gDownwellSoundBankLoads;

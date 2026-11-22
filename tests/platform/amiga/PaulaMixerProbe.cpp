@@ -41,7 +41,7 @@ int main(){
     auto* bank=static_cast<UBYTE*>(AllocMem(DOWNWELL_SFX_BANK_BYTES,MEMF_CHIP));
     if(!bank)return fail(2);
     gPaulaProbeChipBank=DOWNWELL_SFX_BANK_BYTES;
-    if(platform.loadFile("Downwell.sfx",bank,DOWNWELL_SFX_BANK_BYTES)!=LONG(DOWNWELL_SFX_BANK_BYTES))return fail(3);
+    if(platform.loadData("Downwell.sfx",bank,DOWNWELL_SFX_BANK_BYTES)!=LONG(DOWNWELL_SFX_BANK_BYTES))return fail(3);
     downwell::AmigaPaulaAudio audio;
     if(audio.acquire(platform))return fail(4); // no pre-takeover admission
     if(!audio.bind(downwell::AmigaPaulaAudio::resident,bank,DOWNWELL_SFX_BANK_BYTES))return fail(4);

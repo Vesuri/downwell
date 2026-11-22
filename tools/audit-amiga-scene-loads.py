@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-FORBIDDEN = (b'PROGDIR:Downwell.game\0', b'PROGDIR:Downwell.planes\0')
+FORBIDDEN = (b'Downwell.game\0', b'Downwell.planes\0')
 
 
 def violations(binary):

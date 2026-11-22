@@ -79,7 +79,33 @@ void AmigaPlatform::endIo()
     Enable();
 }
 
+LONG AmigaPlatform::loadData(const char* name, UBYTE* destination, ULONG bytes)
+{
+    // The installer puts the converted files in data/ beside the program;
+    // a development drawer keeps them beside it (as the sibling ports do).
+    static const char* const directories[] = {"PROGDIR:data/", "PROGDIR:"};
+    char path[96];
+    for (const char* directory : directories) {
+        unsigned length = 0;
+        for (const char* c = directory; *c; ++c) path[length++] = *c;
+        for (const char* c = name; *c; ++c) {
+            if (length + 1 >= sizeof path) return -1;
+            path[length++] = *c;
+        }
+        path[length] = 0;
+        bool opened = false;
+        const LONG read = loadFile(path, destination, bytes, &opened);
+        if (opened) return read;
+    }
+    return -1;
+}
+
 LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)
+{
+    return loadFile(name, destination, bytes, nullptr);
+}
+
+LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes, bool* opened)
 {
     DW_PROFILE_SCOPE(profileSceneFileIo);
     if (!DOSBase || !destination) return -1;
@@ -91,6 +117,7 @@ LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)
     LONG read = -1;
     const BPTR file = Open((CONST_STRPTR)name, MODE_OLDFILE);
     if (file) {
+        if (opened) *opened = true;
         read = Read(file, destination, (LONG)bytes);
         Close(file);
     }

@@ -43,6 +43,10 @@ public:
     // servers, interrupts and disk DMA; the display stays owned. Drain the
     // blitter first. Returns the bytes read, or -1.
     LONG loadFile(const char* name, UBYTE* destination, ULONG bytes);
+    // A game data file by its bare name: PROGDIR:data/name (the installed
+    // layout), else PROGDIR:name (a development drawer). The second is tried
+    // only when the first does not open. Same result as loadFile.
+    LONG loadData(const char* name, UBYTE* destination, ULONG bytes);
     // The same bracketing for one Open(MODE_NEWFILE)/Write/Close. DOS
     // requesters (a write-protected or missing volume) are suppressed: the
     // call fails instead of waiting on a Workbench window nobody can see.
@@ -50,6 +54,7 @@ public:
     void restore();
 
 private:
+    LONG loadFile(const char* name, UBYTE* destination, ULONG bytes, bool* opened);
     AmigaPlatform(const AmigaPlatform&);
     AmigaPlatform& operator=(const AmigaPlatform&);
 

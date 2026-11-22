@@ -175,7 +175,7 @@ int main() {
                 self.assertFalse((root / 'Downwell.hunk-options.tmp').exists())
 
     def test_shipping_load_path_audit(self):
-        cavern = b'PROGDIR:Downwell.cavern\0PROGDIR:Downwell.cavernplanes\0'
+        cavern = b'Downwell.cavern\0Downwell.cavernplanes\0'
         self.assertEqual(audit.violations(cavern), [])
         for path in audit.FORBIDDEN:
             self.assertEqual(audit.violations(cavern + path), [path[:-1].decode('ascii')])

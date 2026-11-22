@@ -375,11 +375,11 @@ static bool entryHudReady=false;
 #include "../../../generated/amiga-transient-banks.h"
 using TransientOwner = AmigaTransientBank::Owner;
 static constexpr AmigaTransientBank::Contract shopBankContract{
-    TransientOwner::shop, "PROGDIR:Downwell.shop", DOWNWELL_SHOP_BANK_BYTES, DOWNWELL_SHOP_BANK_BUDGET};
+    TransientOwner::shop, "Downwell.shop", DOWNWELL_SHOP_BANK_BYTES, DOWNWELL_SHOP_BANK_BUDGET};
 static constexpr AmigaTransientBank::Contract resultsBankContract{
-    TransientOwner::results, "PROGDIR:Downwell.results", DOWNWELL_RESULTS_BANK_BYTES, DOWNWELL_RESULTS_BANK_BUDGET};
+    TransientOwner::results, "Downwell.results", DOWNWELL_RESULTS_BANK_BYTES, DOWNWELL_RESULTS_BANK_BUDGET};
 static constexpr AmigaTransientBank::Contract clearBankContract{
-    TransientOwner::upgrade, "PROGDIR:Downwell.clear", DOWNWELL_CLEAR_BANK_BYTES, DOWNWELL_CLEAR_BANK_BUDGET};
+    TransientOwner::upgrade, "Downwell.clear", DOWNWELL_CLEAR_BANK_BYTES, DOWNWELL_CLEAR_BANK_BUDGET};
 static AmigaTransientBank overlayBank;
 static AmigaPlatform* sceneAssetPlatform;
 extern "C" { volatile ULONG gDownwellTransientLoads, gDownwellUpgradeSourceBytes; }
@@ -389,7 +389,7 @@ static_assert(DOWNWELL_HUD_BANK_BYTES<=DOWNWELL_HUD_BANK_BUDGET,
     "HUD growth requires an explicit scene residency budget");
 
 static bool readTransientBank(const char* file, UBYTE* target, unsigned bytes) {
-    if (!sceneAssetPlatform || sceneAssetPlatform->loadFile(file, target, bytes) != LONG(bytes)) return false;
+    if (!sceneAssetPlatform || sceneAssetPlatform->loadData(file, target, bytes) != LONG(bytes)) return false;
     ++gDownwellTransientLoads;
     return true;
 }
@@ -423,7 +423,7 @@ public:
         }
         // Upgrade preparation copies this source into its own DMA bank. It
         // must never become a permanent linked asset or a gameplay load.
-        if (!sceneAssetPlatform || sceneAssetPlatform->loadFile("PROGDIR:Downwell.selectionmask",
+        if (!sceneAssetPlatform || sceneAssetPlatform->loadData("Downwell.selectionmask",
                 storage_+clearBankContract.bytes,DOWNWELL_SELECTIONMASK_BANK_BYTES)!=
                 LONG(DOWNWELL_SELECTIONMASK_BANK_BYTES)) { release(); return false; }
         ++gDownwellSelectionMaskLoads;
@@ -446,8 +446,8 @@ public:
 // and dropped; front art is reloaded whenever gameplay returns to it.
 // Gameplay reuses the region for terrain/field staging. The separate gameplay
 // DMA atlas is a separate gameplay lease, absent during front-end scenes.
-static const char bootBankName[] = "PROGDIR:Downwell.boot";
-static const char frontBankName[] = "PROGDIR:Downwell.front";
+static const char bootBankName[] = "Downwell.boot";
+static const char frontBankName[] = "Downwell.front";
 static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOOT_BANK_BYTES
     ? DOWNWELL_FRONT_BANK_BYTES : DOWNWELL_BOOT_BANK_BYTES;
 #ifdef DOWNWELL_PREPARED_FIELDS
@@ -478,7 +478,7 @@ static bool loadSceneBank(AmigaPlatform& platform, const char* name, ULONG bytes
     invalidateGameplayFieldBank();
     frontPack = frontPackEnd = nullptr;
     if (!sceneBank || bytes > sceneBankBytes ||
-        platform.loadFile(name, sceneBank, bytes) != (LONG)bytes ||
+        platform.loadData(name, sceneBank, bytes) != (LONG)bytes ||
         amigaRendererChipPackBytes(sceneBank, sceneBank + bytes) != bytes) return false;
     ++gDownwellSceneBankLoads;
     return true;
@@ -615,7 +615,7 @@ static bool selectOverlayAssetBank(bool shop) {
 // sprDitherFade, sprProgress) borrows the same retired-garden gap. A living,
 // controllable player owns neither shop nor results art there.
 static constexpr AmigaTransientBank::Contract pauseBankContract{
-    TransientOwner::pause, "PROGDIR:Downwell.pause", DOWNWELL_PAUSE_BANK_BYTES, DOWNWELL_PAUSE_BANK_BUDGET};
+    TransientOwner::pause, "Downwell.pause", DOWNWELL_PAUSE_BANK_BYTES, DOWNWELL_PAUSE_BANK_BUDGET};
 static AmigaTransientBank::View selectPauseBank() {
     if (residentCover != ResidentCover::none || !overlayAssetStorage) return {nullptr, 0};
     const auto held = overlayBank.view(TransientOwner::pause);
@@ -679,7 +679,7 @@ static bool selectExitMaskBank() {
     overlayBank.release();
     gDownwellResultsPack = gDownwellShopPack = nullptr;
     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
-    if (sceneAssetPlatform->loadFile("PROGDIR:Downwell.exitmask",overlayAssetStorage,
+    if (sceneAssetPlatform->loadData("Downwell.exitmask",overlayAssetStorage,
             AmigaExitMask::bytes)!=LONG(AmigaExitMask::bytes)) return false;
     ++gDownwellExitMaskLoads;
     residentCover = ResidentCover::exit;
@@ -2073,7 +2073,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     const auto acquireBuilderPatterns=[&](){
         if(builders.valid())return memory.builderPatterns()!=nullptr;
         if(!memory.acquireBuilderPatterns(DOWNWELL_PATTERNS_BANK_BYTES))return false;
-        if(platform.loadFile("PROGDIR:Downwell.patterns",memory.builderPatterns(),
+        if(platform.loadData("Downwell.patterns",memory.builderPatterns(),
                 DOWNWELL_PATTERNS_BANK_BYTES)!=LONG(DOWNWELL_PATTERNS_BANK_BYTES)){
             memory.releaseBuilderPatterns();return false;
         }
@@ -2310,7 +2310,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             !gameplayColumnBank.load(memory.fieldColumns(),downwell::fieldColumnBytes,
                 [&](UBYTE* target,unsigned bytes){
                     ++gDownwellFieldColumnLoads;
-                    return platform.loadFile("PROGDIR:Downwell.columns",target,bytes)==LONG(bytes);
+                    return platform.loadData("Downwell.columns",target,bytes)==LONG(bytes);
                 }))return false;
         gDownwellFieldColumnResidentBytes=downwell::fieldColumnBytes;
 #endif
@@ -2361,14 +2361,14 @@ __attribute__((noinline)) static int runDownwell(void) {
         // These explicit full-catalogue pixel oracles include later-area art.
         if(!AmigaGameplayAssetAdmission::referenceOracle(port.runStage().area))return false;
         constexpr ULONG cpuBytes=DOWNWELL_GAME_BANK_BYTES,planeBytes=DOWNWELL_GAME_PLANE_BYTES;
-        const char* cpuPath="PROGDIR:Downwell.game";
-        const char* planePath="PROGDIR:Downwell.planes";
+        const char* cpuPath="Downwell.game";
+        const char* planePath="Downwell.planes";
         const auto* planeHash=downwellGamePlaneSourceHash;
 #else
         if(!AmigaGameplayAssetAdmission::production(port.runStage().area))return false;
         constexpr ULONG cpuBytes=DOWNWELL_CAVERN_BANK_BYTES,planeBytes=DOWNWELL_CAVERN_PLANE_BYTES;
-        const char* cpuPath="PROGDIR:Downwell.cavern";
-        const char* planePath="PROGDIR:Downwell.cavernplanes";
+        const char* cpuPath="Downwell.cavern";
+        const char* planePath="Downwell.cavernplanes";
         const auto* planeHash=downwellCavernPlaneSourceHash;
 #endif
         if(gDownwellGameArtResidentBytes)
@@ -2392,7 +2392,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         if(!memory.acquireGameCatalogue(cpuBytes+DOWNWELL_ENTRYMASK_BANK_BYTES+terrainArtBytes))return false;
         activeGamePack=memory.gameCatalogue();activeGamePackEnd=activeGamePack+cpuBytes;
         UBYTE* entryMask=memory.gameCatalogue()+cpuBytes;
-        if(platform.loadFile("PROGDIR:Downwell.entrymask",entryMask,
+        if(platform.loadData("Downwell.entrymask",entryMask,
                 DOWNWELL_ENTRYMASK_BANK_BYTES)!=LONG(DOWNWELL_ENTRYMASK_BANK_BYTES)){
             releaseGameplayArt();return false;
         }
@@ -2401,7 +2401,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         ++gDownwellEntryMaskLoads;
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
         UBYTE* terrainArt=entryMask+DOWNWELL_ENTRYMASK_BANK_BYTES;
-        if(platform.loadFile("PROGDIR:Downwell.terrain",terrainArt,terrainArtBytes)!=LONG(terrainArtBytes)||
+        if(platform.loadData("Downwell.terrain",terrainArt,terrainArtBytes)!=LONG(terrainArtBytes)||
            !AmigaTerrainPainter::bindPatterns(terrainArt,terrainArtBytes)){
             releaseGameplayArt();return false;
         }
@@ -2411,7 +2411,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             if(entryMask[i]!=amiga_entry_mask[i]){releaseGameplayArt();return false;}
 #endif
         bool good=acquireTerrainRaster()&&
-            platform.loadFile(cpuPath,memory.gameCatalogue(),cpuBytes)==LONG(cpuBytes)&&
+            platform.loadData(cpuPath,memory.gameCatalogue(),cpuBytes)==LONG(cpuBytes)&&
             effectAssets.bind(activeGamePack,cpuBytes)&&
             effectAssets.bindEntryMask(activeEntryMask,DOWNWELL_ENTRYMASK_BANK_BYTES)&&
             AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd);
@@ -2426,7 +2426,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)&&
             AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)&&
             memory.acquireGameAssets(gamePackBytes)&&
-            platform.loadFile(planePath,memory.gameAssets(),gamePackBytes)==LONG(gamePackBytes)&&
+            platform.loadData(planePath,memory.gameAssets(),gamePackBytes)==LONG(gamePackBytes)&&
             amigaBlitterBindGamePlanes(activeGamePack,cpuBytes,
                 memory.gameAssets(),gamePackBytes,planeHash);
         if(!good){releaseGameplayArt();return false;}
@@ -3071,8 +3071,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                         DW_PROFILE_PHASE(profileEntryLargeFields);
                         if(!amigaBlitterBindFieldBands(sceneBank+fieldBandOffset,
                             [](void* p,UBYTE* target,unsigned bytes){
-                                return static_cast<AmigaPlatform*>(p)->loadFile(
-                                    "PROGDIR:Downwell.fields",target,bytes)==LONG(bytes);
+                                return static_cast<AmigaPlatform*>(p)->loadData(
+                                    "Downwell.fields",target,bytes)==LONG(bytes);
                             },&platform)){exitCode=downwellGameplayFailed(__LINE__);break;}
                         ++gDownwellFieldBankUploads;
                     }else ++gDownwellFieldBankReuses;
@@ -3155,7 +3155,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         hudStorage[byte] = amiga_hud_pack[byte];
 #else
                     if (!entryHudReady) {
-                        if (platform.loadFile("PROGDIR:Downwell.hud",hudStorage,hudBytes)!=LONG(hudBytes) ||
+                        if (platform.loadData("Downwell.hud",hudStorage,hudBytes)!=LONG(hudBytes) ||
                             !validateTransientBank(hudStorage,hudBytes)) {
                             exitCode=downwellGameplayFailed(__LINE__);
                             break;

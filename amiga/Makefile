@@ -661,7 +661,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 COLLISION_PACK := $(REPO)/generated/downwell-sprites.dwsc
 COLLISION_MASK_PACK := $(REPO)/generated/downwell-sprite-masks.dwsm
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaPaulaAudio.o obj/AmigaSoundBanks.o obj/AmigaPlayer.o \
+OBJECTS := obj/AmigaStart.o obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaKeyboard.o obj/AmigaPaulaAudio.o obj/AmigaSoundBanks.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
@@ -937,6 +937,8 @@ $(OUT).exe: $(OUT).elf FORCE_HUNK_OPTIONS | audit
 $(OUT).elf: $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) -o $@
+	@test "$$($(OBJDUMP) -t $@ | awk '$$NF == "_start" && $$4 == ".text" { print $$1 }')" = 00000000 || \
+		{ echo "*** _start is not at the hunk start" >&2; rm -f $@; exit 1; }
 	$(OBJDUMP) --disassemble --no-show-raw-ins -S $@ > $(OUT).s
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
@@ -999,7 +1001,7 @@ obj/WindAudioProbeDriver.o: $(AMIGA_SRC)/AmigaWindAudio.cpp $(AMIGA_SRC)/AmigaWi
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -I$(REPO)/generated -DDOWNWELL_WIND_AUDIO_VERIFY -c -o $@ $<
 
-out/WindAudioProbe.elf: obj/WindAudioProbe.o obj/WindAudioProbeDriver.o obj/AmigaPlatform.o obj/AmigaHardware.o obj/CopperList.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+out/WindAudioProbe.elf: obj/AmigaStart.o obj/WindAudioProbe.o obj/WindAudioProbeDriver.o obj/AmigaPlatform.o obj/AmigaHardware.o obj/CopperList.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/WindAudioProbe.map $^ -o $@
 
@@ -1014,7 +1016,7 @@ obj/FreeMemoryProbe.o: $(REPO)/tests/platform/amiga/FreeMemoryProbe.cpp
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
-out/FreeMemoryProbe.elf: obj/FreeMemoryProbe.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+out/FreeMemoryProbe.elf: obj/AmigaStart.o obj/FreeMemoryProbe.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/FreeMemoryProbe.map $^ -o $@
 
@@ -1052,7 +1054,7 @@ obj/PaulaMixerProbe.o: $(REPO)/tests/platform/amiga/PaulaMixerProbe.cpp $(REPO)/
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -I$(REPO)/generated -I$(REPO)/tests/platform/amiga -c -o $@ $<
 
-out/PaulaMixerProbe.elf: obj/PaulaMixerProbe.o obj/AmigaPaulaAudio.o obj/AmigaPlatform.o obj/AmigaHardware.o obj/CopperList.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+out/PaulaMixerProbe.elf: obj/AmigaStart.o obj/PaulaMixerProbe.o obj/AmigaPaulaAudio.o obj/AmigaPlatform.o obj/AmigaHardware.o obj/CopperList.o obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/gcc8_c_support.o obj/gcc8_a_support.o
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=out/PaulaMixerProbe.map $^ -o $@
 
@@ -1343,7 +1345,13 @@ obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c Makefile
 	@mkdir -p $(@D)
 	# -fno-builtin: without it GCC folds strlen's own loop into a call to
 	# strlen, so the linked strlen is `bra.s strlen` and never returns.
-	$(CC) $(CFLAGS) -fno-builtin -Dmemcpy=downwellToolchainMemcpy -Dmemset=downwellToolchainMemset -c -o $@ $<
+	# Its _start loses main's result and the Workbench message: AmigaStart.c's runs.
+	$(CC) $(CFLAGS) -fno-builtin -Dmemcpy=downwellToolchainMemcpy -Dmemset=downwellToolchainMemset \
+		-D_start=downwellUnusedSharedStart -c -o $@ $<
+
+obj/AmigaStart.o: $(AMIGA_SRC)/AmigaStart.c Makefile
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 obj/AmigaMemoryCopy.o: $(AMIGA_SRC)/AmigaMemoryCopy.cpp $(AMIGA_SRC)/AmigaMemoryCopy.h
 	@mkdir -p $(@D)

@@ -43,29 +43,46 @@ fi
 fsuae_claim_port
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
-printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
-cp -f "$VERIFY_PROGRAM.exe" "$DH1/Downwell"
-cp -f out/Downwell.boot "$DH1/Downwell.boot"
-cp -f out/Downwell.front "$DH1/Downwell.front"
-cp -f out/Downwell.planes "$DH1/Downwell.planes"
-cp -f out/Downwell.game "$DH1/Downwell.game"
-cp -f out/Downwell.cavern "$DH1/Downwell.cavern"
-cp -f out/Downwell.cavernplanes "$DH1/Downwell.cavernplanes"
-for bank in results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear; do
-  cp -f "out/Downwell.$bank" "$DH1/Downwell.$bank"
+# VERIFY_WORKBENCH=1: Workbench 2.04 (its floppy's C: and Libs:, LoadWB)
+# starts the program from its tool icon in SYS:WBStartup, with the icon's
+# stack (VERIFY_STACK_BYTES), instead of the Shell, with the installed
+# layout: the banks in data/ beside it (PROGDIR:data/), the save beside it.
+# The Shell start keeps the development layout, everything in PROGDIR:.
+GAME="$DH1"
+DATA="$DH1"
+BOOT_ARGS=()
+if [ "${VERIFY_WORKBENCH:-0}" = 1 ]; then
+  [ -f "$WORKBENCH_ADF" ] || { echo "Workbench floppy not found: $WORKBENCH_ADF"; exit 1; }
+  [ -f "$SETPATCH" ] || { echo "SetPatch not found: $SETPATCH"; exit 1; }
+  GAME="$DH0/WBStartup"
+  DATA="$GAME/data"
+  mkdir -p "$DATA" "$DH0/c"
+  find "$GAME" -mindepth 1 -not -path "$DATA" -delete
+  cp -f "$SETPATCH" "$DH0/c/SetPatch"
+  printf '%s\n' 'DH0:c/SetPatch QUIET' 'DF0:C/Assign C: DF0:C' 'Assign LIBS: DF0:Libs' \
+    'MakeDir RAM:ENV' 'Assign ENV: RAM:ENV' 'LoadWB' 'EndCLI >NIL:' > "$DH0/s/startup-sequence"
+  python3 ../tools/tool_icon.py --stack "$VERIFY_STACK_BYTES" "$GAME/Downwell.info"
+  BOOT_ARGS=(--floppy_drive_0="$WORKBENCH_ADF" --hard_drive_0_priority=10)
+else
+  [ ! -d "$DH0/WBStartup" ] || find "$DH0/WBStartup" -mindepth 1 -delete
+  printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
+fi
+cp -f "$VERIFY_PROGRAM.exe" "$GAME/Downwell"
+for bank in boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear; do
+  cp -f "out/Downwell.$bank" "$DATA/Downwell.$bank"
 done
 if [ "$VERIFY_PROGRAM" = out/WindAudioProbe ]; then
-  cp -f out/Downwell.wind "$DH1/Downwell.wind"
+  cp -f out/Downwell.wind "$DATA/Downwell.wind"
 fi
 if [ "$VERIFY_PROGRAM" = out/PaulaMixerProbe ]; then
-  cp -f out/Downwell.sfx "$DH1/Downwell.sfx"
+  cp -f out/Downwell.sfx "$DATA/Downwell.sfx"
 fi
 # W1.10: verification starts from a fresh save unless VERIFY_SAVE seeds one.
-rm -f "$DH1/save.ini"
-if [ -n "${VERIFY_SAVE:-}" ]; then cp -f "$VERIFY_SAVE" "$DH1/save.ini"; fi
+rm -f "$GAME/save.ini"
+if [ -n "${VERIFY_SAVE:-}" ]; then cp -f "$VERIFY_SAVE" "$GAME/save.ini"; fi
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
-  "$RUN/gdb-ready.marker" "$DH1/Downwell.reject-draw"
+  "$RUN/gdb-ready.marker" "$GAME/Downwell.reject-draw"
 
 cleanup() {
   if [ -n "${GDB_PID:-}" ]; then
@@ -73,7 +90,7 @@ cleanup() {
     wait "$GDB_PID" 2>/dev/null || true
   fi
   fsuae_stop
-  rm -f "$DH1/Downwell.reject-draw"
+  rm -f "$GAME/Downwell.reject-draw"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -96,7 +113,7 @@ echo "verification machine: $(downwell_machine_description)"
 fsuae_options
 FSUAE_LOG="$RUN/fsuae-startup.log" fsuae_launch \
   --uae_chipset="$MACHINE_CHIPSET" \
-  --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
+  --hard_drive_0="$DH0" --hard_drive_1="$DH1" ${BOOT_ARGS[@]+"${BOOT_ARGS[@]}"} \
   --joystick_port_0=none --joystick_port_1=none \
   --remote_debugger_trigger=Downwell \
   --state_dir="$RUN/state"

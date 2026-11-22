@@ -49,7 +49,7 @@ public:
 #endif
         }
         masks_=static_cast<UBYTE*>(AllocMem(DOWNWELL_ENCOUNTER_MASK_BYTES,MEMF_PUBLIC));
-        if(!masks_||platform.loadFile("PROGDIR:Downwell.encountermasks",masks_,
+        if(!masks_||platform.loadData("Downwell.encountermasks",masks_,
                 DOWNWELL_ENCOUNTER_MASK_BYTES)!=DOWNWELL_ENCOUNTER_MASK_BYTES){releaseScene();return false;}
         maskView_=downwell::SpriteMaskPack(masks_,DOWNWELL_ENCOUNTER_MASK_BYTES);
         if(!maskView_.valid()){releaseScene();return false;}
