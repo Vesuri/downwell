@@ -3091,18 +3091,26 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // W1.10: a new run takes style select's style and mode
                     // (objPlayer_n Create's styleUpdate at 1-1). The first
                     // boot's builder checkpoint was taken before the choice.
-                    if (freshlyLoadedRoom && port.runStage().level <= 1) {
+                    // A results restart is still at stage 0 here; it begins
+                    // the run below, before the builder reads the mode.
+                    if (freshlyLoadedRoom && !newRunWorldPending && port.runStage().level <= 1) {
                         if (!port.beginRun(scenes.playStyle(), scenes.hardMode())) {
                             exitCode=downwellGameplayFailed(__LINE__);break;
                         }
-                        if (!newRunWorldPending) liveBuilder.applyRunStyle(scenes.playStyle(), scenes.hardMode());
+                        liveBuilder.applyRunStyle(scenes.playStyle(), scenes.hardMode());
                     }
                     if (newRunWorldPending) {
                         AmigaHardware::blitterDrain();
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
+                        // A results restart (stage 0) begins its run at 1-1;
+                        // a next-level entry keeps the run.
+                        const bool runRestart = port.runStage().area == 0;
                         port.confirmFirstStage();
+                        if (runRestart && !port.beginRun(scenes.playStyle(), scenes.hardMode())) {
+                            exitCode=downwellGameplayFailed(__LINE__);break;
+                        }
                         unsigned style=scenes.playStyle();
                         if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend,
                             [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,

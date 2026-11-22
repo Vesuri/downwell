@@ -135,15 +135,6 @@ style select, patched with the chosen style and hard mode.
 Every world-1 upgrade works in play, each on an `upgrade-<ids>-v<variant>`
 route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
 
-13. **Results re-entry route breaks.** `make verify-amiga-results-restart`
-    fails with the executable returning 20 before its third results
-    destination. It fails the same way with the sound mixer not acquired
-    (found during W2.5 on 2026-11-21). The main loop leaves through a plain
-    `break` after the style-select re-entry has reached gameplay, and the
-    encounter session's `retire()` then fails at exit (gameplay failure
-    line 5576). Find which `break` fires: the route's Chip trace and bank
-    loads are clean up to that point.
-
 14. **Garden jump.** `rmMenu`'s player is the full `objPlayer_n`, so the
     original garden player can jump (and land on the bench, metal). The
     port's menu player only walks, falls into the well and wakes from the

@@ -67,6 +67,8 @@ def main():
     # (READY_MARKER=DOWNWELL_WORLD_ONE_RESULTS_READY).
     base=os.environ.get('DOWNWELL_ROUTE_TAPE','../tmp/world-one-gameplay')
     deathRoute=os.environ.get('DOWNWELL_ROUTE_DEATH')=='1'
+    retryRoute=deathRoute and os.environ.get('DOWNWELL_ROUTE_RETRY')=='1'
+    retrySamples=-1;retryLive=0
     tape=Path(base+'.inputs').read_bytes()
     witnesses={row[0]:row[1:] for row in
         (list(map(int,line.split())) for line in Path(base+'.states').read_text().splitlines())}
@@ -233,6 +235,25 @@ def main():
                 if scene==0: packed=4 if sceneFrame%60==0 else 0
                 elif scene==1: packed=2 if sceneFrame>40 else 0
                 elif scene==2: packed=4 if sceneFrame==120 else 0
+                elif retrySamples>=0:
+                    # DOWNWELL_ROUTE_RETRY=1: after the results bar, fire takes
+                    # the default RETRY (cursor 0); the new run must reach 1-1
+                    # alive and keep running hands-off.
+                    retrySamples+=1
+                    if hp>0 and area==1 and level==1 and good:
+                        retryLive+=1
+                        packed=0
+                        if retryLive==200:
+                            print(state,flush=True)
+                            checked('delete breakpoints')
+                            shot('world-one-retry')
+                            print('DOWNWELL_WORLD_ONE_RETRY_READY',flush=True)
+                            Path('.run/gdb-ready.marker').touch()
+                            return
+                    else:
+                        if retryLive: raise RuntimeError('retried run stopped: '+state)
+                        packed=4 if retrySamples%40<4 else 0
+                    if retrySamples>3000: raise RuntimeError('Retry did not reach 1-1: '+state)
                 elif deathRoute and hp<=0:
                     # Hands off: the results sequence fills the progress bar.
                     packed=0
@@ -245,6 +266,10 @@ def main():
                         # Without a gem seed no goal is reached: the bar's
                         # completion sound (sfxUiRetry 330) ends the results.
                         checkSounds()
+                        if retryRoute:
+                            print('RESULTS DONE '+state,flush=True)
+                            retrySamples=0
+                            continue
                         print('DOWNWELL_WORLD_ONE_RESULTS_READY',flush=True)
                         Path('.run/gdb-ready.marker').touch()
                         return
