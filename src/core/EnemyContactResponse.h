@@ -69,7 +69,7 @@ bool stepEnemyContacts(unsigned count, Player& player, int& health,
         auto& enemy = get(i);
         const int object = enemy.objectId;
         if (!enemy.active || enemy.health <= 0 ||
-            (object != 111 && object != 112 && object != 113 &&
+            (object != 111 && object != 112 && object != 113 && object != 114 &&
              object != 116 && object != 117 && object != 119)) continue;
         const auto location = locate(enemy);
         bool succeeded = true;

@@ -1233,7 +1233,7 @@ bool GameplayWorld::advanceEnemyAlarm(EnemyState& enemy,unsigned alarm){
         } else if (enemy.objectId == 119 && alarm0Fired) {
             updateCrawler(enemy, true, cameraPixelX_, viewCameraYQ8());
             enemy.alarm0 = 2;
-        } else if ((enemy.objectId == 115 || enemy.objectId == 118) && (alarm0Fired || alarm1Fired)) {
+        } else if ((enemy.objectId == 115 || enemy.objectId == 118 || enemy.objectId == 173) && (alarm0Fired || alarm1Fired)) {
             return advanceSteeringAlarm(enemy, alarm0Fired ? 0 : 1);
         }
         return run_.effectsSucceeded;
@@ -1312,9 +1312,12 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
     EnemyState& enemy = *live;
     if (!enemy.active||enemy.destroyRequested)
         return true;
-    // Steering families step whenever active; they have no awake gate.
-    if (enemy.objectId == 115 || enemy.objectId == 118)
+    // Steering families and the eyefish step whenever active; they have no
+    // awake gate.
+    if (enemy.objectId == 115 || enemy.objectId == 118 || enemy.objectId == 173)
         return stepSteeringEnemy(enemy);
+    if (enemy.objectId == 114)
+        return stepEyefish(enemy);
     // Each family's Step body is inside if (!global.pTimeStop); the
     // presentation after it still runs, on the unchanged motion state.
     const bool frozen=compactTimeStop()&&stopped();
@@ -2353,7 +2356,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     return frame;
 }
 
-// ---- Compact spawner 78 and steering families 115/118 -------------------
+// ---- Compact spawner 78 and steering families 115/118/173 ---------------
 
 namespace {
 using SteeringReal=downwell::MotionBinary64;
@@ -2380,7 +2383,7 @@ bool ceilQ8(SteeringReal value,long& out){
     out=nearest+((!value.zero()&&!(value.high&0x80000000u))?1:0);
     return true;
 }
-bool steeringObject(int object){return object==115||object==118;}
+bool steeringObject(int object){return object==115||object==118||object==173;}
 }
 
 struct GameplayWorld::SteeringOps {
@@ -2520,17 +2523,16 @@ void GameplayWorld::releaseSteering(const EnemyState& enemy){
 
 bool GameplayWorld::redBallEye(const EnemyState& enemy,int& sprite,int& mirror)const{
     auto* actor=const_cast<GameplayWorld*>(this)->steeringActor(enemy);
-    if(!actor||enemy.objectId!=118)return false;
+    if(!actor||(enemy.objectId!=118&&enemy.objectId!=173))return false;
     const auto& ball=steering_[enemy.auxiliaryState].ball;
     if(!ball.eyeInitialized)return false;
     sprite=ball.eye;mirror=ball.eyeX;return true;
 }
 
 bool GameplayWorld::createCompactSpawner(int y){
-    // scrBuilder's spawner: spawnerSet1. Hard mode's sets need enmEyefish
-    // 114 and neonRedBall 173, which this world does not have yet.
+    // scrBuilder's spawner: spawnerSet1, or hardSet1 in hard mode.
     if(compactSpawnerLive_||run_.stage.area!=1||
-       !compactSpawner_.createCaverns(run_.stage.level,false))return run_.effectsSucceeded=false;
+       !compactSpawner_.createCaverns(run_.stage.level,run_.hardMode))return run_.effectsSucceeded=false;
     compactSpawnerY_=downwell::MotionBinary64::fromInteger(y);
     compactSpawnerMask_=-1;compactSpawnerLive_=true;
     return true;
@@ -2596,8 +2598,9 @@ struct GameplayWorld::SpawnerOps {
     }
     bool objectMask(int object,int& value){
         switch(object){
+            case 114:value=278;return true; // enmEyefish's OBJT mask
             case 115:value=174;return true;
-            case 118:value=153;return true;
+            case 118:case 173:value=153;return true;
             case 116:value=-1;return true; // enmBat has no explicit mask.
             default:return false;
         }
@@ -2634,6 +2637,7 @@ bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,dow
     std::int32_t px,py;
     if(!run_.effectsSucceeded||!x.roundPixel(px)||!y.roundPixel(py)||enemyCount_>=enemyCapacity)
         return run_.effectsSucceeded=false;
+    if(object==114)return createEyefish(px,py);
     if(object==116){
         // enmBat Create, as AreaOneBuilder's: one discarded word, then heading.
         enemyRandom_.nextU32();
@@ -2648,7 +2652,7 @@ bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,dow
     if(slot==steeringCapacity)return run_.effectsSucceeded=false;
     downwell::SteeringEnemyBirthState* actor;
     if(object==115)actor=new(&steering_[slot].jelly) downwell::WhiteJellyStep{};
-    else actor=new(&steering_[slot].ball) downwell::RedBallStep{};
+    else{actor=new(&steering_[slot].ball) downwell::RedBallStep{};steering_[slot].ball.neon=object==173;}
     SteeringOps ops{*this,nullptr,*actor};
     downwell::RunnerImageValue cx,cy;
     if(!cx.assignInteger(px)||!cy.assignInteger(py))return run_.effectsSucceeded=false;
@@ -2658,11 +2662,53 @@ bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,dow
     if(!born||!run_.effectsSucceeded||!actor->x.promoted().roundPixel(bx)||!actor->y.promoted().roundPixel(by))
         return run_.effectsSucceeded=false;
     // instance_deactivate_object follows Create: born inactive and pending.
-    if(!configureEnemy(enemyCount_,object,object==115?176:702,bx-240,by-176,0,0,actor->health,actor->money,
+    if(!configureEnemy(enemyCount_,object,object==115?176:object==118?702:352,bx-240,by-176,0,0,actor->health,actor->money,
         0,int(slot),ops.alarm0,ops.alarm1,0,0,false,false,true,0))return false;
     auto& enemy=enemies_[enemyCount_-1];
     enemy.imageSpeed=4; // imgSp 0.2, in twentieths.
     steeringOwner_[slot]=enemy.lifetimeId;++steeringPopulation_;
+    return true;
+}
+
+// enmEyefish Create after subparentEnemy's prefix (move_snap leaves the
+// spawner's 16-pixel grid as it is): xsp = choose(0.5, -0.5). image_xscale
+// stays 1 until its first Step. Born inactive and pending, like the others.
+bool GameplayWorld::createEyefish(int px,int py){
+    const bool left=enemyRandom_.chooseIndexSmall(2)!=0;
+    const auto profile=downwell::enemyCreateProfile(114);
+    if(!configureEnemy(enemyCount_,114,289,px-240,py-176,0,0,profile.health,profile.reward,
+        0,0,-1,-1,0,0,false,false,true,0))return false;
+    auto& enemy=enemies_[enemyCount_-1];
+    enemy.eyefish.create(px,py,left);
+    enemy.speedX=left?-128:128; // xsp, read by scrDeadBody
+    return true;
+}
+
+// enmEyefish Step. Its Alarm 1 is never armed, hitStun is never set (bullets
+// are refused, and a stomp kills at the contact in this world), so the
+// sprite stays sprEyefish; under pTimeStop only image_speed stops.
+bool GameplayWorld::stepEyefish(EnemyState& enemy){
+    const bool frozen=compactTimeStop()&&stopped();
+    enemy.frozen=frozen;
+    if(!frozen){
+        std::int32_t px;
+        if(!enemy.eyefish.step([this](downwell::MotionBinary64 x,downwell::MotionBinary64 y,int,bool& hit){
+               return steeringWallMeeting(289,x,y,hit);},px)||!run_.effectsSucceeded)
+            return run_.effectsSucceeded=false;
+        const int scale=enemy.eyefish.left()?-1:1; // xscaleXsp
+        enemy.speedX=scale*128;
+        if(!enemyLifecycle_.recordOwnsAppearance()&&
+           !enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,px,enemy.y+176))
+            return run_.effectsSucceeded=false;
+        enemy.x=px-240;enemy.preciseX=enemy.x*256L;
+        if(enemy.facing!=scale){
+            if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+            enemy.facing=scale;
+        }
+    }
+    while((enemy.imagePhase>>8)>=4u)enemy.imagePhase-=4u<<8;
+    if(!publishEnemyImage(enemy,enemy.imagePhase))return false;
+    enemy.imageFrame=enemy.imagePhase>>8;
     return true;
 }
 
@@ -2690,7 +2736,7 @@ bool GameplayWorld::stepSteeringEnemy(EnemyState& enemy){
     while((enemy.imagePhase>>8)>=frames)enemy.imagePhase-=frames<<8;
     if(!publishEnemyImage(enemy,enemy.imagePhase))return false;
     enemy.imageFrame=enemy.imagePhase>>8;
-    if(enemy.objectId==118){
+    if(enemy.objectId==118||enemy.objectId==173){
         // Draw's eye sector depends only on Step state; record it here.
         struct DrawOps {
             const EnemyState& enemy;
@@ -2730,7 +2776,7 @@ bool GameplayWorld::hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTu
 }
 
 bool GameplayWorld::collideSteeringEnemies(){
-    // objPlayer_n contacts: typStompable (115) and typical damage (118).
+    // objPlayer_n contacts: typStompable (115) and typical damage (118, 173).
     for(unsigned i=0;i<enemyCount_;++i){
         auto& enemy=enemies_[i];
         if(!steeringObject(enemy.objectId)||!enemy.active||enemy.destroyRequested||enemy.health<=0)continue;
@@ -2761,8 +2807,9 @@ bool GameplayWorld::collideSteeringEnemies(){
                 176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
         }
     }
-    // Collision events with other enemies: jelly vs subparentEnemy, red ball
-    // vs red ball. Both read the other's published builtin x/y.
+    // Collision events with other enemies: jelly and neon red ball vs
+    // subparentEnemy, red ball vs red ball. All read the other's published
+    // builtin x/y.
     for(unsigned i=0;i<enemyCount_;++i){
         auto& self=enemies_[i];
         if(!steeringObject(self.objectId)||!self.active||self.destroyRequested)continue;
@@ -3521,11 +3568,12 @@ bool GameplayWorld::typicalBulletDamage(EnemyState& enemy,int damage,std::uint32
     consumed=true;
     // soundPlay(29, 90, 0, 1) after the damage (a compact death runs inside
     // the damage below, so it plays first).
-    if(enemy.objectId!=112)run_.soundPlay(29,90,false,true);
-    if(enemy.objectId==115||enemy.objectId==118)
+    const bool immune=enemy.objectId==112||enemy.objectId==114; // bulletImmune
+    if(!immune)run_.soundPlay(29,90,false,true);
+    if(steeringObject(enemy.objectId))
         return hitSteeringEnemy(enemy,direction,damage)||(run_.effectsSucceeded=false);
     // scrBulletImpact precedes the (here immediate) death's scrDeadBody.
-    if(enemy.objectId!=112)enemy.takenImpactDamage=damage;
+    if(!immune)enemy.takenImpactDamage=damage;
     const auto impact=downwell::applyBulletDamage(
         enemy,run_.kills,enemyRandom_,
         [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
@@ -3746,7 +3794,7 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         downwell::RunnerImageValue lx,ly;
         if(!downwell::ProjectilePublication::coordinate(shot.x,240,lx)||
            !downwell::ProjectilePublication::coordinate(shot.y,176,ly))return run_.effectsSucceeded=false;
-        if(enemy.objectId==112){ // bulletImmune: the 112 spark, then choose(30,31).
+        if(enemy.objectId==112||enemy.objectId==114){ // bulletImmune: the 112 spark, then choose(30,31).
             destroy=true;if(!compactImmuneSpark(lx.promoted(),ly.promoted()))return false;
             run_.soundPlay(30+int(enemyRandom_.chooseIndexSmall(2)),50,false,true);break;
         }
@@ -3755,7 +3803,7 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         if(ignored)continue;
         if(bullet.laserHitCount<4)bullet.laserHits[bullet.laserHitCount++]=enemy.lifetimeId;
         if(enemy.health>bullet.damage)destroy=true;
-        if(enemy.objectId==115||enemy.objectId==118){
+        if(steeringObject(enemy.objectId)){
             run_.soundPlay(16,50,false,true); // sndEnemyhurt
             if(!hitSteeringEnemy(enemy,shot.direction,bullet.damage))return false;
             continue;
@@ -4285,6 +4333,7 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
     switch(enemy.objectId){
         case 111:sprite=165;break;case 112:sprite=337;break;case 113:sprite=172;break;
         case 116:sprite=158;break;case 117:sprite=179;break;case 119:sprite=281;break;
+        case 114:sprite=291;break;
         default:return run_.effectsSucceeded=false;
     }
     // scrEnemyDeath: gunshotStop (toggleGuncut is on) before momentDelay.
@@ -4292,13 +4341,17 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
     compactMomentDelay();
     compactLevelBeginCue();
     const Real x=Real::fromInteger(enemy.x+240),y=Real::fromInteger(enemy.y+176);
+    // The eyefish's smoke and flash take its private xx/yy; it has no sound.
+    const bool eyefish=enemy.objectId==114;
+    const Real fx=eyefish?enemy.eyefish.xx:x,fy=eyefish?enemy.eyefish.yy:y;
     int deathSound;
     switch(enemy.objectId){
         case 111:deathSound=121;break;case 112:deathSound=123;break;case 113:deathSound=114;break;
-        case 116:deathSound=111;break;case 117:deathSound=119;break;default:deathSound=124;break;
+        case 116:deathSound=111;break;case 117:deathSound=119;break;case 114:deathSound=-1;break;
+        default:deathSound=124;break;
     }
     // The family's last act before instance_destroy.
-    struct DeathSound {GameplayWorld& world;int sound,y;~DeathSound(){if(world.run_.effectsSucceeded)world.playEnemySound(sound,y);}}
+    struct DeathSound {GameplayWorld& world;int sound,y;~DeathSound(){if(world.run_.effectsSucceeded&&sound>=0)world.playEnemySound(sound,y);}}
         lastAct{*this,deathSound,enemy.y+176};
     // scrEnemyStomped: scrBloodfx(3, 0), then pugExplodingKnees; the death
     // the compact world runs at the contact follows.
@@ -4307,7 +4360,7 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         240+int(downwell::roundGameMakerQ8(player_.frameStartXFixed())),
         176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
-    if(!compactBloodfx(x,y)||!emitBoxSmoke(x,y)||!run_.emitFlash<1,0,0>(x,y,enemyRandom_))return false;
+    if(!compactBloodfx(x,y)||!emitBoxSmoke(fx,fy)||!run_.emitFlash<1,0,0>(fx,fy,enemyRandom_))return false;
     spawnReward(enemy,stomped);
     if(!run_.effectsSucceeded)return false;
     downwell::DeadBodySource source;

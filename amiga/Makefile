@@ -1341,7 +1341,9 @@ obj/AmigaFieldPrepared.o: $(AMIGA_SRC)/AmigaFieldPrepared.s $(REPO)/generated/am
 
 obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c Makefile
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -Dmemcpy=downwellToolchainMemcpy -Dmemset=downwellToolchainMemset -c -o $@ $<
+	# -fno-builtin: without it GCC folds strlen's own loop into a call to
+	# strlen, so the linked strlen is `bra.s strlen` and never returns.
+	$(CC) $(CFLAGS) -fno-builtin -Dmemcpy=downwellToolchainMemcpy -Dmemset=downwellToolchainMemset -c -o $@ $<
 
 obj/AmigaMemoryCopy.o: $(AMIGA_SRC)/AmigaMemoryCopy.cpp $(AMIGA_SRC)/AmigaMemoryCopy.h
 	@mkdir -p $(@D)

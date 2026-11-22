@@ -194,7 +194,7 @@ struct RedBallStep : RedBallBirth, CheckCollisionWithScript {
             if(!ops.flash(x.promoted(),y.promoted(),1,0,0)||!ops.currency(money)||
                 !ops.sound(125,50,0,1,"enemymove")||!ops.destroy())return false;
         }
-        return ops.sprite(hitStun?703:702); // Also executes after destruction.
+        return ops.sprite(hitStun?703:neon?352:702); // Also executes after destruction.
     }
 };
 }

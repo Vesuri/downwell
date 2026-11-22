@@ -34,8 +34,9 @@ inline bool usesMainRoomOutOfView(int objectId, int area) {
 // default gameplay supplies camMain's rounded, published view, not its easing
 // accumulator. Inactive instances do not receive End Step.
 // Storage adapters only expose records and apply the resulting retirement.
-// steering admits the compact owner's 115/118 records (GameplayWorld): their
-// End Step is scrOutofview, and enmRedBall's adds y < view-124 after it.
+// steering admits the compact owner's 115/118/173 records (GameplayWorld): their
+// End Step is scrOutofview, and the red balls' add y < view-124 after it;
+// and enmEyefish 114, whose End Step is outOfView(64, 640) alone.
 // Other owners keep these families in their own registered stores.
 template<class Read, class Retire>
 bool retireMainRoomObjectsChecked(unsigned count, int roomId, int area, long viewTopQ12,
@@ -45,12 +46,15 @@ bool retireMainRoomObjectsChecked(unsigned count, int roomId, int area, long vie
     if (roomId != 11) return true;
     for (unsigned i = 0; i < count; ++i) {
         const LifetimeInstance instance = read(i);
-        const bool steered = steering && (instance.objectId == 115 || instance.objectId == 118);
-        if (!instance.active || (!steered && !usesMainRoomOutOfView(instance.objectId, area))) continue;
+        const bool red = instance.objectId == 118 || instance.objectId == 173;
+        const bool eyefish = steering && instance.objectId == 114;
+        const bool steered = steering && (instance.objectId == 115 || red);
+        if (!instance.active || (!steered && !eyefish && !usesMainRoomOutOfView(instance.objectId, area))) continue;
         if((instance.objectId==289)!=(phase==MainRoomLifetimePhase::step))continue;
         const long y = instance.y * 4096L;
-        const long above = instance.objectId == 118 && steered ? 124L : 160L;
-        if (y < viewTopQ12 - above * 4096 || y > viewTopQ12 + 3000L * 4096)
+        const long above = eyefish ? 64L : red && steered ? 124L : 160L;
+        const long below = eyefish ? 640L : 3000L;
+        if (y < viewTopQ12 - above * 4096 || y > viewTopQ12 + below * 4096)
             if (!retire(i)) return false;
     }
     return true;

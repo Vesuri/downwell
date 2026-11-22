@@ -84,8 +84,9 @@ Current state of the normal Amiga build: boot, garden, style select,
 area-1 generation and scrolling, movement, stomping and shooting, the health,
 ammo and gem HUD, damage numbers, six builder-placed enemy families (snake
 111, ground turtle 112, frog 113, bat 116, snail 117, crawler 119) plus the
-level spawner 78 with its white jelly 115 and red ball 118 (normal-mode
-channels, steering motion, stomp and bullet deaths, eye art), box bursts (smoke,
+level spawner 78 with its white jelly 115 and red ball 118 (steering motion,
+stomp and bullet deaths, eye art) and, in hard mode's channels, the eyefish
+114 and the neon red ball 173, box bursts (smoke,
 flash, impact, `breakablesDebris` 370, rewards), `Scattered16` 289, `gemChunk`
 293, torches 295/296, the steering enemies' splash, smoke and flash,
 `GunModule` 109 (battery and heart pickups, `moduleText` 373 and `itemNotif`
@@ -134,19 +135,6 @@ style select, patched with the chosen style and hard mode.
 Every world-1 upgrade works in play, each on an `upgrade-<ids>-v<variant>`
 route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
 
-10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
-    cavern builder's extra enemies, doubled shop prices, "-H" titles, the
-    records' +100), but its area-1 spawner sets (`hardSet1`, already in
-    `SpawnerStep::createCaverns`) need two enemies the port lacks, so
-    `GameplayWorld` still creates the normal sets: `enmEyefish` 114 (sprites
-    289/290/291, ehp 15, bullet-immune, stompable, a horizontal patrol at
-    `movesp` 0.5 that turns at walls; its Create never arms Alarm 1, so it
-    never fires `pooferBullet`) and `neonRedBall` 173 (the red ball's steering
-    with ehp 40, maxsp 1.5, knock-back on hit, `sprNeonRedBall` and the
-    `emitMovingFx` 704 trail, from above). Pass `run_.hardMode` to
-    `createCaverns` once both exist. (The results' unlock notice is seen
-    natively since W2.6: the hard-mode coverage route
-    `hard-mode-death-v456-tour` dies in 1-3 and unlocks the Matcha palette.)
 11. **Low-health flicker.** At 1 HP `playerDraw` replaces the player, on 7 of
     every 52 Draws, by two `shaderPlayerRed` copies (white and red texels red,
     black transparent) jittered by `irandom_range(-2,2)` and
@@ -287,6 +275,14 @@ The Safety Jetpack's flame (21-23, effect surface only) adds 1,320 bytes to
 the cavern CPU bank (485,108; ceiling 474 KiB) and takes the reference game
 CPU bank to 496,932 (486 KiB). Its thrust is a few comparisons in the
 player's Step; the flame is one more effect-surface stamp while thrusting.
+W1.10 (hard mode's eyefish 114 and neon red ball 173): their art (289, the
+corpse 291 and 352, with mirrored and DMA forms) adds 5,532 bytes to the
+cavern CPU bank (490,640; ceiling 480 KiB) and takes its Chip planes to
+191,500 (ceiling 188 KiB); the reference game bank goes to 502,464 (491 KiB)
+and its planes from 194,590 to 196,726 (193 KiB). EnemyState grows by
+24 bytes per record (the eyefish's binary64 xx, yy and xsp). A live eyefish
+runs scrCheckCollisionWith's wall tests every update; the neon ball costs
+what a red ball does, plus its collision test against every enemy.
 
 W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
 197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about

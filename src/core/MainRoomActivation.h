@@ -21,7 +21,7 @@ struct ActivationInstance {
 struct MainRoomActivationResult { bool succeeded; unsigned activated; };
 // Failure retains the advanced frontier and completed activations. The caller
 // must latch it and stop the frame, not retry a partially published region.
-// steering admits the compact owner's 115/118 records (GameplayWorld).
+// steering admits the compact owner's 114/115/118/173 records (GameplayWorld).
 template<class Read, class Activate>
 MainRoomActivationResult advanceMainRoomActivationChecked(int& activationY, long viewBottomQ8,
                                    unsigned count, Read read, Activate activate, bool steering = false) {
@@ -33,7 +33,8 @@ MainRoomActivationResult advanceMainRoomActivationChecked(int& activationY, long
         const bool enemy = instance.objectId == 111 || instance.objectId == 112 ||
             instance.objectId == 113 || instance.objectId == 116 ||
             instance.objectId == 117 || instance.objectId == 119 ||
-            (steering && (instance.objectId == 115 || instance.objectId == 118));
+            (steering && (instance.objectId == 114 || instance.objectId == 115 ||
+                          instance.objectId == 118 || instance.objectId == 173));
         if (enemy && !instance.active && instance.pending &&
             instance.bounds.left < instance.bounds.right && instance.bounds.top < instance.bounds.bottom &&
             instance.bounds.left <= 480 && instance.bounds.right > 0 &&

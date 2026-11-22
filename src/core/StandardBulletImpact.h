@@ -22,7 +22,7 @@ BulletImpact applyBulletDamage(Enemy& enemy, Count& defeated, Random& random, Re
                                int damage, std::uint32_t directionTurns = 0xc0000000u,
                                Retire retire = {}) {
     if (!enemy.active || enemy.health <= 0) return {BulletImpactKind::ignored, -1};
-    if (enemy.objectId == 112) {
+    if (enemy.objectId == 112 || enemy.objectId == 114) {
         // scrTypicalBulletDamage's immune branch: choose(30,31) before
         // soundPlay. Sound playback itself does not draw random values.
         return {BulletImpactKind::immune, 30 + static_cast<int>(random.chooseIndexSmall(2))};

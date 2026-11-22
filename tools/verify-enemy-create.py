@@ -13,8 +13,8 @@ assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee49275
 assert manifest["extractor"]["version"] == "0.9.2.0"
 header = (root / "src/core/EnemyCreateProfile.h").read_text()
 profiles = re.findall(r"case (\d+): return \{(\d+), (\d+), (\d+)\};", header)
-assert len(profiles) == 6
-assert {int(row[0]) for row in profiles} == {111, 112, 113, 116, 117, 119}
+assert len(profiles) == 7
+assert {int(row[0]) for row in profiles} == {111, 112, 113, 114, 116, 117, 119}
 for object_id, health, reward, rate in profiles:
     obj = manifest["resources"]["objects"][int(object_id)]
     assert obj["id"] == int(object_id)
@@ -27,7 +27,7 @@ for object_id, health, reward, rate in profiles:
     assert assigned("money") == Decimal(reward), obj["name"]
     assert assigned("imgSp") * 20 == Decimal(rate), obj["name"]
     assert "push.v self.imgSp\npop.v.v self.image_speed" in assembly, obj["name"]
-print("6 shared enemy birth profiles match pinned Create-event VM assembly")
+print("7 shared enemy birth profiles match pinned Create-event VM assembly")
 
 # White jelly is a separately owned source actor, not another compact profile.
 # Its inherited setters and RNG precede the concrete direction publication.

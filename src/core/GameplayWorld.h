@@ -8,6 +8,7 @@
 #include "PreparedRoomTerrain.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
+#include "EyefishMotion.h"
 #include "Profile.h"
 #include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
@@ -242,6 +243,7 @@ public:
         unsigned short batDirectionFraction;
         downwell::BatActivity batActivity;
         downwell::BasicWalkingEnemyMotion<EnemyMotionMath> walker;
+        downwell::EyefishMotion eyefish; // enmEyefish 114's xx, yy and xsp
         int motionState;
         int auxiliaryState;
         int alarm0;
@@ -2550,6 +2552,10 @@ public:
         player_.setPlayStyle(int(style));
         const int hp = style == 2 ? 6 : 4;
         health_ = hp; run_.combo.healthReserve.maximum = hp;
+        // The first boot's 1-1 was generated before style select: its
+        // spawner (not yet stepped) takes the chosen mode's channels.
+        if (compactSpawnerLive_ && !compactSpawner_.scriptActive &&
+            !compactSpawner_.createCaverns(run_.stage.level, hard)) return false;
         return true;
     }
     bool hardMode() const { return run_.hardMode; }
@@ -3158,6 +3164,8 @@ private:
     bool stepCompactSpawner(long generationCameraY);
     bool createSpawnedEnemy(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y);
     bool stepSteeringEnemy(EnemyState& enemy);
+    bool createEyefish(int x,int y);
+    bool stepEyefish(EnemyState& enemy);
     bool advanceSteeringAlarm(EnemyState& enemy,unsigned alarm);
     bool hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTurns,int damage);
     bool collideSteeringEnemies();

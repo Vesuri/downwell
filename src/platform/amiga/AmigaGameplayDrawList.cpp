@@ -746,10 +746,11 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 const int x=downwellPlayfieldX+80+enemy->x-port.cameraOffsetX();
                 const int y=playerStartY+enemy->y-port.cameraOffsetY();
                 if(!append(enemy->spriteId,enemy->drawFrame(),x,y,enemy->objectId!=119&&enemy->facing<0))return false;
-                // enmRedBall Draw: the eye follows draw_self at (x,y-5),
-                // with the body's image index and the sector's own mirror.
+                // enmRedBall (and neonRedBall) Draw: the eye follows
+                // draw_self at (x,y-5), with the body's image index and the
+                // sector's own mirror.
                 int eye,mirror;
-                return enemy->objectId!=118||!port.redBallEye(*enemy,eye,mirror)||
+                return (enemy->objectId!=118&&enemy->objectId!=173)||!port.redBallEye(*enemy,eye,mirror)||
                     append(eye,enemy->drawFrame(),x,y-5,mirror<0);
 #else
                 return true;
@@ -969,18 +970,31 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             while(at&&later(order[at-1],index)){order[at]=order[at-1];--at;}
             order[at]=static_cast<unsigned char>(index);
         }
-        for (unsigned i = 0; i < drawn; ++i) {
-            const auto& enemy = port.enemyAt(order[i]);
-            if(downwell::enemyDrawDepth(enemy.objectId)<-1000&&!drawForeground())ready=false;
+        // Hard mode's eyefish and neon red ball (depth -100000) draw in
+        // front of the player (-50000) and the blasts.
+        unsigned front=drawn;
+        const auto drawEnemy=[&](const GameplayWorld::EnemyState& enemy){
             const int x=downwellPlayfieldX+80+enemy.x-port.cameraOffsetX();
             const int y=playerStartY+enemy.y-port.cameraOffsetY();
             if(!append(enemy.spriteId,enemy.drawFrame(),x,y,enemy.objectId!=119&&enemy.facing<0))ready=false;
             int eye,mirror;
-            if(enemy.objectId==118&&port.redBallEye(enemy,eye,mirror)&&
+            if((enemy.objectId==118||enemy.objectId==173)&&port.redBallEye(enemy,eye,mirror)&&
                !append(eye,enemy.drawFrame(),x,y-5,mirror<0))ready=false;
+        };
+        for (unsigned i = 0; i < drawn; ++i) {
+            const auto& enemy = port.enemyAt(order[i]);
+            if(downwell::enemyDrawDepth(enemy.objectId)<=-50000){if(front==drawn)front=i;continue;}
+            if(downwell::enemyDrawDepth(enemy.objectId)<-1000&&!drawForeground())ready=false;
+            drawEnemy(enemy);
         }
 #endif
         if(!drawForeground()||!drawPlayer()||!drawBlasts())ready=false;
+#ifndef DOWNWELL_REPLAY_VERIFY
+        for (unsigned i = front; i < drawn; ++i) {
+            const auto& enemy = port.enemyAt(order[i]);
+            if(downwell::enemyDrawDepth(enemy.objectId)<=-50000)drawEnemy(enemy);
+        }
+#endif
         if(const auto* above=port.ditherAbove()){
             const auto* record=above->find(above->handle());
             if(record&&record->active&&!record->destroyRequested&&!drawDitherAbove(record))ready=false;

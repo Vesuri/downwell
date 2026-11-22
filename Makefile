@@ -3741,7 +3741,7 @@ UPGRADE_ROUTES := upgrade-0-18-v72 upgrade-5-9-v96 upgrade-3-v58 upgrade-11-v18 
 # visit; -shot adds DOWNWELL_SLICE_MODULE_SHOT, shooting a resting gun
 # module down with Reverse Engineering), picked so that every world-1 sound the core requests plays on some
 # route. The pause menu's sounds are on the native menus route.
-SOUND_COVERAGE_ROUTES := world-one-v106-tour hard-mode-death-v16-tour hard-mode-death-v110-tour hard-mode-death-v336-tour hard-mode-death-v383 hard-mode-death-v228 hard-mode-death-v29-tour \
+SOUND_COVERAGE_ROUTES := world-one-v106-tour hard-mode-death-v36 hard-mode-death-v80-tour hard-mode-death-v195 hard-mode-death-v16-tour hard-mode-death-v66-tour hard-mode-death-v75-tour \
 	$(UPGRADE_ROUTES)
 # W2.3 sound routes: each route's SoundRequests summary against
 # tests/data/sound-routes/<route>.summary (DOWNWELL_WRITE_SOUND_ROUTES=1

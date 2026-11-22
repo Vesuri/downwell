@@ -72,6 +72,10 @@ GAME_IDS = frozenset({
     # W1.9 effect-surface art: explosions (both facings), the drone and the
     # Heart Balloon and the jetpack flame.
     463, 62463, 470, 62470, 131, 526, 700, 701, 21, 22, 23,
+    # W1.10 hard mode's spawner enemies: sprEyefish 289, its corpse
+    # sprEyefishDead 291 and sprNeonRedBall 352, with their mirrored planar
+    # and DMA forms (sprEyefishDmg 290 needs hitStun, which nothing sets).
+    289, 291, 352, 62289, 62291, 62352, 63289, 63352,
 })
 
 # Art drawn only on the CPU effect surface (drawFx), never by the blitter:
@@ -89,8 +93,11 @@ SURFACE_ONLY_IDS = frozenset({463, 62463, 470, 62470, 131, 526, 700, 701, 21, 22
 # W1.9 Heart Balloon's surface-only art takes the reference game CPU bank
 # from 493,356 to 495,612 bytes, past 482 KiB.
 # The Safety Jetpack's flame takes it to 496,932, past 485 KiB.
+# W1.10 hard mode's eyefish, its corpse and the neon red ball take it to
+# 502,464, past 486 KiB, and the reference game planes from 194,590 to
+# 196,726, past 191 KiB.
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 102 * 1024,
-                'game': 486 * 1024, 'game-planes': 191 * 1024}
+                'game': 491 * 1024, 'game-planes': 193 * 1024}
 
 # Explicit cavern roots, independent of future additions to GAME_IDS. Derived
 # mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
@@ -125,6 +132,8 @@ CAVERN_ROOTS = frozenset({
     # W1.9 Rocket Jump's blast, the explosions, the drone, the balloon and
     # the jetpack flame.
     461, 463, 470, 131, 526, 700, 701, 21, 22, 23,
+    # W1.10 hardSet1's eyefish (and its corpse) and neon red ball.
+    289, 291, 352,
 })
 CAVERN_IDS = frozenset(
     {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
@@ -165,7 +174,11 @@ CAVERN_IDS = frozenset(
 # (four frames each, effect surface only) add 2,256: 483,788, past 472 KiB.
 # The Safety Jetpack's flame (21-23, three frames each) adds 1,320: 485,108,
 # past 473 KiB.
-BANK_BUDGETS.update({'cavern': 474 * 1024, 'cavern-planes': 186 * 1024})
+# W1.10 hard mode's eyefish 289 (four frames), its corpse 291 and the neon
+# red ball 352 (four frames), with mirrored and DMA forms, add 5,532 CPU
+# bytes: 490,640, past 474 KiB, and take the cavern planes to 191,500 Chip
+# bytes, past 186 KiB.
+BANK_BUDGETS.update({'cavern': 480 * 1024, 'cavern-planes': 188 * 1024})
 
 
 def require_budget(bank, size):

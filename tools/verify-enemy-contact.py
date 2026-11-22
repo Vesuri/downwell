@@ -25,7 +25,7 @@ assert [line for line in field_body.splitlines() if line and not line.startswith
     "pushi.e 0", "pop.v.i self.ehp"]
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 84, 91, 133, 134, 139, 140, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 457, 458, 459, 460, 465, 461, 463, 466, 467, 470, 471, 472, 473, 526, 550, 568, 569, 585, 598, 599, 702, 710}
+assert {int(row[0]) for row in records} == {31, 84, 91, 133, 134, 139, 140, 153, 154, 157, 162, 163, 164, 166, 174, 177, 186, 208, 278, 289, 457, 458, 459, 460, 465, 461, 463, 466, 467, 470, 471, 472, 473, 526, 550, 568, 569, 585, 598, 599, 702, 710}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
@@ -36,7 +36,7 @@ for row in records:
                 sprite["marginBottom"] - sprite["originY"] + 1)
     assert tuple(map(int, row[1:])) == expected, (sprite["name"], row, expected)
 # Spawner children: explicit masks 174/153; Spawner 78 itself uses sprite 702.
-for object_id, mask in ((35, 31), (113, 166), (115, 174), (117, 177), (118, 153), (119, 278), (120, 208)):
+for object_id, mask in ((35, 31), (113, 166), (115, 174), (117, 177), (118, 153), (119, 278), (120, 208), (173, 153)):
     assert manifest["resources"]["objects"][object_id]["textureMaskId"] == mask
 assert manifest["resources"]["objects"][112]["spriteId"] == 186
 assert manifest["resources"]["objects"][248]["spriteId"] == 133

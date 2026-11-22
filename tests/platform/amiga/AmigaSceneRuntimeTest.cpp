@@ -2464,6 +2464,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // default route's content coverage (it must still exit every level alive).
     const bool upgradeRoute=!slicePicks.empty();
     std::map<std::string,unsigned> upgradeWitness;
+    // W1.10 hard mode's spawner enemies: updates with one active, and deaths.
+    std::map<std::string,unsigned> hardWitness;std::set<std::uint32_t> hardDead;
     std::set<std::uint32_t> seenBlasts;std::set<std::uint64_t> seenBlastHits;
     // The upgrades owned in play: the 1-3 clear's pick is never played.
     downwell::UpgradeInventory playedUpgrades{};
@@ -2757,6 +2759,16 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 peakDebris=std::max(peakDebris,game.compactDebris().size());peakGems=std::max(peakGems,game.gemSlotEnd());
                 peakPlants=std::max(peakPlants,sc.scatteredEnd);
                 peakCorpses=std::max(peakCorpses,game.compactCorpses().size());
+                {   // W1.10 enmEyefish 114 and neonRedBall 173.
+                    bool eyefish=false,neon=false;
+                    for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+                        if(e.objectId!=114&&e.objectId!=173)continue;
+                        if(e.active&&e.health>0)(e.objectId==114?eyefish:neon)=true;
+                        if(e.health<=0&&hardDead.insert(e.lifetimeId).second)
+                            ++hardWitness[e.objectId==114?"eyefishDead":"neonDead"];}
+                    if(eyefish)++hardWitness["eyefish"];
+                    if(neon)++hardWitness["neon"];
+                }
                 {   // W1.9: blasts (471 knees, 461 rocket, 463/470 explosions) and what they hit.
                     unsigned end=0;const auto* blasts=game.compactBlasts(end);
                     for(unsigned i=0;i<end;++i){const auto& b=blasts[i];if(!b.live)continue;
@@ -3095,6 +3107,12 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     std::string reason;
     if(died)require(sounds.plays(89)&&sounds.plays(5)&&sounds.plays(319)&&sounds.plays(328),
         "the death route hurts, dies, opens the results and fills the bar");
+    if(hardRoute){
+        std::cout<<"Slice hard enemies";
+        for(const char* k:{"eyefish","eyefishDead","neon","neonDead"})std::cout<<' '<<k<<'='<<hardWitness[k];
+        std::cout<<std::endl;
+        require(hardWitness["eyefish"]&&hardWitness["neon"],"hardSet1 spawns an eyefish and a neon red ball");
+    }
     if(upgradeRoute){
         std::cout<<"Slice upgrades";
         for(const auto& w:upgradeWitness)std::cout<<' '<<w.first<<'='<<w.second;

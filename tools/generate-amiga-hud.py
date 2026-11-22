@@ -222,6 +222,9 @@ SELECTIONS = {
         696: None,   # sprDevolverLogo
         702: None,   # sprRedBall
         703: None,   # sprRedballStun
+        289: None,   # sprEyefish (hard mode)
+        291: None,   # sprEyefishDead (hard mode corpse, planar only)
+        352: None,   # sprNeonRedBall (hard mode)
         733: None,   # sprDitherFade
         # W1.7 combo and streak HUD. The bar's 1-pixel columns (393 frames
         # 1 and 4) are native fills; only its caps are art.
@@ -797,7 +800,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if profile == "game" and sprite_id == 704:
                 canvas = red_splash_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
-                    166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
+                    166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703, 289, 352,
                     458, 459, 460, 461, 463, 470, 471, 485, 486, 487, 496, 497, 602, 603, 605,
                     83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457, 467, 112, 94, 95):
                 # Prepare snail Y flips and crawler quarter turns on the host.
@@ -839,7 +842,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                         # one-pixel transparent frame at the anchor.
                         bounds = (ox, oy, ox + 1, oy + 1)
                     require(bounds is not None, "empty oriented actor frame")
-                    if gun_spread or w14_turned or sprite_id in (111, 83, 84, 85, 101, 118, 181, 182, 183, 184, 185, 571, 572, 702, 703, 704, 711, 712):
+                    if gun_spread or w14_turned or sprite_id in (111, 83, 84, 85, 101, 118, 181, 182, 183, 184, 185, 571, 572, 702, 703, 352, 704, 711, 712):
                         # Projectile art and smoke's final single-pixel frame
                         # can sit beyond their origin. Keep that anchor inside
                         # the DMA frame when cropping, without moving pixels.
@@ -899,7 +902,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 551, 568, 569,
                     0, 1, 3, 12, 15, 20, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42,
                     153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278,
-                    158, 165, 179, 281, 337)):
+                    158, 165, 179, 281, 337, 291)):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)
@@ -1185,7 +1188,7 @@ def build_records(manifest, extracted, profile, language_path=None):
         hardware = []
         actors = (0, 1, 3, 12, 15, 20, 27, 31, 37, 25, 26, 28, 29, 32, 33, 34, 35, 38, 40, 42, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
-                  485, 486, 487, 496, 497, 602, 603, 707)
+                  289, 352, 485, 486, 487, 496, 497, 602, 603, 707)
         if profile == "clear":
             actors = UPGRADE_PLAYER_IDS
         for sprite, frame_index, dma_width, planar in encoded:

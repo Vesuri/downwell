@@ -4,15 +4,20 @@
 namespace downwell {
 // Object 118 Create. Complete synchronously before spawner deactivation.
 // Lifetime/ID ownership and subsequent events belong to the enclosing owner.
+// neonRedBall 173 (hard mode) has the same events apart from its stats here,
+// its sprite and its Collision with every subparentEnemy; set neon before
+// create.
 struct RedBallBirth : SteeringEnemyBirthState {
     Real emitTimer{};
+    bool neon=false;
     template<class Random,class Ops> bool create(RunnerImageValue px,RunnerImageValue py,Random& random,Ops& ops){
         if(!inheritedCreate(px,py,ops))return false;
-        health=30;money=20;xsp={};ysp={};
+        health=neon?40:30;money=neon?10:20;xsp={};ysp={};
         if(!randomBinary64(random.nextU32(),{0x3fe00000u,0},velocity)||
             !velocity.add(Real::fromInteger(1)))return false;
         xx=x.promoted();yy=y.promoted();hitStun=false;
-        moveSpeed={0x3fb99999u,0x9999999au};maxSpeed={0x3ff33333u,0x33333333u};
+        if(neon){moveSpeed=Real::fromInteger(1);maxSpeed={0x3ff80000u,0};}
+        else{moveSpeed={0x3fb99999u,0x9999999au};maxSpeed={0x3ff33333u,0x33333333u};}
         acceleration={0x3fa99999u,0x9999999au};deceleration={0x3fd00000u,0};
         cone=90;rotateSpeed=Real::fromInteger(2);angle16={0x40368000u,0};
         Real targetY,targetX,angle,acceptedDirection;

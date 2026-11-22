@@ -12,6 +12,7 @@ constexpr EnemyCreateProfile enemyCreateProfile(int object) {
         case 111: return {5, 6, 5};
         case 112: return {5, 14, 3};
         case 113: return {35, 20, 0};
+        case 114: return {15, 6, 4};
         case 116: return {15, 12, 4};
         case 117: return {20, 24, 2};
         case 119: return {3, 6, 2};
@@ -29,6 +30,7 @@ constexpr int enemyDrawDepth(int object) {
         case 113: return -15000;
         case 118: return -11000;
         case 112: case 117: return -10000;
+        case 114: case 173: return -100000;
         default: return 0;
     }
 }

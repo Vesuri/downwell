@@ -29,6 +29,7 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 186: return {-8, 8, -4, 8};
         case 208: return {-10, 10, -7, 8};
         case 278: return {-5, 5, -5, 5};
+        case 289: return {-9, 9, -4, 4};
         case 458: return {2, 8, -3, 3};
         case 459: return {-4, 6, -3, 3};
         case 457: return {-4, 4, -4, 4};
@@ -62,7 +63,8 @@ inline int enemyContactMask(int object, int sprite,int explicitMask=-1) {
         case 112: return 186; // Create: mask_index = sprite_index
         case 113: return 166; // serialized explicit mask
         case 115: return 174; // serialized explicit masks, unchanged by hit art
-        case 118: return 153;
+        case 114: return 289; // Create: mask_index = normalSpr
+        case 118: case 173: return 153;
         case 117: return 177;
         case 119: return 278;
         case 120: return 208; // Explicit mask: unchanged by throw/hit artwork.
@@ -126,7 +128,7 @@ inline EnemyContact classifyEnemyContact(const ContactActor& player,
         a.left >= b.right || b.left >= a.right ||
         a.top >= b.bottom || b.top >= a.bottom) return EnemyContact::none;
     const bool stompable = object == 111 || object == 112 || object == 113 ||
-        object == 115 || object == 116;
+        object == 114 || object == 115 || object == 116;
     // typStompable compares enemy yy, not rounded y, to global.ply published
     // by scrPlMovement BEFORE the player's integration in this frame.
     return stompable && stompY > playerStartY + 2 * 256

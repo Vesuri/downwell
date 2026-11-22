@@ -177,11 +177,11 @@ bool GameplayWorld::stepCompactBlasts(std::uint32_t lastSerial){
 // hit, hitDir = bDir (270), scrDamageEnemy, soundPlay(29, 90), scrBulletImpact
 // and scrEffectSpawn(x, y, 605, 0.4, bDir, 0), momentDelay.
 bool GameplayWorld::blastEnemy(downwell::CompactBlastRecord& blast,EnemyState& enemy){
-    if(enemy.objectId==112||enemy.health<=0)return true; // bulletImmune; ehp > 0
+    if(enemy.objectId==112||enemy.objectId==114||enemy.health<=0)return true; // bulletImmune; ehp > 0
     if(!blast.remember(blastHitEnemy|(enemy.lifetimeId&0x0fffffffu)))return true;
     const std::uint32_t down=0xc0000000u; // 270 degrees
     const int damage=50;
-    if(enemy.objectId==115||enemy.objectId==118){
+    if(enemy.objectId==115||enemy.objectId==118||enemy.objectId==173){
         if(!hitSteeringEnemy(enemy,down,damage))return false;
         run_.soundPlay(29,90,false,true);
     }else{
