@@ -308,7 +308,10 @@ struct RunSession {
     }
     // Room-owned effects are reset on run/room retirement, not on a repaint.
     FlashBallEffects<32> flashEffects;
-    SmokeEffects<32> smokeEffects;
+    // W1.9: Exploding Knees adds four puffs per stomp and Rocket Jump two per
+    // jump to the box, death and gun smoke.
+    static constexpr unsigned smokeCapacity=48;
+    SmokeEffects<smokeCapacity> smokeEffects;
     BloodEffects<32> bloodEffects;
     CorpseExpiryEffects<32> corpseExpiryEffects;
     PlayerDamageNumbers<8> damageNumbers;
@@ -563,7 +566,7 @@ struct RunSession {
     void advanceSmokeAnimation(){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.advanceAnimation(smokeEffects.beginPhase());
     }
-    void stepSmoke(SmokeEffects<32>::Phase phase,GameMakerRandom& random){
+    void stepSmoke(SmokeEffects<smokeCapacity>::Phase phase,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.step(phase,random);
     }
     void collideSmokeShopWalls(){
@@ -896,8 +899,10 @@ struct RunSession {
     // sParentSolid); every table's irandom_range(1, count) consumes two words
     // whatever the count. fullStepGain: pTimeStop || groundRoom() || atPit.
     struct PlayerFloor { int operator()()const{return 2;} };
-    template<class Floor=PlayerFloor>
-    bool playPlayerSounds(PlayerMotion& player,GameMakerRandom& random,bool dead,Floor floor={},bool fullStepGain=false){
+    struct NoRocketJump { bool operator()(PlayerMotion&)const{return true;} };
+    template<class Floor=PlayerFloor,class Rocket=NoRocketJump>
+    bool playPlayerSounds(PlayerMotion& player,GameMakerRandom& random,bool dead,Floor floor={},bool fullStepGain=false,
+                          Rocket rocket={}){
         using Event=PlayerMotion::SoundEvent;
         // initSfxFs / initSfxJl: global.sfxFs[i] and global.sfxJl[i].
         static const std::uint8_t steps[5][5]={{3,48,49,50},{3,63,64,65},{4,51,52,53,54},{4,55,56,57,58},{4,59,60,61,62}};
@@ -931,6 +936,9 @@ struct RunSession {
             }
             case Event::hardLandTurn:
                 soundPlay(88,30,false,true); // no draw
+                break;
+            case Event::rocket:
+                if(!rocket(player))return effectsSucceeded=false;
                 break;
             }
         }

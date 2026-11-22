@@ -2992,7 +2992,7 @@ public:
         return run_.createDamageNumber(x,y,amount,direction)!=0;
     }
     bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
-    const SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
+    const SmokeEffects<downwell::RunSession::smokeCapacity>& smokeEffects() const {return run_.smokeEffects;}
     bool emitBoxSmoke(MotionBinary64 x,MotionBinary64 y){return run_.emitBoxSmoke(x,y,random_);}
     bool emitBoxFlash(MotionBinary64 x,MotionBinary64 y){return run_.emitBoxFlash(x,y,random_);}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}

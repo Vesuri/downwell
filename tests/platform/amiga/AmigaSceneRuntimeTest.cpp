@@ -26,6 +26,7 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
+#include <map>
 #include <set>
 #include <array>
 #include <algorithm>
@@ -806,8 +807,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         native.configureSolidResolver(amigaResolveTerrainSolid,&context,amigaResolveTerrainSegment,
             amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
         downwell::GameMakerRandom a(91),b(91);
-        auto& hs=const_cast<downwell::SmokeEffects<32>&>(host.smokeEffects());
-        auto& ns=const_cast<downwell::SmokeEffects<32>&>(native.smokeEffects());
+        auto& hs=const_cast<downwell::SmokeEffects<downwell::RunSession::smokeCapacity>&>(host.smokeEffects());
+        auto& ns=const_cast<downwell::SmokeEffects<downwell::RunSession::smokeCapacity>&>(native.smokeEffects());
         const auto hh=hs.create(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),a);
         const auto nh=ns.create(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),b);
         require(hh && nh,"both owners create collision fixtures");
@@ -2452,6 +2453,17 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):119u;
     const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
     const bool shopTour=std::getenv("DOWNWELL_SLICE_SHOP_TOUR")!=nullptr;
+    std::vector<unsigned> slicePicks;
+    if(const char* picks=std::getenv("DOWNWELL_SLICE_PICK"))
+        for(const char* p=picks;*p;){char* end=nullptr;slicePicks.push_back(unsigned(std::strtoul(p,&end,10)));
+            p=*end?end+1:end;}
+    // An upgrade route checks the picked upgrades' witnesses instead of the
+    // default route's content coverage (it must still exit every level alive).
+    const bool upgradeRoute=!slicePicks.empty();
+    std::map<std::string,unsigned> upgradeWitness;
+    std::set<std::uint32_t> seenBlasts;std::set<std::uint64_t> seenBlastHits;
+    // The upgrades owned in play: the 1-3 clear's pick is never played.
+    downwell::UpgradeInventory playedUpgrades{};
     const std::string output=std::getenv("DOWNWELL_SLICE_OUTPUT")?std::getenv("DOWNWELL_SLICE_OUTPUT"):"tmp/world-one-gameplay";
     std::ofstream tape(output+".inputs",std::ios::binary);
     std::ofstream states(output+".states");
@@ -2471,6 +2483,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         sounds.drain(game.soundRequests(),game.soundVoices());
     };
     unsigned routePickups=0,routeNewGunShots=0;
+    downwell::Input lastTapeInput;
     require(bool(tape),"open slice input tape");
     unsigned total=0;
     unsigned routeRedBalls=0,routeEyes=0,routeChunks=0;
@@ -2679,7 +2692,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<' '<<game.currency()
                 <<' '<<game.shops().noControl<<' '<<game.compactShopSpeechLive()<<'\n';
             lastFire=input.fire;lastPlayerX=game.player().offsetXFixed();
-            const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;
+            const auto packed=downwell::packReplayInput(input);tape.put(char(packed));++total;lastTapeInput=input;
             downwell::GameplayEncounterSession::Frame frame(session);
             require(frame.valid()&&frame.sampleInput(input),"slice encounter frame samples input");
             const int healthBefore=game.health();
@@ -2738,6 +2751,17 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 peakDebris=std::max(peakDebris,game.compactDebris().size());peakGems=std::max(peakGems,game.gemSlotEnd());
                 peakPlants=std::max(peakPlants,sc.scatteredEnd);
                 peakCorpses=std::max(peakCorpses,game.compactCorpses().size());
+                {   // W1.9: blasts (471 knees, 461 rocket, 463/470 explosions) and what they hit.
+                    unsigned end=0;const auto* blasts=game.compactBlasts(end);
+                    for(unsigned i=0;i<end;++i){const auto& b=blasts[i];if(!b.live)continue;
+                        if(seenBlasts.insert(b.serial).second)
+                            ++upgradeWitness[b.sprite==471?"knees":b.sprite==461?"rocket":"explosion"];
+                        for(unsigned h=0;h<b.hitCount;++h)
+                            if(seenBlastHits.insert(std::uint64_t(b.serial)<<32|b.hits[h]).second)
+                                ++upgradeWitness[std::string(b.sprite==471?"knees":b.sprite==461?"rocket":"explosion")+
+                                    ((b.hits[h]>>28)==1?"Enemy":"Object")];
+                    }
+                }
                 bool wallHit=false,dust=false,emptyText=false;
                 for(unsigned i=0;i<fx.noLoopCount();++i){const int id=fx.noLoop(i).effect.spriteId;
                     wallHit|=id==101||id==96;dust|=id==94||id==95||id==62094;}
@@ -2899,9 +2923,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             <<" peak combo="<<peakCombo<<" rewardFrames="<<rewardFrames<<" barFrames="<<barFrames
             <<" gemHighFrames="<<gemHighFrames<<" afterImageFrames="<<afterImageFrames<<std::endl;
         routeTitles+=titleFrames!=0;routeRewards+=rewardFrames;routeGemHigh+=afterImageFrames;
-        if(level==3)require(routeTitles==3&&routeRewards,"every level shows its title and the route earns a combo reward");
+        if(level==3&&!upgradeRoute)require(routeTitles==3&&routeRewards,"every level shows its title and the route earns a combo reward");
         routeCorpses=std::max(routeCorpses,peakCorpses);routeWallHits+=wallHitFrames;routeDust+=dustFrames;
-        if(level==3)require(routeCorpses&&routeWallHits&&routeDust,"the route leaves corpses, wall hits and dust");
+        if(level==3&&!upgradeRoute)require(routeCorpses&&routeWallHits&&routeDust,"the route leaves corpses, wall hits and dust");
         std::cout<<"Slice level="<<level<<" jellies="<<jellies<<" redBalls="<<redBalls
             <<" steeringKills="<<steeringKills<<" eyeFrames="<<eyes<<std::endl;
         std::cout<<"Slice level="<<level<<" updates="<<updates<<" hp="<<game.health()
@@ -2929,35 +2953,61 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         std::cout<<"Slice level="<<level<<" shopVisited="<<shopVisited<<" speechFrames="<<speechFrames<<" promptFrames="<<promptFrames
             <<" funded="<<routeFunded<<" soldOut="<<routeSoldOut<<" poor="<<routePoor<<" farewells="<<routeFarewells
             <<" thankful="<<routeThankful<<" confused="<<routeConfused<<" goodbye="<<routeGoodbye<<" currency="<<game.currency()<<std::endl;
-        if(level==3)require(routeShops&&routeFunded&&routeSoldOut&&routePoor&&routeFarewells,
+        if(level==3&&!upgradeRoute)require(routeShops&&routeFunded&&routeSoldOut&&routePoor&&routeFarewells,
             "the route visits a shop: a purchase, a sold-out and a too-poor reply, and the farewell");
-        if(level==3)require(routeSpeechFrames&&routePromptFrames&&routeThankful&&routeConfused&&routeGoodbye,
+        if(level==3&&!upgradeRoute)require(routeSpeechFrames&&routePromptFrames&&routeThankful&&routeConfused&&routeGoodbye,
             "the merchant speaks, the prompt shows and the keeper reacts");
         for(const auto& shop:game.shops().instances)if(shop.allocated)
             std::cout<<"Slice level="<<level<<" shopAt="<<shop.x<<','<<shop.y<<" stock="<<shop.stock.items[0].upgrade<<'/'<<shop.stock.items[0].price
                 <<' '<<shop.stock.items[1].upgrade<<'/'<<shop.stock.items[1].price<<' '<<shop.stock.items[2].upgrade<<'/'<<shop.stock.items[2].price<<std::endl;
-        if(level==1)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
+        if(level==1&&!upgradeRoute)require(jellies&&steeringKills,"1-1 spawns white jellies and the route defeats one");
         if(level>=2){routeRedBalls+=redBalls;routeEyes+=eyes;}
-        if(level==3)require(routeRedBalls&&routeEyes,"1-2/1-3 spawn red balls with drawn eyes");
+        if(level==3&&!upgradeRoute)require(routeRedBalls&&routeEyes,"1-2/1-3 spawn red balls with drawn eyes");
         routeChunks+=openedChunks.size();routePickups+=pickups;
-        if(level==3)require(routeChunks,"the route opens a gem chunk");
-        if(level==3)require(routePickups&&routeNewGunShots,"the route collects a GunModule and fires its gun");
+        if(level==3&&!upgradeRoute)require(routeChunks,"the route opens a gem chunk");
+        if(level==3&&!upgradeRoute)require(routePickups&&routeNewGunShots,"the route collects a GunModule and fires its gun");
         routeSideStops+=sideStops;routeFrozen+=frozenFrames+fieldKills;routeDoused+=doused.size();
         routeShards=std::max(routeShards,peakShards);routeFireViews+=fireViews;
-        if(level==3)require(routeSideStops&&routeShards,"the route stops time in a side room with shards");
-        if(level==3)require(routeFrozen,"the route freezes or field-kills an enemy");
-        if(level==3)require(routeFireViews&&routeDoused,"the route shows and douses a TorchFire");
+        if(level==3&&!upgradeRoute)require(routeSideStops&&routeShards,"the route stops time in a side room with shards");
+        if(level==3&&!upgradeRoute)require(routeFrozen,"the route freezes or field-kills an enemy");
+        if(level==3&&!upgradeRoute)require(routeFireViews&&routeDoused,"the route shows and douses a TorchFire");
         require(!game.dead()&&game.levelResultRequested(),"input-only slice reaches exit alive");
+        playedUpgrades=game.upgrades();
         bool heart=false;require(game.enterLevelClear(0,heart),"slice Result Create");
-        unsigned clear=0;
+        unsigned clear=0;bool moved=false,offersLogged=false;
+        // AmigaUpgradeScene passes left/right press edges against the
+        // previous frame's input, the last gameplay frame's included.
+        downwell::Input previousClear=lastTapeInput;
         for(;clear<600&&!game.nextLevelRequested();++clear){
             states<<game.tick()<<' '<<level<<' '<<game.player().offsetXFixed()<<' '<<game.player().offsetYFixed()
                 <<' '<<game.health()<<' '<<game.randomDrawCount()<<' '<<game.currency()
                 <<' '<<game.shops().noControl<<' '<<game.compactShopSpeechLive()<<'\n';
-            bool fire=clear%4==2;downwell::Input input;input.fire=fire;tape.put(char(downwell::packReplayInput(input)));++total;
+            bool fire=clear%4==2;downwell::Input input;
+            // W1.9 (DOWNWELL_SLICE_PICK=id,id,...): move the cursor to the
+            // first offered upgrade in the list, one press per tick, and
+            // confirm only once it is there. Without the list the route
+            // keeps the default middle choice.
+            const auto& sel=game.levelClear().selection;
+            if(sel.visible){
+                const auto& offers=game.levelClear().offers.ids;
+                if(!offersLogged){offersLogged=true;std::cout<<"Slice offers level="<<level;
+                    for(unsigned i=0;i<=sel.lastIndex;++i)std::cout<<' '<<offers[i];std::cout<<std::endl;}
+                int want=-1;
+                for(unsigned id:slicePicks){for(unsigned i=0;i<=sel.lastIndex;++i)if(offers[i]==id){want=int(i);break;}
+                    if(want>=0)break;}
+                if(want>=0&&unsigned(want)!=sel.cursor){
+                    fire=false;
+                    if(!moved){input.right=unsigned(want)>sel.cursor;input.left=unsigned(want)<sel.cursor;}
+                    moved=!moved;
+                }else moved=false;
+                if(fire)std::cout<<"Slice pick level="<<level<<" upgrade="<<offers[sel.cursor]<<std::endl;
+            }
+            input.fire=fire;tape.put(char(downwell::packReplayInput(input)));++total;
+            const bool leftEdge=input.left&&!previousClear.left,rightEdge=input.right&&!previousClear.right;
+            previousClear=input;lastTapeInput=input;
             downwell::GameplayEncounterSession::Frame frame(session);
             require(frame.valid()&&frame.sampleInput(input),"slice Result frame samples input");
-            require(game.stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"slice Result Step");
+            require(game.stepLevelClear(fire,leftEdge,rightEdge,heart,[](auto,unsigned){}),"slice Result Step");
             drainSounds();
             require(frame.beginDraw(true)&&frame.finish(),"slice Result frame completes");
         }
@@ -2983,7 +3033,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     }
     // W2.6 coverage routes: another variant is its own route (world-one-v335).
     std::string routeName=hardRoute?(died?"hard-mode-death":"hard-mode"):"world-one";
-    if(variant!=119u||shopTour)routeName+="-v"+std::to_string(variant);
+    if(upgradeRoute){
+        routeName=hardRoute?"hard-upgrade":"upgrade";
+        for(unsigned id:slicePicks)routeName+="-"+std::to_string(id);
+    }
+    if(variant!=119u||shopTour||upgradeRoute)routeName+="-v"+std::to_string(variant);
     if(shopTour)routeName+="-tour";
     sounds.flush(); // complete even when a check below fails (route sweeps)
     std::cout<<"World one slice sounds: "<<sounds.requests()<<" requests, "<<sounds.kinds(downwell::SoundRequest::play)
@@ -2998,6 +3052,20 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     std::string reason;
     if(died)require(sounds.plays(89)&&sounds.plays(5)&&sounds.plays(319)&&sounds.plays(328),
         "the death route hurts, dies, opens the results and fills the bar");
+    if(upgradeRoute){
+        std::cout<<"Slice upgrades";
+        for(const auto& w:upgradeWitness)std::cout<<' '<<w.first<<'='<<w.second;
+        std::cout<<std::endl;
+        const auto& owned=playedUpgrades;
+        const auto need=[&](unsigned id,bool seen,const char* what){
+            if(owned.levels[id])require(seen,what);
+        };
+        need(0,upgradeWitness["knees"]&&upgradeWitness["kneesEnemy"]+upgradeWitness["kneesObject"],
+            "Exploding Knees blasts at a stomp and the blast hits something");
+        need(18,upgradeWitness["rocket"]!=0,"Rocket Jump's blast appears at a jump");
+        need(9,sounds.plays(47)!=0,"the Drone follows the player and fires (sound 47)");
+        need(5,sounds.plays(342)!=0,"a Gunpowder Block fires its shot (sound 342)");
+    }
     require(sounds.matchesExpectation(routeName,reason),reason.c_str());
     std::cout<<"World one slice route passed: "<<routeName<<' '<<total<<" inputs\n";
 }

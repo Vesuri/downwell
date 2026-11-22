@@ -6,7 +6,7 @@ import struct
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from amiga_scene_contract import require_budget, VERSION as SCENE_CONTRACT_VERSION, BANK_BUDGETS
+from amiga_scene_contract import require_budget, VERSION as SCENE_CONTRACT_VERSION, BANK_BUDGETS, SURFACE_ONLY_IDS
 
 ROOT = Path(__file__).resolve().parents[1]
 RECORD = struct.Struct('>HHhhHHHHII')
@@ -19,6 +19,8 @@ def build(pack):
     for i in range(count):
         r = RECORD.unpack_from(pack, 20 + i * RECORD.size)
         if r[7] != 3:  # Hardware sprite streams never pass through the BOB blitter.
+            continue
+        if r[0] in SURFACE_ONLY_IDS:  # Effect-surface art stays in the CPU pack.
             continue
         offset, length = r[8:]
         plane = (r[6] // 8) * r[5]

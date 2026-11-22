@@ -1645,6 +1645,10 @@ int main(int argc, char** argv) {
         for(unsigned i=0;i<count;++i){
             const auto* r=pack+20+i*24;const auto sprite=word(r),frame=word(r+2);
             if(sprite>=741)continue;
+            // CPU effect-surface art has no actor frames (AmigaActorFrames).
+            if(sprite==463||sprite==470||sprite==131){
+                require(!prepared.find(sprite,frame),"effect-surface art takes no actor frame");continue;
+            }
             const auto* f=prepared.find(sprite,frame);require(f,"every original actor frame indexed");
             for(int flip:{0,1})for(int x:{-20,110,270})for(int y:{-32,0,284}){
                 int l,t,w,h,rl,rt,rw,rh;f->bounds(x,y,flip,l,t,w,h);
@@ -1671,9 +1675,9 @@ int main(int argc, char** argv) {
     std::cout << "Amiga renderer pixel comparisons passed\n";
     // The old per-asset upload sum is not the shipping Chip allocation: the
     // offline atlas shares planes. Enforce the actual banks' fixed ceilings.
-    require(gamePack.size()==DOWNWELL_GAME_BANK_BYTES&&gamePack.size()<=372u*1024u, // tools/amiga_scene_contract.py
+    require(gamePack.size()==DOWNWELL_GAME_BANK_BYTES&&gamePack.size()<=482u*1024u, // tools/amiga_scene_contract.py
             "CPU gameplay art stays within its fixed scene lease budget");
-    require(DOWNWELL_GAME_PLANE_BYTES<=177u*1024u, // tools/amiga_scene_contract.py
+    require(DOWNWELL_GAME_PLANE_BYTES<=190u*1024u, // tools/amiga_scene_contract.py
             "DMA gameplay atlas stays within its fixed Chip lease budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;

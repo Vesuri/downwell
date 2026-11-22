@@ -35,8 +35,14 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 460: return {-5, 5, -4, 5};
         case 465: return {-4, 4, -4, 4};
         case 466: return {-2, 2, -4, 4};
+        case 461: return {-20, 20, -30, 13};
+        case 463: return {-25, 25, -26, 25};
+        case 467: return {-3, 3, -3, 3};
+        case 470: return {-8, 8, -8, 8};
+        case 471: return {-16, 16, -10, 66};
         case 472: return {4, 8, -2, 2};
         case 473: return {4, 9, -3, 3};
+        case 526: return {-5, 6, -13, -1};
         case 550: return {-6, 6, -1, 8};
         case 568: return {-6, 6, -5, 7};
         case 569: return {-9, 10, -7, 9};

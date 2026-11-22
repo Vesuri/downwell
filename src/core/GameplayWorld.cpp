@@ -558,7 +558,7 @@ bool GameplayWorld::birthPlayerOwnership() {
     }
     run_.playerCreated();
     resetCompactAfterImages(playerInstance_.x,playerInstance_.y);
-    return true;
+    return createCompactCompanions(playerInstance_.x,playerInstance_.y);
 }
 
 bool GameplayWorld::retirePlayerOwnership() {
@@ -1613,6 +1613,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(compactCorpses_.size()){struct Hooks{} hooks;
         if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),
             [](auto,downwell::CorpseAnimation& corpse){return corpse.advanceImage();},hooks))run_.effectsSucceeded=false;}
+    if(blastEnd_)advanceCompactBlastAnimation();
+    advanceCompactDroneAnimation();
     }
     if(!run_.effectsSucceeded)return {};
     {
@@ -1662,6 +1664,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 #endif
 
     ++tick_;
+    firedThisStep_=false;
     // W2.3: the audio clock of this source step (see SoundVoices).
     run_.soundRequests.setTick(tick_);
     run_.startRechargeSounds(player_);
@@ -1741,6 +1744,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const unsigned landingsBefore=player_.landings();
     const int emptyX=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
     const int emptyY=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
+    // scrPlayerInit reads pugRocket at each room's player Create; no grant
+    // happens inside a room.
+    player_.setRocketJump(run_.upgrades.levels[18]!=0);
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,
@@ -1759,7 +1765,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             return run_.effectsSucceeded&&
                 playerTimeTransition_(playerTimeContext_,playerInstance_,motion,x,y)&&run_.effectsSucceeded;
         },[this](PlayerMotion& motion){
-            return run_.playPlayerSounds(motion,enemyRandom_,death_.active,[this]{return playerFloorMaterial();},run_.timeStopped);
+            return run_.playPlayerSounds(motion,enemyRandom_,death_.active,[this]{return playerFloorMaterial();},run_.timeStopped,
+                [this](PlayerMotion& player){
+                    return compactRocketJump(240+int(downwell::roundGameMakerQ8(player.rocketX())),
+                        176+int(downwell::roundGameMakerQ8(player.rocketY())),
+                        240+int(downwell::roundGameMakerQ8(player.frameStartXFixed())),
+                        176+int(downwell::roundGameMakerQ8(player.frameStartYFixed())));
+                });
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
@@ -1801,6 +1813,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         currencyAccount_.streak=streakBeforeStep;currencyAccount_.timer=streakTimerBeforeStep;
         currencyAccount_.beginStep(false,stopped());
     }
+    if (player_.shots() != oldShots) firedThisStep_=true; // scrPlayerShootN: pFired = 1
     if (player_.shots() != oldShots && gunsActive_()) {
         playShotSound(ammoBeforeStep);
         if(!firePlayerGun(muzzleX,muzzleY-4,muzzleX,muzzleY))return {};
@@ -1857,6 +1870,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(downwell::AlarmBank::advanceValue(cameraShakeAlarm_))cameraMotion_.stopShake();
     advanceEnemyAlarms();
     if(run_.effectsSucceeded&&gunsActive_()&&!advanceCompactGunAlarms())return {};
+    if(drone_.live&&!advanceCompactDroneAlarm())return {};
     // fxRisingText 212 Alarms 0 and 1; no RNG, no cross-family effects.
     if(shopSpeechLive_)for(unsigned index=0;index<2;++index)
         for(auto& r:shopSpeech_)if(r.rise.live&&!r.rise.alarmEvent(index))--shopSpeechLive_;
@@ -1877,6 +1891,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const auto compactDebrisStepPhase=compactDebris_.beginPhase();
     const auto shardStepPhase=timeStop_.shards.beginPhase();
     const auto corpseStepPhase=compactCorpses_.beginPhase();
+    const std::uint32_t blastStepLastSerial=blastSerial_;
     if(!captureEnemyStepOrder())return {};
     if(playerChildrenStarted_&&!publishPlayerFallDepth())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,-1)){
@@ -2093,6 +2108,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
     }
 
+    // objDrone 249 follows currency (248).
+    stepCompactDrone();
     // A shot born in player Begin Step is eligible here; one born during this
     // ordinary Step is not. Currency (248) precedes the usual bullet (261).
     {
@@ -2112,6 +2129,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Compact objDeadBody 263, then Scattered16/gemChunk/TorchFire/Torch
     // (289-296), then compact debris 370.
     if(compactCorpses_.size()&&!stepCompactCorpses(corpseStepPhase))return {};
+    // bulletExplosion1 272, explosionSmall 274 and bulletBlast 276.
+    if(blastEnd_&&!stepCompactBlasts(blastStepLastSerial))return {};
     if(!scenery_.empty()&&!stepCompactScenery())return {};
     if(compactDebris_.size()&&!compactDebris_.step(compactDebrisStepPhase,enemyRandom_,
         [this](auto,const downwell::DebrisAnimation& d,bool& frozen){ // !TimeStopBound, mask 598
@@ -2186,6 +2205,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if (run_.goalWindPossible() &&
         !run_.collideGoalFieldWind(enemyRandom_,240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
             176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),player_.facing())) return {};
+    // Blasts and explosions (272-276) precede scenery 289.
+    if (blastEnd_ && !collideCompactBlasts()) return {};
     if (!scenery_.empty() && !collideCompactScenery()) return {};
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
@@ -2706,6 +2727,9 @@ bool GameplayWorld::collideSteeringEnemies(){
             // death, combo and reward follow in the jelly's next Step.
             actor->health-=100;actor->hit=true;actor->stomped=true;
             enemy.health=actor->health;
+            if(run_.upgrades.levels[0]&&!compactExplodingKnees(enemy.x+240,enemy.y+176,
+                240+int(downwell::roundGameMakerQ8(player_.frameStartXFixed())),
+                176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
         }
     }
     // Collision events with other enemies: jelly vs subparentEnemy, red ball
@@ -2761,6 +2785,7 @@ bool GameplayWorld::resetCompactScenery(){
     // scrPlayerInit: aimAngle = 0, burstCount = 0; room instances are gone.
     guns_.clear();aimAngle_=0;burstCount_=0;burstAlarm_=-1;
     if(!compactDebris_.clear())return run_.effectsSucceeded=false;
+    clearCompactUpgrades();
     {struct Hooks{bool retire(std::uint32_t,const downwell::CorpseAnimation&){return true;}} hooks;
         if(!compactCorpses_.clear(hooks))return run_.effectsSucceeded=false;}
     // Result Create clears pTimeStop; the next room's player is new.
@@ -2897,8 +2922,8 @@ struct GameplayWorld::SceneryOps {
     bool playStyle(int& style){style=int(world.run_.playStyle);return true;}
     bool jump(int,Real){world.player_.stompBounce();return true;}
     bool shake(int amount,int duration){return world.requestCameraShake(amount,duration);}
-    bool explodingKnees(bool& knees){knees=false;return true;} // Upgrade 0 is W1.9.
-    bool createBlast(){return fail();}
+    bool explodingKnees(bool& knees){knees=world.run_.upgrades.levels[0]!=0;return true;}
+    bool createBlast(){return world.createCompactBlast(276,x,y);}
     // Torch: place_meeting with its own sprite mask.
     bool solid(int px,int py,bool& hit){return world.solidMeeting(568,Real::fromInteger(px),Real::fromInteger(py),true,hit);}
     bool wall(int px,int py,bool& hit){return world.solidMeeting(568,Real::fromInteger(px),Real::fromInteger(py),false,hit);}
@@ -3044,7 +3069,10 @@ bool GameplayWorld::collideCompactScenery(){
         r.objHp=0;r.stomped=1;
         player_.stompBounce(); // scrFjump(0,2.5), or 1.5 for style 2.
         if(!requestCameraShake(2,4))return false;
-        // pugExplodingKnees (upgrade 0) is W1.9.
+        if(run_.upgrades.levels[0]){
+            if(!createCompactBlast(276,r.x,r.y))return false;
+            run_.soundPlay(91+int(enemyRandom_.chooseIndexSmall(3)),60,false,true);
+        }
     }
     return true;
 }
@@ -3149,18 +3177,43 @@ struct GameplayWorld::BoxOps {
     bool effect(Real x,Real y,int sprite,Real speed,Real angle,int depth){
         return world.compactEffects_.spawnNoLoop(x,y,sprite,speed,angle,Real::fromInteger(depth))||fail();
     }
-    // global.ug[5] chain reaction (bulletDrone 266, neighbour alarms) is W1.9.
-    bool chainReaction(){return false;}
+    // global.ug[5] (Gunpowder Blocks): bulletDrone 266 at the box, then
+    // Alarm 0 = 5 on each boxed neighbour 16 pixels away.
+    bool chainReaction(){return world.run_.upgrades.levels[5]!=0;}
+    GameplayWorld::BulletState* shot=nullptr;
     bool create(int object,Real x,Real y,Handle& child){
-        return object==370&&world.spawnCompactDebris(x,y,child);
+        if(object==370)return world.spawnCompactDebris(x,y,child);
+        std::int32_t px,py;
+        if(object!=266||!x.roundPixel(px)||!y.roundPixel(py))return fail();
+        shot=world.createDroneBullet(px,py,270,4);
+        child=shot?shot->lifetimeId:0;
+        return shot!=nullptr;
     }
-    bool myBullet(Handle){return fail();}
-    bool bulletDirection(Handle,int){return fail();}
-    bool bulletDamage(Handle,int){return fail();}
-    bool place(int,Real,Real,Handle&,bool&){return fail();}
-    bool target(Handle){return fail();}
-    bool targetAlarm(Handle,int,int){return fail();}
-    bool targetChecked(Handle,bool){return fail();}
+    bool myBullet(Handle h){return shot&&shot->lifetimeId==h;}
+    bool bulletDirection(Handle h,int degrees){
+        if(!myBullet(h))return fail();
+        shot->shot.direction=downwell::RangedShot::degreesToTurns(degrees);return true;
+    }
+    bool bulletDamage(Handle h,int damage){if(!myBullet(h))return fail();shot->damage=damage;return true;}
+    // instance_place(x, y, objBox_n) with the caller's 16-pixel mask.
+    bool place(int object,Real x,Real y,Handle& target,bool& found){
+        std::int32_t px,py;
+        if(object!=92||!x.roundPixel(px)||!y.roundPixel(py))return fail();
+        found=false;target=0;
+        for(unsigned i=0;i<world.breakableCount_;++i){const auto& b=world.breakables_[i];
+            if(b.active&&!b.destroyRequested&&i!=key.slot&&b.x+240>px-16&&b.x+240<px+16&&b.y+176>py-16&&b.y+176<py+16){
+                found=true;target=i+1;break;
+            }
+        }
+        return true;
+    }
+    bool target(Handle){return true;}
+    bool targetAlarm(Handle h,int alarm,int value){
+        if(!h||alarm!=0||h>world.breakableCount_)return fail();
+        const auto& b=world.breakables_[h-1];
+        return world.publishBoxAlarm0({h-1,b.lifetimeId},value);
+    }
+    bool targetChecked(Handle,bool){return fail();} // autoTile is never set
     bool destroySelf(){return world.markBreakableDestroyed(key);}
     bool lowSpec(){return false;}
     int area(){return world.run_.stage.area;}
@@ -3357,6 +3410,7 @@ bool GameplayWorld::burstFire(){
     const int x=int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
     const int y=int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
     if(!emitPlayerBullets(x,y+4,y,shotAngle_,false))return false;
+    firedThisStep_=true; // scrBurstFire: pFired = 1
     if(followCamera_&&!requestCameraShake(gun.shake,gun.shakeDuration))return false;
     playShotSound(player_.ammo()); // scrShotSound: stammo is already spent
     player_.setVerticalSpeedFifths(gun.recoilFifths);
@@ -4162,8 +4216,13 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
     // The family's last act before instance_destroy.
     struct DeathSound {GameplayWorld& world;int sound,y;~DeathSound(){if(world.run_.effectsSucceeded)world.playEnemySound(sound,y);}}
         lastAct{*this,deathSound,enemy.y+176};
+    // scrEnemyStomped: scrBloodfx(3, 0), then pugExplodingKnees; the death
+    // the compact world runs at the contact follows.
+    if(stomped&&compactDamageEffectsAdmitted&&!compactBloodfx(x,y))return false;
+    if(stomped&&run_.upgrades.levels[0]&&!compactExplodingKnees(enemy.x+240,enemy.y+176,
+        240+int(downwell::roundGameMakerQ8(player_.frameStartXFixed())),
+        176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
-    if(stomped&&!compactBloodfx(x,y))return false;
     if(!compactBloodfx(x,y)||!emitBoxSmoke(x,y)||!run_.emitFlash<1,0,0>(x,y,enemyRandom_))return false;
     spawnReward(enemy,stomped);
     if(!run_.effectsSucceeded)return false;
@@ -4428,3 +4487,5 @@ void GameplayWorld::drawCompactAfterImages(){
     }
     afterImagesDrawn_=amount+1;
 }
+
+#include "GameplayWorldUpgrades.inc"

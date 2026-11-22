@@ -61,6 +61,7 @@
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
 #include "core/CorpseInstances.h"
+#include "core/CompactUpgrades.h"
 #include "core/CorpseEffects.h"
 #include "core/ConsumptionBloodInstances.h"
 #include "core/CorpseDraw.h"
@@ -1565,13 +1566,36 @@ public:
             else ok=visitRoomActors(visitor);
         }
         // Compact objDeadBody 263 and object-370 debris have no room actors:
-        // draw them after them, in object order.
+        // draw them after them, in object order. W1.9's objDrone (depth
+        // 10000) precedes them; explosionSmall (0) and bulletExplosion1
+        // (-60000) follow.
+        if(ok&&drone_.live){
+            const auto x=downwell::MotionBinary64::fromInteger(int((drone_.x+0x8000)>>16));
+            const auto y=downwell::MotionBinary64::fromInteger(int((drone_.y+0x8000)>>16));
+            downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
+            if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
+            if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
+               (!assets.drone(drone_.frame(),asset)||!emit(asset,x,y)))return false;
+        }
         if(ok&&compactCorpses_.size()&&!compactCorpses_.visitNewest([&](auto,const downwell::CorpseAnimation& corpse){
             if(ok&&!downwell::CorpseDraw::surface(corpse,assets,view,emit))ok=false;
         }))return false;
         if(ok&&compactDebris_.size()&&!compactDebris_.visitNewest([&](auto,const downwell::DebrisAnimation& effect){
             if(ok&&!downwell::DebrisDraw::surface(effect,assets,view,emit))ok=false;
         }))return false;
+        static const int explosionObjects[]={274,272};
+        for(int object:explosionObjects)for(unsigned i=blastEnd_;ok&&i-->0;){
+            const auto& b=blasts_[i];
+            if(!b.live||b.object!=object)continue;
+            const auto x=downwell::MotionBinary64::fromInteger(b.x),y=downwell::MotionBinary64::fromInteger(b.y);
+            downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
+            if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
+            if(placement.target==downwell::EffectSurfacePlacement::hidden)continue;
+            // GameMaker mirrors, then rotates: a mirrored page turns the other way.
+            const bool mirrored=b.xscale<0;
+            const unsigned turn=unsigned(mirrored?(4-b.turn)&3:b.turn);
+            if(!assets.explosion(unsigned(b.sprite),mirrored,turn,b.frame(),asset)||!emit(asset,x,y))return false;
+        }
         return ok;
     }
     const downwell::NativeTimeShardRegistration::Record* timeShardForDraw(downwell::InstanceHandle key)const{
@@ -2434,7 +2458,7 @@ public:
         return run_.createDamageNumber(x,y,amount,direction)!=0;
     }
     bool emitCorpseExpiry(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
-    const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
+    const downwell::SmokeEffects<downwell::RunSession::smokeCapacity>& smokeEffects() const {return run_.smokeEffects;}
     bool emitBoxSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitBoxSmoke(x,y,enemyRandom_);}
     bool emitBoxFlash(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitBoxFlash(x,y,enemyRandom_);}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
@@ -3175,6 +3199,28 @@ private:
     bool stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase);
     bool advanceCompactCorpseAlarm(unsigned alarm);
     bool endStepCompactCorpses(long viewTop);
+    // W1.9 upgrade owners (CompactUpgrades.h); GameplayWorldUpgrades.inc.
+    downwell::CompactBlastRecord blasts_[downwell::gameplayCompactBlastCapacity];
+    unsigned blastEnd_=0;
+    std::uint32_t blastSerial_=0;
+    bool createCompactBlast(int object,int x,int y,int sprite=0);
+    bool compactExplodingKnees(int x,int y,int smokeX,int smokeY,bool smoke);
+    bool compactRocketJump(int x,int y,int smokeX,int smokeY);
+    void advanceCompactBlastAnimation();
+    bool stepCompactBlasts(std::uint32_t lastSerial);
+    bool collideCompactBlasts();
+    bool blastEnemy(downwell::CompactBlastRecord& blast,EnemyState& enemy);
+    bool blastShootables(downwell::CompactBlastRecord& blast,const downwell::ContactBounds& bounds);
+    bool blastWalls(downwell::CompactBlastRecord& blast,const downwell::ContactBounds& bounds);
+    void clearCompactUpgrades();
+    // objDrone 249 (Drone) and bulletDrone 266 (its shot, Gunpowder Blocks').
+    downwell::CompactDroneRecord drone_;
+    bool firedThisStep_=false; // global.pFired as objDrone's Step sees it
+    bool createCompactCompanions(int x,int y);
+    BulletState* createDroneBullet(int x,int y,int degrees,int damage);
+    void advanceCompactDroneAnimation(){if(drone_.live)++drone_.phaseHalves;}
+    bool advanceCompactDroneAlarm();
+    void stepCompactDrone();
     downwell::CompactScenery scenery_;
     int sceneryRepaintX_[downwell::gameplaySceneryRepaintCapacity]{};
     int sceneryRepaintY_[downwell::gameplaySceneryRepaintCapacity]{};
@@ -3263,6 +3309,14 @@ public:
     const downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity>& compactCorpses()const{return compactCorpses_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}
+    const downwell::CompactBlastRecord* compactBlasts(unsigned& end)const{end=blastEnd_;return blasts_;}
+    const downwell::CompactDroneRecord& compactDrone()const{return drone_;}
+    // Effect-surface producers among the W1.9 owners.
+    bool compactSurfaceUpgrades()const{
+        if(drone_.live)return true;
+        for(unsigned i=0;i<blastEnd_;++i)if(blasts_[i].live&&blasts_[i].object!=276)return true;
+        return false;
+    }
     // W1.7 compact combo and controller HUD. The platform supplies the
     // language's area titles (langString("area" + n)); without them the
     // title draws nothing, as the stored levelNumber owner is absent too.

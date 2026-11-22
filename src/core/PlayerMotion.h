@@ -145,7 +145,13 @@ public:
     // the hard-landing hop's soundPlay(88). recharge is a successful
     // scrRecharge (sfxGunRecharge), also from stompBounce/contactKnockback;
     // the owner drains those with takeRechargeSounds().
-    enum class SoundEvent : unsigned char { jump, wallKick, land, footstep, hardLandTurn };
+    // rocket: scrJump's pugRocket block, which precedes the jump sound.
+    enum class SoundEvent : unsigned char { jump, wallKick, land, footstep, hardLandTurn, rocket };
+    // Rocket Jump (upgrade 18): scrPlayerInit's jumpsp 5, and scrJump's blast
+    // at the instance x/y of the last jump (Q8, offset space).
+    void setRocketJump(bool value) { rocketJump_ = value; }
+    long rocketX() const { return rocketX_; }
+    long rocketY() const { return rocketY_; }
     unsigned soundEventCount() const { return soundEventCount_; }
     SoundEvent soundEvent(unsigned index) const { return soundEvents_[index]; }
     unsigned takeRechargeSounds() { const unsigned n = pendingRecharges_; pendingRecharges_ = 0; return n; }
@@ -164,6 +170,8 @@ public:
 
 private:
     bool motionSucceeded_ = true;
+    bool rocketJump_ = false;
+    long rocketX_ = 0, rocketY_ = 0;
     // World-owned coordinate adapter, rebound before each shared gameplay
     // step like the terrain callbacks; not an independently simulated field.
     int collisionOriginX_=0,collisionOriginY_=0;

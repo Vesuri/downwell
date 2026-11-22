@@ -48,8 +48,9 @@ void PlayerMotion::enterRoom(bool fireHeld, int landingOffset)
     const bool rules = gunRules_, delayKill = gunDelayKill_;
     const int consumption = gunConsumption_, rof = gunRof_, recoil = gunRecoilFifths_;
     const int style = playStyle_;
+    const bool rocket = rocketJump_;
     *this = PlayerMotion(false, landingOffset);
-    playStyle_ = style;
+    playStyle_ = style; rocketJump_ = rocket;
     // scrPlayerInit clears nonAuto; the selected gun is global state.
     gunRules_ = rules; gunDelayKill_ = delayKill;
     gunConsumption_ = consumption; gunRof_ = rof; gunRecoilFifths_ = recoil;
@@ -128,10 +129,17 @@ void PlayerMotion::recharge()
 // scrJump's dry, rocketless branch.
 void PlayerMotion::jump(const downwell::Input& input, int x, int y)
 {
-    speedY_ = jumpSpeed;
-    gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
-    // scrPlayerInit: style 3's jumpsp *= 0.85 (3.74 = 4787.2 fifths).
-    if (playStyle_ == 3) setVerticalSpeedFifths(-4787);
+    if (rocketJump_) {
+        // scrPlayerInit: pugRocket's jumpsp 5, then style 3's * 0.85 (4.25).
+        setVerticalSpeedFifths(playStyle_ == 3 ? -5440 : -6400);
+        rocketX_ = long(x) * fixedOne; rocketY_ = long(y) * fixedOne;
+        addSound(SoundEvent::rocket);
+    } else {
+        speedY_ = jumpSpeed;
+        gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
+        // scrPlayerInit: style 3's jumpsp *= 0.85 (3.74 = 4787.2 fifths).
+        if (playStyle_ == 3) setVerticalSpeedFifths(-4787);
+    }
     addSound(SoundEvent::jump); // soundPlay(choose(86), 80, 0, 1)
     // objJumpFx at the instance x/y.
     addDust(true, long(x) * fixedOne, long(y) * fixedOne, 0);

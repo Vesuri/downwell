@@ -262,8 +262,9 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
     for(unsigned i=0;i<fx.noLoopCount();++i){
         const auto& e=fx.noLoop(i).effect;unsigned turn;
         if(!e.valid||!quarterTurn(e.angle,turn))return false;
-        // 603 and 605 carry offline 0 and 270 degree pages only.
-        if(turn!=0&&turn!=3){failedSprite=UWORD(e.spriteId);return false;}
+        // 603 and 605 carry offline 0 and 270 degree pages; 605 also 90
+        // (W1.9: Gunpowder Blocks' upward shot splashes at its angle).
+        if(turn!=0&&turn!=3&&!(turn==1&&e.spriteId==605)){failedSprite=UWORD(e.spriteId);return false;}
         if(!place(e.x,e.y,e.spriteId,turn*256+e.drawFrame()))return false;
     }
     for(unsigned i=0;i<fx.movingCount();++i){
@@ -547,6 +548,20 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
 #endif
         return true;
     };
+    // W1.9 compact bulletBlast 276 (depth -80000, default Draw): above the
+    // player (-50000), below objDitherAbove (-100000). Newest first within
+    // the depth, as the runner's layer lists insert.
+    bool blastsDrawn=false;
+    const auto drawBlasts=[&](){
+        if(blastsDrawn)return true;
+        blastsDrawn=true;
+        unsigned end=0;const auto* blasts=port.compactBlasts(end);
+        for(unsigned i=end;i-->0;){const auto& b=blasts[i];
+            if(!b.live||b.object!=276)continue;
+            if(!append(UWORD(b.sprite),UWORD(b.frame()),downwellPlayfieldX+b.x-worldViewX,b.y-worldViewY,b.xscale<0))return false;
+        }
+        return true;
+    };
     // objDitherAbove 61 Draw (depth -100000): black above its y, then the
     // dither edge below it.
     const auto drawDitherAbove=[&](const downwell::GameplayDitherAbove::Record* record){
@@ -577,9 +592,11 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
     if(port.hasRoomActorDraw()) {
         DW_PROFILE_SCOPE(profileActorLayerWalk);
         downwell::RunnerImageValue foregroundDepth;foregroundDepth.assign(downwell::MotionBinary64::fromInteger(-1000));
+        downwell::RunnerImageValue blastDepth;blastDepth.assign(downwell::MotionBinary64::fromInteger(-80000));
         if(!port.visitRoomActorsReadOnly([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
+            if(downwell::RunnerSpatialSplit::less(depth,blastDepth)&&!drawBlasts())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
             // Registered Shop Draw events need their own source handlers.
             // Never reinterpret a Shop-local handle as a script-effect slot,
@@ -870,6 +887,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             failedSprite=failedFrame=0;
             return append(effect.spriteId,frame,downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
         }))return false;
+        if(!drawBlasts())ready=false;
     } else {
         // Without a collision owner the world-1 room actors follow the
         // runner's layer order directly: bullets (depth 0), the foreground
@@ -914,7 +932,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                !append(eye,enemy.drawFrame(),x,y-5,mirror<0))ready=false;
         }
 #endif
-        if(!drawForeground()||!drawPlayer())ready=false;
+        if(!drawForeground()||!drawPlayer()||!drawBlasts())ready=false;
         if(const auto* above=port.ditherAbove()){
             const auto* record=above->find(above->handle());
             if(record&&record->active&&!record->destroyRequested&&!drawDitherAbove(record))ready=false;

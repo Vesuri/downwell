@@ -62,7 +62,7 @@ public:
     // is only a subtractor: it cannot produce pixels on an empty surface.
     bool hasControllerProducers(const GameplayWorld& world)const{
         return entryCoverVisible||world.gemSlotEnd()||world.smokeEffects().size()||
-            world.compactDebris().size()||world.compactCorpses().size()||
+            world.compactDebris().size()||world.compactCorpses().size()||world.compactSurfaceUpgrades()||
             (world.registeredSmoke()&&world.registeredSmoke()->size())||
             (world.registeredCorpses()&&world.registeredCorpses()->size())||
             (world.debrisInstances()&&world.debrisInstances()->size())||

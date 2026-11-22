@@ -134,22 +134,22 @@ style select, patched with the chosen style and hard mode.
 
 9. **Upgrade effects.** Every upgrade the clear screen can offer in world 1
    (IDs 0–22 except the disabled 2, 19 and 21) must work in play, not only be
-   selectable, including the balloon/decoy target that steering enemies
-   chase (they now always chase the player), box chain reactions (upgrade
-   5) and exploding knees on scenery and boxes (upgrade 0). W1.4 left Hot
-   Casing (upgrade 8, damaging casings), Reverse Engineering (upgrade 1,
-   `pugEngineer` on gun pickups) and Laser Sight's beam against the new guns'
-   spread (its `bdirRand` and `decTimer` changes are in) to this item, and
-   W1.5 left Time Field Damage (`pugTime`: `scrTypicalDamage` from the time
-   fields), and W1.6 left Rest in Pieces (`pugRip`: corpses that explode).
-   Their sounds come with them (W2.6 left them here; the bank holds them):
-   the drone's shot 47 (upgrade 9: `objDrone` Alarm 0 and `bulletDrone`),
-   `sfxPlayerEat` 83 (Knife and Fork, upgrade 11: the compact world has no
-   corpse/player collision), `sfxEnmExplode1-3` 91-93 (Exploding Knees'
-   stomp, `Scattered16` and `TorchFire`, and `bulletExplosion1` from Rest in
-   Pieces and the decoy), the gunpowder box 342 (upgrade 5:
-   `chainReaction()` returns false), the jetpack loop 343 (upgrade 22) and
-   the rocket jump 344 (upgrade 18).
+   selectable. Exploding Knees (0), Gunpowder Blocks (5), Drone (9) and
+   Rocket Jump (18) are in, with routes `upgrade-0-18-v72` and
+   `upgrade-5-9-v96`. Still to do: the Heart Balloon's decoy (15) that
+   steering enemies chase (they now always chase the player), Hot Casing
+   (8, damaging casings), Reverse Engineering (1, `pugEngineer` on gun
+   pickups), Laser Sight's beam against the new guns' spread (its
+   `bdirRand` and `decTimer` changes are in), Time Field Damage (`pugTime`:
+   `scrTypicalDamage` from the time fields), Rest in Pieces (3, `pugRip`:
+   corpses that explode, `bulletExplosion1` 272 and `explosionSmall` 274
+   whose surface art is already in the banks), Knife and Fork (11) and the
+   Safety Jetpack (22). Their sounds come with them (the bank holds them):
+   `sfxPlayerEat` 83 (Knife and Fork: the compact world has no
+   corpse/player collision), `sfxEnmExplode1-3` 91-93 from Rest in Pieces
+   and the decoy, and the jetpack loop 343. Routes that pick an unwired
+   upgrade (world-one-v38-tour picks 3 and 17) need re-searching as these
+   land.
    Reference: [upgrade coverage](upgrade-coverage.md).
 10. **Hard-mode enemies.** Hard mode itself works (PlayMenu toggle, the
     cavern builder's extra enemies, doubled shop prices, "-H" titles, the
@@ -281,6 +281,14 @@ so animating screens never show a cleared well; the pause bank is 8,818
 bytes and the results bank grew to 28,672 for the unlock notice's glyphs.
 The Timer publishes its 16 HUD rows on every update while shown and costs
 nothing while off.
+W1.9 (Knees, Gunpowder, Drone, Rocket Jump): the explosion and drone art
+drawn on the CPU effect surface adds 94,346 bytes to the cavern CPU bank and
+no Chip (no actor frames either); the Rocket Jump blast 461 adds 17,512 CPU
+and 13,538 Chip bytes; the 605 splash's 90-degree page adds 170 Chip bytes.
+Cavern CPU bank 480,656, planes 188,872. Smoke grows from 32 to 48 records
+and debris from 24 to 48; 24 blast records and the drone are new. Every
+update now runs the blast and drone steps (empty loops without the
+upgrades), and the unowned enemy step order costs an insertion pass.
 
 W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
 197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about

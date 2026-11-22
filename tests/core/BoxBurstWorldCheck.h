@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_TEST_BOX_BURST_WORLD_CHECK_H
 #define DOWNWELL_TEST_BOX_BURST_WORLD_CHECK_H
 #include <cassert>
+#include <type_traits>
 #include "core/SmokeEffects.h"
 #include "core/FlashBallEffects.h"
 
@@ -9,7 +10,10 @@
 // retained children and terminal failure across the two effect banks.
 template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
     using namespace downwell;
-    SmokeEffects<32> smoke;FlashBallEffects<32> flash;
+    // The world's smoke pool is larger than its flash pool (W1.9 smoke).
+    typename std::decay<decltype(world.smokeEffects())>::type smoke;FlashBallEffects<32> flash;
+    constexpr unsigned smokeSlots=decltype(smoke)::capacity;
+    static_assert(smokeSlots>=32,"the burst loop fills the flash pool first");
     auto random=world.randomState();
     auto sameRandom=[&](){
         assert(world.randomState().drawCount()==random.drawCount());
@@ -19,7 +23,7 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
     auto same64=[](MotionBinary64 a,MotionBinary64 b){assert(a.high==b.high&&a.low==b.low);};
     auto sameChildren=[&](){
         assert(world.smokeEffects().size()==smoke.size());
-        for(unsigned i=0;i<32;++i){
+        for(unsigned i=0;i<smokeSlots;++i){
             const auto& a=world.smokeEffects().slot(i);const auto& b=smoke.slot(i);
             assert(a.handle==b.handle);
             if(a.handle){
@@ -28,6 +32,7 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
                 assert(a.effect.imageSpeed.bits==b.effect.imageSpeed.bits);
                 assert(a.effect.imageIndex.bits==b.effect.imageIndex.bits);
             }
+            if(i>=32)continue;
             const auto& c=world.flashEffects().slot(i);const auto& d=flash.slot(i);
             assert(c.handle==d.handle);
             if(c.handle){
@@ -36,10 +41,11 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
             }
         }
     };
-    for(unsigned i=0;i<32;++i){
+    for(unsigned i=0;i<smokeSlots;++i){
         const auto x=MotionBinary64::fromInteger(240+i),y=MotionBinary64::fromInteger(304+i);
         assert(smoke.boxBurst(x,y,random));assert(world.emitBoxSmoke(x,y));
         sameRandom();sameChildren();
+        if(i>=32)continue;
         const auto baseY=MotionBinary64::fromInteger(300+i);
         assert(flash.boxBurst(x,baseY,random));assert(world.emitBoxFlash(x,baseY));
         sameRandom();sameChildren();

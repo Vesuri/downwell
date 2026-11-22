@@ -168,10 +168,15 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
             break;
         }
         bool heart=false;require(game.enterLevelClear(0,heart),"replay Result Create");
+        // AmigaUpgradeScene: left/right press edges against the previous
+        // frame's input, the last gameplay frame's included.
+        auto previous=t?downwell::unpackReplayInput(std::uint8_t(tape[t-1])):downwell::Input{};
         while(t<tape.size()&&!game.nextLevelRequested()){
             check(level);
-            bool fire=downwell::unpackReplayInput(std::uint8_t(tape[t++])).fire;
-            frameStep([&]{require(game.stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"replay Result Step");});
+            const auto input=downwell::unpackReplayInput(std::uint8_t(tape[t++]));
+            const bool left=input.left&&!previous.left,right=input.right&&!previous.right;previous=input;
+            bool fire=input.fire;
+            frameStep([&]{require(game.stepLevelClear(fire,left,right,heart,[](auto,unsigned){}),"replay Result Step");});
         }
         if(level<3&&game.nextLevelRequested()){
             downwell::Input input;input.fire=true;

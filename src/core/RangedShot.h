@@ -66,6 +66,18 @@ struct RangedShot {
         decelerateAlarm = timer;
         return true;
     }
+    // bulletDrone 266 Create (objDrone's shot and Gunpowder Blocks' box
+    // shot): bSpeed 7, bdirRand 0, image_speed 0 until it slows below 3,
+    // then 0.5; decTimer 16 with declSp 0.8. No Create RNG; its first Step
+    // still draws random_range(-0, 0).
+    void createDrone(int px, int py, int degrees) {
+        *this = {};
+        x = {px, 0}; y = {py, 0};
+        direction = degreesToTurns(degrees);
+        imageSpeed = {0x3f000000u};
+        speed = 7u << 20;
+        decelerateAlarm = 16;
+    }
     // Alarm 0 (from the alarm dispatcher, index 0).
     void alarm() {
         if (decelerateAlarm > 0 && --decelerateAlarm == 0) { decelerate = true; decelerateAlarm = -1; }

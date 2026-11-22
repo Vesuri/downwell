@@ -50,6 +50,15 @@ public:
         return ready_&&corpseSpriteAdmitted(int(sprite))&&
             resolve(pack_,size_,count_,sprite+(mirrored?62000:0),0,out);
     }
+    // W1.9 objDrone's sprDrone (two frames) and the explosions' quarter-turn
+    // pages (turn * 256 + frame; mirrored pages at 62000 + sprite).
+    bool drone(unsigned frame,Asset& out)const{
+        return ready_&&frame<2&&resolve(pack_,size_,count_,131,frame,out);
+    }
+    bool explosion(unsigned sprite,bool mirrored,unsigned turn,unsigned frame,Asset& out)const{
+        const unsigned frames=sprite==463?12:sprite==470?8:0;
+        return ready_&&frame<frames&&turn<4&&resolve(pack_,size_,count_,sprite+(mirrored?62000:0),turn*256+frame,out);
+    }
     bool corpseExpiry(unsigned frame,Asset& out)const{
         return ready_&&frame<12&&resolve(pack_,size_,count_,102,frame,out);
     }

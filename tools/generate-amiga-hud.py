@@ -167,6 +167,12 @@ SELECTIONS = {
         472: None,   # spread-gun projectile
         473: None,   # spread-gun projectile, gem-high
         471: None,   # sprBlast: fourteen frames, offline mirrored planar art
+        461: None,   # spSplosion1: W1.9 Rocket Jump's bulletBlast, mirrored planar art
+        # W1.9 effect-surface art (drawFx, CPU only): bulletExplosion1 and
+        # explosionSmall in quarter turns and both facings, and objDrone.
+        463: None,   # sprExplosion32RedOutline
+        470: None,   # sprExplosion16Outline
+        131: None,   # sprDrone
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: None,   # registered case: intact, flashing and opened frames
@@ -785,7 +791,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                 canvas = red_splash_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 175, 176, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
-                    458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605,
+                    458, 459, 460, 461, 463, 470, 471, 485, 486, 487, 496, 497, 602, 603, 605,
                     83, 118, 571, 572, 704, 711, 712, 472, 473, 601, 111, 457, 112, 94, 95):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
@@ -799,7 +805,9 @@ def build_records(manifest, extracted, profile, language_path=None):
                 # Unlike 458/459 these keep nearest-turn art without a
                 # per-angle pixel proof (docs/open-work.md W3/WR note).
                 w14_turned = sprite_id in (472, 473, 601)
-                turns = (3,) if sprite_id == 601 else (0, 3) if gun_spread or w14_turned or sprite_id == 605 else range(2 if snail else 4 if sprite_id in (278, 704) else 1)
+                # W1.9: Gunpowder Blocks' bulletDrone flies at exactly 90
+                # degrees, and its 605 hit splash takes the shot's angle.
+                turns = (3,) if sprite_id == 601 else (0, 1, 3) if sprite_id in (459, 605) else (0, 3) if gun_spread or w14_turned else range(2 if snail else 4 if sprite_id in (278, 463, 470, 704) else 1)
                 for turn in turns:
                     if turn == 0:
                         variant = canvas

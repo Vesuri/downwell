@@ -4270,6 +4270,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             const bool compositeEffects=actorList.hasControllerProducers(port)&&((compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
                 port.smokeEffects().size()||port.compactDebris().size()||port.compactCorpses().size()||
+                port.compactSurfaceUpgrades()||
                 (port.registeredSmoke()&&port.registeredSmoke()->size())||
                 (port.registeredCorpses()&&port.registeredCorpses()->size())||
                 (port.timeShardInstances()&&port.timeShardInstances()->size())))||
