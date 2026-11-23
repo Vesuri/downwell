@@ -212,15 +212,35 @@ Stages, in order:
 2. **WI.4 Portable converter.** One C implementation of the generators
    that the host build also uses, so the Python and ffmpeg path stops being
    a second authority: FORM chunk parsing streamed from disk (`data.win`
-   is 28 MB; the target has 4 MB Fast), zlib inflate for the texture PNGs,
-   our own resampler in place of ffmpeg's `swr` (the user's choice,
+   is 28 MB, 24.6 MB of it AUDO; the target has 4 MB Fast), the texture
+   pages, our own resampler in place of ffmpeg's `swr` (the user's choice,
    2026-11-23: its samples become the reference), an Ogg Vorbis decoder for
-   the 11 Ogg effects in the banks (and the songs' lengths), then every bank
-   and `Downwell.tables` (today `tools/install-table-headers.py` and
-   `tools/pack-amiga-tables.py` over the generated headers). Host tests compare its output with
-   the current `generated/` files; where the resampler changes samples, the
-   new output is recorded and the sound and route gates rerun. Then a 68020 build of the converter, timed
-   and fitted in memory on the target.
+   the 11 Ogg effects in the banks, then every bank and `Downwell.tables`
+   (today `tools/install-table-headers.py` and `tools/pack-amiga-tables.py`
+   over the generated headers). Host tests compare its output with the
+   current `generated/` files; where the resampler changes samples, the new
+   output is recorded and the sound and route gates rerun. Then a 68020
+   build of the converter, timed and fitted in memory on the target.
+   Measured so far (2026-11-23, throwaway probes in `tmp/`):
+   - The texture pages in `data.win` are not PNG. TXTR points at `2zoq`
+     blobs: u16 width, u16 height, u32 decoded length, then a `BZh9`
+     bzip2 stream of a `fioq` image (GameMaker's early-draft QOI, with
+     two's-complement DIFF fields rather than QOI's bias). A decoder with
+     those rules matches UTMT's exported PNGs on every pixel of both pages
+     (587 KB and 930 KB decoded). So the converter needs bzip2 (a 900 KB
+     block takes about 2.25 MB in bzip2's small-memory mode), not zlib.
+   - The song and effect lengths need no decoder: the last Ogg page's
+     granule position equals ffprobe's `duration_ts` for all 11 effects.
+   - stb_vorbis (v1.23, commit `48fb1c97`, the user's choice of
+     2026-11-23), built for the 68020 with `-msoft-float`, GCC 15.1's
+     `lb1sf68.S`/`fpgnulib.c` for the float routines, and our own math
+     functions on both sides, decodes all 11 effects with 175 KB of work
+     memory. On the cycle-exact `a1200-4m` this took 248,987 ticks: 83
+     minutes, about 10 per wind. Its output hashes also differ from the
+     host's, so its banks would depend on the machine that converted them.
+     Open: the user's decision between an integer decoder (Tremor and
+     libogg, BSD) measured the same way, a fixed-point stb_vorbis, or
+     another way.
 3. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
    siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
    an existing drawer (saves preserved), Use existing or Replace the
