@@ -99,7 +99,7 @@ static u32 find_even(const u8* hay, u32 hn, const u8* needle, u32 nn)
     if (nn > hn) return NONE;
     if (!nn) return 0;
     for (p = 0; p + nn <= hn; p += 2)
-        if (hay[p] == needle[0] && !memcmp(hay + p, needle, nn)) return p;
+        if (hay[p] == needle[0] && (nn < 2 || hay[p + 1] == needle[1]) && !memcmp(hay + p, needle, nn)) return p;
     return NONE;
 }
 
@@ -159,7 +159,7 @@ static void ix_build(Ix* x, const u8* d, u32 n)
 }
 
 /* Leading zeros z and the four bytes there: a stream's query signature. */
-typedef struct { u32 z, key, o, okey; } Sig;  /* o, okey: first even run start (NONE: none) */
+typedef struct { u32 z, key, bucket, o, okey; } Sig;  /* o, okey: first run start (NONE: none) */
 
 static u32 overlap_ix(const Ix* x, const u8* r, u32 rn, const Sig* g)
 {
@@ -167,13 +167,13 @@ static u32 overlap_ix(const Ix* x, const u8* r, u32 rn, const Sig* g)
     if (((n < rn ? n : rn) & ~1u) < 2) return 0;
     if (z < rn) {
         if (rn - z >= 4)
-            for (q = x->head[kh(g->key, IXB)]; q != END16; q = x->next[q]) {
+            for (q = x->head[g->bucket]; q != END16; q = x->next[q]) {
                 if (q < z || ((q ^ z) & 1) || n - q > rn - z || x->zrun[q] < z) continue;
                 if (rd_be32(x->d + q) != g->key || memcmp(x->d + q + 4, r + z + 4, n - q - 4)) continue;
                 return n - q + z;
             }
         for (q = n > 3 ? n - 3 : 0; q < n; ++q) {
-            if (q < z || ((q ^ z) & 1) || n - q > rn - z || x->zrun[q] < z) continue;
+            if (x->d[q] != r[z] || q < z || ((q ^ z) & 1) || n - q > rn - z || x->zrun[q] < z) continue;
             if (!memcmp(x->d + q, r + z, n - q)) return n - q + z;
         }
     }
@@ -191,7 +191,7 @@ static int contains_ix(const Ix* x, const u8* d, u32 dn, const Sig* g)
     u32 z = g->z, q;
     if (dn > x->n) return 0;
     if (z == dn || dn - z < 4) return find_even(x->d, x->n, d, dn) != NONE;
-    for (q = x->head[kh(g->key, IXB)]; q != END16; q = x->next[q]) {
+    for (q = x->head[g->bucket]; q != END16; q = x->next[q]) {
         if (q < z || ((q ^ z) & 1) || q + dn - z > x->n || x->zrun[q] < z) continue;
         if (rd_be32(x->d + q) == g->key && !memcmp(x->d + q + 4, d + z + 4, dn - z - 4)) return 1;
     }
@@ -203,14 +203,15 @@ static void signature(const u8* d, u32 n, Sig* g)
     u32 i;
     for (g->z = 0; g->z < n && !d[g->z]; ++g->z) continue;
     g->key = g->z + 4 <= n ? rd_be32(d + g->z) : 0;
+    g->bucket = kh(g->key, IXB);
     g->o = NONE; g->okey = 0;
-    for (i = 2; i + 4 <= n; i += 2)
+    for (i = 1; i + 4 <= n; ++i)
         if (d[i] && !d[i - 1]) { g->o = i; g->okey = rd_be32(d + i); break; }
 }
 
-/* The interning payload, its even run starts (a nonzero byte after a zero)
-   chained by their four bytes in ascending order: an even occurrence of a
-   stream puts the stream's first even run start on one of them. */
+/* The interning payload, its run starts (a nonzero byte after a zero)
+   chained by their four bytes in ascending order: an occurrence of a stream
+   puts the stream's first run start on one of them. */
 #define PXB 13
 #define PX_CHUNK 4096          /* entries a chunk: position, next */
 #define PX_CHUNKS 256
@@ -225,7 +226,7 @@ static u32* px_entry(const Px* x, u32 e) { return x->chunk[e / PX_CHUNK] + 2 * (
 static int px_update(Px* x)
 {
     u32 q;
-    for (q = x->scanned ? x->scanned : 2; q + 4 <= x->n; q += 2)
+    for (q = x->scanned ? x->scanned : 1; q + 4 <= x->n; ++q)
         if (x->p[q] && !x->p[q - 1]) {
             u32 b = kh(rd_be32(x->p + q), PXB), *e;
             if (!(x->count % PX_CHUNK)) {
@@ -259,7 +260,7 @@ static u32 px_find(const Px* x, const u8* d, u32 dn, const Sig* g)
         if (q < g->o) continue;
         p = q - g->o;
         if (p + dn > x->n) break;
-        if (rd_be32(x->p + q) == g->okey && !memcmp(x->p + p, d, dn)) return p;
+        if (!(p & 1) && rd_be32(x->p + q) == g->okey && !memcmp(x->p + p, d, dn)) return p;
     }
     return NONE;
 }
@@ -318,10 +319,10 @@ static u32 root(u32* parent, u32 i)
 }
 
 /* The disjoint overlap paths. Python sorts every nonzero (-overlap, i, j)
-   edge; here each i keeps only its best few successors (recomputed when
+   edge; here each i keeps only its best 32 successors (recomputed when
    used up) in a heap ordered the same way, so the same edges are visited
    in the same order without holding them all. */
-#define TOPK 16
+#define TOPK 32
 typedef struct {
     const Order* o;
     const u32* sa;   /* standalone streams */
@@ -372,47 +373,116 @@ static void heap_pop(Paths* p)
     }
 }
 
-static int overlap_paths(const Order* o, const u32* sa, u32 n, Ix* ix, u32* out)
+static void paths_free(Paths* p)
 {
-    Paths p;
-    u32 i, j, np = 0;
-    int ok = 0;
-    p.o = o; p.sa = sa; p.n = n; p.ix = ix; p.nheap = 0;
-    p.cand = dw_alloc(4 * TOPK * n + 4); p.cnt = dw_alloc(4 * n + 4); p.cur = dw_alloc(4 * n + 4);
-    p.before = dw_alloc(4 * n + 4); p.after = dw_alloc(4 * n + 4); p.parent = dw_alloc(4 * n + 4);
-    p.heapA = dw_alloc(4 * n + 4); p.heapB = dw_alloc(4 * n + 4);
-    if (!p.cand || !p.cnt || !p.cur || !p.before || !p.after || !p.parent || !p.heapA || !p.heapB) goto done;
-    for (i = 0; i < n; ++i) { p.parent[i] = i; p.before[i] = p.after[i] = NONE; }
+    dw_free(p->cand); dw_free(p->cnt); dw_free(p->cur); dw_free(p->before); dw_free(p->after);
+    dw_free(p->parent); dw_free(p->heapA); dw_free(p->heapB);
+}
+
+/* Every standalone stream's best successors. */
+static int paths_rows(Paths* p, const Order* o, const u32* sa, u32 n, Ix* ix)
+{
+    u32 i;
+    memset(p, 0, sizeof *p);
+    p->o = o; p->sa = sa; p->n = n; p->ix = ix;
+    p->cand = dw_alloc(4 * TOPK * n + 4); p->cnt = dw_alloc(4 * n + 4); p->cur = dw_alloc(4 * n + 4);
+    p->before = dw_alloc(4 * n + 4); p->after = dw_alloc(4 * n + 4); p->parent = dw_alloc(4 * n + 4);
+    p->heapA = dw_alloc(4 * n + 4); p->heapB = dw_alloc(4 * n + 4);
+    if (!p->cand || !p->cnt || !p->cur || !p->before || !p->after || !p->parent || !p->heapA || !p->heapB) return 0;
+    for (i = 0; i < n; ++i) { p->parent[i] = i; p->before[i] = p->after[i] = NONE; }
     for (i = 0; i < n; ++i) {
-        if (io_cancelled()) { dw_fail("cancelled"); goto done; }
-        row(&p, i, NONE);
-        if (p.cnt[i]) heap_push(&p, i);
+        if (io_cancelled()) return dw_fail("cancelled");
+        row(p, i, NONE);
     }
-    while (p.nheap) {
-        u32 a = p.heapA[0] & 0xffff, b = p.heapB[0];
-        u32 key = p.cand[a * TOPK + p.cur[a]];
-        heap_pop(&p);
-        if (p.after[a] == NONE && p.before[b] == NONE && root(p.parent, a) != root(p.parent, b)) {
-            p.after[a] = b; p.before[b] = a;
-            p.parent[root(p.parent, b)] = root(p.parent, a);
+    return 1;
+}
+
+static int overlap_paths(Paths* p, u32* out)
+{
+    u32 i, j, np = 0, n = p->n;
+    for (i = 0; i < n; ++i) if (p->cnt[i]) heap_push(p, i);
+    while (p->nheap) {
+        u32 a = p->heapA[0] & 0xffff, b = p->heapB[0];
+        u32 key = p->cand[a * TOPK + p->cur[a]];
+        heap_pop(p);
+        if (p->after[a] == NONE && p->before[b] == NONE && root(p->parent, a) != root(p->parent, b)) {
+            p->after[a] = b; p->before[b] = a;
+            p->parent[root(p->parent, b)] = root(p->parent, a);
             continue;
         }
-        if (p.after[a] != NONE) continue;
-        if (++p.cur[a] == p.cnt[a]) {
-            if (p.cnt[a] < TOPK) continue;
-            row(&p, a, key);
-            if (!p.cnt[a]) continue;
+        if (p->after[a] != NONE) continue;
+        if (++p->cur[a] == p->cnt[a]) {
+            if (p->cnt[a] < TOPK) continue;
+            if (io_cancelled()) return dw_fail("cancelled");
+            row(p, a, key);
+            if (!p->cnt[a]) continue;
         }
-        heap_push(&p, a);
+        heap_push(p, a);
     }
     for (i = 0; i < n; ++i)
-        if (p.before[i] == NONE)
-            for (j = i; j != NONE; j = p.after[j]) out[np++] = sa[j];
-    ok = np == n || dw_fail("overlap paths lost a stream");
-done:
-    dw_free(p.cand); dw_free(p.cnt); dw_free(p.cur); dw_free(p.before); dw_free(p.after);
-    dw_free(p.parent); dw_free(p.heapA); dw_free(p.heapB);
-    return ok;
+        if (p->before[i] == NONE)
+            for (j = i; j != NONE; j = p->after[j]) out[np++] = p->sa[j];
+    return np == n || dw_fail("overlap paths lost a stream");
+}
+
+/* Greedy tail: the longest overlap with the payload so far, first wins.
+   The payload ends with the stream last taken, X. A stream left that is no
+   longer than X overlaps the payload as it overlaps X: the first entry of
+   X's row still left and no longer than X is the best of those (none left:
+   overlap 0, if the row is complete). Longer streams, or all when the row
+   ran out, are measured against the payload's last bytes, kept in `tail`:
+   by KMP when few, else through an index of the tail. */
+static int greedy(const Paths* p, u32* ordered, u32* left, u8* used, u8* tail, u32 maxlen, u16* pi)
+{
+    const Recs* rs = p->o->rs;
+    u32 nl = p->n, plen = 0, tlen = 0, last = NONE, no = 0, k;
+    for (k = 0; k < nl; ++k) left[k] = k;
+    while (nl) {
+        u32 best = 0, bestOv = 0, w = 0, piece, lx = 0, nlong = 0, pick = NONE, pickOv = 0;
+        int direct = 1, indexed = 0;
+        const u8* d;
+        if (io_cancelled()) return dw_fail("cancelled");
+        for (k = 0; k < nl; ++k) if (rs->s[p->sa[left[k]]].len > w) w = rs->s[p->sa[left[k]]].len;
+        if (w > plen) w = plen;
+        if (plen) {
+            const u32* c = p->cand + last * TOPK;
+            lx = rs->s[p->sa[last]].len;
+            for (k = 0; k < p->cnt[last]; ++k) {
+                u32 j = c[k] & 0xffff;
+                if (!used[j] && rs->s[p->sa[j]].len <= lx) { pick = j; pickOv = 65535 - (c[k] >> 16); break; }
+            }
+            if (pick != NONE || p->cnt[last] < TOPK) direct = 0;
+            if (pick == NONE && !direct)
+                for (k = 0; k < nl; ++k) if (rs->s[p->sa[left[k]]].len <= lx) { pick = left[k]; break; }
+        }
+        for (k = 0; k < nl; ++k) if (direct || rs->s[p->sa[left[k]]].len > lx) ++nlong;
+        if (nlong > 4 && plen) { ix_build(p->ix, tail + tlen - w, w); indexed = 1; }
+        best = NONE;
+        for (k = 0; k < nl; ++k) {
+            u32 j = left[k], s = p->sa[j], ov;
+            if (j == pick) ov = pickOv;
+            else if (!direct && rs->s[s].len <= lx) continue;
+            else if (!plen) ov = 0;
+            else if (indexed) ov = overlap_ix(p->ix, stream_data(rs, s), rs->s[s].len, &p->o->sig[s]);
+            else ov = overlap_kmp(tail, tlen, stream_data(rs, s), rs->s[s].len, pi);
+            if (best == NONE || ov > bestOv) { bestOv = ov; best = k; }
+        }
+        last = left[best];
+        d = stream_data(rs, p->sa[last]);
+        piece = rs->s[p->sa[last]].len - bestOv;
+        if (tlen + piece > 2 * maxlen) {
+            u32 drop = tlen - maxlen;
+            for (k = 0; k < maxlen; ++k) tail[k] = tail[k + drop];
+            tlen = maxlen;
+        }
+        memcpy(tail + tlen, d + bestOv, piece);
+        tlen += piece; plen += piece;
+        used[last] = 1;
+        ordered[no++] = p->sa[last];
+        for (k = best; k + 1 < nl; ++k) left[k] = left[k + 1];
+        --nl;
+    }
+    return 1;
 }
 
 /* planar_payload_order: list[0..n) (unique streams) becomes the interning
@@ -422,11 +492,13 @@ static int payload_order(const Order* o, u32* list, u32 n, u8* payload)
     const Recs* rs = o->rs;
     Ctx ctx;
     Ix* ix = 0;
+    Paths p;
     u32 *standalone = 0, *contained = 0, *ordered = 0, *paths = 0, *left = 0;
     u8 *flag = 0, *tail = 0;
-    u32 ns = 0, nc = 0, no = 0, i, j, maxlen, sizeO, sizeP;
+    u32 ns = 0, nc = 0, i, j, maxlen, sizeO, sizeP;
     int ok = 0;
     ctx.rs = rs;
+    memset(&p, 0, sizeof p);
     if (!sort_stable(list, n, longer_first, &ctx)) return 0;
     maxlen = rs->s[list[0]].len;
     ix = dw_alloc(sizeof *ix);
@@ -447,43 +519,17 @@ static int payload_order(const Order* o, u32* list, u32 n, u8* payload)
                 contains_ix(ix, stream_data(rs, list[j]), rs->s[list[j]].len, &o->sig[list[j]])) flag[j] = 1;
     }
     for (i = 0; i < n; ++i) { if (flag[i]) contained[nc++] = list[i]; else standalone[ns++] = list[i]; }
-    /* Greedy tail: the longest overlap with the payload so far, first
-       wins; only the payload's last bytes matter, kept in `tail`. */
-    {
-        u32 nl = ns, plen = 0, tlen = 0;
-        memcpy(left, standalone, 4 * ns);
-        while (nl) {
-            u32 best = 0, bestOv = 0, k, w = 0, piece;
-            const u8* d;
-            if (io_cancelled()) { dw_fail("cancelled"); goto done; }
-            for (k = 0; k < nl; ++k) if (rs->s[left[k]].len > w) w = rs->s[left[k]].len;
-            if (w > plen) w = plen;
-            ix_build(ix, tail + tlen - w, w);
-            for (k = 0; k < nl; ++k) {
-                u32 ov = overlap_ix(ix, stream_data(rs, left[k]), rs->s[left[k]].len, &o->sig[left[k]]);
-                if (!k || ov > bestOv) { bestOv = ov; best = k; }
-            }
-            d = stream_data(rs, left[best]);
-            piece = rs->s[left[best]].len - bestOv;
-            if (tlen + piece > 2 * maxlen) {
-                u32 drop = tlen - maxlen;
-                for (k = 0; k < maxlen; ++k) tail[k] = tail[k + drop];
-                tlen = maxlen;
-            }
-            memcpy(tail + tlen, d + bestOv, piece);
-            tlen += piece; plen += piece;
-            ordered[no++] = left[best];
-            for (k = best; k + 1 < nl; ++k) left[k] = left[k + 1];
-            --nl;
-        }
-    }
-    if (!overlap_paths(o, standalone, ns, ix, paths)) goto done;
-    memcpy(ordered + no, contained, 4 * nc);
+    memset(flag, 0, n);
+    if (!paths_rows(&p, o, standalone, ns, ix)) goto done;
+    if (!greedy(&p, ordered, left, flag, tail, maxlen, o->pi)) goto done;
+    if (!overlap_paths(&p, paths)) goto done;
+    memcpy(ordered + ns, contained, 4 * nc);
     memcpy(paths + ns, contained, 4 * nc);
     if (!intern_all(o, paths, n, payload, &sizeP, 0) || !intern_all(o, ordered, n, payload, &sizeO, 0)) goto done;
     memcpy(list, sizeP < sizeO ? paths : ordered, 4 * n);
     ok = 1;
 done:
+    paths_free(&p);
     if (ix) { dw_free(ix->next); dw_free(ix->zrun); }
     dw_free(ix); dw_free(standalone); dw_free(contained); dw_free(ordered); dw_free(paths);
     dw_free(left); dw_free(flag); dw_free(tail);
