@@ -117,7 +117,9 @@ down (Collision with `moduleText`), and `moduleText`, `itemNotif`, "EMPTY!" and
 the `levelNumber` letters assume top-left text alignment although the HUD
 leaves `fa_middle` set; "EMPTY!" reuses the `itemNotif` record for
 `fxRisingText`, skips its Collision with `fxRisingText` and is born after the
-whole player Step. `levelNumber` is drawn on the fixed HUD layer: above the world and the hardware sprites,
+whole player Step. The spread guns' and aimed shots' art uses the nearest
+offline quarter turn without the usual gun's per-angle pixel proof.
+`levelNumber` is drawn on the fixed HUD layer: above the world and the hardware sprites,
 and hidden while the death flash covers the playfield. The merchant's speech
 (`fxRisingText` from `scrRisingTextShop`) uses the same alignment as "EMPTY!"
 and rises in Q16 like `itemNotif` rather than binary64. The Shop Step's
@@ -229,21 +231,34 @@ Stages, in order:
      with 171 KB of work memory, and every output hash equals the host's.
      stb_vorbis with soft float took 83 minutes and its hashes differed.
    - Done in `tools/install-data/` (`make -C tools/install-data test`):
-     input checks, the `data.win` page cache, the `Downwell.tables`
-     packer, and the text, rooms, masks, code, exe and audio stages; all
-     their outputs are identical to `generated/` (the sound banks are the
-     converter's own since 2026-11-23: `tools/pack-amiga-sfx.py` runs it).
-     Left: the scene-art stage (texture pages: our own bzip2 and the fioq
-     decoder, then `generate-amiga-hud.py`'s banks) and the stage derived
-     from those banks (AMDV, AMFA, HUDT, HART, DMGT, STMP, TPH6, TINI,
-     terrain, planes); then the 68020 build timed and fitted on
-     `a1200-4m`.
-   - Cost to cut: the CMOT correction search (`exe.cpp`, src/core's
-     integer soft-double over all 411,776 Q16 inputs) is estimated at
-     40-50 minutes on a 14 MHz 68020 (Unicorn sample: ~90k cycles per
-     input, 57 % in `multiplyBinary64`, 28 % in `MotionBinary64::add`);
-     the host takes 0.4 s. A converter-local Real on the 68020's
-     `mulu.l` may halve it; measure on `a1200-4m` first.
+     every stage. On the host all 22 outputs are identical to
+     `generated/` (0.57 s, peak allocation 3,298,004 bytes; the sound banks
+     are the converter's own since 2026-11-23: `tools/pack-amiga-sfx.py`
+     runs it).
+   - Measured on `a1200-4m` (2026-11-23,
+     `tools/install-data/time_amiga.py`: the `amiga-timing` build from the
+     Shell with `Stack 16384`, over `data/` mounted read-only): result 0,
+     all 22 outputs equal the host's, peak allocation 3,296,960 bytes, stack
+     6,414 of 16,384 bytes. It fits, but takes 83 minutes:
+
+     | Stage | Minutes |
+     | --- | ---: |
+     | inputs (SHA-256 of the 12 files, 42.7 MB) | 15.6 |
+     | exe (CMOT) | 36.7 |
+     | art | 14.4 |
+     | audio | 8.9 |
+     | derived | 6.1 |
+     | rooms, code, text, soundtables, masks, data.win | 0.9 |
+
+   - Left: cut the time; agree a target with the user first.
+     - CMOT: src/core's integer soft-double over all 411,776 Q16 inputs
+       (Unicorn sample: ~90k cycles per input, 57 % in `multiplyBinary64`,
+       28 % in `MotionBinary64::add`); the host takes 0.4 s. A
+       converter-local Real on the 68020's `mulu.l` may halve it.
+     - The input check hashes 42.7 MB at about 45 KB/s, a second pass over
+       files the stages read anyway.
+     - Art and audio: profile their owners on the target before changing
+       them.
    - The converter is built for the 68020 (`-m68020`, as the siblings'
      helpers are); a 68000 player could not run it. Open: whether that
      is acceptable or the converter needs a 68000 build.
@@ -276,162 +291,195 @@ Stages, in order:
 
 ### W3. Performance
 
-After W1 and W2: every gameplay update of world 1 within 20 ms on the
-A1200 with 4 MB Fast RAM. Code, BSS and CPU-side data run from Fast; only
-DMA data shares the Chip bus with display, blitter and audio DMA. The
-68EC020's 256-byte instruction cache helps. `profile.sh` still defaults to
-the A500 (`VERIFY_CHIP_KB=1024`); move its baselines to the target. The A500 numbers below and in
-sections 0 and 5 are relative evidence only; re-measure on the target.
-Start with the initial fall (section 0: D, then C, then E), then the rest of
-world 1: dense combat, shops, side rooms and time-stop, and scene handoffs
-judged by transition latency (section 5). Re-measure first; numbers recorded
-before W1 and W2 will be stale. The parked candidates in section 0 (C and D
-selectors) and in 1.01 (the scene collision backend) can be reused here.
-New costs from W1: the spawner step runs every update (quiet-fall rose from
-178 to 181 fields), and each live jelly or red ball calls `portableAtan` and
-binary64 trig every update. W1.4: every shot now draws RNG (spread, speed,
-image speed, three casing draws), the compact bullet store holds 32 shots,
-the laser casts its ray every update in 8-pixel steps against enemies,
-walls and shootables, and up to 96 laser trails are BOBs. Gun art adds
-17,762 bytes to the cavern CPU bank (now 246,710) and 8,334 Chip bytes to its
-plane atlas (now 117,744); the prepared actor-frame table grew from 512 to 640
-entries. The spread guns' and aimed shots' art uses the nearest offline
-quarter turn without the usual gun's per-angle pixel proof. W1.5: every
-update tests the player and every live enemy against a y-sorted field index
-(a mask query only within reach of a field), and casings, debris, moving
-effects and TorchFires against `TimeStopBound` while stopped; up to 20 (store 32) binary64
-time shards each run a solid query, and the compact no-loop store doubled to
-32 for gem-high SHOTGUN bursts. Sprite 91 adds 1,170 Chip bytes to the cavern
-plane atlas (now 118,914). `fxTimeChange` slows presentation on purpose (two
-fields per update at room speed 30, plus the 30 ms sleep); judge it as
-transition latency, not as frame cost. The quiet-fall witness went from 190
-to 193 fields: the steady-state Begin Step, the enemy field pass and the
-gem, box and fire gates. W1.6: each death now runs blood, smoke, flash and an
-`objDeadBody` (up to 16 corpses, each a TimeStopBound and two mask-599 wall
-queries per update, drawn on the controller effect surface), every damaging
-hit spawns an impact, a bullet or casing at a wall steps up to 101 tenths
-of its velocity to place its puff, and the player's dust and the empty-gun
-smoke add no-loop and smoke records. `momentDelay` (30 for one update) and
-player damage (40 for 40 updates) slow presentation on purpose; judge them
-like `fxTimeChange`. The corpse art, spark, dust and "!" add 2,460 Chip bytes
-to the cavern plane atlas (now 121,374). The quiet-fall witness went from
-193 to 195 fields. W1.7: the player's pose is evaluated once per update at
-the Draw boundary and shared by the draw list and Alarm 7's nine-record
-afterimage ring; while gem high, up to nine extra BOBs are drawn, each with
-two world RNG draws; the streak block (a 14-word, 22-row HUD stage that also erases
-its previous pixels by mask) is recomposed and published on every update
-that changes it, which is every update while gem
-high (cap and motion frames) or while the bar line moves; `currencyText`
-redraws the currency while it counts. Combo, reward and title art, the
-afterimage pages and the upgrade icons add 34,968 bytes to the cavern CPU
-bank (now 288,058) and 21,960 Chip bytes to its plane atlas (now 143,334);
-the prepared actor-frame table grew from 640 to 1,024 entries. The
-`levelNumber` title publishes to the HUD layer only when a letter appears or
-moves (a third of its updates; its baked letters cost one per reveal step).
-The quiet-fall witness went from 195 to 197 fields (the per-update HUD state
-and pose sharing; the title starts at the landing). W1.8: each shop's speech
-is a rising-text record (stepped with the notices, gated by a live count), up
-to ten glyph BOBs; the four new glyphs add 310 bytes to the cavern CPU bank
-(now 288,368) and 160 Chip bytes to its plane atlas (now 143,494). A full
-no-loop or moving effect store now drops the new effect instead of failing
-the game; the store sizes (32 and 48) are unchanged. W1.10: the per-style
-player art adds 78,466 bytes to the cavern CPU bank (now 366,834) and 30,510
-Chip bytes to its plane atlas (now 174,004), and the actor-frame table grew
-from 1,024 to 1,408 entries (cavern 1,274, reference game 1,298). The pause
-menus compose in a 27,264-byte scratch copy of the HUD layer (any memory,
-allocated only while paused) with the CPU renderer and copy the changed rows,
-so animating screens never show a cleared well; the pause bank is 8,818
-bytes and the results bank grew to 28,672 for the unlock notice's glyphs.
-The Timer publishes its 16 HUD rows on every update while shown and costs
-nothing while off.
-W1.9 (Knees, Gunpowder, Drone, Rocket Jump): the explosion and drone art
-drawn on the CPU effect surface adds 94,346 bytes to the cavern CPU bank and
-no Chip (no actor frames either); the Rocket Jump blast 461 adds 17,512 CPU
-and 13,538 Chip bytes; the 605 splash's 90-degree page adds 170 Chip bytes.
-Cavern CPU bank 480,656, planes 188,872. Smoke grows from 32 to 48 records
-and debris from 24 to 48; 24 blast records and the drone are new. Every
-update now runs the blast and drone steps (empty loops without the
-upgrades), and the unowned enemy step order costs an insertion pass.
-Hot Casing's sprLeakBullet 467 adds 420 bytes to the cavern CPU bank
-(481,532, past the old 470 KiB ceiling, now 472) and takes the reference game
-planes to 194,590 (ceiling 191 KiB). With the upgrade, every update tests
-each live hot casing against every active enemy (casings times enemies
-bounds tests).
-The Heart Balloon's three sprites (526, 700, 701, effect surface only) add
-2,256 bytes to the cavern CPU bank (483,788; ceiling 473 KiB) and take the
-reference game CPU bank to 495,612 (485 KiB). With the upgrade, every update
-steps the balloon (a string climb of up to 21 point tests and five binary64
-divisions) and tests it against every active enemy. The string draws as
-one-pixel white fills, one per column it crosses.
-The Safety Jetpack's flame (21-23, effect surface only) adds 1,320 bytes to
-the cavern CPU bank (485,108; ceiling 474 KiB) and takes the reference game
-CPU bank to 496,932 (486 KiB). Its thrust is a few comparisons in the
-player's Step; the flame is one more effect-surface stamp while thrusting.
-W1.10 (hard mode's eyefish 114 and neon red ball 173): their art (289, the
-corpse 291 and 352, with mirrored and DMA forms) adds 5,532 bytes to the
-cavern CPU bank (490,640; ceiling 480 KiB) and takes its Chip planes to
-191,500 (ceiling 188 KiB); the reference game bank goes to 502,464 (491 KiB)
-and its planes from 194,590 to 196,726 (193 KiB). EnemyState grows by
-24 bytes per record (the eyefish's binary64 xx, yy and xsp). A live eyefish
-runs scrCheckCollisionWith's wall tests every update; the neon ball costs
-what a red ball does, plus its collision test against every enemy.
-W1.11 (the 1-HP flicker and the laser's wall smoke): a red silhouette page
-for every living player pose, both facings, adds 20,654 bytes to the cavern
-CPU bank (511,294; ceiling 500 KiB) and 9,092 Chip plane bytes (200,592;
-ceiling 196 KiB); the reference game bank goes to 523,114 (511 KiB) and its
-planes to 205,818 (201 KiB). `AmigaActorFrames` widens from 8 to 10
-256-frame pages, 2,964 more bytes of span table. At 1 HP each Draw adds a
-counter and, on 7 Draws in 51, four RNG words and two BOBs in place of one.
+The target: every gameplay update of world 1 within 20 ms of work on the
+A1200 with 4 MB Fast RAM (`MACHINE=a1200-4m`). Code, BSS and CPU-side data
+run from Fast. Only DMA data shares the Chip bus with display, blitter and
+audio DMA, so CPU writes into Chip (row painting, HUD and plane publication)
+gain far less from the faster CPU than computation does. Scene handoffs are
+judged by overall transition latency and visible stalls (section 5's
+handoff rule). The updates the original slows on purpose are transitions,
+not frame cost: `fxTimeChange` (two fields per update at room speed 30, plus
+a 30 ms sleep), `momentDelay` (30 for one update) and player damage (40 for
+40 updates).
 
-W2.3's gameplay change misses the quiet-fall ceiling: 205 fields against
-197 (HEAD 194). The landing witness is unchanged, so this is pure cost, about
-0.4–0.7 ms per update by an instruction trace against the previous build:
-- About 700 cycles in `PlayerMotion::step`: the hard-land state, the two
-  alarms, `airstatus`, the wall-pose test and the call's larger frame.
-- About 2,000 cycles in `GameplayWorld::step`: the `SoundVoices` clock, the
-  recharge starts and the goal-field wind gate, plus diffuse growth across
-  unrelated lines.
-- Compiling the world-side calls out still gives 200, and builds that differ
-  only in layout vary by about ±3 fields.
-- Already done: `SoundVoices` keeps live voices packed (an idle world scans
-  nothing), and the wind skips its contact test while `global.voidWind`
-  plays.
-- Recover the gate before W3's 20 ms work, and move the player's rare-state
-  bookkeeping behind a single test.
+No world-1 timing has been measured on the target yet. Every number in
+sections 0 and 5 and in the [frame-cost audit](amiga-frame-cost.md) is from
+the A500 and predates most of W1 and W2, so it is relative evidence only.
+Work the steps in order; sections 0 and 5 hold the detail for the items they
+name. Every change follows their working rules:
 
-W2.4's mixer costs, from the probe on the A500 (raster lines of about
-64 µs):
-- **VBlank service:** at most 6 lines.
-- **`submit` of a play:** about 2.4 lines on a free channel, or 4.9 when it
-  steals. A gain costs about 4.
-- **`frame()`:** about 6.6 lines for each channel whose sound changed, at
-  most four a frame. A play only claims a channel; the final sound's bank
-  entry, period, length and volume are worked out once, at publish.
-- **Worst case:** the world-one route's worst tick (17 plays) should cost
-  about 110 lines (7 ms) on that update. The mean tick is about 2 requests.
-- **Idle:** idle channels cost nothing but Paula DMA, with no per-update
-  scans.
-- **Memory:** about 500 bytes of any memory for the plan, sequencer and
-  mailbox, plus the 8-byte Chip silent word and the bank.
-- **Wired (W2.6):** the longest VBlank service on the world-one and
-  hard-mode death routes is 8 lines. Quiet-fall stays at 208 fields with
-  the drain and `frame()` in the loop (`frame()` returns at once while no
-  voice plays and nothing is published). Finishing W2.6's requests (the
-  frog-against-frog bump scan, the shop walls) measures 210; the same tree
-  with the bump returning at once measures 211 and without its call 207, so
-  a few fields either way here are code layout, not the scan.
+- state the removed work and the expected saving from the profile before
+  writing code;
+- compare the same deterministic workload on the target, including its
+  worst update;
+- an accepted change is the default in its commit, with the replaced path
+  kept only as a `REFERENCE_*` oracle;
+- two rejected attempts end an item, and closed approaches stay closed;
+- no tuning of code under the work threshold;
+- delete traces once their numbers are in a commit.
 
-The wall-kick pose (`sprPlayerWall`, frame 0 with mirrored, DMA and
-afterimage forms) takes the cavern CPU bank to 368,798 bytes (ceiling raised
-to 361 KiB) and its plane atlas to 175,094 Chip bytes. The reference game
-planes' ceiling is now 177 KiB.
+**Gates**
+
+1. **W3.1 Repair the broken regression gates.** W3.8–W3.13 rely on both.
+   - `make verify-cross-replay` stops at frame 5 on the Amiga with
+     `downwellGameplayFailed` at the `effectsSucceeded` check. The fixture
+     world (`GameplayWorld(300)` on the host, the reference-terrain world on
+     the Amiga) installs no wall-contact resolver, so `stepCasings` →
+     `solidMeeting` clears `effectsSucceeded` from frame 5 on both targets.
+     Only the Amiga loop stops on it; `tools/port-replay-reference.cpp`
+     ignores it. Broken since the W1.4 casings (2026-11-03); frames 1–4
+     match. Give both fixture worlds the same empty wall/platform resolver
+     and make the host reference fail on lost effects.
+   - `make verify-amiga-gameplay-cache` fails with `raster=64 checks=156`
+     (seen 2026-11-21, also before the terrain raster ring).
+
+**Baseline on the target**
+
+2. **W3.2 Profile on the target.** `amiga/profile.sh` sets
+   `VERIFY_CHIP_KB=1024` (the A500) for its quiet-fall modes. Make
+   `a1200-4m` the default for every mode, and keep `MACHINE=a500` only for
+   relative comparisons. Check that `tools/amiga-fall-budget.py`,
+   `tools/amiga-trace-report.py` and the frame marks convert at the
+   68EC020's clock, and that the instruction profile records on the 020
+   core. A profiled field runs slightly differently from an unprofiled one
+   on that core, so compare only captures that profiled the same fields
+   (the shared measurement method).
+3. **W3.3 Recover W2.3's quiet-fall regression.** On the A500, W2.3's
+   gameplay change took the quiet fall from 197 to 205 fields with an
+   unchanged landing witness, about 0.4–0.7 ms per update:
+   - about 700 cycles in `PlayerMotion::step`: the hard-land state, the two
+     alarms, `airstatus`, the wall-pose test and the call's larger frame;
+   - about 2,000 cycles in `GameplayWorld::step`: the `SoundVoices` clock,
+     the recharge starts and the goal-field wind gate, plus diffuse growth.
+
+   W2.6's requests then measured 210 (the frog-against-frog bump and the
+   shop walls); builds that differ only in layout vary by about ±3 fields.
+   Move the player's rare-state bookkeeping behind a single test, and A/B
+   the quiet fall on the target.
+4. **W3.4 Target references.** Record on `a1200-4m`:
+   - the quiet-fall field count and landing witness
+     (`tools/verify-quiet-fall.py`; tick 164, y 262,144, health 4, ammo 8,
+     3 enemies, 1,371 RNG draws), and set the cadence ceiling from it;
+   - all 165 native state samples;
+   - the full-fall window table (section 0's three-capture method,
+     `tools/amiga-fall-budget.py`).
+5. **W3.5 A per-update census for whole routes.** A 100-field cycle-exact
+   capture is about 500 MB, too much for whole routes. Add a profile build
+   that records every update's work on the target, excluding the
+   publication wait, together with its scene and room speed. It keeps them
+   in a ring read once at the end, with no stops inside measured updates.
+   It flags the deliberate slowdowns and the scene handoffs, so they are
+   judged separately.
+6. **W3.6 Census of world 1.** Run it over:
+   - the initial fall;
+   - the contact tape (`profile.sh fps`) and the shop tape
+     (`profile.sh shop`);
+   - the native world-one route (`tools/verify-world-one-native.py`: 1-1 to
+     1-3 with shops, side rooms, time-stop, and the clear and upgrade
+     screens) and the hard-mode death route;
+   - the upgrade routes that add per-update work (`UPGRADE_ROUTES`: Hot
+     Casing, Heart Balloon, Gunpowder and Drone, Rocket Jump, the laser);
+   - a dense-encounter tape (section 5 H), chosen with the seeded input
+     search and its parity checks;
+   - the gameplay entry (`profile.sh entry`) and the transitions.
+
+   For each, record the work mean, the worst update, and the updates over
+   20 ms with their excess.
+7. **W3.7 Owners and ranking.** Trace the worst updates with short captures
+   that start one update early. Rank owners by their total excess across
+   all workloads. Replace the A500 numbers in this section, sections 0 and
+   5 and the audit with the target's, and drop any item the target already
+   meets. Then review the order of W3.8–W3.13 with the user: CPU-side work
+   should shrink more than Chip-bus work, so C may rank ahead of D. A 68020
+   build (`-m68020`: 32-bit multiply and divide for the binary64
+   arithmetic) is the user's decision; the code stays 68000-compatible
+   until then.
+
+**The initial fall (section 0)**
+
+8. **W3.8 D, the fixed per-update cost.** Start from the
+   `REFERENCE_FRAME_WORK=0` candidate: re-measure it on the target, finish
+   its behaviour acceptance and cadence run, and make it the default. Then
+   remove what remains on a quiet update:
+   - a retained draw list instead of the room-actor walk;
+   - dirty tracking instead of per-update clears;
+   - no work in phases without participants (alarms, Step-order capture,
+     End Step interior, shop End Step);
+   - the weapon level recomputed when the streak changes, and the camera
+     when the player moves;
+   - the builder's position acquired once for its lifetime.
+
+   Gate: the quiet-update target re-derived on the target (room for a
+   row's work and one enemy), with unchanged state samples.
+9. **W3.9 C, row painting.** Take the `REFERENCE_ROW_PAINTING=0` candidate
+   (painting ahead into the hidden scroll margin, prepared pattern rows)
+   through the full fall, the cadence run and default acceptance on the
+   target. Gate:
+   - no row update over 20 ms in 122–135 or 137–162;
+   - generation and painting in different updates of each row period;
+   - the scalar pixel comparison over all pattern rows and seams.
+10. **W3.10 E, the bursts at 122, 136 and 163.** First make event cells
+    cheaper: breakables become source records under a lent-counter lease,
+    and enemy adoption goes through the native roster. Then stage the
+    builder's next pattern in slack time, verify its key at the trigger
+    update and commit it there. Gate: each burst at or under 20 ms, a
+    fixture that forces a key mismatch, and unchanged state samples and
+    replay.
+11. **W3.11 Close section 0:** the fall in 164 fields with every update
+    within 20 ms. Remove section 0.
+
+**The rest of world 1**
+
+12. **W3.12 Gameplay owners in census order.** Take only owners with at
+    least 3 ms in a budget update (section 5's threshold). The A500
+    candidates are section 5's A (later generation bursts), B (the contact
+    damage number), C (combat composition) and E (quiet frames), plus the
+    work W1 added:
+    - Hot Casing: each live hot casing against every active enemy, every
+      update;
+    - Heart Balloon: a string climb of up to 21 point tests and five
+      binary64 divisions, and a test against every active enemy, every
+      update;
+    - the blast and drone steps (empty loops without the upgrades) and the
+      unowned enemy step order's insertion pass;
+    - the laser's ray (8-pixel steps against enemies, walls and
+      shootables) and up to 96 trail BOBs;
+    - every shot's RNG draws (spread, speed, image speed, three casing
+      draws);
+    - jellies and red balls: `portableAtan` and binary64 trig every update;
+      the eyefish's wall tests; the neon ball's test against every enemy;
+    - gem high: up to nine afterimage BOBs with two RNG draws each, and the
+      streak block recomposed and published every update; `currencyText`
+      while it counts; the Timer's 16 HUD rows while shown;
+    - time-stop: up to 20 binary64 time shards with a solid query each, the
+      y-sorted field index for the player and every enemy, and
+      `TimeStopBound` for casings, debris, moving effects and TorchFires;
+    - deaths: up to 16 corpses, each a `TimeStopBound` and two mask-599
+      wall queries per update; a bullet or casing at a wall steps up to 101
+      tenths of its velocity to place its puff;
+    - the 1-HP flicker: four RNG words and two BOBs on 7 Draws in 51;
+    - shop speech: up to ten glyph BOBs per rising text.
+13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
+    the first interactive frame and by visible stalls: gameplay entry,
+    level transitions and shop re-entry, the clear and upgrade screens,
+    results and Retry, and the pause menus.
+
+**Close**
+
+14. **W3.14 Re-audit and lock in.** Repeat the census on the target, with
+    every active-gameplay update within 20 ms. Commit the results to the
+    audit, and turn the cadences into regression ceilings: the quiet fall
+    at 164 fields, and a ceiling for the world-one route. Check that the
+    shipping footprint still fits the target.
+15. **W3.15 Close W3:** remove this section and the world-1 parts of
+    section 5. Its other items stay parked for world 2.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
 (Measured on the A500; the target is now the A1200 with 4 MB Fast, see the top
 of this file and W3.)
 
-**Part of W3 (performance); paused until W1 and W2 are done.** The target is the **no-input initial fall from the top of the well to
+**Part of W3 (W3.8–W3.11); re-measure on the target first (W3.4).** The target is the **no-input initial fall from the top of the well to
 the first platform**, updates 1–164. The goal is that every update fits one
 PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
 earlier target of matching the historical 181 fields; reaching that is a
@@ -648,16 +696,6 @@ reintroduce per-span terrain structures on the generated path.
 
 ### Other regression work (after the fall)
 
-- `make verify-amiga-gameplay-cache` fails with `raster=64 checks=156`
-  (seen 2026-11-21, also before the terrain raster ring).
-- `make verify-cross-replay` stops at frame 5 on the Amiga with
-  `downwellGameplayFailed` at the `effectsSucceeded` check. The fixture world
-  (`GameplayWorld(300)` on the host, the reference-terrain world on the Amiga)
-  installs no wall-contact resolver, so `stepCasings` → `solidMeeting` clears
-  `effectsSucceeded` from frame 5 on both targets. Only the Amiga loop stops on
-  it; `tools/port-replay-reference.cpp` ignores it. Broken since the W1.4 casings
-  (2026-11-03). Frames 1–4 match. Give both fixture worlds the same empty
-  wall/platform resolver and make the host reference fail on lost effects.
 - Enforce scene/level-local residency and execution before adding content:
   1. Replace remaining resident
      gameplay tables/room catalogues and SDL collision masks with explicit
@@ -1202,6 +1240,8 @@ ports does not count as parity with the original.
 Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 ## 5. Meet the Amiga frame budget
+
+W3.12 and W3.13 take its world-1 part, re-measured on the target.
 
 Target <=20 ms frames during active gameplay and smooth style/upgrade navigation.
 Scene handoffs are not gameplay frames: judge them by total transition latency

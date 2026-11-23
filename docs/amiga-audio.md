@@ -162,6 +162,27 @@ area-1 patterns, and names every cut with its reason.
   1-1 (outside a shop): 476,576 bytes of Chip are free, 476,520 of them in
   one block, so about 465 KiB. Startup leaves 651,136.
 
+## Mixer cost
+
+W2.4's mixer costs, from the probe on the A500 (raster lines of about
+64 µs):
+
+- **VBlank service:** at most 6 lines.
+- **`submit` of a play:** about 2.4 lines on a free channel, or 4.9 when it
+  steals. A gain costs about 4.
+- **`frame()`:** about 6.6 lines for each channel whose sound changed, at
+  most four a frame. A play only claims a channel; the final sound's bank
+  entry, period, length and volume are worked out once, at publish.
+- **Worst case:** the world-one route's worst tick (17 plays) should cost
+  about 110 lines (7 ms) on that update. The mean tick is about 2 requests.
+- **Idle:** idle channels cost nothing but Paula DMA, with no per-update
+  scans. `frame()` returns at once while no voice plays and nothing is
+  published.
+- **Memory:** about 500 bytes of any memory for the plan, sequencer and
+  mailbox, plus the 8-byte Chip silent word and the bank.
+- **Wired (W2.6):** the longest VBlank service on the world-one and
+  hard-mode death routes is 8 lines.
+
 ## Recording check
 
 `make verify-amiga-paula-mixer` plays every sound and the mixer exercises in
