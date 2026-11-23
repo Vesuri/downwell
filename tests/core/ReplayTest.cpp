@@ -99,12 +99,15 @@ void testReplayProducesStableStartupState() {
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
     const std::uint64_t digest = runtime.stateDigest();
-    // Schema 49 includes stored projectile identities and their lifetime links.
-    if (digest != 0xbf4d5aed1cf0989eULL)
+    // A determinism pin, not a Windows oracle. It includes stored projectile
+    // identities and their lifetime links (02f66b1a), the runner's
+    // pre-incremented instance IDs (fed72c3a) and the authored dither Begin
+    // Step (afe3b22e).
+    if (digest != 0xa3d23c048e98e0cbULL)
         std::cerr << "startup state digest: 0x" << std::hex << digest
                   << std::dec << '\n';
-    require(digest == 0xbf4d5aed1cf0989eULL,
-            "schema-49 startup state digest remains wire-stable");
+    require(digest == 0xa3d23c048e98e0cbULL,
+            "the startup state digest remains wire-stable");
     auto& record=const_cast<downwell::InstanceRecord&>(runtime.instanceAt(0));
     const auto mask=record.maskId;record.maskId=31;
     require(runtime.stateDigest()!=digest,"digest detects mask-only changes behind identical artwork");
@@ -116,7 +119,8 @@ void testPortCheckpointIsStable() {
     PlayerMotion player(false, 300);
     const auto checkpoint = downwell::portCheckpointDigest(
         50, 5, player, 30, true, -1, 15);
-    require(checkpoint == 0x860ff3c3941bc1a5ULL,
+    // Includes the W2.3 landing, hop and wall-kick state (ba5f503b).
+    require(checkpoint == 0x551bb16a6ef9cba9ULL,
             "schema-three player-complete checkpoint remains wire-stable");
     PlayerMotion delayed = player;
     delayed.initializeEntryInput(false);
