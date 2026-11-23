@@ -47,7 +47,7 @@ def main():
         launcher.write_text(
             '#!/bin/bash\nset -euo pipefail\ncd "$1"\n. "$2/amiga/env.sh"\nFSUAE_RUN=.\n. "$FSUAE_COMMON"\n'
             "trap 'fsuae_stop' EXIT\nFSUAE=\"$FSUAE_ARM\"\n"
-            f'AMIGA_SETUP={setup} DEBUG=1 DEBUG_PORT="$3" SOUND=0 WINDOW=none WARP=1\n'
+            f'AMIGA_SETUP={setup} DEBUG=1 DEBUG_PORT="$3" SOUND=0 WARP=1\n'
             'fsuae_claim_port\nfsuae_options\n'
             'fsuae_launch --hard_drive_0="$PWD/boot" --hard_drive_1="$4" --hard_drive_1_read_only=1 '
             '--hard_drive_2="$PWD/out" --remote_debugger_trigger=DownwellInstallData --state_dir="$PWD/state" '
