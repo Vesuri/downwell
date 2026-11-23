@@ -3369,6 +3369,7 @@ private:
     bool attractCompactGem(int slot);
     bool spawnCompactDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& handle);
     bool solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool segmentSolid(const downwell::ProjectileSegment& path)const;
     bool compactInView(int x,int y,bool& visible)const;
 public:
     const CompactEffects& compactEffects()const{return compactEffects_;}

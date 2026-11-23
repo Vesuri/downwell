@@ -427,7 +427,8 @@ struct LiveSimulation {
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
         port.configureSolidResolver(amigaResolveTerrainSolid, &collision,
                                     amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,
-                                    nullptr,nullptr,amigaResolveTerrainCorners);
+                                    amigaResolveTerrainWallContacts,amigaResolveTerrainPlatformContact,
+                                    amigaResolveTerrainCorners);
         port.configureSolidCells(amigaTerrainSolidCells(collision));
     }
 };
@@ -508,8 +509,10 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
                             enemy.grounded == command.grounded && enemy.active == command.active,
                         "native enemy retains exact integer Create state and alarms");
             }
+            // W1.4: an admitted GunModule (109) is a falling world record,
+            // not a painted decoration (decorationSprite in AmigaTerrain.cpp).
             if (command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
-                command.objectId == 109) {
+                (command.objectId == 109 && !GameplayWorld::compactGunsAdmitted)) {
                 require(decorationCount < native.decorationCount(), "decoration exists on creation tick");
                 const auto& decoration = decorations[decorationCount++];
                 require(decoration.objectId == command.objectId && decoration.x == command.x &&
@@ -699,10 +702,16 @@ int main(int argc, char** argv) {
         LiveSimulation indexed(patterns), pixels(patterns);
         AmigaPortRuntime fast(300, false, 4096-176, true), reference(300, false, 4096-176, true);
         indexed.bind(fast); pixels.bind(reference);
-        reference.configureSolidResolver(amigaResolveTerrainSolid, &pixels.collision);
+        // Movement takes the point resolver; casings and gems (W1.4) ask for
+        // wall and platform contacts the same way in both worlds.
+        reference.configureSolidResolver(amigaResolveTerrainSolid, &pixels.collision, nullptr, nullptr,
+                                         amigaResolveTerrainWallContacts, amigaResolveTerrainPlatformContact);
         reference.configureSolidCells({});
-        unsigned enemyUpdates = 0;
-        for (unsigned tick = 0; tick < 600; ++tick) {
+        unsigned enemyUpdates = 0, comparedTicks = 0;
+        // At least 600 ticks, and on until an awake enemy has been compared:
+        // the GunModule draws (9e683b15) changed the level this tape meets.
+        for (unsigned tick = 0; tick < 1800 && (tick < 600 || enemyUpdates == 0); ++tick) {
+            ++comparedTicks;
             downwell::Input input;
             input.fire = tick % 23 < 17;
             input.left = tick % 180 < 35;
@@ -713,6 +722,8 @@ int main(int argc, char** argv) {
                     fast.trajectoryDigest() == reference.trajectoryDigest() &&
                     fast.blocksDestroyed() == reference.blocksDestroyed(),
                     "indexed segment/corner terrain preserves live simulation checkpoints");
+            require(fast.effectsSucceeded() && reference.effectsSucceeded(),
+                    "indexed/pixel live comparison keeps its effects");
             compareRandom(fast.randomState(), reference.randomState());
             require(fast.enemyCount() == reference.enemyCount(), "indexed/pixel enemy populations match");
             for (unsigned i = 0; i < fast.enemyCount(); ++i) {
@@ -728,6 +739,8 @@ int main(int argc, char** argv) {
             }
         }
         require(fast.player().shots() > 0, "indexed/pixel live comparison exercises firing");
+        std::cout << "Indexed/pixel comparison: " << comparedTicks << " ticks, "
+                  << enemyUpdates << " awake enemy updates\n";
         require(enemyUpdates > 0, "indexed/pixel live comparison moves awake enemies");
     }
     LiveCollision boundary;

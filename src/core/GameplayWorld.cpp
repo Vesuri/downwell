@@ -2941,6 +2941,22 @@ bool GameplayWorld::spawnCompactDebris(downwell::MotionBinary64 x,downwell::Moti
 
 // sParentSolid (56) or parentWall (57) place_meeting for a rectangle mask:
 // generated walls, live boxes and shop walls, plus thin platforms for 56.
+// Whether a projectile's line meets unbreakable terrain: the segment
+// resolver when configured, otherwise the point resolver over the line's
+// bounds (fixtures that compare the two). Shots and casings both ask here.
+bool GameplayWorld::segmentSolid(const downwell::ProjectileSegment& path)const{
+    if(!solidResolver_)return false;
+    if(segmentResolver_)return segmentResolver_(solidResolverContext_,path);
+    const int left=path.x.pixel<path.endX.pixel?path.x.pixel:path.endX.pixel;
+    const int right=path.x.pixel>path.endX.pixel?path.x.pixel:path.endX.pixel;
+    const int top=path.y.pixel<path.endY.pixel?path.y.pixel:path.endY.pixel;
+    const int bottom=path.y.pixel>path.endY.pixel?path.y.pixel:path.endY.pixel;
+    for(int y=top;y<=bottom;++y)
+        for(int x=left;x<=right;++x)
+            if(solidResolver_(solidResolverContext_,x,y)&&path.intersects(x,x+1,y,y+1))return true;
+    return false;
+}
+
 bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
     downwell::ContactBounds bounds;
     if(!run_.effectsSucceeded||!wallContactResolver_||(platforms&&!platformContactResolver_)||
@@ -3635,19 +3651,7 @@ bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::Proje
         if(hit)return true;
     }
     // An ordinary, non-wave bullet also stops at unbreakable walls.
-    if(solidResolver_!=0){
-        if(segmentResolver_){
-            if(segmentResolver_(solidResolverContext_,path)){consumed=true;return compactBulletWallHit(path);}
-        }else{
-            const int left=path.x.pixel<path.endX.pixel?path.x.pixel:path.endX.pixel;
-            const int right=path.x.pixel>path.endX.pixel?path.x.pixel:path.endX.pixel;
-            const int top=path.y.pixel<path.endY.pixel?path.y.pixel:path.endY.pixel;
-            const int bottom=path.y.pixel>path.endY.pixel?path.y.pixel:path.endY.pixel;
-            for(int y=top;y<=bottom;++y)
-                for(int x=left;x<=right;++x)
-                    if(solidResolver_(solidResolverContext_,x,y)&&path.intersects(x,x+1,y,y+1)){consumed=true;return compactBulletWallHit(path);}
-        }
-    }
+    if(segmentSolid(path)){consumed=true;return compactBulletWallHit(path);}
     // W2.6: shopTable and objInvisWall are subparentSolidWall too.
     if(const int material=shopWallOn(path,false);material>=0){consumed=true;return compactBulletWallHit(path,material);}
     if((!scenery_.empty()||guns_.moduleEnd)&&!hitCompactShootable(path,bullet,consumed))return false;
@@ -3940,7 +3944,7 @@ bool GameplayWorld::stepCasings(){
         const downwell::ProjectileSegment path(q20(c.x-(240L<<16)),q20(c.y-(176L<<16)),
             std::int32_t(c.xsp*16),std::int32_t(c.ysp*16));
         bool hit=false;
-        if(solidResolver_&&segmentResolver_)hit=segmentResolver_(solidResolverContext_,path);
+        hit=segmentSolid(path);
         if(hit&&!compactBulletWallHit(path))return false;
         if(!hit){const int material=shopWallOn(path,false);
             if(material>=0){hit=true;if(!compactBulletWallHit(path,material))return false;}}
