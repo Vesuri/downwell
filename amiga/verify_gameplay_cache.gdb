@@ -1,5 +1,6 @@
 set pagination off
 set confirm off
+set remotetimeout 120
 target remote 127.0.0.1:2345
 break downwellGameplayLongRunReady
 continue
@@ -24,6 +25,8 @@ while $guard_word < 64
 end
 if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks < 50 || gDownwellGameBufferFailures != 0 || gDownwellGameplayBobFailures != 0
     printf "Gameplay cache verification failed: raster=%lu checks=%lu buffers=%lu\n", gDownwellTerrainRasterFailures, gDownwellTerrainRasterChecks, gDownwellGameBufferFailures
+    printf "First cache/fresh mismatch: viewX=%ld worldY=%ld height=%ld row=%ld plane=%ld word=%ld cached=%04lx fresh=%04lx\n", gDownwellTerrainFirstMismatch[0], gDownwellTerrainFirstMismatch[1], gDownwellTerrainFirstMismatch[2], gDownwellTerrainFirstMismatch[3], gDownwellTerrainFirstMismatch[4], gDownwellTerrainFirstMismatch[5], gDownwellTerrainFirstMismatch[6], gDownwellTerrainFirstMismatch[7]
+    printf "bobs=%lu\n", gDownwellGameplayBobFailures
     quit 1
 end
 if gDownwellLiveGenerationFailed != 0 || gDownwellLiveFragments == 0 || gDownwellLiveFragments >= 19 || gDownwellLiveEnemies == 0

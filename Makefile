@@ -3437,9 +3437,10 @@ verify-amiga-gameplay-bobs:
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j4 SKIP_TO_GAME=1 SCENE_VERIFY=1 BOB_VERIFY=1' ; } && \
 	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_bobs.gdb READY_MARKER=DOWNWELL_GAMEPLAY_BOBS_READY READY_DESCRIPTION="overflow actor oracle" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh' ; }
 
+# Its oracle build (2.6 MB of BSS) cannot load beside the game on a1200-4m.
 verify-amiga-gameplay-cache:
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j4 SKIP_TO_GAME=1 SCENE_VERIFY=1' ; } && \
-	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_cache.gdb READY_MARKER=DOWNWELL_GAMEPLAY_CACHE_READY READY_DESCRIPTION="600-tick terrain cache oracle" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh' ; }
+	{ bash -c '. amiga/env.sh && MACHINE=$${MACHINE:-a1200-fast} GDB_SOURCE=verify_gameplay_cache.gdb READY_MARKER=DOWNWELL_GAMEPLAY_CACHE_READY READY_DESCRIPTION="600-tick terrain cache oracle" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh' ; }
 
 .PHONY: verify-amiga-natural-route verify-amiga-clear-scene
 verify-amiga-natural-route: verify-natural-exit
