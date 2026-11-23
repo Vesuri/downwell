@@ -28,11 +28,18 @@ struct BasicWalkingEnemyMotion {
         // Supported area-one terrain consists of aligned 16x16 cells.
         return solidCorners(solid,b.left,b.top,b.right-1,b.bottom-1);
     }
+    // Without a floor limit the count to the floor is the source's, unbounded.
+    // (A numeric_limits default would be zero for a class Number such as
+    // PixelFraction: it is not specialised for it.)
+    template<class Meeting,class Presentation=NoWalkingPresentation>
+    bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation={}) {
+        return step(turtle,walking,visible,meeting,presentation,Number{},false);
+    }
     // floorLimit: a y below which no solid can be met (the world's lowest
     // terrain). See the count to the floor below.
-    template<class Meeting,class Presentation=NoWalkingPresentation>
-    bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation={},
-              Number floorLimit=std::numeric_limits<Number>::max()) {
+    template<class Meeting,class Presentation>
+    bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation,
+              Number floorLimit,bool limited=true) {
         const Number zero{}, one = Math::pixels(1);
         vy += Math::fixed(256);
         if (vy >= Math::pixels(7)) vy = Math::pixels(7);
@@ -58,7 +65,7 @@ struct BasicWalkingEnemyMotion {
                     Number distance{};
                     bool found = true;
                     for (Number i = one; !meeting(x, y + i); i += one) {
-                        if (y + i > floorLimit) { found = false; break; }
+                        if (limited && y + i > floorLimit) { found = false; break; }
                         distance += one;
                     }
                     if (found) vy = distance;
