@@ -199,17 +199,7 @@ builds every derived file from the player's files.
 
 Stages, in order:
 
-1. **WI.1 Workbench start and exit.** `AmigaStart.c` replaces the shared
-   gcc8 `_start`: it takes the WBStartup message first, returns `main`'s
-   result and replies the message under `Forbid()` after the finalizers,
-   like the siblings' `start.c`. Data files load through
-   `AmigaPlatform::loadData`: `PROGDIR:data/`, where the installer puts
-   them, else `PROGDIR:` (a development drawer), as the siblings do; the
-   save stays in `PROGDIR:`. Check: `VERIFY_WORKBENCH=1` in
-   `verify_startup.sh` (the installed `data/` layout) with
-   `tools/verify-workbench-start.py`, and the same driver from the Shell
-   (the flat layout).
-2. **WI.4 Portable converter.** One C implementation of the generators
+1. **WI.4 Portable converter.** One C implementation of the generators
    that the host build also uses, so the Python and ffmpeg path stops being
    a second authority: FORM chunk parsing streamed from disk (`data.win`
    is 28 MB, 24.6 MB of it AUDO; the target has 4 MB Fast), the texture
@@ -238,11 +228,26 @@ Stages, in order:
      the cycle-exact `a1200-4m` all 11 take 11,571 ticks (3.9 minutes)
      with 171 KB of work memory, and every output hash equals the host's.
      stb_vorbis with soft float took 83 minutes and its hashes differed.
-   - Done so far in `tools/install-data/` (`make -C tools/install-data
-     test`): input checks, the `data.win` page cache, the
-     `Downwell.tables` section packer, and SNDD and SNDG, identical to
-     `generated/`.
-3. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
+   - Done in `tools/install-data/` (`make -C tools/install-data test`):
+     input checks, the `data.win` page cache, the `Downwell.tables`
+     packer, and the text, rooms, masks, code, exe and audio stages; all
+     their outputs are identical to `generated/` (the sound banks are the
+     converter's own since 2026-11-23: `tools/pack-amiga-sfx.py` runs it).
+     Left: the scene-art stage (texture pages: our own bzip2 and the fioq
+     decoder, then `generate-amiga-hud.py`'s banks) and the stage derived
+     from those banks (AMDV, AMFA, HUDT, HART, DMGT, STMP, TPH6, TINI,
+     terrain, planes); then the 68020 build timed and fitted on
+     `a1200-4m`.
+   - Cost to cut: the CMOT correction search (`exe.cpp`, src/core's
+     integer soft-double over all 411,776 Q16 inputs) is estimated at
+     40-50 minutes on a 14 MHz 68020 (Unicorn sample: ~90k cycles per
+     input, 57 % in `multiplyBinary64`, 28 % in `MotionBinary64::add`);
+     the host takes 0.4 s. A converter-local Real on the 68020's
+     `mulu.l` may halve it; measure on `a1200-4m` first.
+   - The converter is built for the 68020 (`-m68020`, as the siblings'
+     helpers are); a 68000 player could not run it. Open: whether that
+     is acceptable or the converter needs a 68000 build.
+2. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
    siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
    an existing drawer (saves preserved), Use existing or Replace the
    converted data, the player's Steam drawer, `DownwellInstallData` into a
@@ -251,7 +256,7 @@ Stages, in order:
    `tools/check_release.py` on AmigaXDev's `amigaxdev.release`, icons from
    the siblings. An emulated install test covers fresh, keep, replace,
    wrong files and the start from both icon and Shell.
-4. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
+3. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
    little memory, a missing or wrong data file) says why: on the Shell's
    output, or in a requester when started from Workbench.
 
