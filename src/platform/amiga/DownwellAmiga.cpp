@@ -2845,6 +2845,15 @@ __attribute__((noinline)) static int runDownwell(void) {
         if (sliceEnd.presented) { platform.waitVblank(); continue; }
         decltype(encounterSession)::Frame encounterFrame(encounterSession);
         if(!encounterFrame.valid())break;
+#ifdef DOWNWELL_CENSUS
+        {
+            const bool censusGameplay = scenes.scene() == AmigaScene::gameplay;
+            downwellCensusUpdate((unsigned)scenes.scene(), censusGameplay ? port.roomSpeed() : 60,
+                censusGameplay ? unsigned(port.runStage().area * 4 + port.runStage().level) : 0u,
+                censusGameplay && (port.levelResultRequested() || port.levelClearActive()),
+                censusGameplay ? port.cameraOffsetX() : 0);
+        }
+#endif
         DW_PROFILE_FRAME((unsigned)scenes.scene());
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
         AmigaFrameBudget frameBudget(frameWorkStamp());
@@ -2908,10 +2917,18 @@ __attribute__((noinline)) static int runDownwell(void) {
             const int speed=port.roomSpeed();
             if(speed>0&&speed<60){
                 speedCredit+=unsigned(60-speed);
-                while(speedCredit>=unsigned(speed)){speedCredit-=unsigned(speed);platform.waitVblank();}
+                while(speedCredit>=unsigned(speed)){speedCredit-=unsigned(speed);platform.waitVblank();
+#ifdef DOWNWELL_CENSUS
+                    downwellCensusMark(censusDeliberate);
+#endif
+                }
             }else speedCredit=0;
             sleepCredit+=port.takePauseMilliseconds();
-            while(sleepCredit>=20u){sleepCredit-=20u;platform.waitVblank();}
+            while(sleepCredit>=20u){sleepCredit-=20u;platform.waitVblank();
+#ifdef DOWNWELL_CENSUS
+                downwellCensusMark(censusDeliberate);
+#endif
+            }
         }
 #endif
         if (!overlapStep) {

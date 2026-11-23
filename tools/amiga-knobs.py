@@ -26,7 +26,7 @@ SETS = {
                     "FRAME_WORK_CANDIDATE"],
     "verify": ["*_VERIFY", "*_AUDIT", "REPLAY_FRAME_TRACE", "FRAME_DUMP"],
     "profile": ["PROBES", "FPSCOUNT", "PROFILE_*", "GENERATION_*", "PHASE_SAMPLING",
-                "SAMPLE_FRAME", "TRACE_FRAMES"],
+                "SAMPLE_FRAME", "TRACE_FRAMES", "CENSUS", "CENSUS_UPDATES"],
     "reference": ["REFERENCE_*"],
 }
 KNOB = re.compile(r"^([A-Z][A-Z0-9_]*)\s*\?=\s*(.*?)\s*\\?$")

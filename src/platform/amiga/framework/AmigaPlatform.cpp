@@ -273,14 +273,29 @@ void AmigaPlatform::publish(const CopperList& copper)
     publishedVblank_ = vblankCount_;
 }
 
+#ifdef DOWNWELL_CENSUS
+void (*AmigaPlatform::waitObserver)(bool) = nullptr;
+namespace {
+struct ObservedWait {
+    ObservedWait() { if (AmigaPlatform::waitObserver) AmigaPlatform::waitObserver(true); }
+    ~ObservedWait() { if (AmigaPlatform::waitObserver) AmigaPlatform::waitObserver(false); }
+};
+}
+#define DOWNWELL_OBSERVED_WAIT ObservedWait observedWait
+#else
+#define DOWNWELL_OBSERVED_WAIT ((void)0)
+#endif
+
 void AmigaPlatform::waitVblank() const
 {
+    DOWNWELL_OBSERVED_WAIT;
     const UWORD start = vblankCount_;
     while (vblankCount_ == start) { }
 }
 
 UWORD AmigaPlatform::waitPublished(UWORD since) const
 {
+    DOWNWELL_OBSERVED_WAIT;
     UWORD now;
     while ((now = vblankCount_) == publishedVblank_ || now == since) { }
     return now;
@@ -288,6 +303,7 @@ UWORD AmigaPlatform::waitPublished(UWORD since) const
 
 void AmigaPlatform::waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const
 {
+    DOWNWELL_OBSERVED_WAIT;
     const UWORD start=vblankCount_;
     serviceIdleUntilVblank(start,idleWork,context,reserveLines);
     // If work crossed the boundary, do not accidentally wait another field.
@@ -296,6 +312,7 @@ void AmigaPlatform::waitVblank(bool (*idleWork)(void*),void* context,unsigned re
 
 UWORD AmigaPlatform::waitPublished(UWORD since,bool (*idleWork)(void*),void* context,unsigned reserveLines) const
 {
+    DOWNWELL_OBSERVED_WAIT;
     const UWORD start=vblankCount_;
     if(start==publishedVblank_||start==since)
         serviceIdleUntilVblank(start,idleWork,context,reserveLines);

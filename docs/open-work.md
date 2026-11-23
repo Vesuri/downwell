@@ -205,14 +205,8 @@ On the target the quiet fall already presents every update in one field
 its field count cannot show a smaller regression: judge the quiet fall on
 the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
 
-5. **W3.5 A per-update census for whole routes.** A 100-field cycle-exact
-   capture is about 500 MB, too much for whole routes. Add a profile build
-   that records every update's work on the target, excluding the
-   publication wait, together with its scene and room speed. It keeps them
-   in a ring read once at the end, with no stops inside measured updates.
-   It flags the deliberate slowdowns and the scene handoffs, so they are
-   judged separately.
-6. **W3.6 Census of world 1.** Run it over:
+6. **W3.6 Census of world 1.** Run `CENSUS=1 bash amiga/profile.sh` (the
+   [census](amiga-profiling.md#per-update-work-census)) over:
    - the initial fall;
    - the contact tape (`profile.sh fps`) and the shop tape
      (`profile.sh shop`);
@@ -226,7 +220,11 @@ the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
    - the gameplay entry (`profile.sh entry`) and the transitions.
 
    For each, record the work mean, the worst update, and the updates over
-   20 ms with their excess.
+   20 ms with their excess. Three tapes wait for the host reference's W1.4
+   shot (section 3): `verify-contact-profile` fails at frame 13,
+   `generate-shop-profile` at parity frame 3 (camera X 159 against 160) and
+   the overflow witness at frame 7, group 1. The world-one route stops GDB at
+   every input sample; run it under the census without those stops.
 7. **W3.7 Owners and ranking.** Trace the worst updates with short captures
    that start one update early. Rank owners by their total excess across
    all workloads. Replace the A500 numbers in this section, sections 0 and
@@ -1072,7 +1070,9 @@ Reference: [area-two recovery](area-two-recovery.md).
   matches (they ran through the shots, results and later rooms before).
   `make verify-contact-profile` stops at gameplay frame 13 for the same
   reason (the tape fires): camera Y 68 against the reference's 69, player
-  194 against 194.199.
+  194 against 194.199. `make generate-shop-profile` stops at parity frame 3
+  (camera X 159 against 160), and `profile.sh overflow-state` at frame 7
+  (witness group 1); check that they share this cause.
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.

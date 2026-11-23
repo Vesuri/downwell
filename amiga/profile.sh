@@ -143,15 +143,41 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-state|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: [CENSUS=1] bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-state|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
 fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
+# W3.5: CENSUS=1 adds the per-update work census to a mode that runs to the
+# profile freeze without probes, traces or per-update stops. The debugger
+# reads its ring once, just before the mode's ready marker.
+census="${CENSUS:-0}"
+unset CENSUS
+if [[ $census == 1 ]]; then
+  case "$mode" in
+    fps|idle|quiet-fall|shop|overflow-state|draw-cache|draw-order|ammo) ;;
+    # Their routes, without the probes: census.gdb only waits for the freeze.
+    entry|transition) flags=(FPSCOUNT=1); script=census.gdb; ready_marker=DOWNWELL_PROFILE_READY ;;
+    *) echo "CENSUS=1 needs a mode that runs to the profile freeze without traces or per-update stops" >&2
+       exit 1 ;;
+  esac
+  [[ " ${flags[*]} " != *" PROBES=1 "* ]] || { echo "CENSUS=1 cannot measure a probes build" >&2; exit 1; }
+  flags+=(CENSUS=1 CENSUS_UPDATES="${CENSUS_UPDATES:-16384}")
+  if [[ $script != census.gdb ]]; then
+    mkdir -p .run/census
+    awk '/^shell touch \.run\/gdb-ready\.marker$/ && !done {print "source census_dump.gdb"; done=1} {print}' \
+      "$script" > .run/census/profile.gdb
+    grep -qx 'source census_dump.gdb' .run/census/profile.gdb || {
+      echo "$script has no ready marker to read the census at" >&2; exit 1; }
+    script=.run/census/profile.gdb
+  fi
+  rm -f .run/census.bin
+fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   unset SCENE_VERIFY
+  unset CENSUS CENSUS_UPDATES
   unset TERRAIN_READ_CENSUS
   unset PROBES FPSCOUNT
   unset PROFILE_ENTRY
@@ -255,11 +281,21 @@ fi
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER="$ready_marker" \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
-if [[ ${PROFILE_ENTRY:-0} == 1 ]]; then
+if [[ ${PROFILE_ENTRY:-0} == 1 && $census != 1 ]]; then
   cmp .run/entry-hud.bin ../generated/amiga-hud.dwap
   cmp .run/entry-fields.bin ../generated/amiga-field-images.bin
 fi
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
+if [[ $census == 1 ]]; then
+  census_out="${CENSUS_OUTPUT:-$PWD/../tmp/census/$mode}"
+  mkdir -p "$census_out"
+  cp .run/census.bin "$census_out/census.bin"
+  cp ".run/profile-${mode}.log" "$census_out/capture.log"
+  cp out/Downwell.elf "$census_out/Downwell.elf"
+  python3 ../tools/amiga-census-report.py "$census_out/census.bin" "$census_out/capture.log" \
+    --list=over --json="$census_out/census.json" | tee "$census_out/census.txt"
+  echo "Census: $census_out"
+fi
 if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^PHASE coarse:' ".run/profile-${mode}.log"; then
   echo "Requested coarse generation measurement was not produced" >&2
   exit 1

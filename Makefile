@@ -3048,6 +3048,11 @@ test: test-quiet-fall-witness
 test-quiet-window-guard:
 	python3 tests/quiet-window-guard-test.py
 test: test-quiet-window-guard
+
+.PHONY: test-amiga-census-report
+test-amiga-census-report:
+	python3 -B tests/amiga-census-report-test.py
+test: test-amiga-census-report
 test-scene-asset-admission: generate-amiga-game generate-amiga-clear
 	python3 tests/scene-asset-admission-test.py
 test: test-scene-asset-admission

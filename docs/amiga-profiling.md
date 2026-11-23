@@ -224,6 +224,41 @@ as well as waiting; it is not a CPU-idle duration. Inner
 exclusive with full probes and coarse generation timing. The script rejects
 an unobserved focus frame and restores the playable build with sampling off.
 
+### Per-update work census
+
+`CENSUS=1 bash amiga/profile.sh MODE` measures every main-loop iteration of
+a whole route without a 500 MB trace. The build (`CENSUS=1`, an `FPSCOUNT`
+build; `CENSUS_UPDATES`, default 16384, sets the ring) records one 16-byte
+record per iteration, mark to mark as the trace splits frames:
+
+- its span and its work, the span minus every display wait
+  (`AmigaPlatform::waitVblank` and `waitPublished`, with their idle work);
+- its scene, room speed and run stage (area and level);
+- flags: room speed below 60 (fxTimeChange, momentDelay, damage), a
+  deliberate wait (room speed, sleep), a scene or level handoff (the update
+  where it happened and the first of the new scene), the level clear,
+  results or upgrade overlay, a side-room camera column change, and the
+  first gameplay update.
+
+Times are beam positions (313 × 256 ticks per PAL field), so they mean the
+same on every CPU. The ring is written in Fast RAM and read once by the
+debugger at the mode's ready marker; nothing stops inside a measured update.
+A full ring keeps the newest records and the report says how many were
+overwritten. The modes that run to the freeze take it as they are (`fps`,
+`idle`, `quiet-fall`, `shop`, `overflow-state`, `draw-cache`, `draw-order`,
+`ammo`); `entry` and `transition` run their routes as census builds without
+probes (`census.gdb`).
+
+`tools/amiga-census-report.py census.bin capture.log` (run by profile.sh,
+output in `CENSUS_OUTPUT`, default `tmp/census/MODE`) prints the work mean,
+worst update and updates over 20 ms with their excess for each class:
+gameplay, slowdowns, handoffs, overlays, camera jumps and the front end.
+Handoffs are also grouped into transitions with their total latency, as
+handoffs are judged. `--list=over|all` lists updates, `--frames=N-M`
+restricts to gameplay frames, `--json` writes everything. On the initial fall
+the census matches the cycle-exact traces' work (frame minus
+`AmigaPlatform::waitPublished`) within 0.17 ms per update, 0.02 ms on average.
+
 ### Cycle-exact instruction traces
 
 For exact attribution with no in-game brackets, record FS-UAE's instruction

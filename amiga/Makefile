@@ -194,6 +194,17 @@ endif
 ifeq ($(PROFILE_AUTORUN)$(PROBES)$(FPSCOUNT),100)
 $(error PROFILE_AUTORUN requires PROBES=1 or FPSCOUNT=1)
 endif
+# W3.5 per-update work census: a ring of CENSUS_UPDATES records (16 bytes
+# each, a power of two), read by the debugger at the profile freeze.
+CENSUS ?= 0
+CENSUS_UPDATES ?= 16384
+ifeq ($(CENSUS),1)
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING)$(PROFILE_AUTORUN),10001)
+$(error CENSUS=1 requires FPSCOUNT=1 PROFILE_AUTORUN=1 without probes, coarse timing or sampling)
+endif
+endif
+endif
 ifeq ($(PROFILE_CONTACT),1)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL),110)
@@ -541,6 +552,9 @@ CFLAGS += -DDOWNWELL_PHASE_SAMPLING -DDOWNWELL_SAMPLE_FRAME=$(SAMPLE_FRAME)
 endif
 ifneq ($(TRACE_FRAMES),)
 CFLAGS += -DDOWNWELL_TRACE_FRAMES=$(TRACE_FRAMES)
+endif
+ifeq ($(CENSUS),1)
+CFLAGS += -DDOWNWELL_CENSUS -DDOWNWELL_CENSUS_UPDATES=$(CENSUS_UPDATES)
 endif
 ifeq ($(TERRAIN_READ_CENSUS),1)
 ifneq ($(FPSCOUNT),1)

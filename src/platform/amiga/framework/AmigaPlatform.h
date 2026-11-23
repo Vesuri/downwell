@@ -33,6 +33,11 @@ public:
     // reserveLines is a scheduling margin, not a preemptive execution limit.
     void waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const;
     static UWORD vblankCount() { return vblankCount_; }
+#ifdef DOWNWELL_CENSUS
+    // Census profile builds only: told when each display wait (waitVblank,
+    // waitPublished, including their idle work) begins (true) and ends.
+    static void (*waitObserver)(bool begin);
+#endif
     // One optional device service, after beam-critical display publication and
     // profiling. The owner must detach before releasing its state or restoring
     // the machine; no service runs while DOS temporarily owns VERTB.

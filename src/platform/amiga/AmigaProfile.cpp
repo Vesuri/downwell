@@ -232,7 +232,7 @@ void downwellProfileVblank()
         }
     }
 #endif
-#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING) || defined(DOWNWELL_CENSUS)
     gDownwellProfileEpoch += ticksPerField;
 #endif
 }
@@ -243,7 +243,7 @@ void downwellProfileOsFields(unsigned long fields)
     // handler, but still belong to the active frame and its current phase.
     gDownwellProfileOsFieldCount += fields;
     gDownwellProfileVbi += fields;
-#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING) || defined(DOWNWELL_CENSUS)
     gDownwellProfileEpoch += fields * ticksPerField;
 #endif
 }
@@ -264,7 +264,7 @@ void downwellProfileGameplay(unsigned tick,long playerYQ8,long viewY,int health,
     if(enemySlots>gDownwellProfileMaxEnemySlots)gDownwellProfileMaxEnemySlots=enemySlots;
 }
 
-#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING) || defined(DOWNWELL_CENSUS)
 static ULONG beamTick()
 {
     volatile UWORD* const vp = (volatile UWORD*)0xdff004;
@@ -292,6 +292,87 @@ static ULONG beamTick()
 static unsigned sceneId;
 #ifdef DOWNWELL_PROBES
 unsigned long downwellAmigaProfileTimestamp(){return beamTick();}
+#endif
+#ifdef DOWNWELL_CENSUS
+#include "framework/AmigaPlatform.h"
+#ifndef DOWNWELL_CENSUS_UPDATES
+#define DOWNWELL_CENSUS_UPDATES 16384
+#endif
+static_assert((DOWNWELL_CENSUS_UPDATES & (DOWNWELL_CENSUS_UPDATES - 1)) == 0,
+              "CENSUS_UPDATES must be a power of two");
+// One record per main-loop iteration, mark to mark (as the instruction
+// trace splits frames). Ticks are beam positions, 313 x 256 per PAL field,
+// so they mean the same on every CPU. work = span minus every display wait.
+// The debugger reads the ring once, at the profile freeze; nothing stops
+// inside a measured update. Read by tools/amiga-census-report.py.
+struct DownwellCensusRecord {
+    ULONG work, span, frame;
+    UBYTE scene, roomSpeed, flags, stage;
+};
+static_assert(sizeof(DownwellCensusRecord) == 16, "census record layout");
+extern "C" {
+// Written by the first update (constant initialisers fold away under LTO).
+volatile ULONG gDownwellCensusCapacity, gDownwellCensusTicksPerField;
+volatile ULONG gDownwellCensusCount;   // records closed, including overwritten
+DownwellCensusRecord gDownwellCensus[DOWNWELL_CENSUS_UPDATES];
+}
+static bool censusOpen;
+static ULONG censusStart, censusWaitStart, censusWaited;
+static unsigned censusWaitDepth;
+static DownwellCensusRecord censusCurrent;
+static int censusCameraX;
+static void censusWait(bool begin)
+{
+    if (begin) {
+        if (censusWaitDepth++ == 0) censusWaitStart = beamTick();
+    } else if (censusWaitDepth && --censusWaitDepth == 0) {
+        censusWaited += beamTick() - censusWaitStart;
+    }
+}
+void downwellCensusMark(unsigned flags)
+{
+    censusCurrent.flags |= static_cast<UBYTE>(flags);
+}
+void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool overlay, int cameraX)
+{
+    if (gDownwellProfileFrozen) return;
+    const ULONG now = beamTick();
+    const bool gameplay = scene == 3;
+    if (!gameplay) { roomSpeed = 60; stage = 0; overlay = false; cameraX = censusCameraX; }
+    if (censusOpen) {
+        // The change happened during the closing update: flag it there, and
+        // flag the first update of the new scene or level as well.
+        if (scene != censusCurrent.scene || stage != censusCurrent.stage)
+            censusCurrent.flags |= censusHandoff;
+        if (gameplay && censusCurrent.scene == 3 && cameraX != censusCameraX)
+            censusCurrent.flags |= censusSideCamera;
+        if (overlay) censusCurrent.flags |= censusOverlay;
+        censusCurrent.span = now - censusStart;
+        censusCurrent.work = censusCurrent.span - censusWaited;
+        gDownwellCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = censusCurrent;
+        ++gDownwellCensusCount;
+        // Only the debugger reads the ring: keep its stores, and keep the
+        // ring and its constants through section GC.
+        __asm__ volatile("" :: "g"(gDownwellCensus) : "memory");
+    } else {
+        gDownwellCensusCapacity = DOWNWELL_CENSUS_UPDATES;
+        gDownwellCensusTicksPerField = ticksPerField;
+        AmigaPlatform::waitObserver = censusWait;
+    }
+    const bool handoff = censusOpen && (scene != censusCurrent.scene || stage != censusCurrent.stage);
+    censusOpen = true;
+    censusStart = now;
+    censusWaited = 0;
+    censusCameraX = cameraX;
+    censusCurrent.scene = static_cast<UBYTE>(scene);
+    censusCurrent.stage = static_cast<UBYTE>(stage);
+    censusCurrent.roomSpeed = static_cast<UBYTE>(roomSpeed > 0 && roomSpeed < 255 ? roomSpeed : 0);
+    censusCurrent.flags = static_cast<UBYTE>((handoff ? censusHandoff : 0) |
+        (roomSpeed > 0 && roomSpeed < 60 ? censusSlowed : 0) | (overlay ? censusOverlay : 0) |
+        (gameplay && !gameplayWarmed ? censusWarmup : 0));
+    // Gameplay frames use the FPS report's numbering (warm-up excluded).
+    censusCurrent.frame = gDownwellProfileFrames[scene < 4 ? scene : 0] + 1;
+}
 #endif
 static ULONG startField;
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
