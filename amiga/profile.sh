@@ -283,16 +283,16 @@ if [[ $mode == trace || $mode == quiet-window ]]; then
       --frame-summary="$trace_out/frames.json" --causes > "$trace_out/quiet.txt"
     python3 ../tools/amiga-trace-report.py "$trace_out" --frames=122 --require-complete \
       --causes > "$trace_out/generation-122.txt"
-    # The frozen baseline is an A500 capture; a guard compares one machine only.
-    if python3 -c 'import json, sys; sys.exit(json.load(open(sys.argv[1]))["pal_field_cycles"] != json.load(open(sys.argv[2]))["pal_field_cycles"])' \
-        "$trace_out/frames.json" ../docs/amiga-quiet-frame-baseline.json; then
-      python3 ../tools/verify-quiet-window.py "$trace_out/frames.json" "$trace_out/Downwell.elf"
-    else
-      echo "Quiet-window guard not judged: its baseline is from another CPU clock"
-    fi
+    # Work excludes the publication wait and all its children (idle RNG service).
+    python3 ../tools/amiga-trace-report.py "$trace_out" --frames=57-122 --require-complete \
+      --work-summary="$trace_out/work.json" --work-wait=AmigaPlatform::waitPublished > /dev/null
+    # Each summary meets the baseline of its machine's clock and kind, if any.
+    python3 ../tools/verify-quiet-window.py "$trace_out/frames.json" "$trace_out/work.json" \
+      "$trace_out/Downwell.elf"
     echo "Quiet updates 57–121: $trace_out/quiet.txt"
     echo "First generation burst 122: $trace_out/generation-122.txt"
     echo "Exact complete-frame cycles and build hash: $trace_out/frames.json"
+    echo "Exact work of updates 57–122: $trace_out/work.json"
   fi
   echo "Traces: $trace_out (report: python3 tools/amiga-trace-report.py $trace_out)"
   exit 0
@@ -304,6 +304,16 @@ elif [[ $mode == quiet-state ]]; then
   [[ $(grep -c '^QUIET ' ".run/profile-${mode}.log") == 165 ]] || {
     echo "Expected all 165 initial-fall state samples" >&2; exit 1;
   }
+  # The samples are machine-independent: the A1200 and A500 agree exactly.
+  if [[ ${QUIET_STATE_RECORD:-0} == 1 ]]; then
+    grep '^QUIET ' ".run/profile-${mode}.log" > ../docs/amiga-quiet-states.txt
+    echo "Recorded docs/amiga-quiet-states.txt"
+  else
+    diff <(grep '^QUIET ' ".run/profile-${mode}.log") ../docs/amiga-quiet-states.txt || {
+      echo "Initial-fall state samples differ from docs/amiga-quiet-states.txt" >&2; exit 1;
+    }
+    echo "All 165 initial-fall state samples match docs/amiga-quiet-states.txt"
+  fi
 elif [[ $mode == quiet-fall ]]; then
   # The landing witness is always checked. On the target every update of the
   # fall presents in one field (164 fields), so any missed field fails. The

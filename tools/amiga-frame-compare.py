@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Compare explicitly identical complete-frame windows, never capture duration.
 
+A frame summary compares whole frames, publication wait included. A work
+summary (--work-summary) compares each frame's work: its cycles minus the
+named wait. Both summaries must be of the same kind, wait and CPU clock.
+
 Inputs are --frame-summary JSON files from amiga-trace-report.py. Callers must
 separately establish identical input/RNG workloads and behavior. Matching frame
 numbers alone does not prove that two revisions performed equivalent work.
@@ -13,8 +17,12 @@ import re
 def load_summary(path):
     with open(path) as source:
         value = json.load(source)
-    if value.get('schema') != 'downwell-frame-cycles/v1':
+    schema = value.get('schema')
+    if schema not in ('downwell-frame-cycles/v1', 'downwell-frame-work/v1'):
         raise ValueError(f'{path}: unsupported frame summary')
+    wait = value.get('wait_symbol') if schema == 'downwell-frame-work/v1' else None
+    if schema == 'downwell-frame-work/v1' and not wait:
+        raise ValueError(f'{path}: work summary names no wait')
     clock = value.get('pal_field_cycles')
     if type(clock) is not int or clock <= 0:
         raise ValueError(f'{path}: missing PAL field clock')
@@ -27,14 +35,21 @@ def load_summary(path):
         if (type(frame) is not int or frame <= 0 or frame in frames or frame in partial or
                 type(cycles) is not int or cycles <= 0):
             raise ValueError(f'{path}: invalid, duplicate or partial frame {frame}')
+        if wait is not None:
+            waited = row.get('wait_cycles')
+            if type(waited) is not int or not 0 <= waited < cycles:
+                raise ValueError(f'{path}: invalid wait in frame {frame}')
+            cycles -= waited
         frames[frame] = cycles
     frames.clock = clock
+    frames.wait = wait
     return value['elf_sha256'], frames
 
 
 class Frames(dict):
-    """Complete-frame cycles with the capture's PAL field length."""
+    """Complete-frame cycles (or work) with the capture's PAL field length."""
     clock = None
+    wait = None
 
 
 def windows(spec):
@@ -55,6 +70,8 @@ def compare(before, after, ranges):
     if before.clock != after.clock:
         raise ValueError(f'summaries from different CPU clocks: {before.clock} and {after.clock} '
                          'cycles per field; compare captures of the same machine')
+    if before.wait != after.wait:
+        raise ValueError(f'summaries measure different things: wait {before.wait} and {after.wait}')
     result = []
     for first, last in ranges:
         keys = range(first, last + 1)

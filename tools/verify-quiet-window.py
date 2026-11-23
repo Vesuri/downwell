@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Guard the recovered no-input fall, not the unfinished historical target.
+"""Guard the no-input fall's quiet window against its frozen baseline.
 
 Call only for profile.sh quiet-window's deterministic workload. Frame numbers
 and an ELF hash cannot independently prove equivalent inputs or game behavior.
+Each summary given is checked against the baseline of its CPU clock and kind:
+the A500's whole frames (its updates overran the field, so frame time was
+work) and the A1200 target's work, where every quiet frame fills its field
+and only work, the frame minus the publication wait, can show a regression.
+A machine with no baseline is not judged.
 """
 import argparse
 import hashlib
@@ -13,6 +18,21 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('frame_compare', ROOT / 'tools/amiga-frame-compare.py')
 frames = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(frames)
+
+
+BASELINES = (ROOT / 'docs/amiga-quiet-frame-baseline.json',
+             ROOT / 'docs/amiga-quiet-work-baseline-a1200-4m.json')
+
+
+def matching_baseline(summary, baselines=BASELINES):
+    _, frames_ = frames.load_summary(summary)
+    for baseline in baselines:
+        if not baseline.exists():
+            continue
+        _, reference = frames.load_summary(baseline)
+        if (reference.clock, reference.wait) == (frames_.clock, frames_.wait):
+            return baseline
+    return None
 
 
 def verify(baseline, summary, elf):
@@ -36,16 +56,25 @@ def verify(baseline, summary, elf):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('summary', type=Path)
+    parser.add_argument('summaries', type=Path, nargs='+', help='frame and/or work summaries')
     parser.add_argument('elf', type=Path)
-    parser.add_argument('--baseline', type=Path, default=ROOT / 'docs/amiga-quiet-frame-baseline.json')
+    parser.add_argument('--baseline', type=Path, help='use this baseline for every summary')
     args = parser.parse_args()
+    judged = 0
     try:
-        mean, worst, generation = verify(args.baseline, args.summary, args.elf)
+        for summary in args.summaries:
+            baseline = args.baseline or matching_baseline(summary)
+            if baseline is None:
+                continue
+            mean, worst, generation = verify(baseline, summary, args.elf)
+            judged += 1
+            print(f'QUIET_WINDOW_PASS baseline={baseline.name} mean_ms={mean:.3f} '
+                  f'worst_ms={worst:.3f} generation122_ms={generation:.3f}')
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
-    print(f'QUIET_WINDOW_PASS mean_ms={mean:.3f} worst_ms={worst:.3f} generation122_ms={generation:.3f}')
-    print('Regression guard only; historical fall restoration and replay equivalence remain separate checks.')
+    if not judged:
+        print('QUIET_WINDOW_NOT_JUDGED: no baseline for this CPU clock')
+    print('Regression guard only; replay equivalence remains a separate check.')
 
 
 if __name__ == '__main__':

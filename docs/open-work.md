@@ -205,12 +205,6 @@ On the target the quiet fall already presents every update in one field
 its field count cannot show a smaller regression: judge the quiet fall on
 the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
 
-4. **W3.4 Target references.** Record on `a1200-4m`:
-   - a target `quiet-window` baseline beside the A500 one, so its guard
-     runs on `a1200-4m`;
-   - all 165 native state samples;
-   - the full-fall window table (section 0's three-capture method,
-     `tools/amiga-fall-budget.py`).
 5. **W3.5 A per-update census for whole routes.** A 100-field cycle-exact
    capture is about 500 MB, too much for whole routes. Add a profile build
    that records every update's work on the target, excluding the
@@ -324,14 +318,33 @@ the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
 
-(Measured on the A500; the target is now the A1200 with 4 MB Fast, see the top
-of this file and W3.)
-
-**Part of W3 (W3.8–W3.11); re-measure on the target first (W3.4).** The target is the **no-input initial fall from the top of the well to
+**Part of W3 (W3.8–W3.11).** The target is the **no-input initial fall from the top of the well to
 the first platform**, updates 1–164. The goal is that every update fits one
 PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
 earlier target of matching the historical 181 fields; reaching that is a
 milestone on the way, not completion.
+
+**On the target** (`a1200-4m`, measured at 666437a9) the fall already
+presents in 164 fields: display buffering absorbs the two updates that still
+overrun. Three overlapping 100-field captures (from marks 1, 60 and 120;
+work excludes `AmigaPlatform::waitPublished` and its children):
+
+| Window | Work mean ms | Worst ms (update) | Updates over 20 ms | Excess ms |
+| --- | ---: | ---: | ---: | ---: |
+| Authored entrance, 2–55 | 5.1 | 6.0 (49) | 0 | 0 |
+| Quiet generation, 56–121 | 5.8 | 6.9 (117) | 0 | 0 |
+| First burst, 122–135 | 6.4 | 15.3 (122) | 0 | 0 |
+| Enemies, 136–162 | 7.9 | 21.2 (136) | 1 | 1 |
+| Landing, 163–164 | 22.8 | 28.7 (163) | 1 | 9 |
+
+Update 163 spends 23.5 ms and update 136 18.9 ms in `GameplayWorld::step`;
+the row-painting updates (141 and 143, 11.3 ms and 11.1 ms of work) are the next
+largest. `profile.sh quiet-fall` (164 fields), `quiet-window` (the work
+baseline `docs/amiga-quiet-work-baseline-a1200-4m.json`) and `quiet-state`
+(`docs/amiga-quiet-states.txt`, identical on the A500) guard it.
+
+The rest of this section was measured on the A500, relative evidence only
+until W3.7 replaces it.
 
 The current state is the complete trace of the
 [native enemy updates](amiga-frame-cost.md#native-enemy-updates-section-0-b)

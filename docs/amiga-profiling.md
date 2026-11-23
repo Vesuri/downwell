@@ -41,7 +41,10 @@ options that select an older path (for example `TABLE_CONTACT_ATAN=0`,
 references for paired measurements and pixel/replay oracles; never ship one.
 
 For the deterministic no-input fall, use `bash amiga/profile.sh quiet-fall`
-for the complete 164-update landing/cadence witness, and
+for the complete 164-update landing/cadence witness,
+`bash amiga/profile.sh quiet-state` for its 165 state samples (compared with
+`docs/amiga-quiet-states.txt`, identical on every machine;
+`QUIET_STATE_RECORD=1` rewrites it after an intended behaviour change), and
 `bash amiga/profile.sh quiet-window` for instruction-level costs. Both run on
 `MACHINE` like every other mode, cap the emulator run at 90 seconds and
 restore the normal binary. On `a1200-4m` the fall must present every update
@@ -51,8 +54,13 @@ inside the window, in a fresh `tmp/trace/quiet-window.*` directory. It writes
 `quiet.txt` for complete updates 57–121, `generation-122.txt` for the first
 generation burst, and `frames.json` containing exact cycles and the ELF hash.
 `verify-quiet-window.py` checks that hash against the frozen ELF and compares
-against `docs/amiga-quiet-frame-baseline.json`, an A500 capture, so it runs
-only on a machine with the same CPU clock: quiet mean may rise by at most
+against the baseline of the capture's machine: on the A500 the whole frames
+in `docs/amiga-quiet-frame-baseline.json` (its updates overran their field,
+so frame time was work); on `a1200-4m` the work in
+`docs/amiga-quiet-work-baseline-a1200-4m.json`, from the `work.json` the mode
+also writes for updates 57–122 (each frame minus `AmigaPlatform::waitPublished`,
+since every quiet frame fills its field there). A machine with neither is not
+judged. Quiet mean may rise by at most
 0.5 ms, quiet worst and update 122 by at most 1 ms. These are regression
 tolerances around the recovered build, not the historical restoration target
 or a 20 ms requirement. The guard judges whole windows, not which update owns

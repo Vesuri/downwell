@@ -1,0 +1,340 @@
+{
+  "schema": "downwell-frame-work/v1",
+  "elf_sha256": "2c2df8a77278aaea33ea092d36d60ec182aa7a66ed8b62b235b716bd8f8b6b7c",
+  "pal_field_cycles": 284204,
+  "partial_frames": [],
+  "wait_symbol": "AmigaPlatform::waitPublished",
+  "machine": "a1200-4m",
+  "frames": [
+    {
+      "frame": 57,
+      "cycles": 299320,
+      "wait_cycles": 215786
+    },
+    {
+      "frame": 58,
+      "cycles": 270180,
+      "wait_cycles": 188285
+    },
+    {
+      "frame": 59,
+      "cycles": 298196,
+      "wait_cycles": 214718
+    },
+    {
+      "frame": 60,
+      "cycles": 269062,
+      "wait_cycles": 199915
+    },
+    {
+      "frame": 61,
+      "cycles": 299538,
+      "wait_cycles": 204420
+    },
+    {
+      "frame": 62,
+      "cycles": 268860,
+      "wait_cycles": 199677
+    },
+    {
+      "frame": 63,
+      "cycles": 299661,
+      "wait_cycles": 203474
+    },
+    {
+      "frame": 64,
+      "cycles": 268741,
+      "wait_cycles": 200682
+    },
+    {
+      "frame": 65,
+      "cycles": 299678,
+      "wait_cycles": 203470
+    },
+    {
+      "frame": 66,
+      "cycles": 268964,
+      "wait_cycles": 200778
+    },
+    {
+      "frame": 67,
+      "cycles": 299438,
+      "wait_cycles": 203464
+    },
+    {
+      "frame": 68,
+      "cycles": 268762,
+      "wait_cycles": 199778
+    },
+    {
+      "frame": 69,
+      "cycles": 310560,
+      "wait_cycles": 214524
+    },
+    {
+      "frame": 70,
+      "cycles": 257898,
+      "wait_cycles": 177632
+    },
+    {
+      "frame": 71,
+      "cycles": 312322,
+      "wait_cycles": 215510
+    },
+    {
+      "frame": 72,
+      "cycles": 264140,
+      "wait_cycles": 173797
+    },
+    {
+      "frame": 73,
+      "cycles": 289760,
+      "wait_cycles": 207446
+    },
+    {
+      "frame": 74,
+      "cycles": 270576,
+      "wait_cycles": 189300
+    },
+    {
+      "frame": 75,
+      "cycles": 297440,
+      "wait_cycles": 215512
+    },
+    {
+      "frame": 76,
+      "cycles": 270924,
+      "wait_cycles": 201268
+    },
+    {
+      "frame": 77,
+      "cycles": 297700,
+      "wait_cycles": 202983
+    },
+    {
+      "frame": 78,
+      "cycles": 270720,
+      "wait_cycles": 201058
+    },
+    {
+      "frame": 79,
+      "cycles": 298238,
+      "wait_cycles": 203980
+    },
+    {
+      "frame": 80,
+      "cycles": 270162,
+      "wait_cycles": 201554
+    },
+    {
+      "frame": 81,
+      "cycles": 299340,
+      "wait_cycles": 203296
+    },
+    {
+      "frame": 82,
+      "cycles": 269058,
+      "wait_cycles": 200728
+    },
+    {
+      "frame": 83,
+      "cycles": 298260,
+      "wait_cycles": 203314
+    },
+    {
+      "frame": 84,
+      "cycles": 270162,
+      "wait_cycles": 201834
+    },
+    {
+      "frame": 85,
+      "cycles": 297880,
+      "wait_cycles": 214880
+    },
+    {
+      "frame": 86,
+      "cycles": 270560,
+      "wait_cycles": 189641
+    },
+    {
+      "frame": 87,
+      "cycles": 297860,
+      "wait_cycles": 215844
+    },
+    {
+      "frame": 88,
+      "cycles": 270558,
+      "wait_cycles": 189614
+    },
+    {
+      "frame": 89,
+      "cycles": 297822,
+      "wait_cycles": 215822
+    },
+    {
+      "frame": 90,
+      "cycles": 270578,
+      "wait_cycles": 189644
+    },
+    {
+      "frame": 91,
+      "cycles": 297440,
+      "wait_cycles": 214805
+    },
+    {
+      "frame": 92,
+      "cycles": 270918,
+      "wait_cycles": 201592
+    },
+    {
+      "frame": 93,
+      "cycles": 297704,
+      "wait_cycles": 204300
+    },
+    {
+      "frame": 94,
+      "cycles": 270716,
+      "wait_cycles": 201394
+    },
+    {
+      "frame": 95,
+      "cycles": 298244,
+      "wait_cycles": 203295
+    },
+    {
+      "frame": 96,
+      "cycles": 270160,
+      "wait_cycles": 201820
+    },
+    {
+      "frame": 97,
+      "cycles": 298280,
+      "wait_cycles": 203302
+    },
+    {
+      "frame": 98,
+      "cycles": 270140,
+      "wait_cycles": 201816
+    },
+    {
+      "frame": 99,
+      "cycles": 298276,
+      "wait_cycles": 203320
+    },
+    {
+      "frame": 100,
+      "cycles": 270124,
+      "wait_cycles": 200773
+    },
+    {
+      "frame": 101,
+      "cycles": 297860,
+      "wait_cycles": 214906
+    },
+    {
+      "frame": 102,
+      "cycles": 270600,
+      "wait_cycles": 190598
+    },
+    {
+      "frame": 103,
+      "cycles": 297840,
+      "wait_cycles": 215860
+    },
+    {
+      "frame": 104,
+      "cycles": 270560,
+      "wait_cycles": 189810
+    },
+    {
+      "frame": 105,
+      "cycles": 297818,
+      "wait_cycles": 214855
+    },
+    {
+      "frame": 106,
+      "cycles": 270580,
+      "wait_cycles": 189887
+    },
+    {
+      "frame": 107,
+      "cycles": 297418,
+      "wait_cycles": 216059
+    },
+    {
+      "frame": 108,
+      "cycles": 270942,
+      "wait_cycles": 201731
+    },
+    {
+      "frame": 109,
+      "cycles": 297819,
+      "wait_cycles": 203489
+    },
+    {
+      "frame": 110,
+      "cycles": 270599,
+      "wait_cycles": 201586
+    },
+    {
+      "frame": 111,
+      "cycles": 298580,
+      "wait_cycles": 204437
+    },
+    {
+      "frame": 112,
+      "cycles": 269880,
+      "wait_cycles": 201904
+    },
+    {
+      "frame": 113,
+      "cycles": 298202,
+      "wait_cycles": 203646
+    },
+    {
+      "frame": 114,
+      "cycles": 270138,
+      "wait_cycles": 200527
+    },
+    {
+      "frame": 115,
+      "cycles": 298282,
+      "wait_cycles": 203026
+    },
+    {
+      "frame": 116,
+      "cycles": 270142,
+      "wait_cycles": 201540
+    },
+    {
+      "frame": 117,
+      "cycles": 312800,
+      "wait_cycles": 214592
+    },
+    {
+      "frame": 118,
+      "cycles": 263096,
+      "wait_cycles": 174491
+    },
+    {
+      "frame": 119,
+      "cycles": 290384,
+      "wait_cycles": 208100
+    },
+    {
+      "frame": 120,
+      "cycles": 270560,
+      "wait_cycles": 189350
+    },
+    {
+      "frame": 121,
+      "cycles": 297860,
+      "wait_cycles": 215584
+    },
+    {
+      "frame": 122,
+      "cycles": 270558,
+      "wait_cycles": 53486
+    }
+  ]
+}
