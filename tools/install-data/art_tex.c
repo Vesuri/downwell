@@ -157,15 +157,23 @@ static int keep_row(Tex* t, TexItem* it, const u8* rgba, u32 n)
 int tex_image(Tex* t, u32 ptr, Img* out)
 {
     TexItem* it = find(t, ptr, 0);
-    u32 h, y = 0;
     REQUIRE(it, "a scene texture item was not decoded");
-    TRY(img_new(out, it->t.sw, it->t.sh));
-    for (h = it->head; h != 0xffffffffu; ++y) {
+    return tex_rows(t, ptr, 0, it->t.sh, out);
+}
+
+int tex_rows(Tex* t, u32 ptr, u32 y0, u32 y1, Img* out)
+{
+    TexItem* it = find(t, ptr, 0);
+    u32 h, y = 0;
+    REQUIRE(it && y0 <= y1 && y1 <= it->t.sh, "a scene texture item was not decoded");
+    TRY(img_new(out, it->t.sw, (int)(y1 - y0)));
+    for (h = it->head; h != 0xffffffffu && y < y1; ++y) {
         const u8* p = at_handle(t, h);
-        u8* d = PIX(out, 0, y);
+        u8* d;
         u32 x = 0;
-        REQUIRE(y < it->t.sh, "a scene texture item is damaged");
         h = rd_be32(p);
+        if (y < y0) continue;
+        d = PIX(out, 0, y - y0);
         p += 4;
         while (x < it->t.sw) {
             u32 c = *p >> 4, run = (*p & 15) + 1;
@@ -174,7 +182,7 @@ int tex_image(Tex* t, u32 ptr, Img* out)
             for (; run--; ++x, d += 4) memcpy(d, t->palette[c], 4);
         }
     }
-    REQUIRE(y == it->t.sh, "a scene texture item was not decoded");
+    REQUIRE(y == y1, "a scene texture item was not decoded");
     return 1;
 }
 

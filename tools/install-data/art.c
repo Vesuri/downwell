@@ -102,28 +102,39 @@ static int record_pens(const Art* a, const Rec* r, u8* pens)
     for (y = 0; y < r->h; ++y)
         for (x = 0; x < r->w; ++x) {
             u32 at = y * row + x / 8, m = 0x80u >> (x & 7);
-            pens[y * r->w + x] = (u8)(!!(d[at] & m) | !!(d[plane + at] & m) << 1);
+            pens[y * r->w + x] = (u8)((d[at] & m ? 1 : 0) | (d[plane + at] & m ? 2 : 0));
         }
     return 1;
 }
 
-static int frame_canvas(Art* a, u32 spriteId, u32 frame, Img* out)
+/* Rows [y0, y1) of frame_canvas: the frame's texture item composited at its
+   target offset over a transparent sprite-sized canvas. */
+static int canvas_rows(Art* a, u32 spriteId, u32 frame, int y0, int y1, Img* out)
 {
     Sprite s;
     Img src;
     const Tpag* t;
     u32 ptr;
+    int from, to;
     TRY(tex_sprite(a->w, spriteId, &s));
     REQUIRE(frame < s.nframes, "a scene sprite lacks a frame");
     ptr = tex_frame(a->w, &s, frame);
     t = tex_item(&a->tex, ptr);
     REQUIRE(t, "a scene texture item was not decoded");
-    TRY(tex_image(&a->tex, ptr, &src));
-    if (!img_new(out, s.w, s.h)) { img_free(&src); return 0; }
-    img_composite(out, &src, t->tx, t->ty);
-    img_free(&src);
+    if (y1 > s.h) y1 = s.h;
+    TRY(img_new(out, s.w, y1 - y0));
+    from = y0 - t->ty; to = y1 - t->ty;
+    if (from < 0) from = 0;
+    if (to > t->sh) to = t->sh;
+    if (from < to) {
+        if (!tex_rows(&a->tex, ptr, (u32)from, (u32)to, &src)) { img_free(out); return 0; }
+        img_composite(out, &src, t->tx, t->ty + from - y0);
+        img_free(&src);
+    }
     return 1;
 }
+
+static int frame_canvas(Art* a, u32 spriteId, u32 frame, Img* out) { return canvas_rows(a, spriteId, frame, 0, 0x7fff, out); }
 
 /* ---- language.ini (configparser: [english], key = value, keys lowercase) */
 
@@ -488,7 +499,7 @@ static int sprite_frames(Art* a, const Selection* sel)
 static int hud_glyphs(Art* a)
 {
     static const s8 offsets[14][2] = {{-1, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, 1}, {0, 0}, {1, 1}, {0, 2}, {0, 0}, {1, -1}, {2, 0}, {1, 1}, {0, 1}, {1, 0}};
-    u8 pens[64 * 64], canvas[64 * 64], cropped[64 * 64];
+    static u8 pens[64 * 64], canvas[64 * 64], cropped[64 * 64];
     int digit, glyph;
     for (digit = 0; digit < 10; ++digit) {
         int layer, left = 32, top = 24, right = -1, bottom = -1, x, y;
@@ -706,8 +717,8 @@ static int dithers(Art* a)
     int x, y, ok;
     Rec r;
     for (i = 0; i < 2; ++i) {
-        TRY(frame_canvas(a, strips[i][1], 0, &canvas));
-        ok = img_crop(&edge, &canvas, strips[i][2], strips[i][3], strips[i][2] + 160, strips[i][3] + 80);
+        TRY(canvas_rows(a, strips[i][1], 0, strips[i][3], strips[i][3] + 80, &canvas));
+        ok = img_crop(&edge, &canvas, strips[i][2], 0, strips[i][2] + 160, 80);
         img_free(&canvas);
         TRY(ok);
         for (n = 0; n < 160u * 80; ++n) {
@@ -719,16 +730,16 @@ static int dithers(Art* a)
         img_free(&edge);
         TRY(ok);
     }
-    TRY(frame_canvas(a, 128, 0, &canvas));
     {
         Sprite s;
         TRY(tex_sprite(a->w, 128, &s));
-        REQUIRE(canvas.w == 320 && canvas.h == 800 && s.ox == 160 && s.oy == 720, "authored dither geometry changed");
+        REQUIRE(s.w == 320 && s.h == 800 && s.ox == 160 && s.oy == 720, "authored dither geometry changed");
     }
+    TRY(canvas_rows(a, 128, 0, 720, 800, &canvas));
     pens = dw_alloc(320 * 80);
     if (!pens) { img_free(&canvas); return 0; }
     for (y = 0; y < 80; ++y)
-        for (x = 0; x < 320; ++x) pens[y * 320 + x] = PIX(&canvas, x, 720 + y)[3] >= 128 ? 3 : 0;
+        for (x = 0; x < 320; ++x) pens[y * 320 + x] = PIX(&canvas, x, y)[3] >= 128 ? 3 : 0;
     img_free(&canvas);
     r = meta(65006, 0, 160, 0, 320, 80);
     ok = add_pens(a, &r, pens, 320, 80);
@@ -1010,6 +1021,11 @@ static int profile(Art* a, int which, const Selection* sel, u32 nsel, const char
     recs_init(&a->rs);
     a->profile = which;
     ok = build_records(a, sel, nsel);
+    if (which == P_GAME) {
+        /* The last profile: its banks no longer need the pixels. */
+        img_free(&a->fontImg);
+        tex_free(&a->tex);
+    }
     if (ok && which == P_GAME) ok = game_banks(a);
     else if (ok) {
         u32* idx = dw_alloc(4 * a->rs.n + 4), i, n = 0;
@@ -1044,7 +1060,7 @@ int stage_art(Context* c)
     a->c = c; a->w = &c->win;
     tex_init(&a->tex);
     a->font = dw_alloc(sizeof *a->font);
-    ok = a->font && tex_font(a->w, 2, a->font) && ini_load(a);
+    ok = a->font && tex_font(a->w, 2, a->font);
     ok = ok && want_selection(a, SEL_HUD, COUNT(SEL_HUD)) && want_selection(a, SEL_RESULTS, COUNT(SEL_RESULTS)) &&
          want_selection(a, SEL_PAUSE, COUNT(SEL_PAUSE)) && want_selection(a, SEL_SHOP, COUNT(SEL_SHOP)) &&
          want_selection(a, SEL_CLEAR, COUNT(SEL_CLEAR)) && want_selection(a, SEL_GAME, COUNT(SEL_GAME));
@@ -1052,7 +1068,7 @@ int stage_art(Context* c)
         static const Selection dither[] = {{128, 1}, {129, 1}};
         ok = want_selection(a, dither, 2) && tex_want(&a->tex, a->w, a->font->tpag);
     }
-    ok = ok && tex_decode(&a->tex, a->w);
+    ok = ok && tex_decode(&a->tex, a->w) && ini_load(a);
     ok = ok && profile(a, P_HUD, SEL_HUD, COUNT(SEL_HUD), "Downwell.hud");
     ok = ok && profile(a, P_RESULTS, SEL_RESULTS, COUNT(SEL_RESULTS), "Downwell.results");
     ok = ok && profile(a, P_PAUSE, SEL_PAUSE, COUNT(SEL_PAUSE), "Downwell.pause");

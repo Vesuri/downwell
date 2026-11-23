@@ -41,5 +41,7 @@ int tex_want(Tex* t, Win* w, u32 ptr);
 int tex_decode(Tex* t, Win* w);
 /* The item's source rectangle as a new image (sw x sh). */
 int tex_image(Tex* t, u32 ptr, Img* out);
+/* Only rows [y0, y1) of it, as a (y1 - y0) row image. */
+int tex_rows(Tex* t, u32 ptr, u32 y0, u32 y1, Img* out);
 const Tpag* tex_item(Tex* t, u32 ptr);
 #endif
