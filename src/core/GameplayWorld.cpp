@@ -2959,11 +2959,22 @@ bool GameplayWorld::segmentSolid(const downwell::ProjectileSegment& path)const{
 
 bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
     downwell::ContactBounds bounds;
-    if(!run_.effectsSucceeded||!wallContactResolver_||(platforms&&!platformContactResolver_)||
-       !downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
-    unsigned count=0;
-    if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
-    bool found=count!=0;
+    if(!run_.effectsSucceeded||!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))
+        return run_.effectsSucceeded=false;
+    bool found=false;
+    if(wallContactResolver_&&(!platforms||platformContactResolver_)){
+        unsigned count=0;
+        if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+        found=count!=0;
+    }else if(solidResolver_){
+        // Worlds with only a point resolver (host fixtures) scan the mask's
+        // pixel box, as compactCorpseMeeting does; without any resolver
+        // nothing is solid. The game always installs contact resolvers.
+        for(int py=bounds.top;py<bounds.bottom&&!found;++py)
+            for(int px=bounds.left;px<bounds.right&&!found;++px)
+                found=solidResolver_(solidResolverContext_,px-240,py-176);
+        platforms=false;
+    }else platforms=false;
     if(!found&&!run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))return run_.effectsSucceeded=false;
     if(!found&&platforms&&!platformContactResolver_(solidResolverContext_,bounds,found))return run_.effectsSucceeded=false;
     hit=found;return true;

@@ -541,7 +541,8 @@ int main() {
     testNativeBoxLifecycle();
     testNativeEnemyLifecycle();
     {
-        AmigaPortRuntime indexed(0), fallback(0);
+        auto indexedOwner = std::make_unique<AmigaPortRuntime>(0); auto& indexed = *indexedOwner;
+        auto fallbackOwner = std::make_unique<AmigaPortRuntime>(0); auto& fallback = *fallbackOwner;
         int xs[129], ys[129];
         for (int i = 0; i < 128; ++i) {
             xs[i] = -512 + (i%16)*64;
@@ -586,7 +587,7 @@ int main() {
     {
         // The last slot is the only hit; lookup must preserve the entire
         // runtime capacity even with many duplicate nonintersecting masks.
-        AmigaPortRuntime runtime(0);
+        auto runtimeOwner = std::make_unique<AmigaPortRuntime>(0); auto& runtime = *runtimeOwner;
         int xs[512], ys[512];
         for (unsigned i = 0; i < 512; ++i) { xs[i] = 100; ys[i] = 32; }
         xs[511] = 0;
@@ -596,7 +597,7 @@ int main() {
                 "ray lookup retains the final block at full capacity");
     }
     {
-        AmigaPortRuntime pool(0);
+        auto poolOwner = std::make_unique<AmigaPortRuntime>(0); auto& pool = *poolOwner;
         require(pool.bulletSlotEnd() == 0 && pool.gemSlotEnd() == 0, "new pools have empty occupied spans");
         for (unsigned tick = 0; tick < 1200; ++tick) {
             pool.step(tick % 97 < 70 ? 4 : 0);
@@ -780,7 +781,7 @@ int main() {
             rewardTotal += crowdedRewards.gemAt(i).amount;
     require(rewardTotal == 140, "crowded rewards do not silently lose currency");
     for(int reward:{640,650}){
-        AmigaPortRuntime fullReward(300);
+        auto fullRewardOwner = std::make_unique<AmigaPortRuntime>(300); auto& fullReward = *fullRewardOwner;
         require(fullReward.configureEnemy(0,111,163,0,5,0,0,5,reward),"configure capacity-boundary reward");
         fullReward.step(0);
         require(fullReward.gemCount()==AmigaPortRuntime::gemCapacity,
@@ -854,7 +855,7 @@ int main() {
                 "sparse compaction is stable and clears the vacated tail");
     }
     {
-        AmigaPortRuntime reserveHud(300);
+        auto reserveHudOwner = std::make_unique<AmigaPortRuntime>(300); auto& reserveHud = *reserveHudOwner;
         // Inject the earned combo, then exercise the actual grounded grant path.
         auto& combo = const_cast<downwell::RunCombo&>(reserveHud.runCombo());
         combo.state.count = 25;
@@ -902,13 +903,25 @@ int main() {
     require(birthCoordinate(burst.bulletAt(0).trajectory.x, burst.bulletAt(0).trajectory.velocityX, 8) == -1 &&
             birthCoordinate(burst.bulletAt(1).trajectory.x, burst.bulletAt(1).trajectory.velocityX, 1) == 1,
             "original default gun alternates left and right boot emission offsets");
-    burst.configureSolidResolver([](void*, int, int y) { return y == 70; }, nullptr);
+    // A wall row inside the oldest shot's next segment, above the survivor.
+    static int burstWallY;
+    burstWallY = burst.bulletAt(0).y + 3;
+    require(burstWallY > burst.bulletAt(1).y + 12, "the burst shots are far enough apart for one wall row");
+    burst.configureSolidResolver([](void*, int, int y) { return y == burstWallY; }, nullptr);
     burst.step(4);
     require(!burst.bulletAt(0).active && burst.bulletAt(1).active,
             "retiring the oldest bullet leaves a hole before a surviving shot");
     require(!burst.findBullet(oldestIdentity) && burst.findBullet(survivorIdentity)==&burst.bulletAt(1),
             "retirement invalidates old identity without touching the survivor");
     burst.configureSolidResolver(nullptr, nullptr);
+    // bulletRanged animates only once it slows below speed 3 (W1.4), so put
+    // the survivor mid-sequence to show the next birth leaves it alone.
+    {
+        auto& survivorShot = const_cast<downwell::RangedShot&>(burst.bulletAt(1).shot);
+        survivorShot.animation = true;
+        survivorShot.imageIndex = {0x3f800000u};  // 1.0
+        survivorShot.imageSpeed = {0x3e800000u};  // 0.25: no Animation End within six steps
+    }
     for (unsigned frame = 9; frame <= 14; ++frame) burst.step(4);
     require(burst.player().shots() == 3 && burst.bulletCount() == 2 &&
                 burst.bulletAt(0).active &&
@@ -920,9 +933,8 @@ int main() {
     require(burst.findBullet(survivorIdentity)==&burst.bulletAt(0) &&
             burst.bulletAt(1).lifetimeId>survivorIdentity && !burst.findBullet(oldestIdentity),
             "lifetime lookup follows compaction and new births cannot alias retired shots");
-    downwell::ProjectileAnimation newborn;
-    require(burst.bulletAt(1).animation.index.bits==newborn.index.bits &&
-                burst.bulletAt(0).animation.index.bits!=newborn.index.bits,
+    require(burst.bulletAt(1).shot.imageIndex.bits==0 && !burst.bulletAt(1).shot.animation &&
+                burst.bulletAt(0).shot.animation && burst.bulletAt(0).shot.imageIndex.bits>0x3f800000u,
             "slot reuse resets new-shot animation without resetting surviving bullets");
     const auto lastBulletIdentity=burst.bulletAt(1).lifetimeId;
     burst.restartFromResults(downwell::DeathMenuSequence::Action::Retry,2,300);
@@ -941,8 +953,8 @@ int main() {
             birthCoordinate(movingShot.bulletAt(0).trajectory.y, movingShot.bulletAt(0).trajectory.velocityY, 1) == muzzleY + 4,
             "shot originates at pre-movement rounded instance coordinates before its own Step");
 
-    AmigaPortRuntime destructible(300);
-    AmigaPortRuntime headBox(0);
+    auto destructibleOwner = std::make_unique<AmigaPortRuntime>(300); auto& destructible = *destructibleOwner;
+    auto headBoxOwner = std::make_unique<AmigaPortRuntime>(0); auto& headBox = *headBoxOwner;
     const int headX[] = {0}, headY[] = {-24};
     headBox.configureBreakables(headX, headY, 1);
     headBox.configureSolidResolver([](void* opaque, int x, int y) {
@@ -964,14 +976,14 @@ int main() {
             headBox.blocksDestroyed() == 1,
             "a destroyed ceiling box cannot issue repeated cache invalidations");
 
-    AmigaPortRuntime wallShot(300, false, 1000);
+    auto wallShotOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000); auto& wallShot = *wallShotOwner;
     wallShot.configureSolidResolver(flatGround, nullptr);
     wallShot.step(4);
     require(wallShot.player().shots() == 1 && !wallShot.bulletActive() &&
                 wallShot.blocksDestroyed() == 0,
             "ordinary solid walls absorb the default bullet without a breakable record");
 
-    AmigaPortRuntime wallEnemyShot(300, false, 1000);
+    auto wallEnemyShotOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000); auto& wallEnemyShot = *wallEnemyShotOwner;
     wallEnemyShot.configureSolidResolver(flatGround, nullptr);
     wallEnemyShot.configureEnemy(0, 111, 163, -1, 12, 0, 0, 5, 6,
                                  0, 0, -1, -1, 0, 0, true, false, true);
@@ -986,7 +998,8 @@ int main() {
             const unsigned cell = seed & 1 ? 8-i : i;
             xs[i] = (int(cell % 3)-1)*16; ys[i] = 16 + int(cell/3)*16;
         }
-        AmigaPortRuntime indexed(300, false, 1000), scanned(300, false, 1000);
+        auto indexedOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000); auto& indexed = *indexedOwner;
+        auto scannedOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000); auto& scanned = *scannedOwner;
         indexed.configureBreakables(xs, ys, 9); scanned.configureBreakables(xs, ys, 9);
         // An unreachable non-grid record selects the established full-scan
         // fallback without changing any nearby collision geometry.
@@ -1037,15 +1050,15 @@ int main() {
                 destructible.appendBreakables(nullptr, nullptr, 0) &&
                 destructible.blocksDestroyed() == 1 && destructible.breakableActiveAt(32, 64),
             "append overflow and missing arrays fail without mutation; empty batch is valid");
-    AmigaPortRuntime indexedBlocks(300);
-    AmigaPortRuntime manyBlocks(300);
+    auto indexedBlocksOwner = std::make_unique<AmigaPortRuntime>(300); auto& indexedBlocks = *indexedBlocksOwner;
+    auto manyBlocksOwner = std::make_unique<AmigaPortRuntime>(300); auto& manyBlocks = *manyBlocksOwner;
     int manyX[300], manyY[300];
     for (int i = 0; i < 300; ++i) { manyX[i] = (i % 32) * 16; manyY[i] = (i / 32) * 16; }
     manyBlocks.configureBreakables(manyX, manyY, 300);
     for (int i = 0; i < 300; ++i)
         require(manyBlocks.breakableActiveAt(manyX[i], manyY[i]),
                 "indexed breakable IDs above 255 do not wrap or disappear");
-    AmigaPortRuntime initiallyEmpty(300);
+    auto initiallyEmptyOwner = std::make_unique<AmigaPortRuntime>(300); auto& initiallyEmpty = *initiallyEmptyOwner;
     require(initiallyEmpty.appendBreakables(newBlockX, newBlockY, 2) &&
                 initiallyEmpty.breakableActiveAt(32, 64) && initiallyEmpty.breakableActiveAt(48, 64),
             "first live batch can append to an empty runtime without prior configuration");
@@ -1056,17 +1069,19 @@ int main() {
                 indexedBlocks.breakableActiveAt(48, 64) && !indexedBlocks.breakableActiveAt(16, 64),
             "aligned batches extend the indexed collision path without losing prior blocks");
 
-    AmigaPortRuntime combat(300);
+    auto combatOwner = std::make_unique<AmigaPortRuntime>(300); auto& combat = *combatOwner;
     {
-        AmigaPortRuntime immune(300, false, 1000);
+        auto immuneOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000); auto& immune = *immuneOwner;
         require(immune.configureEnemy(0, 112, 186, -1, 12, 0, 0, 20, 0),
                 "configure a turtle in the first usual bullet's path");
         const auto draws = immune.randomDrawCount();
         immune.step(4);
         require(immune.enemyAt(0).active && immune.enemyAt(0).health == 20 &&
                     immune.bulletCount() == 0 && immune.enemiesDefeated() == 0 &&
-                    immune.randomDrawCount() == draws + 2,
-                "native immune impact consumes one spread draw and one choose word");
+                    // W1.4: bulletRanged Create 2, bulletCasing Create 3,
+                    // the shot's Step 1, the immune impact's choose 1.
+                    immune.randomDrawCount() == draws + 7,
+                "native immune impact consumes the shot, casing and choose draws");
     }
     require(combat.configureEnemy(0, 111, 163, -1, 12,
                                   0, 0, 5, 6),
@@ -1086,7 +1101,7 @@ int main() {
                  combat.gemAt(0).speedY != 0),
             "gun-kill rewards launch freely with recovered random velocity");
 
-    AmigaPortRuntime turtle(300);
+    auto turtleOwner = std::make_unique<AmigaPortRuntime>(300); auto& turtle = *turtleOwner;
     turtle.configureSolidResolver(flatGround, 0);
     require(turtle.configureEnemy(0, 112, 169, 40, 0,
                                   64, 0, 5, 14,
@@ -1111,15 +1126,15 @@ int main() {
             downwell::enemyPresentationSprite(112, false, -1) == 187,
             "shared walking predicate preserves GML truth values and airborne art");
 
-    AmigaPortRuntime frog(300);
-    AmigaPortRuntime firedAlarmFrog(300);
+    auto frogOwner = std::make_unique<AmigaPortRuntime>(300); auto& frog = *frogOwner;
+    auto firedAlarmFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& firedAlarmFrog = *firedAlarmFrogOwner;
     require(firedAlarmFrog.configureEnemy(0, 113, 166, 40, 1, 0, 0, 35, 20,
                 0, 0, 0, -1, 0, 0, true, false, true),
             "configure a frog with an already-fired alarm and no motion resolver");
     firedAlarmFrog.step(0);
     require(firedAlarmFrog.enemyAt(0).alarm0 == -1,
             "a fired native alarm retires to minus one on the next alarm phase");
-    AmigaPortRuntime simultaneousFrog(300);
+    auto simultaneousFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& simultaneousFrog = *simultaneousFrogOwner;
     simultaneousFrog.configureSolidResolver(flatGround, nullptr);
     require(simultaneousFrog.configureEnemy(0, 113, 166, 40, 1, 0, 0, 35, 20,
                 2, 1, 1, 1, 0, 0, true, true, true),
@@ -1132,7 +1147,7 @@ int main() {
                 simultaneousFrog.enemyAt(0).alarm1 == 59 &&
                 simultaneousFrog.enemyAt(0).speedY < 0,
             "alarm zero jump overwrites expiring alarm one before its countdown to 59");
-    AmigaPortRuntime aimingFrog(300);
+    auto aimingFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& aimingFrog = *aimingFrogOwner;
     aimingFrog.configureSolidResolver(flatGround, nullptr);
     require(aimingFrog.configureEnemy(0, 113, 166, 0, 1, 0, 0, 35, 20,
                 0, 0, -1, 1, 0, 0, true, true, true),
@@ -1141,7 +1156,7 @@ int main() {
     require(aimingFrog.player().offsetXFixed() > 0 &&
                 aimingFrog.enemyAt(0).motionState == -2,
             "frog alarm targets pre-movement equality to the left, not current player X");
-    AmigaPortRuntime edgeFrog(300);
+    auto edgeFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& edgeFrog = *edgeFrogOwner;
     edgeFrog.configureSolidResolver(flatGround, nullptr);
     require(edgeFrog.configureEnemy(0, 113, 166, 80, 1, 0, 0, 35, 20,
                 0, 0, -1, 1, 0, 0, true, true, true),
@@ -1188,7 +1203,7 @@ int main() {
     require(frog.enemyAt(0).imageSpeed == 0 && frog.enemyAt(0).frogPresentation.desiredRate == 0,
             "the following native Step applies the scheduled airborne rate");
 
-    AmigaPortRuntime fallingSnake(300);
+    auto fallingSnakeOwner = std::make_unique<AmigaPortRuntime>(300); auto& fallingSnake = *fallingSnakeOwner;
     fallingSnake.configureSolidResolver(noSolid, nullptr);
     require(fallingSnake.configureEnemy(0, 111, 163, 40, 0, 0, 0, 5, 6),
             "configure snake for exact decimal integration");
@@ -1201,12 +1216,16 @@ int main() {
                 "0.2 gravity retains both velocity and integrated position fractions");
     }
 
-    AmigaPortRuntime fallingFrog(300);
-    AmigaPortRuntime hitFrog(300, false, 10000);
+    auto fallingFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& fallingFrog = *fallingFrogOwner;
+    auto hitFrogOwner = std::make_unique<AmigaPortRuntime>(300, false, 10000); auto& hitFrog = *hitFrogOwner;
     hitFrog.configureSolidResolver(noSolid, nullptr);
     require(hitFrog.configureEnemy(0, 113, 166, -1, 16, 512, 0, 35, 20,
                 2, 1, 30, -1, 0, 0, true, false, true), "configure live bullet-hit frog");
     hitFrog.step(4);
+    // W1.4's bulletRanged ends its birth Step at y 10, short of the frog;
+    // it meets the frog on its second Step.
+    require(hitFrog.enemyAt(0).health == 35 && hitFrog.bulletCount() == 1, "the shot is still in flight");
+    hitFrog.step(0);
     require(hitFrog.enemyAt(0).health == 26 && hitFrog.enemyAt(0).frogHit.pending &&
                 hitFrog.enemyAt(0).frogHit.remaining == 0,
             "bullet damage queues a surviving frog's reaction for its next Step");
@@ -1220,7 +1239,7 @@ int main() {
     for (unsigned i = 0; i < 5; ++i) hitFrog.step(0);
     require(hitFrog.enemyAt(0).frogHit.remaining == 0 && hitFrog.enemyAt(0).spriteId == 168,
             "frog returns to airborne art when the stun alarm expires");
-    AmigaPortRuntime offscreenFrog(300);
+    auto offscreenFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& offscreenFrog = *offscreenFrogOwner;
     offscreenFrog.configureSolidResolver(noSolid, nullptr);
     require(offscreenFrog.configureEnemy(0, 113, 166, 40, 400,
                 512, 0, 35, 20, 0, 0, -1, -1), "configure frog below motion view");
@@ -1251,9 +1270,9 @@ int main() {
                 fallingFrog.enemyAt(0).gravityRemainder == 0,
             "terminal velocity clears gravity remainder rather than accumulating hidden speed");
 
-    AmigaPortRuntime unsupportedFrog(300);
-    AmigaPortRuntime fractionalLanding(300);
-    AmigaPortRuntime movingLanding(300);
+    auto unsupportedFrogOwner = std::make_unique<AmigaPortRuntime>(300); auto& unsupportedFrog = *unsupportedFrogOwner;
+    auto fractionalLandingOwner = std::make_unique<AmigaPortRuntime>(300); auto& fractionalLanding = *fractionalLandingOwner;
+    auto movingLandingOwner = std::make_unique<AmigaPortRuntime>(300); auto& movingLanding = *movingLandingOwner;
     movingLanding.configureSolidResolver(flatGround, nullptr);
     require(movingLanding.configureEnemy(0, 113, 166, 40, 1,
                 512, 0, 35, 20, 0, 0, -1, -1), "configure moving frog reaching support");
@@ -1261,7 +1280,7 @@ int main() {
     require(movingLanding.enemyAt(0).grounded && movingLanding.enemyAt(0).preciseX == 40 * 256L,
             "source integration suppresses horizontal displacement on the landing frame");
     for (int direction : {-1, 1}) {
-        AmigaPortRuntime edgeProbe(300);
+        auto edgeProbeOwner = std::make_unique<AmigaPortRuntime>(300); auto& edgeProbe = *edgeProbeOwner;
         edgeProbe.configureSolidResolver([](void* opaque, int x, int) {
             return *static_cast<int*>(opaque) < 0 ? x <= -9 : x >= 8;
         }, &direction);
@@ -1311,7 +1330,7 @@ int main() {
     require(unsupportedFrog.enemyAt(0).alarm1 == 59,
             "remaining grounded does not continually restart the alarm");
 
-    AmigaPortRuntime snail(300);
+    auto snailOwner = std::make_unique<AmigaPortRuntime>(300); auto& snail = *snailOwner;
     snail.configureSolidResolver(shortRightWall, 0);
     require(snail.configureEnemy(0, 117, 177, 0, 0,
                                  0, 26, 20, 24),
@@ -1358,8 +1377,8 @@ int main() {
     require(snail.enemyAt(0).drawFrame() == snail.enemyAt(0).imageFrame,
             "ascending wall snail restores unflipped artwork");
 
-    AmigaPortRuntime detachedSnail(300);
-    AmigaPortRuntime retiredBox(300);
+    auto detachedSnailOwner = std::make_unique<AmigaPortRuntime>(300); auto& detachedSnail = *detachedSnailOwner;
+    auto retiredBoxOwner = std::make_unique<AmigaPortRuntime>(300); auto& retiredBox = *retiredBoxOwner;
     const int retiredX[] = {0}, retiredY[] = {-512};
     retiredBox.configureBreakables(retiredX, retiredY, 1);
     require(retiredBox.breakableActiveAt(0, -512), "offscreen box exists until end-of-update retirement");
@@ -1367,8 +1386,9 @@ int main() {
     require(!retiredBox.breakableActiveAt(0, -512) && retiredBox.blocksDestroyed() == 0,
             "native offscreen box retires without counting as a destroyed block");
     NativeEnemyLifecycleAudit hitBatAudit;
-    AmigaPortRuntime hitBat(300, false, 1000, false,
+    auto hitBatOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000, false,
         GameplayWorld::EnemyLifecycleBinding::bindAnimation(hitBatAudit));
+    auto& hitBat = *hitBatOwner;
     hitBat.configureSolidResolver(noSolid, nullptr);
     require(hitBat.configureEnemy(0, 116, 153, 0, 12, 0, 0, 15, 12,
                 0, 0, -1, -1, 270, 256, true, false, true),
@@ -1390,7 +1410,7 @@ int main() {
     require(hitBat.enemyAt(0).spriteId == 153 && !hitBat.enemyAt(0).batHit.stunned &&
                 (hitBat.enemyAt(0).preciseX != batX || hitBat.enemyAt(0).preciseY != batY),
             "bat resumes flying when its recovered alarm fires");
-    AmigaPortRuntime hitSnail(300, false, 1000);
+    auto hitSnailOwner = std::make_unique<AmigaPortRuntime>(300, false, 1000); auto& hitSnail = *hitSnailOwner;
     hitSnail.configureSolidResolver(shortRightWall, nullptr);
     require(hitSnail.configureEnemy(0, 117, 177, -1, 12, 0, -26, 20, 24,
                                     0, 0, -1, -1, 0, 0, true, false, true),
@@ -1416,7 +1436,7 @@ int main() {
     require(!detachedSnail.enemyAt(0).active,
             "wall snail retires when neither recovered wall side exists");
 
-    AmigaPortRuntime crawler(300);
+    auto crawlerOwner = std::make_unique<AmigaPortRuntime>(300); auto& crawler = *crawlerOwner;
     crawler.configureSolidResolver(crawlerCorner, 0);
     require(crawler.configureEnemy(0, 119, 181, 0, 0,
                                    0, 0, 3, 6,
@@ -1436,9 +1456,9 @@ int main() {
     require(crawler.enemyAt(0).drawFrame() == crawler.enemyAt(0).imageFrame + 256,
             "upward crawler chooses its host-generated ninety-degree frame");
 
-    AmigaPortRuntime bat(300);
+    auto batOwner = std::make_unique<AmigaPortRuntime>(300); auto& bat = *batOwner;
     {
-        AmigaPortRuntime bounds(300);
+        auto boundsOwner = std::make_unique<AmigaPortRuntime>(300); auto& bounds = *boundsOwner;
         require(bounds.configureEnemy(0, 111, 163, 40, 3, 128, 0, 5, 6,
                     0, 0, -1, -1, 0, 0, false) &&
                 bounds.configureEnemy(1, 111, 163, 300, 3, 128, 0, 5, 6,
@@ -1474,7 +1494,7 @@ int main() {
                 bat.enemyAt(0).moveSpeed <= 320,
             "visible bat activates and steers toward the player in fixed point");
 
-    AmigaPortRuntime animatedBat(300);
+    auto animatedBatOwner = std::make_unique<AmigaPortRuntime>(300); auto& animatedBat = *animatedBatOwner;
     animatedBat.configureSolidResolver(noSolid, 0);
     require(animatedBat.configureEnemy(0, 116, 153, 40, 0,
                                         0, 0, 15, 12,
@@ -1487,7 +1507,7 @@ int main() {
                 animatedBat.enemyAt(0).imageFrame == 3,
             "0.2-speed bat reaches frame three after exactly fifteen updates");
 
-    AmigaPortRuntime walkingTurtle(300);
+    auto walkingTurtleOwner = std::make_unique<AmigaPortRuntime>(300); auto& walkingTurtle = *walkingTurtleOwner;
     walkingTurtle.configureSolidResolver(flatGround, 0);
     require(walkingTurtle.configureEnemy(0, 112, 186, 40, 0,
                                           64, 0, 5, 14,
@@ -1500,7 +1520,7 @@ int main() {
                 walkingTurtle.enemyAt(0).imageFrame == 5,
             "six-frame walking-turtle cycle retains its final two frames");
 
-    AmigaPortRuntime distantBat(300);
+    auto distantBatOwner = std::make_unique<AmigaPortRuntime>(300); auto& distantBat = *distantBatOwner;
     distantBat.configureSolidResolver(noSolid, 0);
     require(distantBat.configureEnemy(0, 116, 153, 40, 500,
                                       0, 0, 15, 12,
@@ -1521,7 +1541,7 @@ int main() {
             "explicit enemy replacement retires the old key even at the same slot");
 
     {
-        AmigaPortRuntime handles(300);
+        auto handlesOwner = std::make_unique<AmigaPortRuntime>(300); auto& handles = *handlesOwner;
         handles.configureSolidResolver(noSolid,0);
         require(handles.configureEnemy(0,111,163,100,-2000,0,0,5,6)&&
                 handles.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false),
@@ -1554,7 +1574,7 @@ int main() {
     }
 
     {
-        AmigaPortRuntime identities(300);
+        auto identitiesOwner = std::make_unique<AmigaPortRuntime>(300); auto& identities = *identitiesOwner;
         std::uint32_t previousEnemy = 0, previousGem = 0, previousField = 0;
         downwell::ObjectPack unusedObjects(nullptr,0);
         for (unsigned cycle = 0; cycle < 32; ++cycle) {
@@ -1595,7 +1615,7 @@ int main() {
         }
     }
 
-    AmigaPortRuntime stomp(300);
+    auto stompOwner = std::make_unique<AmigaPortRuntime>(300); auto& stomp = *stompOwner;
     require(stomp.configureEnemy(0, 111, 163, 0, 5,
                                  0, 0, 5, 6),
             "stomp enemy configuration succeeds");
@@ -1654,7 +1674,7 @@ int main() {
         require(account.gameGem == 22, "run-wide collected gems remain distinct from spendable currency");
     }
 
-    AmigaPortRuntime contact(300);
+    auto contactOwner = std::make_unique<AmigaPortRuntime>(300); auto& contact = *contactOwner;
     require(contact.configureEnemy(0, 117, 177, 0, 0,
                                    0, 0, 20, 24),
             "contact enemy configuration succeeds");
@@ -1721,7 +1741,10 @@ int main() {
         require(!contact.gemAt(i).active, "restart removes old gems");
 
     {
-        AmigaPortRuntime visibility(300,true,0,true);
+        // Beyond the shaft the player's Begin Step stops time and the frog
+        // would not step at all; this checks which view its Step reads.
+        GameplayWorld::compactTimeStopAdmitted=false;
+        auto visibilityOwner = std::make_unique<AmigaPortRuntime>(300,true,0,true); auto& visibility = *visibilityOwner;
         visibility.configureSolidResolver(noSolid,0);
         downwell::Input right;right.right=true;
         bool crossed=false;
@@ -1742,8 +1765,9 @@ int main() {
             }
         }
         require(crossed,"frog publication test reaches a natural horizontal camera crossing");
+        GameplayWorld::compactTimeStopAdmitted=true;
     }
-    AmigaPortRuntime sideCamera(300, true, 0, true);
+    auto sideCameraOwner = std::make_unique<AmigaPortRuntime>(300, true, 0, true); auto& sideCamera = *sideCameraOwner;
     sideCamera.configureSolidResolver(noSolid, 0);
     downwell::Input walkRight;
     walkRight.right = true;
@@ -1816,6 +1840,7 @@ int main() {
             "cross-target replay tape validates");
     auto replayRuntimeStorage=std::make_unique<AmigaPortRuntime>(300);
     auto& replayRuntime=*replayRuntimeStorage;
+    replayRuntime.configureOpenSpaceContacts(); // as tools/port-replay-reference does
     for (std::uint32_t frame = 0; frame < replay.frameCount(); ++frame) {
         downwell::Input replayInput;
         require(replay.frame(frame, replayInput),
@@ -1824,7 +1849,9 @@ int main() {
     }
     std::cout << "Native trajectory digest: " << std::hex
               << replayRuntime.trajectoryDigest() << std::dec << '\n';
-    require(replayRuntime.trajectoryDigest() == 0x70883a2c716f4684ULL,
+    // The digest tools/port-replay-reference prints for the Amiga cross
+    // replay (70883a2c716f4684 was pinned before this test stopped running).
+    require(replayRuntime.effectsSucceeded() && replayRuntime.trajectoryDigest() == 0x3963c415f066bbc8ULL,
             "cross-target trajectory digest remains pinned");
     const auto gems = downwell::verifyGemSimulation();
     std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec
