@@ -119,6 +119,17 @@ static int verify_inputs(Context* c)
 
 static Context context;
 
+#ifdef INSTALL_TIMING
+/* Timing build only (make amiga-timing): 50 Hz ticks before each stage and
+   at the end, and the peak allocation, read by tools/install-data/time_amiga.py. */
+volatile long install_ticks[16];
+volatile unsigned long install_peak;
+long install_now(void); /* timing_amiga.c */
+#define MARK(i) (install_ticks[i] = install_now())
+#else
+#define MARK(i) ((void)0)
+#endif
+
 #ifndef INSTALL_AMIGA
 #include <stdlib.h>
 /* Host builds only: DOWNWELL_INSTALL_STAGES=audio,... runs just those stages
@@ -148,7 +159,9 @@ int install_data(const char* source, const char* dest, const char* temp)
     memset(c, 0, sizeof *c);
     c->source = source; c->dest = dest;
     tables_init(&c->tables);
+    MARK(0);
     ok = verify_inputs(c);
+    MARK(1);
     if (ok) {
         io_message("Reading data.win...");
         dw_path(path, sizeof path, source, "data.win");
@@ -157,6 +170,7 @@ int install_data(const char* source, const char* dest, const char* temp)
     {
         u32 i;
         for (i = 0; i < STAGE_COUNT && ok; ++i) {
+            MARK(2 + i);
             if (!selected(STAGES[i].name)) continue;
             io_message(STAGES[i].message);
             ok = !io_cancelled() && STAGES[i].run(c);
@@ -170,6 +184,10 @@ int install_data(const char* source, const char* dest, const char* temp)
         else ok = tables_partial(&c->tables, dest);
         buf_free(&out);
     }
+    MARK(2 + STAGE_COUNT);
+#ifdef INSTALL_TIMING
+    install_peak = dw_alloc_peak();
+#endif
     win_close(&c->win);
     if (!ok) { io_message("DownwellInstallData failed:"); io_message(dw_error ? dw_error : "unknown error"); return 20; }
 #ifndef INSTALL_AMIGA

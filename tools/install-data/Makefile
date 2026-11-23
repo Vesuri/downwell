@@ -44,7 +44,7 @@ AMIGA_CC = m68k-amiga-elf-gcc
 ELF2HUNK ?= elf2hunk
 AMIGA_NM = $(dir $(shell command -v $(AMIGA_CC)))../m68k-amiga-elf/bin/nm
 AMIGA_CPU = -m68020 -mtune=68020 -msoft-float
-AMIGA_FLAGS = -std=c99 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-tree-loop-distribute-patterns -fstack-usage -Wall -Wextra -Wno-unused-parameter -Wno-volatile-register-var -DINSTALL_AMIGA
+AMIGA_FLAGS = -std=c99 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-tree-loop-distribute-patterns -fstack-usage -Wall -Wextra -Wno-unused-parameter -Wno-volatile-register-var -DINSTALL_AMIGA $(EXTRA_AMIGA_FLAGS)
 
 .PHONY: all amiga test pinned
 pinned:
@@ -71,7 +71,7 @@ $(BUILD)/host/%.cpp.o: %.cpp $(HEADERS) Makefile | pinned
 $(BUILD)/DownwellInstallData: $(HOST_OBJECTS) $(HOST_VORBIS)
 	$(CXX) $(CFLAGS) $^ -o $@
 
-AMIGA_OBJECTS = $(patsubst %,$(BUILD)/amiga/%.o,$(SOURCES) io_amiga.c)
+AMIGA_OBJECTS = $(patsubst %,$(BUILD)/amiga/%.o,$(SOURCES) io_amiga.c timing_amiga.c version_amiga.c)
 $(BUILD)/amiga/%.c.o: %.c $(HEADERS) Makefile | pinned
 	@mkdir -p $(@D)
 	$(AMIGA_CC) $(AMIGA_FLAGS) -I$(BUILD) -Iogg -Iconfig -c $< -o $@
@@ -90,7 +90,14 @@ $(BUILD)/DownwellInstallData.elf: $(BUILD)/amiga/start.o $(AMIGA_OBJECTS) $(AMIG
 	@test ! -s $(BUILD)/undefined.txt || (cat $(BUILD)/undefined.txt; false)
 $(BUILD)/DownwellInstallData.exe: $(BUILD)/DownwellInstallData.elf
 	"$(ELF2HUNK)" $< $@ -s
+	@grep -aq '$$VER: DownwellInstallData' $@ || (echo "$@: no $$VER string"; rm -f $@; false)
 amiga: $(BUILD)/DownwellInstallData.exe
 
 test: all
 	python3 test_install.py $(BUILD)/DownwellInstallData
+
+# A timing build for the target: stage ticks, peak allocation and stack use
+# (io_amiga.c's INSTALL_STACK_TEST), read by time_amiga.py.
+.PHONY: amiga-timing
+amiga-timing:
+	$(MAKE) BUILD=$(BUILD)/timing EXTRA_AMIGA_FLAGS="-DINSTALL_STACK_TEST -DINSTALL_TIMING" $(BUILD)/timing/DownwellInstallData.exe
