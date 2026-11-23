@@ -6,7 +6,7 @@ assembly under the shipping flags, and the data files `make -C amiga` copies
 beside the executable (`Downwell.tables` as each input it packs). `--check`
 fails when the build and this table differ.
 
-45 inputs are linked into `Downwell.exe` and 46 are data files; 7 are our own computation, 39 only describe converted files and 45 are derived from the player's files; 1 derived inputs are still linked.
+28 inputs are linked into `Downwell.exe` and 46 are data files; 7 are our own computation, 22 only describe converted files and 45 are derived from the player's files; 1 derived input is still linked.
 
 - **own**: no byte of the player's files reaches it; it stays linked.
 - **layout**: sizes, budgets or offsets of converted files and no game bytes. It may stay
@@ -28,27 +28,10 @@ fails when the build and this table differ.
 | `amiga-sfx.h` | layout | - | tools/pack-amiga-sfx.py | sound bank sizes and counts |
 | `amiga-tables.h` | layout | - | tools/pack-amiga-tables.py | Downwell.tables size and tags |
 | `amiga-transient-banks.h` | layout | - | tools/generate-amiga-transient-banks.py | transient bank sizes and budgets |
-| `installed/../../src/core/../../generated/installed/contact-motion.inc` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/../../generated/installed/contact-motion.inc |
-| `installed/../../src/core/../../generated/installed/smoke-trig.inc` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/../../generated/installed/smoke-trig.inc |
-| `installed/../../src/core/ContactMotion.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/ContactMotion.h |
-| `installed/../../src/core/ContactMotionCodec.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/ContactMotionCodec.h |
-| `installed/../../src/core/InstalledTables.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/InstalledTables.h |
-| `installed/../../src/core/MultiplyBinary64.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/MultiplyBinary64.h |
-| `installed/../../src/core/RunnerImageValue.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/RunnerImageValue.h |
-| `installed/../../src/core/SmokeDirection.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/SmokeDirection.h |
-| `installed/../../src/core/SmokeTrig.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/core/SmokeTrig.h |
-| `installed/../../src/platform/amiga/../../../generated/installed/amiga-damage-text.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/../../../generated/installed/amiga-damage-text.h |
-| `installed/../../src/platform/amiga/../../../generated/installed/amiga-health-art.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/../../../generated/installed/amiga-health-art.h |
-| `installed/../../src/platform/amiga/../../../generated/installed/amiga-room-terrain-plan.inc` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/../../../generated/installed/amiga-room-terrain-plan.inc |
-| `installed/../../src/platform/amiga/AmigaDamageText.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/AmigaDamageText.h |
-| `installed/../../src/platform/amiga/AmigaHealthArt.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/AmigaHealthArt.h |
-| `installed/../../src/platform/amiga/AmigaLandingIndex.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/AmigaLandingIndex.h |
-| `installed/../../src/platform/amiga/AmigaRenderer.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/AmigaRenderer.h |
-| `installed/../../src/platform/amiga/AmigaRoomTerrainPlan.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/AmigaRoomTerrainPlan.h |
-| `installed/../../src/platform/amiga/AmigaTerrain.h` | layout | - | tools/install-table-headers.py | pointers and counts for ../../src/platform/amiga/AmigaTerrain.h |
 | `installed/amiga-ammo-dividers.h` | layout | - | tools/install-table-headers.py | pointers and counts for amiga-ammo-dividers.h |
 | `installed/amiga-ammo-factored.h` | layout | - | tools/install-table-headers.py | pointers and counts for amiga-ammo-factored.h |
 | `installed/amiga-damage-text.h` | layout | - | tools/install-table-headers.py | pointers and counts for amiga-damage-text.h |
+| `installed/amiga-health-art.h` | layout | - | tools/install-table-headers.py | pointers and counts for amiga-health-art.h |
 | `installed/amiga-hud-text.h` | layout | - | tools/install-table-headers.py | pointers and counts for amiga-hud-text.h |
 | `installed/amiga-room-terrain-plan.inc` | layout | - | tools/install-table-headers.py | pointers and counts for amiga-room-terrain-plan.inc |
 | `installed/bind-tables.h` | layout | - | tools/install-table-headers.py | binds every installed table |
