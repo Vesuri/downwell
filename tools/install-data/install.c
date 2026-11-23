@@ -4,6 +4,29 @@
 #include "install_config.h"
 #include "context.h"
 #include "sha256.h"
+#include "text.h"
+#include "rooms.h"
+#include "masks.h"
+#include "code.h"
+#include "exe.h"
+#include "art.h"
+#include "derived.h"
+#include "audio.h"
+
+/* In order: a stage may read what an earlier one wrote (the scene banks). */
+typedef struct { const char* message; int (*run)(Context*); } Stage;
+static const Stage STAGES[] = {
+    {"Texts...", stage_text},
+    {"Objects and rooms...", stage_rooms},
+    {"Collision masks...", stage_masks},
+    {"Level patterns and palettes...", stage_code},
+    {"Runner tables...", stage_exe},
+    {"Scene art...", stage_art},
+    {"Prepared art...", stage_derived},
+    {"Sound banks...", stage_audio},
+    {"Sound tables...", sound_tables},
+};
+#define STAGE_COUNT (sizeof STAGES / sizeof STAGES[0])
 
 typedef struct { const char* name; const char* sha256; } Input;
 /* docs/source-inventory.md */
@@ -41,6 +64,20 @@ int ctx_open(Context* c, const char* name, File* f)
     char path[512];
     dw_path(path, sizeof path, c->source, name);
     if (!io_open(f, path, 0)) return dw_fail(say("cannot open ", name));
+    return 1;
+}
+
+int ctx_read_output(Context* c, const char* name, Buf* out)
+{
+    char path[512];
+    File f;
+    u8* p;
+    dw_path(path, sizeof path, c->dest, name);
+    if (!io_open(&f, path, 0)) return dw_fail(say("cannot read back ", name));
+    buf_init(out);
+    p = buf_grow(out, f.size);
+    if (!p || (f.size && !io_read(&f, p, f.size))) { io_close(&f); buf_free(out); return dw_fail(say("cannot read back ", name)); }
+    io_close(&f);
     return 1;
 }
 
@@ -97,7 +134,14 @@ int install_data(const char* source, const char* dest, const char* temp)
         dw_path(path, sizeof path, source, "data.win");
         ok = win_open(&c->win, path, 512 * 1024) && sounds_read(&c->win, &c->sounds);
     }
-    if (ok) { io_message("Sound tables..."); ok = sound_tables(c); }
+    {
+        u32 i;
+        for (i = 0; i < STAGE_COUNT && ok; ++i) {
+            io_message(STAGES[i].message);
+            ok = !io_cancelled() && STAGES[i].run(c);
+            if (ok && io_cancelled()) ok = dw_fail("cancelled");
+        }
+    }
     if (ok) {
         Buf out;
         buf_init(&out);

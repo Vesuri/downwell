@@ -6,9 +6,18 @@ BUILD ?= $(ROOT)/build/install-data
 CC ?= cc
 CFLAGS ?= -O2 -g
 WARN = -std=c99 -Wall -Wextra -Werror -Wno-unused-parameter
-# Our sources.
+# Our sources: the shared ones, then one line per stage (install.c's STAGES).
 SOURCES = install.c dw.c win.c tables.c sound.c sha256.c
-HEADERS = install_config.h io.h sha256.h dw.h win.h tables.h sound.h context.h
+SOURCES_TEXT = text.c
+SOURCES_ROOMS = rooms.c
+SOURCES_MASKS = masks.c
+SOURCES_CODE = code.c
+SOURCES_EXE = exe.c
+SOURCES_ART = art.c
+SOURCES_DERIVED = derived.c
+SOURCES_AUDIO = audio.c
+SOURCES += $(SOURCES_TEXT) $(SOURCES_ROOMS) $(SOURCES_MASKS) $(SOURCES_CODE) $(SOURCES_EXE) $(SOURCES_ART) $(SOURCES_DERIVED) $(SOURCES_AUDIO)
+HEADERS = install_config.h io.h sha256.h dw.h win.h tables.h sound.h context.h $(wildcard *.h)
 # Xiph's integer Vorbis decoder and Ogg framing (BSD), unmodified.
 VORBIS_SOURCES = ogg/bitwise.c ogg/framing.c $(addprefix tremor/,block.c codebook.c floor0.c floor1.c info.c mapping0.c mdct.c registry.c res012.c sharedbook.c synthesis.c vorbisfile.c window.c)
 AMIGA_CC = m68k-amiga-elf-gcc
@@ -21,16 +30,34 @@ AMIGA_FLAGS = -std=c99 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-tree-loop
 pinned:
 	@cd $(ROOT) && shasum -a 256 -c --quiet manifest/install-data.sha256
 
+# C++ stages (those that reuse src/core or src/platform/amiga code): no
+# exceptions, RTTI or C++ runtime, as the game builds them.
+CXX ?= c++
+CXXWARN = -std=gnu++17 -Wall -Wextra -Werror -Wno-unused-parameter -fno-exceptions -fno-rtti
+CXX_INCLUDES = -I$(ROOT)/src -I.
+AMIGA_CXX = m68k-amiga-elf-g++
+AMIGA_CXXFLAGS = -std=gnu++17 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-rtti -fno-exceptions -fno-use-cxa-atexit -fstack-usage -Wall -Wextra -Wno-unused-parameter -DINSTALL_AMIGA -DDOWNWELL_FREESTANDING -DDOWNWELL_PLATFORM_AMIGA -I$(ROOT)/src/platform/amiga/compat $(CXX_INCLUDES)
+
 all: $(BUILD)/DownwellInstallData
 $(BUILD):
 	mkdir -p $@
-$(BUILD)/DownwellInstallData: $(SOURCES) io_unix.c $(HEADERS) Makefile | $(BUILD) pinned
-	$(CC) $(CFLAGS) $(WARN) $(SOURCES) io_unix.c -o $@
+HOST_OBJECTS = $(patsubst %,$(BUILD)/host/%.o,$(SOURCES) io_unix.c)
+$(BUILD)/host/%.c.o: %.c $(HEADERS) Makefile | pinned
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(WARN) -c $< -o $@
+$(BUILD)/host/%.cpp.o: %.cpp $(HEADERS) Makefile | pinned
+	@mkdir -p $(@D)
+	$(CXX) $(CFLAGS) $(CXXWARN) $(CXX_INCLUDES) -c $< -o $@
+$(BUILD)/DownwellInstallData: $(HOST_OBJECTS)
+	$(CXX) $(CFLAGS) $^ -o $@
 
-AMIGA_OBJECTS = $(patsubst %.c,$(BUILD)/amiga/%.o,$(SOURCES) io_amiga.c)
-$(BUILD)/amiga/%.o: %.c $(HEADERS) Makefile | pinned
+AMIGA_OBJECTS = $(patsubst %,$(BUILD)/amiga/%.o,$(SOURCES) io_amiga.c)
+$(BUILD)/amiga/%.c.o: %.c $(HEADERS) Makefile | pinned
 	@mkdir -p $(@D)
 	$(AMIGA_CC) $(AMIGA_FLAGS) -c $< -o $@
+$(BUILD)/amiga/%.cpp.o: %.cpp $(HEADERS) Makefile | pinned
+	@mkdir -p $(@D)
+	$(AMIGA_CXX) $(AMIGA_CXXFLAGS) -c $< -o $@
 $(BUILD)/amiga/start.o: start.s | pinned
 	@mkdir -p $(@D)
 	$(AMIGA_CC) $(AMIGA_CPU) -c $< -o $@

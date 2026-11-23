@@ -13,4 +13,7 @@ struct Context {
 };
 /* Open a file in the source drawer. */
 int ctx_open(Context* c, const char* name, File* f);
+/* Read back a file an earlier stage wrote to the destination (the scene
+   banks): the whole file into a new buffer. */
+int ctx_read_output(Context* c, const char* name, Buf* out);
 #endif
