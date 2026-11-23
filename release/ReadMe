@@ -1,0 +1,110 @@
+ THIS PACKAGE COMES WITH ABSOLUTELY NO WARRANTY OF ANY KIND, EITHER EXPRESS OR
+ IMPLIED, STATUTORY OR OTHERWISE. THE ENTIRE RISK AS TO USE, RESULTS AND
+ PERFORMANCE OF THE PACKAGE IS ASSUMED BY YOU AND IF THE PACKAGE SHOULD PROVE
+ TO BE DEFECTIVE, YOU ASSUME THE ENTIRE COST OF ALL NECESSARY SERVICING,
+ REPAIR OR OTHER REMEDIATION.
+ UNDER NO CIRCUMSTANCES, CAN THE AUTHOR BE HELD RESPONSIBLE FOR ANY DAMAGE
+ CAUSED IN ANY USUAL, SPECIAL, OR ACCIDENTAL WAY, ALSO IF THE OWNER OR A THIRD
+ PARTY HAS BEEN POINTED AT SUCH POSSIBILITIES OF DAMAGE.
+
+ This install applies to "Downwell", an unofficial native Amiga port of the
+ 2015 game by Moppin (Ojiro Fumoto), published by Devolver Digital.
+
+ THIS IS A WORK IN PROGRESS: the first world only. It is not WHDLoad; the
+ game runs from Workbench or from a Shell.
+
+
+ What to expect:
+ ---------------
+ This version is the world 1 slice: the game from its start to the end of
+ level 1-3, with the menus, gameplay, shops, side rooms, the pause menu, the
+ results and the style select. It follows the Windows Steam release's own
+ program and data, and is tested against them.
+
+ - Music: not in this version (the sound effects play on Paula).
+ - Speed: optimizing comes after world 1 is complete; busy scenes can slow
+   down. On a PAL Amiga the game runs at 50 frames per second, slower than
+   the original's 60.
+ - After level 1-3 the slice ends: world 2 is not in this version.
+
+
+ Requirements:
+ -------------
+ The game is written for an A1200 with 4 MB Fast memory (68EC020, AGA,
+ 2 MB Chip). It needs Kickstart and Workbench 2.04 or newer and about 1 MB
+ of free Chip memory for its display and sound data, plus about 2.5 MB of
+ further free memory (Fast or Chip) for everything else: about 3.5 MB in all.
+ It refuses to start, and says why, when the memory is not there.
+
+ Installing needs Installer 43 or newer, a 68020 or better (the installer's
+ converter is a 68020 program), and about 4 MB free on the hard disk.
+
+ The install does not include any part of the original game. You need your
+ own copy of Downwell for Windows from Steam (app 360740), version 1.0.5.
+ The installer reads these files from its Downwell drawer
+ (Steam\steamapps\common\Downwell on the PC):
+
+     data.win  Downwell.exe  language.ini
+     amb1.ogg  sfxfalling.ogg  sfxbossfirsthit.ogg
+     audiogroup1.dat  audiogroup2.dat  audiogroup3.dat
+     audiogroup4.dat  audiogroup5.dat  audiogroup6.dat
+
+ Copy the whole drawer to the Amiga (about 140 MB; the installer reads only
+ the files above), or put it on a medium the Amiga can read. Every file is
+ checked; other versions are refused.
+
+
+ Installation:
+ -------------
+ Run the Install icon and choose a parent drawer: a Downwell drawer is
+ created in it. Then select your Steam Downwell drawer. The installer
+ converts the game's graphics, rooms and sounds from your files into
+ Downwell's own data files in Downwell/data. This takes several minutes. If
+ the conversion fails, the installer shows why and changes nothing.
+
+ To update, select the same parent drawer and choose Keep. Use existing (the
+ default) keeps the converted data; Replace converts your Steam files again.
+ Remove deletes everything in the drawer except the saved game. The saved
+ game (save.ini) is kept in every case.
+
+
+ Playing:
+ --------
+ Start the Downwell icon, or from a Shell:
+
+     Stack 8192
+     Downwell
+
+ The game needs a stack of 8 KB; the installer sets it in the icon.
+ Joystick in port 2: left and right move, fire jumps and shoots (hold it to
+ keep shooting while you fall), the second button cancels in the menus.
+ Keyboard: X cancels; Escape or P pauses during play, and Escape quits
+ elsewhere.
+
+
+ Files:
+ ------
+ Downwell                the game
+ data/                   its data, converted from your files by the
+                         installer, and Downwell.fields and Downwell.columns
+ save.ini                your saved game and options, written by the game
+
+ DownwellInstallData, the converter the installer runs, decodes the Ogg
+ Vorbis sounds with Xiph.Org's Tremor and libogg (BSD licences, see
+ LICENSE.Tremor.txt and LICENSE.libogg.txt in the install archive); its
+ file routines are under the LGPL (LICENSE.LGPL.txt).
+
+
+ History:
+ --------
+ version 0.1 (23.11.2026):
+ - The world 1 slice: from the start to the end of level 1-3, with sound
+   effects and no music.
+ - First install archive.
+
+
+ Credits:
+ --------
+ Downwell (c) 2015 Moppin, published by Devolver Digital. This port includes
+ none of the game's files: you provide your own copy.
+ Amiga port by Vesa Halttunen (vesuri@jormas.com).

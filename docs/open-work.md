@@ -256,6 +256,20 @@ Stages, in order:
    `tools/check_release.py` on AmigaXDev's `amigaxdev.release`, icons from
    the siblings. An emulated install test covers fresh, keep, replace,
    wrong files and the start from both icon and Shell.
+   Done (2026-11-23): `release/Install`, `release/ReadMe`, `release/icons`
+   (the game icon packaged as a tool icon), `tools/package_release.py`
+   and `tools/check_release.py` (`make package-release`, `check-release`:
+   build/release/Downwell-`VERSION`.lha with only our members, each
+   decoded by Lhasa and equal to its build output, no player file, derived
+   data file or 64-byte block of the player's files), and
+   `tools/test_release_installer.py` (`make test-installer`: Installer 43
+   on the emulated `a1200-4m`, modes fresh, keep, replace, incomplete,
+   remove and wrong, then `verify_startup.sh VERIFY_INSTALLED` starts the
+   installed drawer from its icon and from the Shell). Remaining, once the
+   converter writes every installed file: rerun `make package-release
+   test-installer` with no PENDING line (the installed data complete, the
+   start without development files supplementing it), and record the
+   converter's time and memory in the fresh install on the target.
 3. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
    little memory, a missing or wrong data file) says why: on the Shell's
    output, or in a requester when started from Workbench.

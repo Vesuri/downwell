@@ -1,0 +1,102 @@
+; Downwell (world 1) installation. Commodore Installer V43 or newer.
+; From Wing Commander 2's release/Install (the WHDLoad Install Template
+; conventions): ReadMe first, the parent drawer, Keep or Remove an existing
+; drawer, Use existing or Replace the converted data, then the player's files.
+; $VER: Install 0.1 (23.11.2026)
+(set @app-name "Downwell")
+(if (< @installer-version (* 43 65536))
+  (abort "This installation requires Amiga Installer 43 or newer."))
+(welcome)
+(set #source (pathonly @icon))
+(set @execute-dir #source)
+; Show the instructions before asking for the destination or the player's files.
+(set #readme (tackon #source "ReadMe"))
+(if (exists #readme)
+  (if (<> 0 (run ("SYS:Utilities/MultiView \"%s\"" #readme)))
+    (run ("SYS:Utilities/More \"%s\"" #readme))))
+; DownwellInstallData is built for the 68020; the game itself also runs on a 68000.
+(set #cpu (database "cpu"))
+(if (or (= #cpu "68000") (= #cpu "68010"))
+  (abort "Installing Downwell needs a 68020 or better: the installer converts the game's files with a 68020 program. See ReadMe."))
+(set #parent
+  (askdir (prompt "Where should Downwell be installed? A Downwell drawer will be created here.")
+    (help "Choose a writable hard disk drawer with at least 4 MB free. The installed game takes about 2 MB; the converted files are first written to a staging drawer beside it.")
+    (default @default-dest)))
+(set #dest (tackon #parent "Downwell"))
+(set #data (tackon #dest "data"))
+(set #helper (tackon #source "DownwellInstallData"))
+(set #staging (tackon #parent "Downwell-InstallStaging"))
+(set #previous (tackon #dest "data-previous"))
+(set #log "DownwellInstallData")
+(set #remove-existing 0)
+(if (exists #dest)
+  (set #remove-existing
+    (askbool
+      (prompt ("The drawer \"%s\" already exists. Remove its contents before installing? Your saved game is kept either way." #dest))
+      (help "Remove deletes everything in the Downwell drawer except the saved game (save.ini), then installs again from your Steam files. Keep updates the program and keeps the saved game; you can then keep or replace the converted game data.")
+      (choices "Remove" "Keep") (default 0))))
+; The converted data: the files DownwellInstallData writes (all must be there).
+(set #complete 1)
+(set #n 0)
+(while (and #complete (< #n 22))
+  ((if (= 0 (exists (tackon #data
+      (select #n "Downwell.boot" "Downwell.front" "Downwell.game" "Downwell.planes"
+        "Downwell.cavern" "Downwell.cavernplanes" "Downwell.results" "Downwell.shop"
+        "Downwell.pause" "Downwell.clear" "Downwell.hud" "Downwell.patterns"
+        "Downwell.exitmask" "Downwell.entrymask" "Downwell.selectionmask" "Downwell.terrain"
+        "Downwell.encountermasks" "Downwell.sndrun" "Downwell.sndfront" "Downwell.sndresults"
+        "Downwell.sndclear" "Downwell.tables"))))
+     (set #complete 0))
+   (set #n (+ #n 1))))
+(set #install-data 1)
+(if (and #complete (= #remove-existing 0))
+  (set #install-data
+    (askchoice
+      (prompt "Downwell's converted game data is already installed. Use the existing data or replace it from your Steam files?")
+      (help "Use existing keeps the installed data and skips the question for your Steam files. Replace converts your Steam files again; the old data is replaced only when the conversion succeeds. The saved game is kept either way.")
+      (choices "Use existing" "Replace") (default 0))))
+(if #install-data
+  ((set #steam
+     (askdir (prompt "Select your Steam Downwell drawer, the one with data.win in it.")
+       (help "Copy the Downwell drawer of your Windows Steam installation (Steam\\steamapps\\common\\Downwell, version 1.0.5) to the Amiga, or select it on a drive the Amiga can read. Needed: data.win, Downwell.exe, language.ini, amb1.ogg, sfxfalling.ogg, sfxbossfirsthit.ogg and audiogroup1.dat to audiogroup6.dat. Every file is checked; any other version is refused.")
+       (default #source)))
+   ; Convert into a staging drawer: data/ changes only after success.
+   (if (exists #staging) (delete #staging (all) (optional "force") (help @delete-help)))
+   (makedir #staging (help @makedir-help))
+   (set #output ">NIL:")
+   (if (<> (getassign "ENV") "") (set #output (cat ">ENV:" #log)))
+   (working "Checking your Steam files and converting Downwell's game data. This takes several minutes.")
+   (set #result (run ("Stack 16384\n\"%s\" %s \"%s\" \"%s\"" #helper #output #steam #staging)))
+   (if (<> #result 0)
+     ((set #failure (cat "Downwell's game data could not be converted from the selected drawer. Nothing was changed.\n\n" (getenv #log)))
+      (delete #staging (all) (optional "force") (help @delete-help))
+      (run ("Delete >NIL: ENV:%s QUIET" #log))
+      (abort #failure)))
+   (run ("Delete >NIL: ENV:%s QUIET" #log))))
+; Everything is ready: only now change the existing drawer.
+(if #remove-existing
+  (run ("Delete >NIL: \"%s/~(save.ini)\" ALL QUIET FORCE" #dest)))
+(if (= (exists #dest) 0) (makedir #dest (infos) (help @makedir-help)))
+(if #install-data
+  ((if (exists #previous) (delete #previous (all) (optional "force") (help @delete-help)))
+   (if (exists #data) (rename #data #previous))
+   (if (= 0 (rename #staging #data))
+     (abort "The converted data could not be moved into the Downwell drawer."))
+   (if (exists #previous) (delete #previous (all) (optional "force") (help @delete-help)))))
+(if (= (exists #data) 0) (makedir #data (help @makedir-help)))
+; Our own computed files, installed with the program.
+(copyfiles (source (tackon #source "Downwell.fields")) (dest #data) (help @copyfiles-help))
+(copyfiles (source (tackon #source "Downwell.columns")) (dest #data) (help @copyfiles-help))
+(copyfiles (source (tackon #source "Downwell")) (dest #dest) (help @copyfiles-help))
+(if (= (exists (tackon #dest "Downwell.info")) 0)
+  ((copyfiles (source (tackon #source "Downwell.inf")) (dest #dest) (newname "Downwell.info") (help @copyfiles-help))
+   (tooltype (dest (tackon #dest "Downwell")) (noposition))))
+; The game refuses a stack below 8 KB.
+(tooltype (dest (tackon #dest "Downwell")) (setstack 8192))
+(copyfiles (source (tackon #source "ReadMe")) (dest #dest) (infos) (help @copyfiles-help))
+; openwbobject was added after Installer 43; retain the template version gate.
+(if (>= @installer-version (+ (* 44 65536) 10))
+  (openwbobject #dest))
+(set @default-dest #dest)
+(complete 100)
+(exit)

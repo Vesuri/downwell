@@ -755,6 +755,25 @@ verify-amiga-inputs:
 	python3 tools/install-table-headers.py --check && python3 tools/pack-amiga-tables.py --check && \
 	python3 tools/check-original-bytes.py amiga/out/Downwell.exe
 
+# WI.5: the install archive build/release/Downwell-<VERSION>.lha from a clean
+# shipping build (STRIP=1) and a fully remade converter (-B), then its
+# independent check: only our files, each equal to its build output
+# (tools/package_release.py, tools/check_release.py, release/). test-installer
+# runs release/Install in Installer 43 on the emulated target, every mode, and
+# starts the installed game from its icon and from the Shell
+# (tools/test_release_installer.py; INSTALLER_MODES selects modes).
+.PHONY: package-release check-release test-installer
+package-release:
+	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && \
+		$(AMIGA_MAKE) -C amiga -j$(DOWNWELL_JOBS) STRIP=1 && \
+		$(AMIGA_MAKE) -B -C tools/install-data -j$(DOWNWELL_JOBS) all amiga && python3 tools/package_release.py' ; } && \
+	python3 tools/check_release.py
+check-release:
+	python3 tools/check_release.py
+INSTALLER_MODES ?=
+test-installer:
+	$(AMIGA_SERIAL) bash -c '. amiga/env.sh && python3 tools/test_release_installer.py $(INSTALLER_MODES)'
+
 # W2.3: generated/sound-durations.inc (each sound's source length in steps,
 # for SoundVoices' audio_is_playing) and sound-gains.inc (asset volumes)
 # match the extracted audio.

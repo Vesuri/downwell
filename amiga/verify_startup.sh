@@ -61,16 +61,30 @@ if [ "${VERIFY_WORKBENCH:-0}" = 1 ]; then
   cp -f "$SETPATCH" "$DH0/c/SetPatch"
   printf '%s\n' 'DH0:c/SetPatch QUIET' 'DF0:C/Assign C: DF0:C' 'Assign LIBS: DF0:Libs' \
     'MakeDir RAM:ENV' 'Assign ENV: RAM:ENV' 'LoadWB' 'EndCLI >NIL:' > "$DH0/s/startup-sequence"
-  python3 ../tools/tool_icon.py --stack "$VERIFY_STACK_BYTES" "$GAME/Downwell.info"
+  [ -n "${VERIFY_INSTALLED:-}" ] || python3 ../tools/tool_icon.py --stack "$VERIFY_STACK_BYTES" "$GAME/Downwell.info"
   BOOT_ARGS=(--floppy_drive_0="$WORKBENCH_ADF" --hard_drive_0_priority=10)
 else
   [ ! -d "$DH0/WBStartup" ] || find "$DH0/WBStartup" -mindepth 1 -delete
   printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
 fi
+# VERIFY_INSTALLED=DIR (WI.5): start the drawer the Installer made instead
+# (tools/test_release_installer.py): its program, its icon (with the stack
+# the Installer set) and its data/, from the icon or, without
+# VERIFY_WORKBENCH, from the Shell. Its ReadMe stays out of WBStartup.
+if [ -n "${VERIFY_INSTALLED:-}" ]; then
+  [ -f "$VERIFY_INSTALLED/Downwell" ] && [ -d "$VERIFY_INSTALLED/data" ] || {
+    echo "not an installed Downwell drawer: $VERIFY_INSTALLED"; exit 1; }
+  cmp -s "$VERIFY_INSTALLED/Downwell" "$VERIFY_PROGRAM.exe" || {
+    echo "the installed program is not $VERIFY_PROGRAM.exe (the debugger needs its ELF)"; exit 1; }
+  find "$GAME" -mindepth 1 -delete
+  rsync -a --exclude '*.uaem' --exclude 'ReadMe*' "$VERIFY_INSTALLED/" "$GAME/"
+  [ "${VERIFY_WORKBENCH:-0}" != 1 ] || [ -f "$GAME/Downwell.info" ] || { echo "the installed drawer has no Downwell.info"; exit 1; }
+else
 cp -f "$VERIFY_PROGRAM.exe" "$GAME/Downwell"
 for bank in boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear tables; do
   cp -f "out/Downwell.$bank" "$DATA/Downwell.$bank"
 done
+fi
 if [ "$VERIFY_PROGRAM" = out/WindAudioProbe ]; then
   cp -f out/Downwell.wind "$DATA/Downwell.wind"
 fi
