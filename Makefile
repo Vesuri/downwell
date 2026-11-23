@@ -3812,9 +3812,13 @@ test: test-sound-routes
 # the probe schedule's host render, the route logs replayed through the plan
 # (no requested sound missing), and the native probe recorded in FS-UAE and
 # compared with the render (verify-amiga-paula-mixer, real time: ~2 min).
-extracted/amiga-sfx/bank/manifest.json: tools/sfx-bank.py tools/sfx-bank-policy.json
-	python3 tools/sfx-bank.py --bank
-generated/amiga-sfx.bin: tools/pack-amiga-sfx.py extracted/amiga-sfx/bank/manifest.json extracted/audio/manifest.json
+# WI.4: the banks are the converter's (tools/install-data/audio.c), built by
+# its host binary from data/.
+.PHONY: install-data-converter
+build/install-data/DownwellInstallData: install-data-converter
+install-data-converter:
+	$(MAKE) -s -C tools/install-data
+generated/amiga-sfx.bin: tools/pack-amiga-sfx.py build/install-data/DownwellInstallData docs/sound-inventory.md tools/sfx-bank-policy.json
 	python3 tools/pack-amiga-sfx.py
 generated/amiga-sfx.h generated/amiga-sfx.json: generated/amiga-sfx.bin
 build/paula-mixer-test: tests/platform/amiga/PaulaMixerTest.cpp tests/platform/amiga/PaulaModel.h tests/platform/amiga/PaulaProbeSchedule.h src/platform/amiga/PaulaMixer.h $(wildcard src/core/*.h)

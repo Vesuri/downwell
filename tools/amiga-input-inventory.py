@@ -35,7 +35,7 @@ OUTPUT = ROOT / 'docs/amiga-input-inventory.md'
 # texture pages, CodeEntries and Assembly views of data.win.
 UTMT = 'UTMT export'
 AUDIO = 'tools/extract-audio.py'
-SFX = f'{AUDIO} -> tools/sfx-bank.py (ffmpeg swr resample) -> tools/pack-amiga-sfx.py'
+SFX = 'tools/install-data/audio.c (Tremor, our resampler) -> tools/pack-amiga-sfx.py'
 HUD = f'{UTMT} -> tools/generate-amiga-hud.py'
 GRAPHICS = 'SPRT, TPAG, TXTR (texture page PNGs)'
 

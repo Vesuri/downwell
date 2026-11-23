@@ -92,9 +92,15 @@ area-1 patterns, and names every cut with its reason.
     own stream because the front end has no game RNG.
   - **Conversion (W2.2):** every class at 8,363 Hz with a -24 dB crop; the
     seven winds as 1.5 s swells, `sfxFalling` a 1 s loop, the jetpack a
-    0.5 s loop and the title sting 2.5 s. The bank comes from
-    `tools/sfx-bank.py --bank` (`make amiga-sfx-bank`) with
-    `tools/sfx-bank-policy.json`; `--preview` rebuilds the listening page.
+    0.5 s loop and the title sting 2.5 s, chosen in
+    `tools/sfx-bank-policy.json` on the listening page that
+    `tools/sfx-bank.py --preview` builds (ffmpeg, for listening only).
+    Since WI.4 (2026-11-23) the banks are the converter's
+    (`tools/install-data/audio.c`, run by `tools/pack-amiga-sfx.py`): Tremor
+    decodes the Ogg effects, our polyphase FIR resamples to the exact Paula
+    rate (3,546,895 / 424 Hz; ffmpeg went to a whole 8,365 Hz), and the cuts
+    and normalisation are integer, so the host and the Amiga write the same
+    bytes. Those samples are the reference.
     Paula's minimum period (124) bounds pitch × rate: at 8,363 Hz the guns'
     1.8 and the progress-bar fill's 2.2 fit.
   - **Routes:** `make test-sound-routes` checks the menus driver and eight

@@ -14,17 +14,17 @@
 #include "audio.h"
 
 /* In order: a stage may read what an earlier one wrote (the scene banks). */
-typedef struct { const char* message; int (*run)(Context*); } Stage;
+typedef struct { const char* name; const char* message; int (*run)(Context*); } Stage;
 static const Stage STAGES[] = {
-    {"Texts...", stage_text},
-    {"Objects and rooms...", stage_rooms},
-    {"Collision masks...", stage_masks},
-    {"Level patterns and palettes...", stage_code},
-    {"Runner tables...", stage_exe},
-    {"Scene art...", stage_art},
-    {"Prepared art...", stage_derived},
-    {"Sound banks...", stage_audio},
-    {"Sound tables...", sound_tables},
+    {"text", "Texts...", stage_text},
+    {"rooms", "Objects and rooms...", stage_rooms},
+    {"masks", "Collision masks...", stage_masks},
+    {"code", "Level patterns and palettes...", stage_code},
+    {"exe", "Runner tables...", stage_exe},
+    {"art", "Scene art...", stage_art},
+    {"derived", "Prepared art...", stage_derived},
+    {"audio", "Sound banks...", stage_audio},
+    {"soundtables", "Sound tables...", sound_tables},
 };
 #define STAGE_COUNT (sizeof STAGES / sizeof STAGES[0])
 
@@ -119,6 +119,26 @@ static int verify_inputs(Context* c)
 
 static Context context;
 
+#ifndef INSTALL_AMIGA
+#include <stdlib.h>
+/* Host builds only: DOWNWELL_INSTALL_STAGES=audio,... runs just those stages
+   (the repo Makefile builds generated/amiga-sfx-*.bin this way). */
+static int selected(const char* name)
+{
+    const char* list = getenv("DOWNWELL_INSTALL_STAGES");
+    u32 n = (u32)strlen(name);
+    if (!list) return 1;
+    while (*list) {
+        if (!strncmp(list, name, n) && (list[n] == ',' || !list[n])) return 1;
+        while (*list && *list != ',') ++list;
+        if (*list) ++list;
+    }
+    return 0;
+}
+#else
+static int selected(const char* name) { (void)name; return 1; }
+#endif
+
 int install_data(const char* source, const char* dest, const char* temp)
 {
     Context* c = &context;
@@ -137,6 +157,7 @@ int install_data(const char* source, const char* dest, const char* temp)
     {
         u32 i;
         for (i = 0; i < STAGE_COUNT && ok; ++i) {
+            if (!selected(STAGES[i].name)) continue;
             io_message(STAGES[i].message);
             ok = !io_cancelled() && STAGES[i].run(c);
             if (ok && io_cancelled()) ok = dw_fail("cancelled");

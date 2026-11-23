@@ -77,10 +77,10 @@ fails when the build and this table differ.
 | `amiga-pause.dwap` | `Downwell.pause` | derived | data.win SPRT, TPAG, TXTR (texture page PNGs), FONT; language.ini (labels written in the tool) | UTMT export -> tools/generate-amiga-hud.py | pause bank (data file) |
 | `amiga-results.dwap` | `Downwell.results` | derived | data.win SPRT, TPAG, TXTR (texture page PNGs), FONT; language.ini (labels written in the tool) | UTMT export -> tools/generate-amiga-hud.py | results bank (data file) |
 | `amiga-room-terrain-plan.inc` | `Downwell.tables (RTPL)` | derived | data.win ROOM | UTMT export -> tools/generate-room-terrain-plan.py | room terrain plan |
-| `amiga-sfx-clear.bin` | `Downwell.sndclear` | derived | data.win SOND, AUDO (WAV) | tools/extract-audio.py -> tools/sfx-bank.py (ffmpeg swr resample) -> tools/pack-amiga-sfx.py | level-clear sound bank (data file) |
-| `amiga-sfx-front.bin` | `Downwell.sndfront` | derived | data.win SOND, AUDO (WAV, Ogg) | tools/extract-audio.py -> tools/sfx-bank.py (ffmpeg swr resample) -> tools/pack-amiga-sfx.py | front-end sound bank (data file) |
-| `amiga-sfx-results.bin` | `Downwell.sndresults` | derived | data.win SOND, AUDO (WAV) | tools/extract-audio.py -> tools/sfx-bank.py (ffmpeg swr resample) -> tools/pack-amiga-sfx.py | results sound bank (data file) |
-| `amiga-sfx-run.bin` | `Downwell.sndrun` | derived | data.win SOND, AUDO (WAV, Ogg); sfxfalling.ogg | tools/extract-audio.py -> tools/sfx-bank.py (ffmpeg swr resample) -> tools/pack-amiga-sfx.py | run sound bank (data file) |
+| `amiga-sfx-clear.bin` | `Downwell.sndclear` | derived | data.win SOND, AUDO (WAV) | tools/install-data/audio.c (Tremor, our resampler) -> tools/pack-amiga-sfx.py | level-clear sound bank (data file) |
+| `amiga-sfx-front.bin` | `Downwell.sndfront` | derived | data.win SOND, AUDO (WAV, Ogg) | tools/install-data/audio.c (Tremor, our resampler) -> tools/pack-amiga-sfx.py | front-end sound bank (data file) |
+| `amiga-sfx-results.bin` | `Downwell.sndresults` | derived | data.win SOND, AUDO (WAV) | tools/install-data/audio.c (Tremor, our resampler) -> tools/pack-amiga-sfx.py | results sound bank (data file) |
+| `amiga-sfx-run.bin` | `Downwell.sndrun` | derived | data.win SOND, AUDO (WAV, Ogg); sfxfalling.ogg | tools/install-data/audio.c (Tremor, our resampler) -> tools/pack-amiga-sfx.py | run sound bank (data file) |
 | `amiga-shop.dwap` | `Downwell.shop` | derived | data.win SPRT, TPAG, TXTR (texture page PNGs), FONT; language.ini | UTMT export -> tools/generate-amiga-hud.py | shop bank (data file) |
 | `amiga-terrain-phase6.bin` | `Downwell.tables (TPH6)` | derived | data.win SPRT, TPAG, TXTR (texture page PNGs) | tools/generate-terrain-phase.py (from amiga-game.dwap) | shifted terrain tiles |
 | `contact-motion.inc` | `Downwell.tables (CMOT)` | derived | Downwell.exe (through smoke-trig.inc) | tools/generate-contact-motion.cpp | contact motion decoder states |
