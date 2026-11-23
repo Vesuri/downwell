@@ -771,6 +771,7 @@ int main() {
         require(owner->attach(bound->startup()),"production Game attaches before its first update");
         // W1.14: the boot route keeps the pinned first world's garden walk.
         const_cast<downwell::StartupRuntime&>(bound->startup()).useCaptureGarden(true);
+        const_cast<downwell::StartupRuntime&>(plain->startup()).useCaptureGarden(true);
         unsigned gameplay=0,splashStages=0;bool garden=false,style=false,gardenDrawChecked=false;
         for(unsigned frame=0;frame<4000&&gameplay<120;++frame){
             const auto& state=bound->startup();
@@ -1407,7 +1408,8 @@ int main() {
         firstDamage,mainTicks,hidden,flashingVisible,damagedGame.startup().mainPlayerHealth());
     // Revalidated with the unchanged input tape in both world adapters after
     // restoring source gem RNG/timing; do not inject damage to satisfy this.
-    require(firstDamage == 645 && mainTicks == 735 && hidden == 45 && flashingVisible == 45 &&
+    // The W2.3 sound-argument draws (ba5f503b) moved it from 645/735.
+    require(firstDamage == 647 && mainTicks == 737 && hidden == 45 && flashingVisible == 45 &&
             damagedGame.startup().mainPlayerHealth() == 3,
             "render route reaches the verified natural contact and complete immunity interval");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");
