@@ -169,62 +169,6 @@ around `pTimeStop`, the level-begin music start and the BGM option keep their
 state but stay silent. The Paula mixer ([Amiga sound effects](amiga-audio.md))
 must let a module player reserve voices later.
 
-### WI. Installer
-
-Set by the user on 2026-11-22: an LHA install archive like the sibling
-ports' (`Downwell Install.info`, `Downwell Install/` with `Install`,
-`ReadMe`, icons and the program), with no WHDLoad slave yet. The player
-chooses a parent drawer; the installed world 1 slice starts from its
-Workbench icon or from the Shell. The archive may hold only our code and
-our own files: the player provides the game.
-
-**What the player provides.** Their own Windows Steam copy of Downwell
-(app 360740, version 1.0.5), the files this repo uses as `data/`. The
-inventory ([amiga-input-inventory.md](amiga-input-inventory.md),
-`make verify-amiga-inputs`) lists what the slice reads: `data.win` (AUDO,
-CODE, FONT, OBJT, ROOM, SHDR, SOND, SPRT, TPAG, TXTR), `language.ini`,
-the runner `Downwell.exe` (its trig path, for `smoke-trig.inc` and
-`contact-motion.inc`) and the loose `sfxfalling.ogg` (sound 186, in the run
-bank). `sound-durations.inc` also needs the lengths, and only the lengths,
-of the songs in `audiogroup1-6.dat`, `amb1.ogg` and `sfxbossfirsthit.ogg`.
-SHA-256s are in [source-inventory.md](source-inventory.md). The installer
-checks every file it reads by SHA-256 and refuses any other version.
-
-**Why it needs a converter.** Unlike the WHDLoad siblings, which run the
-original files, the Amiga build runs on data converted on the host
-(UndertaleModTool, the Python generators and ffmpeg). The executable
-links none of it (WI.3): rooms, objects, sprite masks, HUD and health art,
-text, palettes and sound tables are installed files, read at startup or
-scene load. The user chose a native converter
-(2026-11-22): `DownwellInstallData`, run by the Installer on the Amiga,
-builds every derived file from the player's files.
-
-Stages, in order:
-
-1. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
-   siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
-   an existing drawer (saves preserved), Use existing or Replace the
-   converted data, the player's Steam drawer, `DownwellInstallData` into a
-   staging drawer that replaces `data/` only on success, the icon with an
-   8 KB stack (`main` refuses less). `tools/package_release.py` and
-   `tools/check_release.py` on AmigaXDev's `amigaxdev.release`, icons from
-   the siblings. An emulated install test covers fresh, keep, replace,
-   wrong files and the start from both icon and Shell.
-   Done (2026-11-23): `release/Install`, `release/ReadMe`, `release/icons`
-   (the game icon packaged as a tool icon), `tools/package_release.py`
-   and `tools/check_release.py` (`make package-release`, `check-release`:
-   build/release/Downwell-`VERSION`.lha with only our members, each
-   decoded by Lhasa and equal to its build output, no player file, derived
-   data file or 64-byte block of the player's files), and
-   `tools/test_release_installer.py` (`make test-installer`: Installer 43
-   on the emulated `a1200-4m`, modes fresh, keep, replace, incomplete,
-   remove and wrong, then `verify_startup.sh VERIFY_INSTALLED` starts the
-   installed drawer from its icon and from the Shell). Remaining, once the
-   converter writes every installed file: rerun `make package-release
-   test-installer` with no PENDING line (the installed data complete, the
-   start without development files supplementing it), and record the
-   converter's time and memory in the fresh install on the target.
-
 ### W3. Performance
 
 The target: every gameplay update of world 1 within 20 ms of work on the
@@ -1134,6 +1078,17 @@ Reference: [area-two recovery](area-two-recovery.md).
   For currency, integrate registered active-room membership, pending activation
   semantics and time-stop speed writes; see the currency animation audit.
   The standalone pre-Step animation pass does not close these ownership gaps.
+- Bring the host reference (`StartupRuntime`, which the SDL build runs) up
+  to the native world-1 shot and goal. Its player shot is still the pre-W1.4
+  `MachineGunTrajectory`: no `bulletRanged` Create draws (`random_range` for
+  imgSp and bSpeed), muzzle effect, gun shake or `bulletCasing` (walls, Hot
+  Casing); `GameplayWorld::firePlayerGun` is the native model. And it starts
+  no time stop at the goal unless the caller drives `stepWithPlayerTimeStop`,
+  which the SDL platform does not, so enemies inside the goal field freeze
+  instead of shattering into gems. `amiga-scene-runtime-test` stops its
+  decoded-scene parity at the first landing and its shop parity after the
+  exit latch's grants because of these; extend both once the reference
+  matches (they ran through the shots, results and later rooms before).
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.
