@@ -55,7 +55,7 @@ pinned:
 CXX ?= c++
 CXXWARN = -std=gnu++17 -Wall -Wextra -Werror -Wno-unused-parameter -fno-exceptions -fno-rtti
 CXX_INCLUDES = -I$(ROOT)/src -I.
-AMIGA_CXX = m68k-amiga-elf-g++
+AMIGA_CXX = m68k-amiga-elf-gcc
 AMIGA_CXXFLAGS = -std=gnu++17 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-rtti -fno-exceptions -fno-use-cxa-atexit -fstack-usage -Wall -Wextra -Wno-unused-parameter -DINSTALL_AMIGA -DDOWNWELL_FREESTANDING -DDOWNWELL_PLATFORM_AMIGA -I$(ROOT)/src/platform/amiga/compat $(CXX_INCLUDES)
 
 all: $(BUILD)/DownwellInstallData
