@@ -420,12 +420,15 @@ int main(int argc, char** argv) {
     }
     std::cout<<"interleaved callbacks "<<interleavedCallbacks<<", failures "<<failedCreates
         <<", levels "<<finishedLevels<<", digest "<<std::hex<<emissionDigest<<std::dec<<'\n';
-    require(interleavedCallbacks==148068 && failedCreates==288 && finishedLevels==72,
+    // 9e683b15 (W1.4): GunModule draws irandom(bulletMaxNum) until it differs
+    // from the current gun, which moves every later draw of a tape.
+    require(interleavedCallbacks==148293 && failedCreates==288 && finishedLevels==72,
         "interleaved corpus covers all successful levels and failure boundaries");
     // Row setters now remain visible on a later failed Create, instead of
     // leaving y at the beginning of the pattern. Successful emission/RNG
-    // fingerprints below remain unchanged.
-    require(emissionDigest==0xc2f4db85016aa9d2ULL,
+    // fingerprints below remain unchanged. The GunModule draws (9e683b15)
+    // moved this digest with the callback count.
+    require(emissionDigest==0x18187d2f2693b492ULL,
         "live RNG/health interleaving preserves ordered commands and partial builder state");
     emissionDigest=legacyDigest=preBoxDigest=14695981039346656037ULL;
     unsigned fieldCount=0;
@@ -489,12 +492,15 @@ int main(int argc, char** argv) {
     std::cout << "ordered emission digest " << std::hex << emissionDigest << std::dec << '\n';
     // Re-recorded after VM-audited level-dependent enemy spawning; the previous
     // 1fd36f0408435e8b kept level-one odds and omitted crawler cells. This is a regression
-    // fingerprint, not an independent Windows-runner capture.
-    require(legacyDigest == 0x970b28efcbf63992ULL,
+    // fingerprint, not an independent Windows-runner capture. The GunModule
+    // draws (9e683b15) moved it from 970b28efcbf63992.
+    require(legacyDigest == 0x68ce296493063d05ULL,
         "retaining field radius changes no other Create fields or RNG state");
-    require(preBoxDigest == 0xddd99e417bca728fULL,
+    // Both moved with the GunModule draws (9e683b15): from ddd99e417bca728f
+    // and 5c6663997c7bbf14.
+    require(preBoxDigest == 0x4d752d652f32584dULL,
         "retaining box Create choices changes no prior emission fields or RNG state");
-    require(emissionDigest == 0x5c6663997c7bbf14ULL,
+    require(emissionDigest == 0xaad735cb40293659ULL,
         "64 seeded levels retain ordered box sound/gem choices and complete RNG state");
     GameMakerRandom random(2);
     AreaOneBuilder builder;
