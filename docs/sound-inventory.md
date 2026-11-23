@@ -10,7 +10,7 @@ chosen in W2.2.
   audio manifest sha256 `2e3a26e9fd36b0b6`; Paula conversion sha256 `aac86ae6c2157b8b`.
 - 114 objects are reachable from the world-1 rooms; 181 sounds are referenced by their code, 158 of them kept or cut (905.4 KiB before cuts).
 - Observed and Peak come from the W2.3 host sound routes in
-  `tests/data/sound-routes` (`hard-mode-death-v195` `073711b47b6f`, `hard-mode-death-v294-tour` `57cf0b1ea0e3`, `hard-mode-death-v325-tour` `5e6cde7f7aa8`, `hard-mode-death-v514` `38d1ff09b3fa`, `hard-mode-death-v80-tour` `2865a37e93c9`, `hard-mode-death` `3d66ab3e35f1`, `menus` `425476a89bb6`, `upgrade-0-18-v58` `2880366af824`, `upgrade-1-v682-shot` `299a2f37b381`, `upgrade-11-v18` `f8af0b60b3b4`, `upgrade-12-v155` `76ac7a763c22`, `upgrade-15-v2` `643365d95214`, `upgrade-17-v16` `4e30d274e84b`, `upgrade-22-v25` `9240de601429`, `upgrade-3-v58` `349be72bc330`, `upgrade-5-9-v96` `8b1d8d6aaef3`, `upgrade-8-v17` `140ca688b096`, `world-one-v106-tour` `cbfc321c3ebd`, `world-one` `4a58d7d9e3a7`):
+  `tests/data/sound-routes` (`hard-mode-death-v195` `073711b47b6f`, `hard-mode-death-v294-tour` `57cf0b1ea0e3`, `hard-mode-death-v325-tour` `5e6cde7f7aa8`, `hard-mode-death-v514` `38d1ff09b3fa`, `hard-mode-death-v80-tour` `2865a37e93c9`, `hard-mode-death` `3d66ab3e35f1`, `menus` `4483e5c59de8`, `upgrade-0-18-v58` `2880366af824`, `upgrade-1-v682-shot` `299a2f37b381`, `upgrade-11-v18` `f8af0b60b3b4`, `upgrade-12-v155` `76ac7a763c22`, `upgrade-15-v2` `643365d95214`, `upgrade-17-v16` `4e30d274e84b`, `upgrade-22-v25` `9240de601429`, `upgrade-3-v58` `349be72bc330`, `upgrade-5-9-v96` `8b1d8d6aaef3`, `upgrade-8-v17` `140ca688b096`, `world-one-v106-tour` `cbfc321c3ebd`, `world-one` `4a58d7d9e3a7`):
   plays requested over all routes, and the most live voices of the sound
   at once on any route (source durations, after each frame's requests).
   153 of the sounds above are observed.
@@ -72,9 +72,9 @@ upgrade screen between levels), results (death and results).
 | 48 | `sfxFootstepBreakable1` | 800 | 0.10 |  | gameplay | objPlayer_n | 12 | 1 | keep |
 | 49 | `sfxFootstepBreakable2` | 752 | 0.09 |  | gameplay | objPlayer_n | 13 | 1 | keep |
 | 50 | `sfxFootstepBreakable3` | 816 | 0.10 |  | gameplay | objPlayer_n | 27 | 1 | keep |
-| 51 | `sfxFootstepFoliage1` | 864 | 0.10 |  | front, gameplay | objPlayer_n | 47 | 1 | keep |
-| 52 | `sfxFootstepFoliage2` | 1,264 | 0.15 |  | front, gameplay | objPlayer_n | 35 | 1 | keep |
-| 53 | `sfxFootstepFoliage3` | 1,152 | 0.14 |  | front, gameplay | objPlayer_n | 41 | 1 | keep |
+| 51 | `sfxFootstepFoliage1` | 864 | 0.10 |  | front, gameplay | objPlayer_n | 46 | 1 | keep |
+| 52 | `sfxFootstepFoliage2` | 1,264 | 0.15 |  | front, gameplay | objPlayer_n | 34 | 1 | keep |
+| 53 | `sfxFootstepFoliage3` | 1,152 | 0.14 |  | front, gameplay | objPlayer_n | 40 | 1 | keep |
 | 54 | `sfxFootstepFoliage4` | 1,216 | 0.15 |  | front, gameplay | objPlayer_n | 38 | 1 | keep |
 | 55 | `sfxFsRock1` | 544 | 0.07 |  | front, gameplay | objPlayer_n | 1 | 1 | keep |
 | 56 | `sfxFsRock2` | 576 | 0.07 |  | front, gameplay | objPlayer_n | 3 | 1 | keep |
@@ -105,7 +105,7 @@ upgrade screen between levels), results (death and results).
 | 81 | `sfxJlThin1` | 1,120 | 0.13 |  | gameplay | objPlayer_n | 38 | 1 | keep |
 | 82 | `sfxJlThin2` | 1,056 | 0.13 |  | gameplay | objPlayer_n | 29 | 1 | keep |
 | 83 | `sfxPlayerEat` | 4,672 | 0.56 |  | gameplay | objDeadBody | 18 | 1 | keep |
-| 86 | `sfxPlayerJump1` | 1,360 | 0.16 |  | front, gameplay | objPlayer_n | 2,015 | 1 | keep |
+| 86 | `sfxPlayerJump1` | 1,360 | 0.16 |  | front, gameplay | objPlayer_n | 2,016 | 1 | keep |
 | 88 | `sfxPlayerTurn` | 816 | 0.10 |  | front, gameplay | objPlayer_n | 878 | 1 | keep |
 | 89 | `sfxDeath` | 10,032 | 1.20 |  | gameplay | objPlayer_n | 6 | 1 | keep |
 | 90 | `sfxNotifLowAmmo` | 944 | 0.11 |  | gameplay | objControlerN, objPlayer_n | 2,835 | 1 | keep |
