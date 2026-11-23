@@ -1310,6 +1310,8 @@ verify-damage-profile: generated/smoke-trig.inc generated/downwell-goal-mask.h g
 	./build/damage-profile-probes-test
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -DDOWNWELL_FPSCOUNT -o build/damage-profile-fps-test tests/core/DamageProfileTest.cpp
 	./build/damage-profile-fps-test
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -DDOWNWELL_PORTABLE_CONTACT_ATAN -o build/damage-profile-portable-test tests/core/DamageProfileTest.cpp
+	./build/damage-profile-portable-test
 .PHONY: verify-forced-player-jump
 verify-forced-player-jump: build/forced-player-jump-test
 	./build/forced-player-jump-test

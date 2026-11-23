@@ -8,7 +8,14 @@ void downwellProfilePhase(unsigned phase){active=phase;}
 int main(){
     downwell::RunSession run;
     assert(run.contactDamageNumber(128,-128,0,0,240,176));
-    assert(run.damageNumbers.atNewest(0)->direction.high==0x40468000u); // 45 degrees
+    const auto* number=run.damageNumbers.atNewest(0);
+#ifdef DOWNWELL_PORTABLE_CONTACT_ATAN
+    assert(number->direction.high==0x40468000u&&number->direction.low==0&&!number->tableContact); // 45 degrees
+#else
+    // The default table atan (docs/runner-point-direction.md): its presentation
+    // precision puts 45 degrees at 45.000126, certified for the contact bank.
+    assert(number->direction.high==0x40468004u&&number->direction.low==0x20000000u&&number->tableContact);
+#endif
     assert(run.stepDamageNumbers(run.damageNumbers.beginPhase()));
     assert(active==profileEnemyContact);
     for(unsigned i=1;i<8;++i)assert(run.createDamageNumber({}, {}, {}, {}));
