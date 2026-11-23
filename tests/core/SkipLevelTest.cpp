@@ -35,7 +35,9 @@ int main() {
         game.update({});
         sawWipe |= state.exitDither().active;
     }
-    assert(tick == 96 && sawWipe && state.levelClearActive());
+    // The 95th update requests the results and enters them (0f53a293;
+    // amiga-scene-runtime-test pins the same schedule on both adapters).
+    assert(tick == 95 && sawWipe && state.levelClearActive());
     for (unsigned i = 0; i < 60; ++i) game.update({});
     assert(state.levelClear().selection.visible);
     downwell::Input right; right.right = true;

@@ -12,11 +12,17 @@ compiler = shlex.split(sys.argv[1] if len(sys.argv) > 1 else "clang++")
 # Keep this an explicit list: accepting all generated headers would also admit
 # target-only planar artwork or backend implementation dependencies.
 core_generated = {root / "generated" / name for name in (
-    "downwell-goal-mask.h", "downwell-time-field-mask.h", "smoke-trig.inc")}
+    "downwell-goal-mask.h", "downwell-time-field-mask.h", "smoke-trig.inc",
+    "atan-q16.inc", "contact-motion.inc", "clear-motion.inc",
+    "sound-durations.inc", "sound-gains.inc")}
 
 
 def allowed(source, dependency):
     path = (root / dependency).resolve()
+    # Apple clang lists the SDK's settings file even under -MM: toolchain
+    # metadata, not a header the source includes.
+    if path.name == "SDKSettings.json" and path.parent.suffix == ".sdk":
+        return True
     return (path == root / source or root / "src/core" in path.parents or
             path in core_generated)
 

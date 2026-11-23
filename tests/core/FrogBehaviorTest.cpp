@@ -99,7 +99,7 @@ int main() {
     }
     {
         struct Instance { int health = -1, reward = -1; float imageSpeed = -1; int untouched = 37; };
-        for (int object : {111, 112, 113, 116, 117, 119}) {
+        for (int object : {111, 112, 113, 114, 116, 117, 119}) {
             const auto profile = downwell::enemyCreateProfile(object);
             Instance instance;
             downwell::applyEnemyCreateStats(instance, object);
@@ -107,7 +107,7 @@ int main() {
                     std::lround(instance.imageSpeed * 20) == profile.animationRate && instance.untouched == 37,
                     "SDL creation adapter preserves shared health/reward/rate without resetting other state");
         }
-        for (int object : {-1, 0, 110, 114, 115, 118, 120}) {
+        for (int object : {-1, 0, 110, 115, 118, 120}) { // 115, 118: steering, not this profile
             const auto profile = downwell::enemyCreateProfile(object);
             require(profile.health == 0 && profile.reward == 0 && profile.animationRate == 0,
                     "unsupported objects are not misclassified as supported enemies");

@@ -82,7 +82,11 @@ class ReplayRuntime:public downwell::StartupRuntime {
     std::uint32_t seed_;
     const downwell::BuilderPatternPack* patterns_;
     std::vector<Frame> tape_;
+    bool captureGarden_=false;
 public:
+    // W1.14: the pre-W1.14 walk into the well (the checkpoints' capture
+    // path), for fixtures that continue into the pinned first-run world.
+    void useCaptureGarden(){captureGarden_=true;StartupRuntime::useCaptureGarden(true);}
     ReplayRuntime(downwell::PlatformProfile profile,const downwell::RoomPack* rooms,
         const downwell::ObjectPack* objects,std::uint32_t seed,const downwell::BuilderPatternPack* patterns)
         :StartupRuntime(profile,rooms,objects,seed,patterns),profile_(profile),rooms_(rooms),
@@ -93,6 +97,7 @@ public:
     }
     std::unique_ptr<ReplayRuntime> replay()const{
         auto result=std::make_unique<ReplayRuntime>(profile_,rooms_,objects_,seed_,patterns_);
+        if(captureGarden_)result->useCaptureGarden();
         for(const auto& frame:tape_){
             if(frame.legacy)result->step(frame.advance);
             else result->step(frame.input,frame.advance);
@@ -1594,6 +1599,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         downwell::PlatformProfile::nonDesktop, &pack, objects,
         downwell::StartupRuntime::defaultRandomSeed, patterns);
     auto& runtime=*runtimeStorage;
+    runtime.useCaptureGarden(); // its gameplay checks are the pinned world's
     require(runtime.roomLoadSucceeded(), "packed rmInit loads");
     verifyLiveLayers(runtime);
     require(runtime.activeInstanceCount() == 2,
@@ -1633,12 +1639,18 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         auto& edgeEntry=*edgeEntryStorage;
         edgeEntry.step(false);
         stepMany(edgeEntry, 30);
-        downwell::Input enterAtLeftEdge;
-        enterAtLeftEdge.right = true;
+        // W1.14: the well's rim stops a walk at x 260. Jump onto it (fire
+        // from x 240) and release right at x 290, so the drop comes down at
+        // the gap's left edge (the garden route's x 300 lands further in).
         for (int tick = 0;
-             tick < 160 && edgeEntry.menuPlayerX() < 300.0F;
-             ++tick)
-            edgeEntry.step(enterAtLeftEdge, false);
+             tick < 240 && edgeEntry.menuPlayerX() < 290.0F;
+             ++tick) {
+            downwell::Input input;
+            const float x = edgeEntry.menuPlayerX();
+            input.right = x < 290.0F;
+            input.fire = x >= 240.0F && x < 290.0F;
+            edgeEntry.step(input, false);
+        }
         downwell::Input noInput;
         for (int tick = 0;
              tick < 100 && !edgeEntry.menuTeleportActive();

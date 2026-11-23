@@ -824,13 +824,6 @@ int main() {
             if(x+8>110 && x-8<270 && y+8>0 && y-8<284)
                 expected.push_back({UWORD(sprite),UWORD(frame),x,y,flip});
         };
-#ifndef DOWNWELL_REPLAY_VERIFY
-        for(unsigned i=0;i<world.enemyCount();++i) {
-            const auto& e=world.enemyAt(i);
-            if(e.active && e.awake) emit(e.spriteId,e.drawFrame(),190+e.x-world.cameraOffsetX(),
-                142+e.y-world.cameraOffsetY(),e.objectId!=119 && e.facing<0);
-        }
-#endif
         downwell::drawShopKeepers(world.shops(),[&](int s,unsigned f,int x,int y) { emit(s,f,110+x-vx,y-vy); });
         downwell::drawShopPrompts(world.shops(),false,[&](int s,unsigned f,int x,int y) { emit(s,f,110+x-vx,y-vy); });
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -853,7 +846,7 @@ int main() {
             for(unsigned i=0;i<fx.movingCount();++i)at(fx.moving(i).effect);
         }
 #endif
-        for(unsigned i=0;i<world.bulletSlotEnd();++i) {
+        for(unsigned i=world.bulletSlotEnd();i-->0;) { // newest slot first
             const auto& b=world.bulletAt(i);
             if(b.active) emit(downwell::machineGunProfile(b.gemHigh).sprite,768+b.animation.frame(),
                 190+b.x-world.cameraOffsetX(),142+b.y-world.cameraOffsetY());
@@ -862,6 +855,15 @@ int main() {
             std::int32_t x,y;assert(effect.x.promoted().roundPixel(x)&&effect.y.promoted().roundPixel(y));
             emit(102,effect.drawFrame(),110+x-vx,y-vy);
         }));
+#ifndef DOWNWELL_REPLAY_VERIFY
+        // Since WR.5 the list draws by depth: the turtle (112, depth -10000)
+        // follows the foreground effects (corpse expiry -1000).
+        for(unsigned i=0;i<world.enemyCount();++i) {
+            const auto& e=world.enemyAt(i);
+            if(e.active && e.awake) emit(e.spriteId,e.drawFrame(),190+e.x-world.cameraOffsetX(),
+                142+e.y-world.cameraOffsetY(),e.objectId!=119 && e.facing<0);
+        }
+#endif
         if(world.playerVisible()) emit(world.player().spriteId(world.deathSequence().movementDead()),
             world.player().spriteFrame(world.deathSequence().movementDead(),world.deathSequence().animation),
             190+downwell::roundGameMakerQ8(world.player().offsetXFixed())-world.cameraOffsetX(),
