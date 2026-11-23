@@ -201,15 +201,6 @@ name. Every change follows their working rules:
 **Gates**
 
 1. **W3.1 Repair the broken regression gates.** W3.8–W3.13 rely on both.
-   - `make verify-cross-replay` stops at frame 5 on the Amiga with
-     `downwellGameplayFailed` at the `effectsSucceeded` check. The fixture
-     world (`GameplayWorld(300)` on the host, the reference-terrain world on
-     the Amiga) installs no wall-contact resolver, so `stepCasings` →
-     `solidMeeting` clears `effectsSucceeded` from frame 5 on both targets.
-     Only the Amiga loop stops on it; `tools/port-replay-reference.cpp`
-     ignores it. Broken since the W1.4 casings (2026-11-03); frames 1–4
-     match. Give both fixture worlds the same empty wall/platform resolver
-     and make the host reference fail on lost effects.
    - `make verify-amiga-gameplay-cache` fails with `raster=64 checks=156`
      (seen 2026-11-21, also before the terrain raster ring).
 

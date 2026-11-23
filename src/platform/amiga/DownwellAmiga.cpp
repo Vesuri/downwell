@@ -2032,6 +2032,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin,true,0,false,collisionOwner.enemyBinding(),
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
+    port.configureOpenSpaceContacts();
 #else
     // Native collision/painting still uses occupancy (unchecked walls are
     // sprite 51 with a grid-derived frame). Generation separately retains

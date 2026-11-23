@@ -24,11 +24,14 @@ int main(int argc,char** argv) {
         return 1;
 
     GameplayWorld runtime(300);
+    runtime.configureOpenSpaceContacts();
     for (std::uint32_t frame = 0; frame < replay.frameCount(); ++frame) {
         downwell::Input input;
         if (!replay.frame(frame, input))
             return 2;
         runtime.step(downwell::packReplayInput(input));
+        // The Amiga loop stops on lost effects; so does its reference.
+        if(!runtime.effectsSucceeded()||!runtime.generationSucceeded())return 14;
         if(frameTrace){
             std::uint32_t trace[downwell::ReplayFrameTrace::words];
             downwell::ReplayFrameTrace::capture(runtime,trace);

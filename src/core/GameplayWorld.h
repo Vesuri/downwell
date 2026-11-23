@@ -2221,6 +2221,13 @@ public:
         const downwell::BreakableState* creation=nullptr,const std::uint32_t* sourceIds=nullptr);
     bool appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation,
         std::uint32_t sourceId=0);
+    // Replay fixtures run in open space: no solid, wall or platform. Casings
+    // (W1.4) ask for wall contacts and fail the effects without a resolver.
+    void configureOpenSpaceContacts() {
+        configureSolidResolver(nullptr,nullptr,nullptr,nullptr,
+            [](void*,const downwell::ContactBounds&,unsigned& count){count=0;return true;},
+            [](void*,const downwell::ContactBounds&,bool& found){found=false;return true;});
+    }
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
                                 SolidResolver mask = nullptr,WallContactResolver walls = nullptr,
                                 PlatformContactResolver platforms = nullptr,
