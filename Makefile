@@ -3029,6 +3029,14 @@ generate-amiga-game: generate-amiga-clear
 	python3 tests/scene-asset-admission-test.py
 
 .PHONY: test-scene-asset-admission
+.PHONY: test-multiply-binary64
+build/multiply-binary64-test: tests/core/MultiplyBinary64Test.cpp src/core/MultiplyBinary64.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/MultiplyBinary64Test.cpp
+test-multiply-binary64: build/multiply-binary64-test
+	./build/multiply-binary64-test
+test: test-multiply-binary64
+
 .PHONY: test-quiet-fall-witness
 test-quiet-fall-witness:
 	python3 tests/quiet-fall-witness-test.py

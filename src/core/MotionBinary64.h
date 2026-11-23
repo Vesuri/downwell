@@ -3,6 +3,13 @@
 #include <cstdint>
 
 namespace downwell {
+#ifdef DOWNWELL_ADD_BINARY64_HOOK
+// A build may supply an equal sum (the install converter's twin,
+// tools/install-data/binary64_amiga.s); addPortable is its oracle and must
+// stay bit-identical to it, failures included. The game does not use a hook.
+struct MotionBinary64;
+extern "C" bool downwellAddBinary64Hook(MotionBinary64* self, MotionBinary64 other);
+#endif
 // Finite normal binary64 addition and signed pixel rounding, using only
 // 32-bit integer operations. Not a general floating-point implementation:
 // subnormal operands/results, infinity, NaN and overflow return false.
@@ -62,6 +69,13 @@ struct MotionBinary64 {
         return {(value < 0 ? 0x80000000u : 0u) | (unsigned(exponent) << 20) | (m.high & 0xfffff), m.low};
     }
     bool add(MotionBinary64 other) {
+#ifdef DOWNWELL_ADD_BINARY64_HOOK
+        return downwellAddBinary64Hook(this, other);
+#else
+        return addPortable(other);
+#endif
+    }
+    bool addPortable(MotionBinary64 other) {
         if (!valid() || !other.valid()) return false;
         if (zero()) {
             if (!other.zero()) *this = other;

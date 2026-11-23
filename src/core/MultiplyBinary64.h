@@ -5,7 +5,7 @@ namespace downwell {
 // Normal/zero binary64 product, rounded once to nearest-even. Like the motion
 // adder, unsupported subnormal/nonfinite operands/results fail atomically.
 // Base-65536 limbs keep every intermediate within 32 bits on a 68000.
-inline bool multiplyBinary64(MotionBinary64 a, MotionBinary64 b, MotionBinary64& out) {
+inline bool multiplyBinary64Portable(MotionBinary64 a, MotionBinary64 b, MotionBinary64& out) {
     if (!a.valid() || !b.valid()) return false;
     const auto sign=(a.high^b.high)&0x80000000u;
     if (a.zero() || b.zero()) {out={sign,0};return true;}
@@ -34,5 +34,18 @@ inline bool multiplyBinary64(MotionBinary64 a, MotionBinary64 b, MotionBinary64&
     out={sign|(unsigned(exponent)<<20)|(mantissa.high&0xfffffu),mantissa.low};
     return true;
 }
+#ifdef DOWNWELL_MULTIPLY_BINARY64_HOOK
+// A build may supply an equal product (the install converter's 68020/68030
+// twin, tools/install-data/binary64_amiga.s); multiplyBinary64Portable is its
+// oracle and must stay bit-identical to it. The game does not use a hook.
+extern "C" bool downwellMultiplyBinary64Hook(MotionBinary64 a, MotionBinary64 b, MotionBinary64& out);
+inline bool multiplyBinary64(MotionBinary64 a, MotionBinary64 b, MotionBinary64& out) {
+    return downwellMultiplyBinary64Hook(a,b,out);
+}
+#else
+inline bool multiplyBinary64(MotionBinary64 a, MotionBinary64 b, MotionBinary64& out) {
+    return multiplyBinary64Portable(a,b,out);
+}
+#endif
 }
 #endif

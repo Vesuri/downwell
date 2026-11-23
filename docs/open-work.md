@@ -239,29 +239,40 @@ Stages, in order:
      `tools/install-data/time_amiga.py`: the `amiga-timing` build from the
      Shell with `Stack 16384`, over `data/` mounted read-only): result 0,
      all 22 outputs equal the host's, peak allocation 3,296,960 bytes, stack
-     6,414 of 16,384 bytes. It fits, but takes 83 minutes:
+     6,370 of 16,384 bytes. It fits, and takes 68 minutes:
 
      | Stage | Minutes |
      | --- | ---: |
-     | inputs (SHA-256 of the 12 files, 42.7 MB) | 15.6 |
-     | exe (CMOT) | 36.7 |
-     | art | 14.4 |
-     | audio | 8.9 |
+     | exe (CMOT) | 21.1 (36.7 before the binary64 twins) |
+     | inputs (SHA-256 of the 12 files, 42.7 MB) | 15.7 |
+     | art | 14.5 |
+     | audio | 9.0 |
      | derived | 6.1 |
-     | rooms, code, text, soundtables, masks, data.win | 0.9 |
+     | rooms, code, text, soundtables, masks, data.win | 1.6 |
 
+   - The same build on `a1200-030` (50 MHz 68030): all 22 outputs equal,
+     10.9 minutes (CMOT 4.3, inputs 1.7, art 2.3, derived 1.1, audio 1.0).
+     On `a1200-060` with no 68060.library on the boot drive: all 22 equal,
+     22.9 emulated minutes; that setup is not cycle-exact, so the time is
+     not a measurement of a real 68060.
+   - The CMOT search runs src/core's binary64 multiply and add through
+     the converter's assembly twins (`binary64_amiga.s`, behind
+     `DOWNWELL_MULTIPLY_BINARY64_HOOK` and `DOWNWELL_ADD_BINARY64_HOOK`).
+     The portable versions are their oracles: `make -C tools/install-data
+     amiga-multiply-test` with `time_amiga.py --multiply-test` finds no
+     difference in 258,564 cases each on the 68020 and the 68060. The
+     multiply uses `mulu.l` 32x32->64 only when exec reports a 68020 or
+     68030; a 68040 or 68060 (which Kickstart 3.1 reports as a 68040 without
+     68060.library) takes the portable path. The twins are now 58 % of the
+     search, at about the floor for exact binary64 arithmetic.
    - Left: cut the time; agree a target with the user first.
-     - CMOT: src/core's integer soft-double over all 411,776 Q16 inputs
-       (Unicorn sample: ~90k cycles per input, 57 % in `multiplyBinary64`,
-       28 % in `MotionBinary64::add`); the host takes 0.4 s. A
-       converter-local Real on the 68020's `mulu.l` may halve it.
      - The input check hashes 42.7 MB at about 45 KB/s, a second pass over
        files the stages read anyway.
      - Art and audio: profile their owners on the target before changing
        them.
-   - The converter is built for the 68020 (`-m68020`, as the siblings'
-     helpers are); a 68000 player could not run it. Open: whether that
-     is acceptable or the converter needs a 68000 build.
+   - The converter is built with `-m68020-60` so that a 68060 runs it
+     without 68060.library; a 68000 player could not run it. Open: whether
+     that is acceptable or the converter needs a 68000 build.
 2. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
    siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
    an existing drawer (saves preserved), Use existing or Replace the

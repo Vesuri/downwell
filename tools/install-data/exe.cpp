@@ -287,7 +287,13 @@ int search_one(const std::int64_t (*coefficients)[4], std::uint32_t q, std::uint
 /* Every signed Q16 atan result up to pi (TableAtan.h's domain). */
 int corrections_search(const std::int64_t (*coefficients)[4], Buf* list)
 {
-    const std::uint32_t pi = 205887u; /* round(pi * 65536), generated/atan-q16.inc */
+    /* round(pi * 65536), generated/atan-q16.inc; the amiga-cmot-probe
+       build stops at INSTALL_CMOT_PROBE instead. */
+#ifdef INSTALL_CMOT_PROBE
+    const std::uint32_t pi = INSTALL_CMOT_PROBE;
+#else
+    const std::uint32_t pi = 205887u;
+#endif
     for (std::uint32_t q = 0; q <= pi; ++q) {
         if (!(q & 63) && io_cancelled()) return dw_fail("cancelled");
         TRY(search_one(coefficients, q, 0, list) && search_one(coefficients, q, 1, list));

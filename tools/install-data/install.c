@@ -146,8 +146,18 @@ static int selected(const char* name)
     }
     return 0;
 }
+#elif defined(INSTALL_CMOT_PROBE)
+/* The amiga-cmot-probe build: the exe stage only, inputs unchecked. */
+static int selected(const char* name) { return !dw_strcmp(name, "exe"); }
 #else
 static int selected(const char* name) { (void)name; return 1; }
+#endif
+
+#ifdef INSTALL_AMIGA
+void install_cpu_init(void); /* binary64_amiga.cpp */
+#ifdef INSTALL_MULTIPLY_TEST
+void install_multiply_test(unsigned long randoms);
+#endif
 #endif
 
 int install_data(const char* source, const char* dest, const char* temp)
@@ -156,11 +166,22 @@ int install_data(const char* source, const char* dest, const char* temp)
     char path[512];
     int ok;
     (void)temp;
+#ifdef INSTALL_AMIGA
+    install_cpu_init();
+#ifdef INSTALL_MULTIPLY_TEST
+    install_multiply_test(INSTALL_MULTIPLY_TEST);
+    return 0;
+#endif
+#endif
     memset(c, 0, sizeof *c);
     c->source = source; c->dest = dest;
     tables_init(&c->tables);
     MARK(0);
+#ifdef INSTALL_CMOT_PROBE
+    ok = 1;
+#else
     ok = verify_inputs(c);
+#endif
     MARK(1);
     if (ok) {
         io_message("Reading data.win...");

@@ -43,7 +43,7 @@ VORBIS_SOURCES = ogg/bitwise.c ogg/framing.c $(addprefix tremor/,block.c codeboo
 AMIGA_CC = m68k-amiga-elf-gcc
 ELF2HUNK ?= elf2hunk
 AMIGA_NM = $(dir $(shell command -v $(AMIGA_CC)))../m68k-amiga-elf/bin/nm
-AMIGA_CPU = -m68020 -mtune=68020 -msoft-float
+AMIGA_CPU = -m68020-60 -mtune=68020 -msoft-float
 AMIGA_FLAGS = -std=c99 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-tree-loop-distribute-patterns -fstack-usage -Wall -Wextra -Wno-unused-parameter -Wno-volatile-register-var -DINSTALL_AMIGA $(EXTRA_AMIGA_FLAGS)
 
 .PHONY: all amiga test pinned
@@ -56,7 +56,7 @@ CXX ?= c++
 CXXWARN = -std=gnu++17 -Wall -Wextra -Werror -Wno-unused-parameter -fno-exceptions -fno-rtti
 CXX_INCLUDES = -I$(ROOT)/src -I.
 AMIGA_CXX = m68k-amiga-elf-gcc
-AMIGA_CXXFLAGS = -std=gnu++17 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-rtti -fno-exceptions -fno-use-cxa-atexit -fstack-usage -Wall -Wextra -Wno-unused-parameter -DINSTALL_AMIGA -DDOWNWELL_FREESTANDING -DDOWNWELL_PLATFORM_AMIGA -I$(ROOT)/src/platform/amiga/compat $(CXX_INCLUDES)
+AMIGA_CXXFLAGS = -std=gnu++17 -O2 -g $(AMIGA_CPU) -nostdlib -fno-builtin -fno-rtti -fno-exceptions -fno-use-cxa-atexit -fstack-usage -Wall -Wextra -Wno-unused-parameter -DINSTALL_AMIGA -DDOWNWELL_FREESTANDING -DDOWNWELL_PLATFORM_AMIGA -I$(ROOT)/src/platform/amiga/compat $(CXX_INCLUDES) -DDOWNWELL_MULTIPLY_BINARY64_HOOK -DDOWNWELL_ADD_BINARY64_HOOK $(EXTRA_AMIGA_FLAGS)
 
 all: $(BUILD)/DownwellInstallData
 $(BUILD):
@@ -71,13 +71,16 @@ $(BUILD)/host/%.cpp.o: %.cpp $(HEADERS) Makefile | pinned
 $(BUILD)/DownwellInstallData: $(HOST_OBJECTS) $(HOST_VORBIS)
 	$(CXX) $(CFLAGS) $^ -o $@
 
-AMIGA_OBJECTS = $(patsubst %,$(BUILD)/amiga/%.o,$(SOURCES) io_amiga.c timing_amiga.c version_amiga.c)
+AMIGA_OBJECTS = $(patsubst %,$(BUILD)/amiga/%.o,$(SOURCES) io_amiga.c timing_amiga.c version_amiga.c muldi3_amiga.c binary64_amiga.cpp binary64_amiga.s)
 $(BUILD)/amiga/%.c.o: %.c $(HEADERS) Makefile | pinned
 	@mkdir -p $(@D)
 	$(AMIGA_CC) $(AMIGA_FLAGS) -I$(BUILD) -Iogg -Iconfig -c $< -o $@
 $(BUILD)/amiga/%.cpp.o: %.cpp $(HEADERS) Makefile | pinned
 	@mkdir -p $(@D)
 	$(AMIGA_CXX) $(AMIGA_CXXFLAGS) -c $< -o $@
+$(BUILD)/amiga/%.s.o: %.s Makefile
+	@mkdir -p $(@D)
+	$(AMIGA_CC) $(AMIGA_CPU) -c $< -o $@
 $(BUILD)/amiga/start.o: start.s | pinned
 	@mkdir -p $(@D)
 	$(AMIGA_CC) $(AMIGA_CPU) -c $< -o $@
@@ -101,3 +104,17 @@ test: all
 .PHONY: amiga-timing
 amiga-timing:
 	$(MAKE) BUILD=$(BUILD)/timing EXTRA_AMIGA_FLAGS="-DINSTALL_STACK_TEST -DINSTALL_TIMING" $(BUILD)/timing/DownwellInstallData.exe
+
+# A probe of the CMOT search alone (exe stage, CMOT_PROBE+1 inputs of each
+# sign, inputs unchecked), timed by time_amiga.py --probe.
+CMOT_PROBE ?= 4095
+.PHONY: amiga-cmot-probe
+amiga-cmot-probe:
+	$(MAKE) BUILD=$(BUILD)/cmot-probe EXTRA_AMIGA_FLAGS="-DINSTALL_STACK_TEST -DINSTALL_TIMING -DINSTALL_CMOT_PROBE=$(CMOT_PROBE)u" $(BUILD)/cmot-probe/DownwellInstallData.exe
+
+# The binary64 multiply twin against its portable oracle on the target
+# (binary64_amiga.cpp), read by time_amiga.py --multiply-test.
+MULTIPLY_TEST ?= 200000
+.PHONY: amiga-multiply-test
+amiga-multiply-test:
+	$(MAKE) BUILD=$(BUILD)/multiply-test EXTRA_AMIGA_FLAGS="-DINSTALL_MULTIPLY_TEST=$(MULTIPLY_TEST)ul" $(BUILD)/multiply-test/DownwellInstallData.exe
