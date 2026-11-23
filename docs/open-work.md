@@ -205,18 +205,6 @@ On the target the quiet fall already presents every update in one field
 its field count cannot show a smaller regression: judge the quiet fall on
 the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
 
-3. **W3.3 Recover W2.3's quiet-fall regression.** On the A500, W2.3's
-   gameplay change took the quiet fall from 197 to 205 fields with an
-   unchanged landing witness, about 0.4–0.7 ms per update:
-   - about 700 cycles in `PlayerMotion::step`: the hard-land state, the two
-     alarms, `airstatus`, the wall-pose test and the call's larger frame;
-   - about 2,000 cycles in `GameplayWorld::step`: the `SoundVoices` clock,
-     the recharge starts and the goal-field wind gate, plus diffuse growth.
-
-   W2.6's requests then measured 210 (the frog-against-frog bump and the
-   shop walls); builds that differ only in layout vary by about ±3 fields.
-   Move the player's rare-state bookkeeping behind a single test, and A/B
-   the quiet fall's work cycles on the target (updates 57–122).
 4. **W3.4 Target references.** Record on `a1200-4m`:
    - a target `quiet-window` baseline beside the A500 one, so its guard
      runs on `a1200-4m`;
