@@ -3835,5 +3835,5 @@ verify-amiga-paula-mixer: build/paula-mixer-test generated/amiga-sfx.bin
 	{ ./build/paula-mixer-test generated/amiga-sfx.bin tmp/paula-probe-expected.wav ; } && \
 	{ . amiga/env.sh && $(AMIGA_MAKE) -C amiga -j4 paula-mixer-probe ; } && \
 	{ rm -f tmp/paula-probe.raw ; } && \
-	{ cd amiga && VERIFY_PROGRAM=out/PaulaMixerProbe VERIFY_TIMEOUT_SECONDS=500 GDB_SOURCE=verify_paula_mixer.gdb READY_MARKER=DOWNWELL_PAULA_MIXER_READY READY_DESCRIPTION='Paula mixer schedule' VERIFY_AUDIO_FILE="$(CURDIR)/tmp/paula-probe.raw" bash verify_startup.sh ; } && \
+	( cd amiga && VERIFY_PROGRAM=out/PaulaMixerProbe VERIFY_TIMEOUT_SECONDS=500 GDB_SOURCE=verify_paula_mixer.gdb READY_MARKER=DOWNWELL_PAULA_MIXER_READY READY_DESCRIPTION='Paula mixer schedule' VERIFY_AUDIO_FILE="$(CURDIR)/tmp/paula-probe.raw" bash verify_startup.sh ) && \
 	{ python3 tools/compare-paula-recording.py tmp/paula-probe.raw tmp/paula-probe-expected.wav --events tmp/paula-probe-expected.wav.events --wav captures/paula-probe.wav ; }
