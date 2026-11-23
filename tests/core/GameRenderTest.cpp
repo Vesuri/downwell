@@ -1514,6 +1514,8 @@ int main() {
                     // Seek a nearby live enemy instead of repeatedly killing
                     // every reachable threat with the blind firing sweep.
                     // This also applies to enemies near the entrance bowl.
+                    // Only after the first clear: seeking from the start dies
+                    // on level 1 since the W2.3 draws (ba5f503b) changed it.
                     const downwell::InstanceRecord* threat = nullptr;
                     float nearest = 64;
                     for (std::size_t i=0;i<runtime.activeInstanceCount();++i) {
@@ -1526,7 +1528,7 @@ int main() {
                             std::abs(enemy.y-runtime.mainPlayerY());
                         if (distance<nearest) {nearest=distance;threat=&enemy;}
                     }
-                    if (threat) {
+                    if (threat && naturalClearFrames) {
                         input.left=runtime.mainPlayerX()>threat->x;
                         input.right=runtime.mainPlayerX()<threat->x;
                         // Stop shooting only when the threat is at contact
