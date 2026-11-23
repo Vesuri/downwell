@@ -373,6 +373,10 @@ int main() {
     require(player.recharges() == 1, "full-ammo bounce emits no recharge effect");
     for (unsigned frame = 0; frame < 240 && !player.grounded(); ++frame)
         player.step(input);
+    // The bounce lands hard. A direction held through the landing block
+    // would hop (scrFjump(0,1), W2.3), so that Step runs without input.
+    player.step(input);
+    require(player.grounded() && !player.hardLandJump(), "a neutral hard landing does not hop");
 
     input.right = true;
     const PlayerMotionDelta firstMove = player.step(input);
