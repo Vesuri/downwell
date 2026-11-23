@@ -231,16 +231,17 @@ Stages, in order:
      block takes about 2.25 MB in bzip2's small-memory mode), not zlib.
    - The song and effect lengths need no decoder: the last Ogg page's
      granule position equals ffprobe's `duration_ts` for all 11 effects.
-   - stb_vorbis (v1.23, commit `48fb1c97`, the user's choice of
-     2026-11-23), built for the 68020 with `-msoft-float`, GCC 15.1's
-     `lb1sf68.S`/`fpgnulib.c` for the float routines, and our own math
-     functions on both sides, decodes all 11 effects with 175 KB of work
-     memory. On the cycle-exact `a1200-4m` this took 248,987 ticks: 83
-     minutes, about 10 per wind. Its output hashes also differ from the
-     host's, so its banks would depend on the machine that converted them.
-     Open: the user's decision between an integer decoder (Tremor and
-     libogg, BSD) measured the same way, a fixed-point stb_vorbis, or
-     another way.
+   - The 11 Ogg effects decode with Tremor (Xiph's integer Vorbis
+     decoder, commit `820fb323`) and libogg 1.3.6, both BSD, vendored
+     unmodified in `tools/install-data/` and pinned by
+     `manifest/install-data.sha256` (the user's choice, 2026-11-23). On
+     the cycle-exact `a1200-4m` all 11 take 11,571 ticks (3.9 minutes)
+     with 171 KB of work memory, and every output hash equals the host's.
+     stb_vorbis with soft float took 83 minutes and its hashes differed.
+   - Done so far in `tools/install-data/` (`make -C tools/install-data
+     test`): input checks, the `data.win` page cache, the
+     `Downwell.tables` section packer, and SNDD and SNDG, identical to
+     `generated/`.
 3. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
    siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
    an existing drawer (saves preserved), Use existing or Replace the
