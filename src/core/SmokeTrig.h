@@ -11,7 +11,11 @@ struct IntegerReal {
     bool multiply(IntegerReal other){MotionBinary64 out;if(!multiplyBinary64(value,other.value,out))return false;value=out;return true;}
     bool integer(int& out) const {std::int32_t rounded;if(!value.roundPixel(rounded))return false;out=rounded;return true;}
 };
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../generated/installed/smoke-trig.inc" // WI.3: constants bound from Downwell.tables
+#else
 #include "../../generated/smoke-trig.inc"
+#endif
 }
 // The pinned SSE straight-line paths under nearest-even rounding, bounded to
 // the original exponent dispatch's complete straight-line argument range.

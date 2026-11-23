@@ -3,7 +3,11 @@
 #include "GameMakerRandom.h"
 #include "HudReal.h"
 #include "EnemyContact.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../generated/installed/downwell-time-field-mask.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../generated/downwell-time-field-mask.h"
+#endif
 namespace downwell {
 // Object 82 parentTimeField, sprite 597 at unit scale. Collision never uses
 // the randomized Draw radius. Integer centres cover builder and published

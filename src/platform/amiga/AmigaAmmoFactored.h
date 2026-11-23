@@ -3,7 +3,11 @@
 #include "AmigaRenderer.h"
 #include "core/AmmoGaugeRows.h"
 #include "core/Profile.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/amiga-ammo-factored.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/amiga-ammo-factored.h"
+#endif
 extern volatile unsigned amigaAmmoFactoredMode;
 
 // Complete prepared column plus independent outer-rim changes. The labels are
@@ -44,7 +48,12 @@ class AmigaAmmoFactored {
         if(!pack || end-pack<12 || !equal(pack,reinterpret_cast<const UBYTE*>("DWAP"),4) || read(pack+4)!=2)return false;
         const unsigned directory=read(pack+6),count=longWord(pack+8);
         if(directory>unsigned(end-pack) || count>(unsigned(end-pack)-directory)/24)return false;
-        for(const auto& expected:sourceRecords){
+#ifdef DOWNWELL_INSTALLED_TABLES
+        for(unsigned r=0;r<sourceRecords_count;++r){
+#else
+        for(unsigned r=0;r<sizeof(sourceRecords)/sizeof(sourceRecords[0]);++r){
+#endif
+            const auto& expected=sourceRecords[r];
             const UBYTE* record=nullptr;
             for(unsigned i=0;i<count;++i){
                 const UBYTE* candidate=pack+directory+i*24;

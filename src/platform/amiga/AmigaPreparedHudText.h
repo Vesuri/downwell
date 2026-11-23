@@ -1,6 +1,10 @@
 #pragma once
 #include "AmigaHudText.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/amiga-hud-text.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/amiga-hud-text.h"
+#endif
 
 // Word dependencies are digit identities/positions, not a scan of retained
 // pixels. The HUD owner must invalidate after another writer touches a region.

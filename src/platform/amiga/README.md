@@ -31,7 +31,7 @@ A500 with 1 MiB Chip and 8 MiB Fast (`amiga/machine.sh`).
   `AmigaGameplayDrawList` collects actors in GameMaker's layer order for
   `AmigaGameplayActors` (hardware sprites and blitter bobs).
 - Terrain: `AmigaTerrainPainter` composes rows, mostly from prepared
-  pattern pieces (`AmigaTerrainPrepared.s`, `AmigaPatternTransfer.s`), into
+  pattern pieces (`Downwell.tables`, `AmigaPatternTransfer.s`), into
   `AmigaTerrainRaster`, a 1,024-row ring per column in ordinary memory.
   `AmigaGameplayRows` copies exposed rows into the Chip display rings.
 - Scenes: garden, style, upgrade, shop, pause, results and clear scenes,

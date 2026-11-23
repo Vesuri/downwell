@@ -1,4 +1,9 @@
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/downwell-rising-texts.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/downwell-rising-texts.h"
+#endif
+#include "core/InstalledTables.h"
 #include "AmigaGameplayDrawList.h"
 #include "AmigaProfile.h"
 #include "core/ShopFixtures.h"
@@ -379,7 +384,7 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactGunTexts(const Gam
         if(n.fixedText==downwell::CompactItemNoticeRecord::omnom){
             // fxRisingText omnomText: centred eight-pixel cells, no icon.
             const char* word=downwell::rising_texts::omnom;
-            const int cells=int(sizeof(downwell::rising_texts::omnom))-1;
+            const int cells=int(DOWNWELL_TABLE_COUNT(downwell::rising_texts::omnom))-1;
             const int left=n.left(viewX,160,8*cells);
             for(int k=0;k<cells;++k)
                 if(word[k]!=' '&&!glyph(borderGlyph(word[k]),downwellPlayfieldX+left-4*cells+8*k+4-viewX,y-5-viewY,1))

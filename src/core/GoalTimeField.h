@@ -3,7 +3,11 @@
 #include "GameMakerRandom.h"
 #include "HudReal.h"
 #include "EnemyContact.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../generated/installed/downwell-goal-mask.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../generated/downwell-goal-mask.h"
+#endif
 namespace downwell {
 // goalTimeField Create/Draw, audited against the VM assembly. Advance once
 // per original Draw event; snapshot painting never consumes random values.

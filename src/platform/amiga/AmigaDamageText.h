@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_AMIGA_DAMAGE_TEXT_H
 #define DOWNWELL_AMIGA_DAMAGE_TEXT_H
 #include "AmigaRenderer.h"
+#include "core/InstalledTables.h"
 #include "core/DamageNumberText.h"
 
 struct AmigaPreparedDamageText {
@@ -8,7 +9,11 @@ struct AmigaPreparedDamageText {
     UWORD mask[12][3],white[12][3];
 };
 namespace downwell_damage_bank {
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/amiga-damage-text.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/amiga-damage-text.h"
+#endif
 }
 
 // All four black outline passes precede every white glyph in the source.
@@ -92,7 +97,7 @@ public:
         invalidate();
 #ifndef DOWNWELL_REFERENCE_DAMAGE_BANK
         for(unsigned digit=0;digit<11;++digit)for(unsigned row=0;row<10;++row)
-            if(glyphs.rows[digit][row]!=downwell_damage_bank::preparedDamageGlyphs.rows[digit][row])return false;
+            if(glyphs.rows[digit][row]!=DOWNWELL_TABLE_OBJECT(downwell_damage_bank::preparedDamageGlyphs).rows[digit][row])return false;
         preparedBank_=true;
 #endif
         return preparedBank_;

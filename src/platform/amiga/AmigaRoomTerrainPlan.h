@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_ROOM_TERRAIN_PLAN_H
 #include "AmigaTerrain.h"
 #include "core/PreparedRoomTerrain.h"
+#include "core/InstalledTables.h"
 namespace amiga_room_plan_detail {
 struct Command {
     std::uint32_t instanceId;
@@ -10,7 +11,11 @@ struct Command {
     std::uint16_t cell,bit;
     std::uint8_t before,after;
 };
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/amiga-room-terrain-plan.inc" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/amiga-room-terrain-plan.inc"
+#endif
 }
 
 // Immutable placement metadata, not a second occupancy owner. Each command
@@ -34,7 +39,8 @@ public:
     bool prepare(const downwell::PreparedRoomTerrain& source,AmigaTerrainIndex& index){
         source_=nullptr;count_=0;cursor_=0;
         if(source.count()!=amiga_room_plan_detail::sourceCount)return false;
-        for(const auto& command:amiga_room_plan_detail::commands){
+        for(unsigned c=0;c<DOWNWELL_TABLE_COUNT(amiga_room_plan_detail::commands);++c){
+            const auto& command=amiga_room_plan_detail::commands[c];
             if(command.slot>=source.count())return false;
             const auto& r=source.at(command.slot);
             if(r.instanceId!=command.instanceId||r.objectId!=command.object||

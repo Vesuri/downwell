@@ -745,11 +745,15 @@ verify-sound-inventory:
 
 # WI.2: every generated/ input of the shipping Amiga build is classified
 # (docs/amiga-input-inventory.md). The clean build makes amiga/obj/*.d the
-# shipping build's, not a verify build's.
+# shipping build's, not a verify build's. WI.3: the derived tables are
+# installed (Downwell.tables) and the executable holds no block of the
+# player's files.
 .PHONY: verify-amiga-inputs
 verify-amiga-inputs:
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j$(DOWNWELL_JOBS)' ; } && \
-	python3 tools/amiga-input-inventory.py --check
+	python3 tools/amiga-input-inventory.py --check && \
+	python3 tools/install-table-headers.py --check && python3 tools/pack-amiga-tables.py --check && \
+	python3 tools/check-original-bytes.py amiga/out/Downwell.exe
 
 # W2.3: generated/sound-durations.inc (each sound's source length in steps,
 # for SoundVoices' audio_is_playing) and sound-gains.inc (asset volumes)

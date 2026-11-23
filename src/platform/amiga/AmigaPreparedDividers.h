@@ -1,7 +1,11 @@
 #ifndef DOWNWELL_AMIGA_PREPARED_DIVIDERS_H
 #define DOWNWELL_AMIGA_PREPARED_DIVIDERS_H
 #include "AmigaRenderer.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/amiga-ammo-dividers.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/amiga-ammo-dividers.h"
+#endif
 
 // Asset validation happens once per pack, never on a shot. Synthetic/changed
 // packs retain the sprite compositor instead of silently using different art.

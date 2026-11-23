@@ -68,7 +68,7 @@ else
   printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
 fi
 cp -f "$VERIFY_PROGRAM.exe" "$GAME/Downwell"
-for bank in boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear; do
+for bank in boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear tables; do
   cp -f "out/Downwell.$bank" "$DATA/Downwell.$bank"
 done
 if [ "$VERIFY_PROGRAM" = out/WindAudioProbe ]; then

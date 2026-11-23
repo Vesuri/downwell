@@ -19,6 +19,8 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaInput.h"
 #include "AmigaKeyboard.h"
 #include "AmigaSoundBanks.h"
+#include "AmigaTables.h"
+#include "../../../generated/installed/bind-tables.h"
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
 #include "AmigaEncounterResources.h"
 #endif
@@ -32,8 +34,16 @@ extern "C" { volatile unsigned gDownwellSceneAdmissionFailure; }
 #include "../../../generated/amiga-game-planes.h"
 #endif
 #include "../../../generated/amiga-cavern-planes.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/downwell-area-titles.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/downwell-area-titles.h"
+#endif
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/downwell-shop-speech.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/downwell-shop-speech.h"
+#endif
 extern "C" int amigaBlitterBindGamePlanes(const UBYTE*,unsigned,const UBYTE*,unsigned,const UBYTE*);
 extern "C" void amigaBlitterReleaseGamePlanes();
 extern "C" {
@@ -85,8 +95,16 @@ void downwellTerrainBatchMismatch();
 #include "AmigaAmmoHud.h"
 #include "AmigaPauseOverlay.h"
 #include "core/PauseMenu.h"
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/downwell-menu-text.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/downwell-menu-text.h"
+#endif
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../../generated/installed/downwell-palettes.h" // WI.3: bound from Downwell.tables
+#else
 #include "../../../generated/downwell-palettes.h"
+#endif
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaPreparedTimeFields.h"
 #include "AmigaFieldColumns.h"
@@ -277,13 +295,8 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 extern "C" {
 extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
-extern const UBYTE amiga_effect_stamps[],amiga_effect_stamps_end[];
 #ifdef DOWNWELL_PREPARED_FIELDS
 extern const UBYTE amiga_field_images[],amiga_field_images_end[];
-#endif
-#ifdef DOWNWELL_TERRAIN_DIRECT
-extern const UBYTE amiga_terrain_phase6[],amiga_terrain_phase6_end[];
-extern const UBYTE amiga_initial_terrain[],amiga_initial_terrain_end[];
 #endif
 #ifdef DOWNWELL_REFERENCE_SCENE_BANKS
 extern const UBYTE amiga_results_pack[];
@@ -299,12 +312,6 @@ extern const UBYTE amiga_exit_mask_end[];
 extern const UBYTE amiga_entry_mask[];
 extern const UBYTE amiga_entry_mask_end[];
 #endif
-extern const UBYTE amiga_room_pack[];
-extern const UBYTE amiga_room_pack_end[];
-extern const UBYTE amiga_object_pack[];
-extern const UBYTE amiga_object_pack_end[];
-extern const UBYTE amiga_collision_pack[];
-extern const UBYTE amiga_collision_pack_end[];
 #ifdef DOWNWELL_SCENE_VERIFY
 // Raw masks are consumed only by the retained scene collision oracle below.
 // Live precise-mask events must declare a scene-owned dependency when wired;
@@ -1245,7 +1252,7 @@ static void composeResultsNotice(AmigaRenderer* renderer, const ResultsNotice& n
         } else {
             const unsigned palette = downwell::UnlockProgress::from(
                 downwell::DeathMenuProgress::goals[goal]).paletteUnlock;
-            if (palette < sizeof(downwell::palettes::entries) / sizeof(downwell::palettes::entries[0]))
+            if (palette < downwell::palettes::count)
                 name = downwell::palettes::entries[palette].name;
         }
         if (name) {
@@ -1853,17 +1860,29 @@ __attribute__((noinline)) static int runDownwell(void) {
     int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
     AmigaShopArtSnapshot oldShopArt;
-    const downwell::ObjectPack objects(amiga_object_pack,
-        (unsigned long)(amiga_object_pack_end-amiga_object_pack));
-    const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
-        (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
+    // WI.3: the derived tables come from the installed Downwell.tables.
+    AmigaTables tables;
+    if(!tables.load(platform)||!downwell_installed_tables::bind(
+            [&](unsigned long tag,unsigned long& bytes){
+                ULONG size=0;UBYTE* section=tables.writable(tag,size);
+                bytes=size;return section;}))return 20;
+    const AmigaTables::View objectTable=tables.find(DOWNWELL_TABLE_OBJT);
+    const AmigaTables::View collisionTable=tables.find(DOWNWELL_TABLE_SCOL);
+    const AmigaTables::View roomTable=tables.find(DOWNWELL_TABLE_ROOM);
+    const AmigaTables::View effectStampTable=tables.find(DOWNWELL_TABLE_STMP);
+#ifdef DOWNWELL_TERRAIN_DIRECT
+    const AmigaTables::View phase6Table=tables.find(DOWNWELL_TABLE_TPH6);
+    const AmigaTables::View initialTerrainTable=tables.find(DOWNWELL_TABLE_TINI);
+#endif
+    if(!effectStampTable.data)return 20;
+    const downwell::ObjectPack objects(objectTable.data,objectTable.bytes);
+    const downwell::SpriteCollisionPack collisionSprites(collisionTable.data,collisionTable.bytes);
 #if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY) && !defined(DOWNWELL_SCENE_COLLISION_BACKEND)
     const downwell::SpriteMaskPack collisionMasks(amiga_collision_masks,
         (unsigned long)(amiga_collision_masks_end-amiga_collision_masks));
     if(!collisionMasks.valid())return 20;
 #endif
-    const downwell::RoomPack rooms(amiga_room_pack,
-        (unsigned long)(amiga_room_pack_end-amiga_room_pack));
+    const downwell::RoomPack rooms(roomTable.data,roomTable.bytes);
     if(!objects.valid()||!collisionSprites.valid()||!rooms.valid())return 20;
     checkSceneStack(1);
 #ifdef DOWNWELL_GAMEPLAY_COLLISION_OWNER
@@ -2030,7 +2049,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
     ULONG gamePackBytes = 0; // No gameplay lease has been admitted yet.
     gDownwellGamePlaneExpectedBytes=gamePackBytes;
-    const ULONG effectStampBytes=amiga_effect_stamps_end-amiga_effect_stamps;
+    const ULONG effectStampBytes=effectStampTable.bytes;
     const ULONG sceneBankOffset=(AmigaEffectSurface::bytes+3)&~3UL;
     // The retired selection cache holds two game rings followed by DMA-only
     // effect words. Other scenes may overwrite them; reload on gameplay entry.
@@ -2066,7 +2085,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     (void)soundBanks.acquire(platform);
     sceneBank = memory.assets() + sceneBankOffset;
     UBYTE* effectStamps=memory.sceneCache()+effectStampCacheOffset;
-    memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
+    memcpy(effectStamps,effectStampTable.data+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
     downwell::BuilderPatternPack builders(nullptr,0);
     static_assert(DOWNWELL_PATTERNS_BANK_BYTES<=DOWNWELL_PATTERNS_BANK_BUDGET,
         "Builder pattern residency budget");
@@ -2260,15 +2279,15 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
 #ifdef DOWNWELL_TERRAIN_DIRECT
-    if(!AmigaTerrainPainter::bindPrepared(amiga_terrain_phase6,amiga_terrain_phase6_end-amiga_terrain_phase6)){
+    if(!AmigaTerrainPainter::bindPrepared(phase6Table.data,phase6Table.bytes)){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
 #endif
 #if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_TERRAIN) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER)
     // Unsupported banks retain the ordinary painter. This admits immutable
     // pixels only: publication into the live raster still waits for room entry.
-    const bool initialTerrainReady=initialTerrain.bind(amiga_initial_terrain,
-        amiga_initial_terrain_end-amiga_initial_terrain);
+    const bool initialTerrainReady=initialTerrain.bind(initialTerrainTable.data,
+        initialTerrainTable.bytes);
 #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
     gDownwellInitialTerrainEnabled=initialTerrainReady;
 #else
@@ -2423,7 +2442,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         good=good&&AmigaTerrainPainter::bindBatch(activeGamePack,activeGamePackEnd,sceneBank,sceneBankBytes);
 #endif
         good=good&&AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
-            amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)&&
+            effectStampTable.data,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)&&
             AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)&&
             memory.acquireGameAssets(gamePackBytes)&&
             platform.loadData(planePath,memory.gameAssets(),gamePackBytes)==LONG(gamePackBytes)&&
@@ -3141,7 +3160,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
                     DW_PROFILE_PHASE(profileEntryAssets);
                     AmigaHardware::blitterDrain();
-                    memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
+                    memcpy(effectStamps,effectStampTable.data+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
                     const unsigned hudBytes = DOWNWELL_HUD_BANK_BYTES;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,

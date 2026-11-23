@@ -8,13 +8,6 @@ amiga_hud_pack:
 amiga_hud_pack_end:
 	.endif
 
-	.balign 4
-	.globl amiga_effect_stamps
-amiga_effect_stamps:
-	.incbin "../generated/amiga-effect-stamps.dwef"
-	.globl amiga_effect_stamps_end
-amiga_effect_stamps_end:
-
 	.ifdef DOWNWELL_EXIT_WIPE_VERIFY
 	.balign 4
 	.globl amiga_exit_mask
@@ -50,26 +43,7 @@ amiga_shop_pack_end:
 
 	.endif
 
-	.balign 4
-	.globl amiga_room_pack
-amiga_room_pack:
-	.incbin "../generated/downwell-runtime-rooms.dwrm"
-	.globl amiga_room_pack_end
-amiga_room_pack_end:
 
-	.balign 4
-	.globl amiga_object_pack
-amiga_object_pack:
-	.incbin "../generated/downwell-objects.dwob"
-	.globl amiga_object_pack_end
-amiga_object_pack_end:
-
-	.balign 4
-	.globl amiga_collision_pack
-amiga_collision_pack:
-	.incbin "../generated/downwell-sprites.dwsc"
-	.globl amiga_collision_pack_end
-amiga_collision_pack_end:
 
 	.ifdef DOWNWELL_REFERENCE_COLLISION_MASKS
 	.balign 4

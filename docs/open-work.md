@@ -191,9 +191,9 @@ checks every file it reads by SHA-256 and refuses any other version.
 **Why it needs a converter.** Unlike the WHDLoad siblings, which run the
 original files, the Amiga build runs on data converted on the host
 (UndertaleModTool, the Python generators and ffmpeg). The executable
-itself `.incbin`s and `#include`s derived tables and art (rooms, objects,
-sprites and their masks, HUD and health art, text, palettes), so even the
-executable cannot be distributed today. The user chose a native converter
+links none of it (WI.3): rooms, objects, sprite masks, HUD and health art,
+text, palettes and sound tables are installed files, read at startup or
+scene load. The user chose a native converter
 (2026-11-22): `DownwellInstallData`, run by the Installer on the Amiga,
 builds every derived file from the player's files.
 
@@ -209,19 +209,23 @@ Stages, in order:
    `verify_startup.sh` (the installed `data/` layout) with
    `tools/verify-workbench-start.py`, and the same driver from the Shell
    (the flat layout).
-2. **WI.3 Derived data out of the executable.** Load the 23 linked
-   inputs the inventory classes as derived from installed files, at
-   startup or scene load. A release
-   check (the siblings' `tools/check_release.py`: no 64-byte block of
-   `data.win`, forward or reversed, at any offset of any member) proves
-   the executable and the archive hold no original bytes. Note the W3 cost
-   of any new load.
+2. **WI.3 The trig path's operation order.** Every derived table is
+   installed (`Downwell.tables`) and `tools/check-original-bytes.py` finds
+   no block of the player's files in the executable. One derived input is
+   still linked: `installed/smoke-trig.inc`, the runner's SSE sin/cos path
+   as straight-line code (our transcription; its 64-entry table and 13
+   constants are bound from the file). Either that operation order may
+   ship as code, or it becomes data that `SmokeTrig.h` interprets (a
+   per-call dispatch cost on every smoke and currency direction; measure
+   it on the currency-burst profile).
 3. **WI.4 Portable converter.** One C implementation of the generators
    that the host build also uses, so the Python and ffmpeg path stops being
    a second authority: FORM chunk parsing streamed from disk (`data.win`
    is 28 MB; the target has 4 MB Fast), zlib inflate for the texture PNGs,
    our own resampler in place of ffmpeg's `swr`, an Ogg Vorbis decoder for
-   the 11 Ogg effects in the banks (and the songs' lengths), then every bank. Host tests compare its output with
+   the 11 Ogg effects in the banks (and the songs' lengths), then every bank
+   and `Downwell.tables` (today `tools/install-table-headers.py` and
+   `tools/pack-amiga-tables.py` over the generated headers). Host tests compare its output with
    the current `generated/` files; where the resampler changes samples, the
    sound and route gates rerun. Then a 68020 build of the converter, timed
    and fitted in memory on the target.

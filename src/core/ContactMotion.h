@@ -1,9 +1,14 @@
 #ifndef DOWNWELL_CONTACT_MOTION_H
 #define DOWNWELL_CONTACT_MOTION_H
 #include "ContactMotionCodec.h"
+#include "InstalledTables.h"
 namespace downwell {
 namespace contact_motion_detail {
+#ifdef DOWNWELL_INSTALLED_TABLES
+#include "../../generated/installed/contact-motion.inc" // WI.3: bound from Downwell.tables
+#else
 #include "../../generated/contact-motion.inc"
+#endif
 }
 // Only the signed-Q16 atan domain certified by the host generator is admitted.
 // This is a lossless table decoder: intermediate polynomial rounding errors
@@ -13,7 +18,7 @@ inline bool contactMotion(MotionBinary64 direction,MotionBinary64& speed){
     return angle.assign(direction)&&SmokeDirection::radians(angle,radians)&&
         ContactMotionCodec::decode(radians,contact_motion_detail::coefficients,
             contact_motion_detail::corrections,
-            sizeof(contact_motion_detail::corrections)/sizeof(contact_motion_detail::corrections[0]),speed);
+            DOWNWELL_TABLE_COUNT(contact_motion_detail::corrections),speed);
 }
 }
 #endif

@@ -239,7 +239,7 @@ endif
 
 CFLAGS := -g $(AMIGA_OPTIMIZATION) -flto -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
-	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
+	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA -DDOWNWELL_INSTALLED_TABLES
 ifeq ($(EXIT_WIPE_VERIFY),1)
 CFLAGS += -DDOWNWELL_EXIT_WIPE_VERIFY
 endif
@@ -674,9 +674,6 @@ OBJECTS := obj/AmigaStart.o obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInpu
 	obj/Replay.o \
 	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
-ifeq ($(TERRAIN_DIRECT),1)
-OBJECTS += obj/AmigaTerrainPrepared.o
-endif
 OBJECTS += obj/AmigaPatternTransfer.o
 ifeq ($(PREPARED_FIELDS),1)
 OBJECTS += obj/AmigaFieldPrepared.o
@@ -684,7 +681,7 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).encountermasks $(OUT).sndrun $(OUT).sndfront $(OUT).sndresults $(OUT).sndclear
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).pause $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask $(OUT).terrain $(OUT).encountermasks $(OUT).sndrun $(OUT).sndfront $(OUT).sndresults $(OUT).sndclear $(OUT).tables
 
 $(OUT).entrymask: $(AMIGA_ENTRY_MASK)
 	@mkdir -p $(@D)
@@ -1312,7 +1309,7 @@ $(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
 	cd $(REPO) && python3 tools/generate-effect-stamps.py
 
 obj/AmigaAssets.o: obj/startup-options $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/amiga-health-art.h $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
-		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(REFERENCE_COLLISION_MASK_INPUT) $(BUILDER_PACK)
+		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(REFERENCE_COLLISION_MASK_INPUT) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $(AMIGA_SRC)/AmigaAssets.s
 
@@ -1322,9 +1319,31 @@ $(REPO)/generated/amiga-terrain-phase6.bin: $(AMIGA_GAME) $(REPO)/tools/generate
 $(REPO)/generated/amiga-initial-terrain.bin: $(AMIGA_GAME) $(REPO)/generated/downwell-rooms.dwrm $(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/tools/generate-initial-terrain.py $(REPO)/tools/prepare-initial-terrain.cpp $(AMIGA_SRC)/AmigaTerrainPainter.cpp $(AMIGA_SRC)/AmigaTerrain.cpp $(AMIGA_SRC)/AmigaTerrain.h $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_SRC)/AmigaGameplayRows.h $(REPO)/src/core/RoomPack.cpp $(REPO)/src/core/RoomPack.h $(AMIGA_SRC)/AmigaTerrainRunSurface.h $(AMIGA_SRC)/AmigaInitialTerrain.h
 	$(MAKE) -C $(REPO) generate-initial-terrain
 
-obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/generated/amiga-initial-terrain.bin
+# WI.3: the derived tables are installed as Downwell.tables, not linked.
+# Header tables (tools/install-table-headers.py) become generated/installed/
+# headers of bound pointers plus their sections.
+INSTALLED_TABLE_HEADERS := amiga-ammo-factored.h amiga-ammo-dividers.h amiga-hud-text.h \
+	downwell-goal-mask.h downwell-time-field-mask.h downwell-area-titles.h downwell-menu-text.h \
+	downwell-shop-speech.h downwell-palettes.h downwell-rising-texts.h \
+	amiga-room-terrain-plan.inc sound-durations.inc sound-gains.inc amiga-health-art.h amiga-damage-text.h \
+	contact-motion.inc smoke-trig.inc
+INSTALLED_TABLES := $(addprefix $(REPO)/generated/installed/,$(INSTALLED_TABLE_HEADERS))
+$(REPO)/generated/installed/bind-tables.h: $(addprefix $(REPO)/generated/,$(INSTALLED_TABLE_HEADERS)) $(REPO)/tools/install-table-headers.py
+	cd $(REPO) && python3 tools/install-table-headers.py
+$(INSTALLED_TABLES) $(addsuffix .bin,$(INSTALLED_TABLES)): $(REPO)/generated/installed/bind-tables.h
+	@test -f $@ || (cd $(REPO) && python3 tools/install-table-headers.py)
+$(OBJECTS): $(REPO)/generated/installed/bind-tables.h
+AMIGA_TABLE_INPUTS := $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(AMIGA_EFFECT_STAMPS) \
+	$(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/generated/amiga-initial-terrain.bin \
+	$(addsuffix .bin,$(INSTALLED_TABLES))
+$(REPO)/generated/amiga-tables.bin: $(AMIGA_TABLE_INPUTS) $(REPO)/tools/pack-amiga-tables.py
+	cd $(REPO) && python3 tools/pack-amiga-tables.py
+$(REPO)/generated/amiga-tables.h: $(REPO)/generated/amiga-tables.bin
+	@test -f $@ || (cd $(REPO) && python3 tools/pack-amiga-tables.py)
+obj/DownwellAmiga.o: $(REPO)/generated/amiga-tables.h
+$(OUT).tables: $(REPO)/generated/amiga-tables.bin
 	@mkdir -p $(@D)
-	$(AS) $(ASFLAGS) -o $@ $<
+	cp $< $@
 
 obj/AmigaPatternTransfer.o: $(AMIGA_SRC)/AmigaPatternTransfer.s
 	@mkdir -p $(@D)

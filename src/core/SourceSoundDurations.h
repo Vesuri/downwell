@@ -6,16 +6,33 @@
 // gain() is the asset volume a fresh voice reads back (audio_sound_get_gain).
 #include "MotionBinary64.h"
 #include <cstdint>
+#ifdef DOWNWELL_INSTALLED_TABLES
+// WI.3: bound from Downwell.tables (tools/install-table-headers.py).
+#include "../../generated/installed/sound-durations.inc"
+#include "../../generated/installed/sound-gains.inc"
+#endif
 namespace downwell {
 struct SourceSoundDurations {
     static std::uint16_t ticks(int id){
+#ifdef DOWNWELL_INSTALLED_TABLES
+        const std::uint16_t* table=sourceSoundTicks;
+        constexpr unsigned count=sourceSoundTicks_count;
+#else
         static const std::uint16_t table[]={
 #include "../../generated/sound-durations.inc"
         };
         constexpr unsigned count=sizeof(table)/sizeof(table[0]);
+#endif
         return id>=0&&unsigned(id)<count?table[id]:0;
     }
     static MotionBinary64 gain(int id){
+#ifdef DOWNWELL_INSTALLED_TABLES
+        constexpr unsigned count=sourceSoundGains_count;
+        // scrInitialize: audio_sound_gain(sfxGunM, 0.5, 0) before any run.
+        if(id==18)return {0x3fe00000u,0};
+        if(id<0||unsigned(id)>=count)return MotionBinary64::fromInteger(1);
+        return {sourceSoundGains[id][0],sourceSoundGains[id][1]};
+#else
         struct Bits {std::uint32_t high,low;};
         static const Bits table[]={
 #include "../../generated/sound-gains.inc"
@@ -25,6 +42,7 @@ struct SourceSoundDurations {
         if(id==18)return {0x3fe00000u,0};
         if(id<0||unsigned(id)>=count)return MotionBinary64::fromInteger(1);
         return {table[id].high,table[id].low};
+#endif
     }
 };
 }
