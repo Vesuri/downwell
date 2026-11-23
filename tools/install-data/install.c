@@ -172,6 +172,18 @@ int install_data(const char* source, const char* dest, const char* temp)
     }
     win_close(&c->win);
     if (!ok) { io_message("DownwellInstallData failed:"); io_message(dw_error ? dw_error : "unknown error"); return 20; }
+#ifndef INSTALL_AMIGA
+    if (getenv("DOWNWELL_INSTALL_PEAK")) {
+        char line[64];
+        u32 v = dw_alloc_peak(), n = 0, d = 1000000000u;
+        dw_strcpy(line, "peak allocation ");
+        n = (u32)strlen(line);
+        while (d > 1 && v / d == 0) d /= 10;
+        for (; d; d /= 10) line[n++] = (char)('0' + v / d % 10);
+        dw_strcpy(line + n, " bytes");
+        io_message(line);
+    }
+#endif
     io_message("Done.");
     return 0;
 }
