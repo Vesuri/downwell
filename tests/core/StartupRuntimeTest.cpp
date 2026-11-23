@@ -2328,16 +2328,17 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                   << " specials=" << runtime.mainBuilderSpecialObjectsGenerated() << '\n';
         // This is a tape-specific regression, not a Windows trajectory oracle.
         // The source startTimeField Create consumes a radius draw even when it
-        // destroys itself on level 1. With that entry draw this tape selects
-        // pattern 7/row 86. VM string 1022 contains v,O,_,@,{,} and no J marker.
+        // destroys itself on level 1. With that entry draw, and the sound
+        // argument draws (choose() on jumps, footsteps and shots) that
+        // ba5f503b added, this tape selects pattern 6/row 87.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 7 &&
+                    runtime.mainBuilderLastRightPattern() == 6 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
-                    runtime.mainBuilderRowsGenerated() == 86,
+                    runtime.mainBuilderRowsGenerated() == 87,
                 "the first scheduled side room preserves deterministic selection and rows");
-        require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
+        require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
                 "every special marker in deterministic right-room pattern is interpreted");
         bool foundTorch = false;
         bool foundAmbience = false;
@@ -2353,9 +2354,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             foundRoomReward = foundRoomReward || instance.objectId == 293 ||
                               instance.objectId == 109;
         }
-        require(!foundTorch && foundAmbience && foundTimeField &&
+        // Pattern 6 holds a J (torch) marker beside v,O,_,@,{,}; 7 does not.
+        require(foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "pattern 7 emits its utility/reward IDs without inventing a J torch marker");
+                "pattern 6 emits its J torch and its utility/reward IDs");
     }
 }
 

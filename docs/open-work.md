@@ -212,11 +212,6 @@ name. Every change follows their working rules:
      and make the host reference fail on lost effects.
    - `make verify-amiga-gameplay-cache` fails with `raster=64 checks=156`
      (seen 2026-11-21, also before the terrain raster ring).
-   - `startup-runtime-test` (in `make test`): its side-room tape selects
-     pattern 6 / row 87 where the check expects 7 / 86 ("the first
-     scheduled side room preserves deterministic selection and rows"),
-     already before W1.12. Find the commit that shifted the entry RNG and
-     decide which side is right; the rest of `make test` passes up to it.
 
 **Baseline on the target**
 
