@@ -3937,6 +3937,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                 destroyedBlockY[block] = result.blockY[block];
             }
 #endif
+            // A box gone this update must not come back from retained rows:
+            // a camera column change or exposure later in this frame
+            // transfers cached spans before the box repaint below.
+            for (unsigned block = 0; block < destroyedBlockCount; ++block) {
+                const int centerY = 176 + result.blockY[block];
+                terrainRaster.invalidate(centerY - 8, centerY + 8);
+            }
             if (destroyedBlockCount != 0 && !port.compactScenery().empty()) {
                 // Scenery art changed under a repainted cell: broken plants,
                 // a flashing/opened gem chunk, a placed or removed torch.

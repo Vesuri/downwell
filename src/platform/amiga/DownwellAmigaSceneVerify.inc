@@ -16,6 +16,15 @@ __attribute__((noinline)) static void checkSceneStack(ULONG stage){
 #endif
 #if DOWNWELL_VERIFY_PART == 6
 volatile LONG gDownwellTerrainFirstMismatch[8];
+// The first mismatching span: the cached rows (row, plane, word) and the
+// fresh ring, for a debugger to dump at downwellTerrainMismatch().
+volatile const UWORD* gDownwellTerrainMismatchCached;
+volatile const UBYTE* gDownwellTerrainMismatchRing;
+volatile ULONG gDownwellTerrainMismatchOrigin, gDownwellTerrainMismatchClipY;
+volatile ULONG gDownwellTerrainMismatchTick;
+extern "C" __attribute__((noinline,used)) void downwellTerrainMismatch(){
+    __asm__ volatile("" ::: "memory");
+}
 volatile ULONG gDownwellColdStageRows;
 volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
@@ -120,6 +129,14 @@ static downwell::Input sceneVerificationInput(
                             ++gDownwellTerrainRasterFailures;
                         }
                 }
+            if (gDownwellTerrainRasterFailures && !gDownwellTerrainMismatchCached) {
+                gDownwellTerrainMismatchCached = &expected[0][0][0];
+                gDownwellTerrainMismatchRing = (const UBYTE*)renderer->game;
+                gDownwellTerrainMismatchOrigin = renderer->gameOrigin;
+                gDownwellTerrainMismatchClipY = clipY;
+                gDownwellTerrainMismatchTick = runtime ? runtime->tick() : 0;
+                downwellTerrainMismatch();
+            }
             ++gDownwellTerrainRasterChecks;
 #endif
 #if DOWNWELL_VERIFY_PART == 11
