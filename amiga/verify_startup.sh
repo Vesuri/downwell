@@ -65,7 +65,16 @@ if [ "${VERIFY_WORKBENCH:-0}" = 1 ]; then
   BOOT_ARGS=(--floppy_drive_0="$WORKBENCH_ADF" --hard_drive_0_priority=10)
 else
   [ ! -d "$DH0/WBStartup" ] || find "$DH0/WBStartup" -mindepth 1 -delete
-  printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
+  # VERIFY_SHELL_LOG=1 (tools/verify-start-refusal.py): the program's Shell
+  # output and then its result ($RC) go to DH0:shell.log; FailAt 21 keeps
+  # the script running past a result of 20.
+  rm -f "$DH0/shell.log"
+  if [ "${VERIFY_SHELL_LOG:-0}" = 1 ]; then
+    printf 'Stack %s\ncd dh1:\nFailAt 21\nDownwell >DH0:shell.log\nEcho >>DH0:shell.log "RC $RC"\n' \
+      "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
+  else
+    printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
+  fi
 fi
 # VERIFY_INSTALLED=DIR (WI.5): start the drawer the Installer made instead
 # (tools/test_release_installer.py): its program, its icon (with the stack
@@ -84,6 +93,18 @@ cp -f "$VERIFY_PROGRAM.exe" "$GAME/Downwell"
 for bank in boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear tables; do
   cp -f "out/Downwell.$bank" "$DATA/Downwell.$bank"
 done
+# WI.6 refusals: VERIFY_DATA_MISSING=bank leaves Downwell.bank out of the
+# mounted copy; VERIFY_DATA_SHORT=bank copies only its first half;
+# VERIFY_DATA_CORRUPT=bank inverts its first byte (same size, wrong header).
+if [ -n "${VERIFY_DATA_MISSING:-}" ]; then rm -f "$DATA/Downwell.$VERIFY_DATA_MISSING"; fi
+if [ -n "${VERIFY_DATA_SHORT:-}" ]; then
+  python3 -c 'import os, sys; os.truncate(sys.argv[1], os.path.getsize(sys.argv[1]) // 2)' \
+    "$DATA/Downwell.$VERIFY_DATA_SHORT"
+fi
+if [ -n "${VERIFY_DATA_CORRUPT:-}" ]; then
+  python3 -c 'import sys; f = open(sys.argv[1], "r+b"); b = f.read(1); f.seek(0); f.write(bytes([b[0] ^ 0xff]))' \
+    "$DATA/Downwell.$VERIFY_DATA_CORRUPT"
+fi
 fi
 if [ "$VERIFY_PROGRAM" = out/WindAudioProbe ]; then
   cp -f out/Downwell.wind "$DATA/Downwell.wind"

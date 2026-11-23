@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_ENCOUNTER_RESOURCES_H
 #include "AmigaRunSoundAudio.h"
 #include "framework/AmigaPlatform.h"
+#include "AmigaDataFiles.h"
 #include "core/GameplayEncounterEnvironment.h"
 #include "core/GameplayEncounterSession.h"
 #include "core/PlacementNew.h"
@@ -49,7 +50,7 @@ public:
 #endif
         }
         masks_=static_cast<UBYTE*>(AllocMem(DOWNWELL_ENCOUNTER_MASK_BYTES,MEMF_PUBLIC));
-        if(!masks_||platform.loadData("Downwell.encountermasks",masks_,
+        if(!masks_||platform.loadData(AmigaDataFile::encounterMasks,masks_,
                 DOWNWELL_ENCOUNTER_MASK_BYTES)!=DOWNWELL_ENCOUNTER_MASK_BYTES){releaseScene();return false;}
         maskView_=downwell::SpriteMaskPack(masks_,DOWNWELL_ENCOUNTER_MASK_BYTES);
         if(!maskView_.valid()){releaseScene();return false;}

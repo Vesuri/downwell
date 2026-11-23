@@ -1,4 +1,5 @@
 #include "AmigaSoundBanks.h"
+#include "AmigaDataFiles.h"
 #include "framework/AmigaPlatform.h"
 #include "amiga-sfx.h"
 #include <proto/exec.h>
@@ -16,10 +17,10 @@ namespace {
 struct Pack { const char* file; ULONG bytes; };
 Pack pack(AmigaSoundBanks::Bank bank){
     switch(bank){
-    case AmigaSoundBanks::run:return {"Downwell.sndrun",DOWNWELL_SFX_RUN_BYTES};
-    case AmigaSoundBanks::front:return {"Downwell.sndfront",DOWNWELL_SFX_FRONT_BYTES};
-    case AmigaSoundBanks::results:return {"Downwell.sndresults",DOWNWELL_SFX_RESULTS_BYTES};
-    case AmigaSoundBanks::clear:return {"Downwell.sndclear",DOWNWELL_SFX_CLEAR_BYTES};
+    case AmigaSoundBanks::run:return {AmigaDataFile::soundRun,DOWNWELL_SFX_RUN_BYTES};
+    case AmigaSoundBanks::front:return {AmigaDataFile::soundFront,DOWNWELL_SFX_FRONT_BYTES};
+    case AmigaSoundBanks::results:return {AmigaDataFile::soundResults,DOWNWELL_SFX_RESULTS_BYTES};
+    case AmigaSoundBanks::clear:return {AmigaDataFile::soundClear,DOWNWELL_SFX_CLEAR_BYTES};
     default:return {nullptr,0};
     }
 }

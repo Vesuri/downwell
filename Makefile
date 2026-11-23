@@ -3448,6 +3448,12 @@ verify-amiga-exit-wipe:
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j4 SKIP_TO_GAME=1 EXIT_WIPE_VERIFY=1' ; } && \
 	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_exit_wipe.gdb READY_MARKER=DOWNWELL_EXIT_WIPE_READY READY_DESCRIPTION="exit wipe DMA" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh' ; }
 
+# WI.6: each refused start (stack, missing/short/wrong data file, memory)
+# names its cause from the Shell and from Workbench, and returns 20.
+.PHONY: verify-amiga-refusals
+verify-amiga-refusals:
+	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga -j4 && amiga/verify_refusals.sh' ; }
+
 verify-amiga-startup:
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga' ; } && \
 	{ bash -c '. amiga/env.sh && amiga/verify_startup.sh' ; }

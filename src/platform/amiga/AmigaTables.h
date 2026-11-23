@@ -5,6 +5,7 @@
 // the executable. Read whole once at startup into public memory, then bound
 // by tag; the views stay valid until the owner is destroyed.
 #include "framework/AmigaPlatform.h"
+#include "AmigaDataFiles.h"
 #include "../../../generated/amiga-tables.h"
 #include <exec/memory.h>
 #include <exec/types.h>
@@ -17,20 +18,21 @@ public:
     AmigaTables() = default;
     ~AmigaTables() { if (file_) FreeMem(file_, DOWNWELL_TABLES_BYTES); }
 
-    // False when the file is missing, short or not the version this
-    // executable was built with.
-    bool load(AmigaPlatform& platform) {
-        if (file_) return true;
+    // Read and checked whole; noMemory and wrongFile leave nothing held. A
+    // missing or short file is wrongFile too (the start checks sizes first).
+    enum Load { loaded, noMemory, wrongFile };
+    Load load(AmigaPlatform& platform) {
+        if (file_) return loaded;
         file_ = static_cast<UBYTE*>(AllocMem(DOWNWELL_TABLES_BYTES, MEMF_PUBLIC));
-        if (!file_) return false;
-        if (platform.loadData("Downwell.tables", file_, DOWNWELL_TABLES_BYTES) != LONG(DOWNWELL_TABLES_BYTES) ||
+        if (!file_) return noMemory;
+        if (platform.loadData(AmigaDataFile::tables, file_, DOWNWELL_TABLES_BYTES) != LONG(DOWNWELL_TABLES_BYTES) ||
             word(0) != 0x4457u || word(2) != 0x5442u || word(4) != DOWNWELL_TABLES_VERSION ||
             word(6) != DOWNWELL_TABLES_COUNT) {
             FreeMem(file_, DOWNWELL_TABLES_BYTES);
             file_ = nullptr;
-            return false;
+            return wrongFile;
         }
-        return true;
+        return loaded;
     }
 
     // The table with this tag, or {nullptr, 0}.

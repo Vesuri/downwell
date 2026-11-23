@@ -285,9 +285,6 @@ Stages, in order:
    test-installer` with no PENDING line (the installed data complete, the
    start without development files supplementing it), and record the
    converter's time and memory in the fresh install on the target.
-3. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
-   little memory, a missing or wrong data file) says why: on the Shell's
-   output, or in a requester when started from Workbench.
 
 ### W3. Performance
 

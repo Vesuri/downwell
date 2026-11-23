@@ -79,25 +79,52 @@ void AmigaPlatform::endIo()
     Enable();
 }
 
+// The installer puts the converted files in data/ beside the program; a
+// development drawer keeps them beside it (as the sibling ports do).
+static const char* const dataDirectories[] = {"PROGDIR:data/", "PROGDIR:"};
+
+static bool dataPath(char (&path)[96], const char* directory, const char* name)
+{
+    unsigned length = 0;
+    for (const char* c = directory; *c; ++c) path[length++] = *c;
+    for (const char* c = name; *c; ++c) {
+        if (length + 1 >= sizeof path) return false;
+        path[length++] = *c;
+    }
+    path[length] = 0;
+    return true;
+}
+
 LONG AmigaPlatform::loadData(const char* name, UBYTE* destination, ULONG bytes)
 {
-    // The installer puts the converted files in data/ beside the program;
-    // a development drawer keeps them beside it (as the sibling ports do).
-    static const char* const directories[] = {"PROGDIR:data/", "PROGDIR:"};
     char path[96];
-    for (const char* directory : directories) {
-        unsigned length = 0;
-        for (const char* c = directory; *c; ++c) path[length++] = *c;
-        for (const char* c = name; *c; ++c) {
-            if (length + 1 >= sizeof path) return -1;
-            path[length++] = *c;
-        }
-        path[length] = 0;
+    for (const char* directory : dataDirectories) {
+        if (!dataPath(path, directory, name)) return -1;
         bool opened = false;
         const LONG read = loadFile(path, destination, bytes, &opened);
         if (opened) return read;
     }
     return -1;
+}
+
+LONG AmigaPlatform::dataSize(const char* name, bool& installed) const
+{
+    installed = true;
+    if (!DOSBase || active_) return -1;
+    struct FileInfoBlock* const info = (struct FileInfoBlock*)AllocDosObject(DOS_FIB, 0);
+    if (!info) return -1;
+    char path[96];
+    LONG size = -1;
+    for (unsigned i = 0; i < 2 && dataPath(path, dataDirectories[i], name); ++i) {
+        const BPTR lock = Lock((CONST_STRPTR)path, ACCESS_READ);
+        if (!lock) continue;
+        installed = i == 0;
+        if (Examine(lock, info) && info->fib_DirEntryType < 0) size = info->fib_Size;
+        UnLock(lock);
+        break;
+    }
+    FreeDosObject(DOS_FIB, info);
+    return size;
 }
 
 LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)

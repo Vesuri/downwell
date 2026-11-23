@@ -4,7 +4,9 @@
     GDB=../tools/verify-workbench-start.py READY_MARKER=DOWNWELL_START_READY \\
         [VERIFY_WORKBENCH=1] bash verify_startup.sh
 
-Lets the normal build run 100 input samples, then presses Escape, which
+Lets the normal build run 100 input samples (on at least 8192 bytes of
+stack, AmigaStart.c swapping in its own for a smaller VERIFY_STACK_BYTES),
+then presses Escape, which
 leaves the game outside gameplay with result 0. At AmigaStart.c's
 downwellStartReturn seam it reads the result DOS or Workbench gets and
 whether a WBStartup message is held for the reply. With VERIFY_WORKBENCH=1
@@ -70,6 +72,15 @@ def main():
             Path('../captures/workbench-start.' + ('png' if image.startswith(b'\x89PNG') else 'jpg')).write_bytes(image)
             raise
         if 'AmigaInput::sample' not in stop: raise RuntimeError('no input sample: ' + stop)
+        # WI.6: the game runs on at least 8192 bytes of stack, whatever the
+        # Shell or icon gave (VERIFY_STACK_BYTES): ExecBase ThisTask (276),
+        # its tc_SPLower (58) and tc_SPUpper (62), with sp between them.
+        stack = checked('printf "STACK %u %u %u\\n", *(unsigned long*)(*(unsigned long*)(*(unsigned long*)4+276)+58), '
+                        '*(unsigned long*)(*(unsigned long*)(*(unsigned long*)4+276)+62), $sp')
+        print(stack, flush=True)
+        lower, upper, sp = map(int, re.search(r'STACK (\d+) (\d+) (\d+)', stack).groups())
+        if upper - lower < 8192 or not lower <= sp < upper:
+            raise RuntimeError(f'game stack {upper - lower} bytes, sp {sp:#x} outside {lower:#x}..{upper:#x}')
         # Keys are delivered while the game runs between input samples, as in
         # verify-menus-native.py: press at one sample, release three later.
         with Input(g) as controls:

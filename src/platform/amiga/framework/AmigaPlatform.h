@@ -47,6 +47,10 @@ public:
     // layout), else PROGDIR:name (a development drawer). The second is tried
     // only when the first does not open. Same result as loadFile.
     LONG loadData(const char* name, UBYTE* destination, ULONG bytes);
+    // Before takeover: the size of the file loadData would read, or -1 when
+    // neither place has it (or it is not a file). installed tells where it
+    // was found (PROGDIR:data/) or, when missing, where it belongs.
+    LONG dataSize(const char* name, bool& installed) const;
     // The same bracketing for one Open(MODE_NEWFILE)/Write/Close. DOS
     // requesters (a write-protected or missing volume) are suppressed: the
     // call fails instead of waiting on a Workbench window nobody can see.

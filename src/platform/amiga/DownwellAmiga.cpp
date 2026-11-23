@@ -20,6 +20,8 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaKeyboard.h"
 #include "AmigaSoundBanks.h"
 #include "AmigaTables.h"
+#include "AmigaDataFiles.h"
+#include "../../../generated/amiga-sfx.h"
 #include "../../../generated/installed/bind-tables.h"
 #ifdef DOWNWELL_SCENE_COLLISION_BACKEND
 #include "AmigaEncounterResources.h"
@@ -382,11 +384,11 @@ static bool entryHudReady=false;
 #include "../../../generated/amiga-transient-banks.h"
 using TransientOwner = AmigaTransientBank::Owner;
 static constexpr AmigaTransientBank::Contract shopBankContract{
-    TransientOwner::shop, "Downwell.shop", DOWNWELL_SHOP_BANK_BYTES, DOWNWELL_SHOP_BANK_BUDGET};
+    TransientOwner::shop, AmigaDataFile::shop, DOWNWELL_SHOP_BANK_BYTES, DOWNWELL_SHOP_BANK_BUDGET};
 static constexpr AmigaTransientBank::Contract resultsBankContract{
-    TransientOwner::results, "Downwell.results", DOWNWELL_RESULTS_BANK_BYTES, DOWNWELL_RESULTS_BANK_BUDGET};
+    TransientOwner::results, AmigaDataFile::results, DOWNWELL_RESULTS_BANK_BYTES, DOWNWELL_RESULTS_BANK_BUDGET};
 static constexpr AmigaTransientBank::Contract clearBankContract{
-    TransientOwner::upgrade, "Downwell.clear", DOWNWELL_CLEAR_BANK_BYTES, DOWNWELL_CLEAR_BANK_BUDGET};
+    TransientOwner::upgrade, AmigaDataFile::clear, DOWNWELL_CLEAR_BANK_BYTES, DOWNWELL_CLEAR_BANK_BUDGET};
 static AmigaTransientBank overlayBank;
 static AmigaPlatform* sceneAssetPlatform;
 extern "C" { volatile ULONG gDownwellTransientLoads, gDownwellUpgradeSourceBytes; }
@@ -430,7 +432,7 @@ public:
         }
         // Upgrade preparation copies this source into its own DMA bank. It
         // must never become a permanent linked asset or a gameplay load.
-        if (!sceneAssetPlatform || sceneAssetPlatform->loadData("Downwell.selectionmask",
+        if (!sceneAssetPlatform || sceneAssetPlatform->loadData(AmigaDataFile::selectionMask,
                 storage_+clearBankContract.bytes,DOWNWELL_SELECTIONMASK_BANK_BYTES)!=
                 LONG(DOWNWELL_SELECTIONMASK_BANK_BYTES)) { release(); return false; }
         ++gDownwellSelectionMaskLoads;
@@ -453,8 +455,8 @@ public:
 // and dropped; front art is reloaded whenever gameplay returns to it.
 // Gameplay reuses the region for terrain/field staging. The separate gameplay
 // DMA atlas is a separate gameplay lease, absent during front-end scenes.
-static const char bootBankName[] = "Downwell.boot";
-static const char frontBankName[] = "Downwell.front";
+static const char* const bootBankName = AmigaDataFile::boot;
+static const char* const frontBankName = AmigaDataFile::front;
 static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOOT_BANK_BYTES
     ? DOWNWELL_FRONT_BANK_BYTES : DOWNWELL_BOOT_BANK_BYTES;
 #ifdef DOWNWELL_PREPARED_FIELDS
@@ -622,7 +624,7 @@ static bool selectOverlayAssetBank(bool shop) {
 // sprDitherFade, sprProgress) borrows the same retired-garden gap. A living,
 // controllable player owns neither shop nor results art there.
 static constexpr AmigaTransientBank::Contract pauseBankContract{
-    TransientOwner::pause, "Downwell.pause", DOWNWELL_PAUSE_BANK_BYTES, DOWNWELL_PAUSE_BANK_BUDGET};
+    TransientOwner::pause, AmigaDataFile::pause, DOWNWELL_PAUSE_BANK_BYTES, DOWNWELL_PAUSE_BANK_BUDGET};
 static AmigaTransientBank::View selectPauseBank() {
     if (residentCover != ResidentCover::none || !overlayAssetStorage) return {nullptr, 0};
     const auto held = overlayBank.view(TransientOwner::pause);
@@ -686,7 +688,7 @@ static bool selectExitMaskBank() {
     overlayBank.release();
     gDownwellResultsPack = gDownwellShopPack = nullptr;
     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
-    if (sceneAssetPlatform->loadData("Downwell.exitmask",overlayAssetStorage,
+    if (sceneAssetPlatform->loadData(AmigaDataFile::exitMask,overlayAssetStorage,
             AmigaExitMask::bytes)!=LONG(AmigaExitMask::bytes)) return false;
     ++gDownwellExitMaskLoads;
     residentCover = ResidentCover::exit;
@@ -1739,13 +1741,18 @@ __attribute__((used)) const volatile ULONG downwellChipRequirement = 940u * 1024
 __attribute__((used)) const volatile ULONG downwellPublicRequirement = 661u * 1024u;
 }
 
-static char* appendKilobytes(char* out, ULONG bytes)
+static char* appendNumber(char* out, ULONG value)
 {
-    ULONG kilobytes = (bytes + 1023) / 1024;
     char digits[12];
     unsigned n = 0;
-    do { digits[n++] = char('0' + kilobytes % 10); kilobytes /= 10; } while (kilobytes);
+    do { digits[n++] = char('0' + value % 10); value /= 10; } while (value);
     while (n) *out++ = digits[--n];
+    return out;
+}
+
+static char* appendKilobytes(char* out, ULONG bytes)
+{
+    out = appendNumber(out, (bytes + 1023) / 1024);
     *out++ = ' '; *out++ = 'K'; *out++ = 'B';
     return out;
 }
@@ -1756,9 +1763,12 @@ static char* appendText(char* out, const char* text)
     return out;
 }
 
+extern "C" void downwellRefuse(const char* message); // AmigaStart.c
+extern "C" const char* volatile gDownwellRefusal;
+
 // Refuse before allocating anything, while the shell still shows output:
 // Chip must hold the DMA data, and Chip plus Fast must hold everything.
-static bool downwellMemoryFits(const AmigaPlatform& platform)
+static bool downwellMemoryFits()
 {
     const ULONG chip = AvailMem(MEMF_CHIP), any = AvailMem(MEMF_PUBLIC);
     const ULONG anyNeeded = downwellChipRequirement + downwellPublicRequirement;
@@ -1779,11 +1789,98 @@ static bool downwellMemoryFits(const AmigaPlatform& platform)
         out = appendKilobytes(out, any);
         out = appendText(out, " free)");
     }
-    out = appendText(out, ".\n");
+    out = appendText(out, ".");
     *out = 0;
-    platform.print(line);
+    downwellRefuse(line);
     return false;
 }
+
+// An allocation failed after the free-memory check passed (the memory is
+// there, but not in blocks large enough).
+static void downwellRefuseMemory()
+{
+    char line[128];
+    char* out = appendText(line, "Not enough free memory: Downwell needs ");
+    out = appendKilobytes(out, downwellChipRequirement);
+    out = appendText(out, " of Chip memory and ");
+    out = appendKilobytes(out, downwellChipRequirement + downwellPublicRequirement);
+    out = appendText(out, " in all.");
+    *out = 0;
+    downwellRefuse(line);
+}
+
+// WI.6: every data file this build reads, with the size it was built for,
+// checked before anything loads so that a missing or wrong file is named
+// while the Shell or Workbench can still show it. The loaders read exactly
+// these sizes; a later read that fails still ends the game with an error.
+struct DownwellDataFile { const char* name; ULONG bytes; };
+static const DownwellDataFile downwellDataFiles[] = {
+    {AmigaDataFile::tables, DOWNWELL_TABLES_BYTES},
+    {AmigaDataFile::boot, DOWNWELL_BOOT_BANK_BYTES},
+    {AmigaDataFile::front, DOWNWELL_FRONT_BANK_BYTES},
+#if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
+    {AmigaDataFile::game, DOWNWELL_GAME_BANK_BYTES},
+    {AmigaDataFile::planes, DOWNWELL_GAME_PLANE_BYTES},
+#else
+    {AmigaDataFile::cavern, DOWNWELL_CAVERN_BANK_BYTES},
+    {AmigaDataFile::cavernPlanes, DOWNWELL_CAVERN_PLANE_BYTES},
+#endif
+    {AmigaDataFile::results, DOWNWELL_RESULTS_BANK_BYTES},
+    {AmigaDataFile::shop, DOWNWELL_SHOP_BANK_BYTES},
+    {AmigaDataFile::pause, DOWNWELL_PAUSE_BANK_BYTES},
+    {AmigaDataFile::clear, DOWNWELL_CLEAR_BANK_BYTES},
+    {AmigaDataFile::selectionMask, DOWNWELL_SELECTIONMASK_BANK_BYTES},
+    {AmigaDataFile::exitMask, DOWNWELL_EXITMASK_BANK_BYTES},
+    {AmigaDataFile::entryMask, DOWNWELL_ENTRYMASK_BANK_BYTES},
+    {AmigaDataFile::patterns, DOWNWELL_PATTERNS_BANK_BYTES},
+#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
+    {AmigaDataFile::hud, DOWNWELL_HUD_BANK_BYTES},
+#endif
+#ifdef DOWNWELL_PREPARED_FIELDS
+    {AmigaDataFile::fields, downwell::fieldBandBytes},
+    {AmigaDataFile::columns, downwell::fieldColumnBytes},
+#endif
+#ifdef DOWNWELL_PREPARED_PATTERN_ROWS
+    {AmigaDataFile::terrain, DOWNWELL_TERRAIN_BANK_BYTES},
+#endif
+#ifdef DOWNWELL_SCENE_COLLISION_BACKEND
+    {AmigaDataFile::encounterMasks, DOWNWELL_ENCOUNTER_MASK_BYTES},
+#endif
+    {AmigaDataFile::soundRun, DOWNWELL_SFX_RUN_BYTES},
+    {AmigaDataFile::soundFront, DOWNWELL_SFX_FRONT_BYTES},
+    {AmigaDataFile::soundResults, DOWNWELL_SFX_RESULTS_BYTES},
+    {AmigaDataFile::soundClear, DOWNWELL_SFX_CLEAR_BYTES},
+};
+
+// "Cannot read data/Downwell.x: reinstall Downwell." for a missing file, or
+// "data/Downwell.x is not the file Downwell needs: ..." for a wrong one (its
+// size or its header). The name is where the program looked (data/ unless it
+// was found beside the program).
+static void refuseDataFile(const AmigaPlatform& platform, const char* name, bool missing)
+{
+    bool installed;
+    (void)platform.dataSize(name, installed);
+    char line[128];
+    char* out = missing ? appendText(line, "Cannot read ") : line;
+    if (installed) out = appendText(out, "data/");
+    out = appendText(out, name);
+    out = appendText(out, missing ? ": reinstall Downwell." : " is not the file Downwell needs: reinstall Downwell.");
+    *out = 0;
+    downwellRefuse(line);
+}
+
+static bool downwellDataFilesPresent(const AmigaPlatform& platform)
+{
+    for (const DownwellDataFile& file : downwellDataFiles) {
+        bool installed;
+        const LONG size = platform.dataSize(file.name, installed);
+        if (size == LONG(file.bytes)) continue;
+        refuseDataFile(platform, file.name, size < 0);
+        return false;
+    }
+    return true;
+}
+
 extern "C" __attribute__((noinline)) void downwellGameplayRenderFailure() {
     __asm__ volatile("" ::: "memory");
 }
@@ -1860,9 +1957,20 @@ __attribute__((noinline)) static int runDownwell(void) {
     int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
     AmigaShopArtSnapshot oldShopArt;
+    // WI.6: refuse with a reason before the first load or allocation.
+    if (!platform.available()) {
+        gDownwellStartupFailure = 1;
+        downwellStartupFailed();
+        downwellRefuse("Downwell needs Kickstart 2.0 or later.");
+        return 20; // AmigaDOS RETURN_FAIL
+    }
+    if (!downwellDataFilesPresent(platform)) return 20;
     // WI.3: the derived tables come from the installed Downwell.tables.
     AmigaTables tables;
-    if(!tables.load(platform)||!downwell_installed_tables::bind(
+    const AmigaTables::Load tablesLoad = tables.load(platform);
+    if (tablesLoad == AmigaTables::noMemory) { downwellRefuseMemory(); return 20; }
+    if (tablesLoad == AmigaTables::wrongFile) { refuseDataFile(platform, AmigaDataFile::tables, false); return 20; }
+    if(!downwell_installed_tables::bind(
             [&](unsigned long tag,unsigned long& bytes){
                 ULONG size=0;UBYTE* section=tables.writable(tag,size);
                 bytes=size;return section;}))return 20;
@@ -2016,12 +2124,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     worldViewY += port.cameraOffsetY();
 #endif
 
-    if (!platform.available()) {
-        gDownwellStartupFailure = 1;
-        downwellStartupFailed();
-        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
-    }
-    if (!downwellMemoryFits(platform)) {
+    if (!downwellMemoryFits()) {
         gDownwellStartupFailure = 5;
         downwellStartupFailed();
         return 20;
@@ -2092,7 +2195,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     const auto acquireBuilderPatterns=[&](){
         if(builders.valid())return memory.builderPatterns()!=nullptr;
         if(!memory.acquireBuilderPatterns(DOWNWELL_PATTERNS_BANK_BYTES))return false;
-        if(platform.loadData("Downwell.patterns",memory.builderPatterns(),
+        if(platform.loadData(AmigaDataFile::patterns,memory.builderPatterns(),
                 DOWNWELL_PATTERNS_BANK_BYTES)!=LONG(DOWNWELL_PATTERNS_BANK_BYTES)){
             memory.releaseBuilderPatterns();return false;
         }
@@ -2329,7 +2432,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             !gameplayColumnBank.load(memory.fieldColumns(),downwell::fieldColumnBytes,
                 [&](UBYTE* target,unsigned bytes){
                     ++gDownwellFieldColumnLoads;
-                    return platform.loadData("Downwell.columns",target,bytes)==LONG(bytes);
+                    return platform.loadData(AmigaDataFile::columns,target,bytes)==LONG(bytes);
                 }))return false;
         gDownwellFieldColumnResidentBytes=downwell::fieldColumnBytes;
 #endif
@@ -2380,14 +2483,14 @@ __attribute__((noinline)) static int runDownwell(void) {
         // These explicit full-catalogue pixel oracles include later-area art.
         if(!AmigaGameplayAssetAdmission::referenceOracle(port.runStage().area))return false;
         constexpr ULONG cpuBytes=DOWNWELL_GAME_BANK_BYTES,planeBytes=DOWNWELL_GAME_PLANE_BYTES;
-        const char* cpuPath="Downwell.game";
-        const char* planePath="Downwell.planes";
+        const char* cpuPath=AmigaDataFile::game;
+        const char* planePath=AmigaDataFile::planes;
         const auto* planeHash=downwellGamePlaneSourceHash;
 #else
         if(!AmigaGameplayAssetAdmission::production(port.runStage().area))return false;
         constexpr ULONG cpuBytes=DOWNWELL_CAVERN_BANK_BYTES,planeBytes=DOWNWELL_CAVERN_PLANE_BYTES;
-        const char* cpuPath="Downwell.cavern";
-        const char* planePath="Downwell.cavernplanes";
+        const char* cpuPath=AmigaDataFile::cavern;
+        const char* planePath=AmigaDataFile::cavernPlanes;
         const auto* planeHash=downwellCavernPlaneSourceHash;
 #endif
         if(gDownwellGameArtResidentBytes)
@@ -2411,7 +2514,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         if(!memory.acquireGameCatalogue(cpuBytes+DOWNWELL_ENTRYMASK_BANK_BYTES+terrainArtBytes))return false;
         activeGamePack=memory.gameCatalogue();activeGamePackEnd=activeGamePack+cpuBytes;
         UBYTE* entryMask=memory.gameCatalogue()+cpuBytes;
-        if(platform.loadData("Downwell.entrymask",entryMask,
+        if(platform.loadData(AmigaDataFile::entryMask,entryMask,
                 DOWNWELL_ENTRYMASK_BANK_BYTES)!=LONG(DOWNWELL_ENTRYMASK_BANK_BYTES)){
             releaseGameplayArt();return false;
         }
@@ -2420,7 +2523,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         ++gDownwellEntryMaskLoads;
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
         UBYTE* terrainArt=entryMask+DOWNWELL_ENTRYMASK_BANK_BYTES;
-        if(platform.loadData("Downwell.terrain",terrainArt,terrainArtBytes)!=LONG(terrainArtBytes)||
+        if(platform.loadData(AmigaDataFile::terrain,terrainArt,terrainArtBytes)!=LONG(terrainArtBytes)||
            !AmigaTerrainPainter::bindPatterns(terrainArt,terrainArtBytes)){
             releaseGameplayArt();return false;
         }
@@ -3091,7 +3194,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         if(!amigaBlitterBindFieldBands(sceneBank+fieldBandOffset,
                             [](void* p,UBYTE* target,unsigned bytes){
                                 return static_cast<AmigaPlatform*>(p)->loadData(
-                                    "Downwell.fields",target,bytes)==LONG(bytes);
+                                    AmigaDataFile::fields,target,bytes)==LONG(bytes);
                             },&platform)){exitCode=downwellGameplayFailed(__LINE__);break;}
                         ++gDownwellFieldBankUploads;
                     }else ++gDownwellFieldBankReuses;
@@ -3182,7 +3285,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         hudStorage[byte] = amiga_hud_pack[byte];
 #else
                     if (!entryHudReady) {
-                        if (platform.loadData("Downwell.hud",hudStorage,hudBytes)!=LONG(hudBytes) ||
+                        if (platform.loadData(AmigaDataFile::hud,hudStorage,hudBytes)!=LONG(hudBytes) ||
                             !validateTransientBank(hudStorage,hudBytes)) {
                             exitCode=downwellGameplayFailed(__LINE__);
                             break;
@@ -4592,6 +4695,24 @@ __attribute__((noinline)) static int runDownwell(void) {
 int main(void){
     const ULONG lower=(ULONG)SysBase->ThisTask->tc_SPLower;
     const ULONG upper=(ULONG)SysBase->ThisTask->tc_SPUpper;
-    if(upper<lower||upper-lower<8192)return 20;
-    return runDownwell();
+    // AmigaStart.c gives main 8192 bytes of stack on Kickstart 2.0 or later.
+    if(upper<lower||upper-lower<8192){
+        downwellRefuse("Downwell needs Kickstart 2.0 or later.");
+        return 20;
+    }
+    const int result=runDownwell();
+    // WI.6: a failure that has not said why yet says so now, with the display
+    // given back: an allocation at startup, else the internal failure's code.
+    if(result&&!gDownwellRefusal){
+        if(gDownwellStartupFailure==2||gDownwellStartupFailure==4)downwellRefuseMemory();
+        else{
+            char line[64];
+            char* out=appendText(line,"Downwell stopped after an internal error (");
+            out=appendNumber(out,gDownwellStartupFailure?gDownwellStartupFailure:gDownwellGameplayFailLine);
+            out=appendText(out,").");
+            *out=0;
+            downwellRefuse(line);
+        }
+    }
+    return result;
 }
