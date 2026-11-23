@@ -209,27 +209,19 @@ Stages, in order:
    `verify_startup.sh` (the installed `data/` layout) with
    `tools/verify-workbench-start.py`, and the same driver from the Shell
    (the flat layout).
-2. **WI.3 The trig path's operation order.** Every derived table is
-   installed (`Downwell.tables`) and `tools/check-original-bytes.py` finds
-   no block of the player's files in the executable. One derived input is
-   still linked: `installed/smoke-trig.inc`, the runner's SSE sin/cos path
-   as straight-line code (our transcription; its 64-entry table and 13
-   constants are bound from the file). Either that operation order may
-   ship as code, or it becomes data that `SmokeTrig.h` interprets (a
-   per-call dispatch cost on every smoke and currency direction; measure
-   it on the currency-burst profile).
-3. **WI.4 Portable converter.** One C implementation of the generators
+2. **WI.4 Portable converter.** One C implementation of the generators
    that the host build also uses, so the Python and ffmpeg path stops being
    a second authority: FORM chunk parsing streamed from disk (`data.win`
    is 28 MB; the target has 4 MB Fast), zlib inflate for the texture PNGs,
-   our own resampler in place of ffmpeg's `swr`, an Ogg Vorbis decoder for
+   our own resampler in place of ffmpeg's `swr` (the user's choice,
+   2026-11-23: its samples become the reference), an Ogg Vorbis decoder for
    the 11 Ogg effects in the banks (and the songs' lengths), then every bank
    and `Downwell.tables` (today `tools/install-table-headers.py` and
    `tools/pack-amiga-tables.py` over the generated headers). Host tests compare its output with
    the current `generated/` files; where the resampler changes samples, the
-   sound and route gates rerun. Then a 68020 build of the converter, timed
+   new output is recorded and the sound and route gates rerun. Then a 68020 build of the converter, timed
    and fitted in memory on the target.
-4. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
+3. **WI.5 Archive and Installer.** `release/Install` (Installer 43, the
    siblings' conventions): ReadMe first, the parent drawer, Keep or Remove
    an existing drawer (saves preserved), Use existing or Replace the
    converted data, the player's Steam drawer, `DownwellInstallData` into a
@@ -238,7 +230,7 @@ Stages, in order:
    `tools/check_release.py` on AmigaXDev's `amigaxdev.release`, icons from
    the siblings. An emulated install test covers fresh, keep, replace,
    wrong files and the start from both icon and Shell.
-5. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
+4. **WI.6 Failure messages.** A start that refuses (stack below 8 KB, too
    little memory, a missing or wrong data file) says why: on the Shell's
    output, or in a requester when started from Workbench.
 
