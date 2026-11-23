@@ -125,6 +125,7 @@ static Context context;
 volatile long install_ticks[16];
 volatile unsigned long install_peak;
 long install_now(void); /* timing_amiga.c */
+void install_cache_probe(void);
 #define MARK(i) (install_ticks[i] = install_now())
 #else
 #define MARK(i) ((void)0)
@@ -168,6 +169,9 @@ int install_data(const char* source, const char* dest, const char* temp)
     (void)temp;
 #ifdef INSTALL_AMIGA
     install_cpu_init();
+#ifdef INSTALL_TIMING
+    install_cache_probe();
+#endif
 #ifdef INSTALL_MULTIPLY_TEST
     install_multiply_test(INSTALL_MULTIPLY_TEST);
     return 0;

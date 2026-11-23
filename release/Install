@@ -65,7 +65,7 @@
    (makedir #staging (help @makedir-help))
    (set #output ">NIL:")
    (if (<> (getassign "ENV") "") (set #output (cat ">ENV:" #log)))
-   (working "Checking your Steam files and converting Downwell's game data. This takes about an hour on a 14 MHz 68020 and about ten minutes on a 50 MHz 68030.")
+   (working "Checking your Steam files and converting Downwell's game data. This takes about an hour on a 14 MHz 68020 and about eight minutes on a 50 MHz 68030.")
    (set #result (run ("Stack 16384\n\"%s\" %s \"%s\" \"%s\"" #helper #output #steam #staging)))
    (if (<> #result 0)
      ((set #failure (cat "Downwell's game data could not be converted from the selected drawer. Nothing was changed.\n\n" (getenv #log)))

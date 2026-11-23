@@ -48,21 +48,26 @@ uses `mulu.l` 32x32->64 only when exec reports a 68020 or 68030; a 68040 or
 68060 (which Kickstart 3.1 reports as a 68040 without 68060.library) takes
 the portable path.
 
-`time_amiga.py SETUP` runs the `amiga-timing` build from the Shell with
+`time_amiga.py SETUP` runs the `amiga-timing` build from the Shell, after
+`SetPatch QUIET` as a Workbench boot does (`--no-setpatch` skips it), with
 `Stack 16384` over `data/` mounted read-only and compares the outputs with
 the host converter's. On 2026-11-23 all 22 were equal on each setup, with
 peak allocation 3,296,960 bytes and stack 6,370 of 16,384 bytes. 68 minutes
-on `a1200-4m` is accepted (the user, 2026-11-23):
+on `a1200-4m` is accepted (the user, 2026-11-23). SetPatch matters only on
+the 68030: Kickstart 3.1 leaves its data cache off (CACR flags 0x2001) and
+SetPatch turns it on (0x2111), which takes the 68030's total from 10.9 to
+7.9 minutes. The 68020 has only the instruction cache, which Kickstart
+already enables:
 
 | Stage | `a1200-4m`, minutes | `a1200-030`, minutes |
 | --- | ---: | ---: |
-| exe (CMOT) | 21.1 | 4.3 |
-| inputs (SHA-256 of the 12 files, 42.7 MB) | 15.7 | 1.7 |
-| art | 14.5 | 2.3 |
-| audio | 9.0 | 1.0 |
-| derived | 6.1 | 1.1 |
-| rooms, code, text, soundtables, masks, data.win | 1.6 | 0.5 |
-| total | 68.0 | 10.9 |
+| exe (CMOT) | 21.1 | 3.3 |
+| inputs (SHA-256 of the 12 files, 42.7 MB) | 15.7 | 1.1 |
+| art | 14.5 | 1.6 |
+| audio | 9.0 | 0.8 |
+| derived | 6.1 | 0.8 |
+| rooms, code, text, soundtables, masks, data.win | 1.6 | 0.3 |
+| total | 68.0 | 7.9 |
 
 `a1200-060` is not cycle-exact; its 22.9 emulated minutes are not a
 measurement of a real 68060.

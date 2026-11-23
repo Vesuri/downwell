@@ -32,6 +32,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('setup', nargs='?', default='a1200-4m')
     parser.add_argument('--probe', nargs='?', const=str(BUILD / 'cmot-probe'), type=str)
+    # A Workbench boot runs SetPatch, which turns on the 68030's data cache
+    # (Kickstart 3.1 leaves it off; 0x2001 against 0x2111). The 68020 has none.
+    parser.add_argument('--no-setpatch', dest='setpatch', action='store_false',
+                        help='skip $SETPATCH QUIET before the converter')
     parser.add_argument('--multiply-test', nargs='?', const=str(BUILD / 'multiply-test'), type=str)
     options = parser.parse_args()
     setup = options.setup
@@ -48,7 +52,12 @@ def main():
         for d in ('state', 'home'):
             (base / d).mkdir()
         shutil.copyfile(built / 'DownwellInstallData.exe', boot / 'DownwellInstallData')
-        (boot / 's/startup-sequence').write_text('Stack 16384\nDownwellInstallData DH1: DH2:\n')
+        first = ''
+        if options.setpatch:
+            (boot / 'c').mkdir()
+            shutil.copyfile(os.environ['SETPATCH'], boot / 'c/SetPatch')
+            first = 'DH0:c/SetPatch QUIET\n'
+        (boot / 's/startup-sequence').write_text(first + 'Stack 16384\nDownwellInstallData DH1: DH2:\n')
         s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close()
         if options.multiply_test:
             (base / 'timing.gdb').write_text('\n'.join([
@@ -63,7 +72,8 @@ def main():
         lines = ['set pagination off', 'set confirm off', 'set remotetimeout 120',
                  f'target remote 127.0.0.1:{port}', 'break installer_test_done', 'continue',
                  'printf "TIMING result=%d peak=%lu stack=%lu unused=%lu\\n", installer_result, install_peak, '
-                 'installer_stack_size, installer_stack_unused']
+                 'installer_stack_size, installer_stack_unused',
+                 'printf "TIMING cache=%lu\\n", install_cache_bits']
         lines += [f'printf "TIMING tick{i}=%ld\\n", install_ticks[{i}]' for i in range(len(STAGES) + 1)]
         lines += ['detach', 'quit']
         if not options.multiply_test:
@@ -106,6 +116,10 @@ def main():
                 ticks = [values[f'tick{i}'] for i in range(len(STAGES) + 1)]
                 print(f'result {values["result"]}, peak allocation {values["peak"]:,} bytes, '
                       f'stack used {values["stack"] - values["unused"]:,} of {values["stack"]:,}; wall {time.time() - started:.0f} s')
+                cache = values.get('cache', 0)
+                names = [n for bit, n in ((1, 'instruction'), (0x100, 'data'), (0x2000, 'write-allocate'),
+                                          (0x80000000, 'copyback')) if cache & bit]
+                print(f'caches: {", ".join(names) or "none"} (CacheControl {cache:#x})')
                 for i, name in enumerate(STAGES):
                     print(f'  {name:12s} {(ticks[i + 1] - ticks[i]) / 50:8.1f} s')
                 print(f'  {"total":12s} {(ticks[-1] - ticks[0]) / 50:8.1f} s')
