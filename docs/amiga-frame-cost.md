@@ -3375,7 +3375,7 @@ audit was an incorrect coverage label. Mixed-effect performance remains unproven
 ## Frame cost by scene
 
 Totals include publication waiting, which can move between frames as computation
-changes. One PAL field is 20 ms (142,102 cycles). Attribute redistributed waiting
+changes. One PAL field is 20 ms (142,102 cycles of the A500's 68000). Attribute redistributed waiting
 separately; judge scene handoffs by combined latency and visible stalls.
 
 | Tape frames | Scene | Mean ms | Median | Worst | Over 20 ms | Baseline mean |

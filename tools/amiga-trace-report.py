@@ -16,8 +16,10 @@ inlined by LTO appear as their own logical frames.
 Game frames are split at entries to downwellTraceFrameMark (TRACE_FRAMES
 builds), using the marker's recorded argument, not a count of marker entries.
 Recording may include the requested marker or begin after it. Conservatively,
-both the requested first and final frames are excluded. Cycles are 68000 clocks; a
-PAL field is 142,102 of them.
+both the requested first and final frames are excluded. Cycles are CPU clocks of
+the captured machine; a PAL field is 142,102 of them on the 7.09 MHz 68000 and
+284,204 on the A1200's 14.19 MHz 68EC020. Each capture's field length is read
+from its header, and all captures of one report must agree.
 
   python3 tools/amiga-trace-report.py tmp/trace/run [--frames=N|N-M]
       [--min-fields=F] [--top=60] [--tree-min=0.5] [--focus=name]
@@ -35,7 +37,7 @@ import struct
 import subprocess
 import sys
 
-FIELD_CYCLES = 142102
+FIELD_CYCLES = 142102  # until main() reads the captures' clock
 IRQ_PC = 0x7fffffff
 # AmigaXDev's shared package resolves the installed toolchain under any python3.
 sys.path.insert(0, os.environ.get('AMIGA_PYLIB') or os.path.expanduser('~/.local/share/amiga/pylib'))
@@ -160,6 +162,28 @@ def field_cycle_carry(accounted, elapsed, first_cost, pending=0):
     raise ValueError('unexplained field cycle mismatch')
 
 
+def capture_field_cycles(path):
+    """CPU cycles in one PAL field, from the capture's cycle unit.
+
+    FS-UAE counts CYCLE_UNIT (512) per Chip clock, and a PAL field is 71,051
+    Chip clocks (313 lines of 227); the CPU's cycle unit says how many units
+    one CPU clock takes (256 on the 68000, 128 on the stock 68EC020)."""
+    with open(path, 'rb') as source:
+        def word():
+            return struct.unpack('<I', source.read(4))[0]
+
+        word()  # fields
+        sections = word()
+        source.seek(4 * sections + 16, os.SEEK_CUR)  # bases, stack bounds
+        for _ in range(3):  # ROM, Chip RAM, slow RAM snapshots
+            source.seek(word(), os.SEEK_CUR)
+        word()  # base clock
+        unit = word()
+    if not unit or (71051 * 512) % unit:
+        raise ValueError(f'{path}: unsupported CPU cycle unit {unit}')
+    return 71051 * 512 // unit
+
+
 def records(path, include_registers=False):
     """Yield (field, pc|None, cycles, sp, sr) for every traced instruction."""
     with open(path, 'rb') as source:
@@ -184,7 +208,8 @@ def records(path, include_registers=False):
     for _ in range(3):  # ROM, Chip RAM, slow RAM snapshots
         size = word()
         offset += size
-    word(), word()  # base clock, cycle unit
+    word()  # base clock
+    field_cycles = 71051 * 512 // word()  # cycle unit; see capture_field_cycles
     unpack_regs = struct.Struct('<17I').unpack_from
     pending_cycles = 0
     for field in range(fields):
@@ -200,6 +225,8 @@ def records(path, include_registers=False):
             size, count = word(), word()
             offset += size * count
         cycles, _idle, count = word(), word(), word()
+        if cycles != field_cycles:
+            raise ValueError(f'field {field}: {cycles} cycles elapsed, not a {field_cycles}-cycle PAL field')
         end = offset + 4 * count
         accounted = 0
         first_cost = None
@@ -614,6 +641,14 @@ def main():
                     for m in [re.fullmatch(r'trace-(\d+)\.bin', name)] if m)
     if not traces:
         sys.exit('no trace-<frame>.bin captures in ' + directory)
+    global FIELD_CYCLES
+    try:
+        clocks = {capture_field_cycles(path) for _, path in traces}
+    except ValueError as error:
+        sys.exit(str(error))
+    if len(clocks) != 1:
+        sys.exit(f'captures from different CPU clocks: {sorted(clocks)} cycles per field')
+    FIELD_CYCLES = clocks.pop()
     symbols, calls, text = load_code(elf)
     by_name = {v: k for k, v in symbols.items()}
     mark = by_name.get('downwellTraceFrameMark')
@@ -718,7 +753,7 @@ def main():
           f'{len(complete)} complete game frames; selected {len(chosen)} '
           f'{unit}(s), {selected:,} cycles = {ms(selected) / max(1, len(chosen)):.1f} ms/{unit}\n')
     print('## Captured partial frame slice' if args.partial_frame is not None else
-          '## Game frames (frame mark to next mark; ms = cycles / 142102 x 20)')
+          f'## Game frames (frame mark to next mark; ms = cycles / {FIELD_CYCLES} x 20)')
     print('| frame | ms | fields | largest parts below runDownwell (ms) |')
     print('| ---: | ---: | ---: | --- |')
     for f in sorted(chosen):

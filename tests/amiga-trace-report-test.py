@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 from collections import Counter
 import json
+import struct
 import tempfile
 
 spec = importlib.util.spec_from_file_location(
@@ -61,9 +62,15 @@ class MatchedWindows(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'partial'):
                 comparison.load_summary(path)
 
+    @staticmethod
+    def frames(clock, cycles):
+        result = comparison.Frames(cycles)
+        result.clock = clock
+        return result
+
     def test_faster_capture_extra_frames_do_not_change_comparison(self):
-        before = {11: 142102, 12: 284204}
-        after = {11: 71051, 12: 142102, 13: 1, 14: 1}
+        before = self.frames(142102, {11: 142102, 12: 284204})
+        after = self.frames(142102, {11: 71051, 12: 142102, 13: 1, 14: 1})
         rows = comparison.compare(before, after, comparison.windows('11-12'))
         self.assertEqual(rows, [(11, 12, 30, 15, 40, 20, -10)])
         with self.assertRaisesRegex(ValueError, 'missing complete frames'):
@@ -71,6 +78,28 @@ class MatchedWindows(unittest.TestCase):
         for invalid in ('', '0', '12-11', '1-', '1,,2', '1.5'):
             with self.assertRaises(ValueError):
                 comparison.windows(invalid)
+
+    def test_target_clock_scales_and_machines_do_not_mix(self):
+        before = self.frames(284204, {11: 284204})
+        after = self.frames(284204, {11: 142102})
+        self.assertEqual(comparison.compare(before, after, comparison.windows('11')),
+                         [(11, 11, 20, 10, 20, 10, -10)])
+        with self.assertRaisesRegex(ValueError, 'different CPU clocks'):
+            comparison.compare(self.frames(142102, {11: 1}), after, comparison.windows('11'))
+
+    def test_capture_clock_comes_from_its_cycle_unit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'trace-1.bin'
+            for unit, cycles in ((256, 142102), (128, 284204)):
+                # fields, one section and its base, stack bounds, three empty
+                # memory snapshots, then base clock and CPU cycle unit.
+                path.write_bytes(struct.pack('<3I', 0, 1, 0) + bytes(16) +
+                                 struct.pack('<5I', 0, 0, 0, 28375160, unit))
+                self.assertEqual(report.capture_field_cycles(path), cycles)
+            path.write_bytes(struct.pack('<3I', 0, 1, 0) + bytes(16) +
+                             struct.pack('<5I', 0, 0, 0, 28375160, 36))
+            with self.assertRaisesRegex(ValueError, 'cycle unit'):
+                report.capture_field_cycles(path)
 
     def test_duplicate_capture_is_not_double_duration(self):
         cycles, partial, complete = Counter(), set(), set()

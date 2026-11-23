@@ -22,12 +22,11 @@ def witness(fields=208):
 class Witness(unittest.TestCase):
     def test_shipping_profile_ceiling_preserves_accepted_improvement(self):
         script = (Path(__file__).resolve().parents[1] / 'amiga/profile.sh').read_text()
-        ceilings = re.findall(r'verify-quiet-fall\.py[^\n]*--max-fields (\d+)', script)
-        self.assertEqual(ceilings, ['197'])
+        ceilings = re.findall(r'quiet_target_ceiling=(\d+)', script)
+        self.assertEqual(ceilings, ['164'])
         ceiling = int(ceilings[0])
-        for fields in (181, 191, 197):
-            self.assertEqual(quiet.verify(witness(fields), ceiling), fields)
-        for fields in (198, 200, 206):
+        self.assertEqual(quiet.verify(witness(164), ceiling), 164)
+        for fields in (165, 181, 197):
             with self.assertRaisesRegex(ValueError, 'cadence regression'):
                 quiet.verify(witness(fields), ceiling)
 

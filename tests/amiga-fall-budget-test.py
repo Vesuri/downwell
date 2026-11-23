@@ -29,6 +29,18 @@ class ExactWork(unittest.TestCase):
         self.assertLess(result[1], 20)
         self.assertAlmostEqual(result[1], 142000 * 20 / 142102)
 
+    def test_target_clock_and_mixed_machines(self):
+        data = self.data()
+        data['pal_field_cycles'] = 284204
+        self.assertAlmostEqual(self.parse(data)[139][1], 142000 * 20 / 284204)
+        with tempfile.TemporaryDirectory() as directory:
+            paths = [Path(directory) / 'a500.json', Path(directory) / 'a1200.txt']
+            paths[0].write_text(json.dumps(self.data()))
+            paths[1].write_text('## Game frames (frame mark to next mark; ms = cycles / 284204 x 20)\n'
+                                '| 140 | 12.0 | 0.60 | work 12.0 |\n')
+            with self.assertRaisesRegex(ValueError, 'different CPU clocks'):
+                budget.parse(paths)
+
     def test_invalid_accounting_rejected(self):
         for field, value in [('wait_cycles', 150001), ('wait_cycles', -1),
                              ('cycles', 150001), ('frame', 0)]:

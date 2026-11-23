@@ -19,7 +19,8 @@ case "$mode" in
     export DETERMINISTIC=1
     export STRIP=1 PROFILE_IDLE=1 PROFILE_FRAMES=600 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
     export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
-    export VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-1024}"
+    # Every mode runs on MACHINE (default a1200-4m, the target); MACHINE=a500
+    # remains for relative comparisons with the A500 evidence.
     export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-90}"
     if [[ $mode == quiet-state ]]; then
       # Stops at every update: state equivalence only, never timing evidence.
@@ -282,7 +283,13 @@ if [[ $mode == trace || $mode == quiet-window ]]; then
       --frame-summary="$trace_out/frames.json" --causes > "$trace_out/quiet.txt"
     python3 ../tools/amiga-trace-report.py "$trace_out" --frames=122 --require-complete \
       --causes > "$trace_out/generation-122.txt"
-    python3 ../tools/verify-quiet-window.py "$trace_out/frames.json" "$trace_out/Downwell.elf"
+    # The frozen baseline is an A500 capture; a guard compares one machine only.
+    if python3 -c 'import json, sys; sys.exit(json.load(open(sys.argv[1]))["pal_field_cycles"] != json.load(open(sys.argv[2]))["pal_field_cycles"])' \
+        "$trace_out/frames.json" ../docs/amiga-quiet-frame-baseline.json; then
+      python3 ../tools/verify-quiet-window.py "$trace_out/frames.json" "$trace_out/Downwell.elf"
+    else
+      echo "Quiet-window guard not judged: its baseline is from another CPU clock"
+    fi
     echo "Quiet updates 57–121: $trace_out/quiet.txt"
     echo "First generation burst 122: $trace_out/generation-122.txt"
     echo "Exact complete-frame cycles and build hash: $trace_out/frames.json"
@@ -298,9 +305,19 @@ elif [[ $mode == quiet-state ]]; then
     echo "Expected all 165 initial-fall state samples" >&2; exit 1;
   }
 elif [[ $mode == quiet-fall ]]; then
-  # edaaa369 repeats at 191 fields. Allow 3% (rounded up) for timing noise;
-  # this is a regression guard, NOT the historical 181-field restoration target.
-  python3 ../tools/verify-quiet-fall.py ".run/profile-${mode}.log" --max-fields 197
+  # The landing witness is always checked. On the target every update of the
+  # fall presents in one field (164 fields), so any missed field fails. The
+  # A500's old 197 no longer holds (W2.6 measured 210), so other machines are
+  # judged only with an explicit QUIET_MAX_FIELDS.
+  . ./machine.sh
+  quiet_target_ceiling=164
+  quiet_ceiling=
+  if [[ -z ${VERIFY_CHIP_KB:-} && ${MACHINE:-${VERIFY_MACHINE:-$DOWNWELL_DEFAULT_MACHINE}} == a1200-4m ]]; then
+    quiet_ceiling=$quiet_target_ceiling
+  fi
+  quiet_ceiling="${QUIET_MAX_FIELDS:-$quiet_ceiling}"
+  python3 ../tools/verify-quiet-fall.py ".run/profile-${mode}.log" \
+    ${quiet_ceiling:+--max-fields "$quiet_ceiling"}
   grep '^QUIET_' ".run/profile-${mode}.log"
 elif [[ $mode == draw-cache ]]; then
   grep '^DRAW_CACHE' ".run/profile-${mode}.log"

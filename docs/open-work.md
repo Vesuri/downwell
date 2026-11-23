@@ -200,15 +200,11 @@ name. Every change follows their working rules:
 
 **Baseline on the target**
 
-2. **W3.2 Profile on the target.** `amiga/profile.sh` sets
-   `VERIFY_CHIP_KB=1024` (the A500) for its quiet-fall modes. Make
-   `a1200-4m` the default for every mode, and keep `MACHINE=a500` only for
-   relative comparisons. Check that `tools/amiga-fall-budget.py`,
-   `tools/amiga-trace-report.py` and the frame marks convert at the
-   68EC020's clock, and that the instruction profile records on the 020
-   core. A profiled field runs slightly differently from an unprofiled one
-   on that core, so compare only captures that profiled the same fields
-   (the shared measurement method).
+On the target the quiet fall already presents every update in one field
+(164 updates, 164 fields; `profile.sh quiet-fall` now fails on any more), so
+its field count cannot show a smaller regression: judge the quiet fall on
+the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
+
 3. **W3.3 Recover W2.3's quiet-fall regression.** On the A500, W2.3's
    gameplay change took the quiet fall from 197 to 205 fields with an
    unchanged landing witness, about 0.4–0.7 ms per update:
@@ -220,11 +216,10 @@ name. Every change follows their working rules:
    W2.6's requests then measured 210 (the frog-against-frog bump and the
    shop walls); builds that differ only in layout vary by about ±3 fields.
    Move the player's rare-state bookkeeping behind a single test, and A/B
-   the quiet fall on the target.
+   the quiet fall's work cycles on the target (updates 57–122).
 4. **W3.4 Target references.** Record on `a1200-4m`:
-   - the quiet-fall field count and landing witness
-     (`tools/verify-quiet-fall.py`; tick 164, y 262,144, health 4, ammo 8,
-     3 enemies, 1,371 RNG draws), and set the cadence ceiling from it;
+   - a target `quiet-window` baseline beside the A500 one, so its guard
+     runs on `a1200-4m`;
    - all 165 native state samples;
    - the full-fall window table (section 0's three-capture method,
      `tools/amiga-fall-budget.py`).

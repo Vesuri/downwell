@@ -15,19 +15,26 @@ def load_summary(path):
         value = json.load(source)
     if value.get('schema') != 'downwell-frame-cycles/v1':
         raise ValueError(f'{path}: unsupported frame summary')
-    if value.get('pal_field_cycles') != 142102:
-        raise ValueError(f'{path}: incompatible PAL clock')
+    clock = value.get('pal_field_cycles')
+    if type(clock) is not int or clock <= 0:
+        raise ValueError(f'{path}: missing PAL field clock')
     if not re.fullmatch(r'[0-9a-f]{64}', value.get('elf_sha256', '')):
         raise ValueError(f'{path}: missing ELF identity')
     partial = set(value.get('partial_frames', []))
-    frames = {}
+    frames = Frames()
     for row in value['frames']:
         frame, cycles = row['frame'], row['cycles']
         if (type(frame) is not int or frame <= 0 or frame in frames or frame in partial or
                 type(cycles) is not int or cycles <= 0):
             raise ValueError(f'{path}: invalid, duplicate or partial frame {frame}')
         frames[frame] = cycles
+    frames.clock = clock
     return value['elf_sha256'], frames
+
+
+class Frames(dict):
+    """Complete-frame cycles with the capture's PAL field length."""
+    clock = None
 
 
 def windows(spec):
@@ -45,6 +52,9 @@ def windows(spec):
 
 
 def compare(before, after, ranges):
+    if before.clock != after.clock:
+        raise ValueError(f'summaries from different CPU clocks: {before.clock} and {after.clock} '
+                         'cycles per field; compare captures of the same machine')
     result = []
     for first, last in ranges:
         keys = range(first, last + 1)
@@ -52,7 +62,7 @@ def compare(before, after, ranges):
             missing = [f for f in keys if f not in frames]
             if missing:
                 raise ValueError(f'{label}: missing complete frames {missing}; capture a longer window')
-        scale = 20 / 142102
+        scale = 20 / before.clock
         a, b = [before[f] for f in keys], [after[f] for f in keys]
         result.append((first, last, sum(a) / len(a) * scale, sum(b) / len(b) * scale,
                        max(a) * scale, max(b) * scale,

@@ -28,11 +28,12 @@ have not changed the replay. Presentation time includes display synchronization.
 
 ### Amiga checks
 
-The target is an A500 with 1 MiB Chip (ECS 8372A Agnus) and the startup,
-replay, profile and run launchers default to 1 MiB Chip and 8 MiB Fast RAM,
-passing `--uae_chipset=ecs_agnus`. `VERIFY_CHIP_KB=512` selects the OCS
-512 KiB machine for comparisons with older measurements. The launcher prints
-the selected memory configuration.
+The target is the A1200 with 4 MB Fast RAM (68EC020 at 14.19 MHz, AGA,
+2 MB Chip), and the startup, replay, profile and run launchers default to it
+(`MACHINE=a1200-4m`, `amiga/machine.sh`). `MACHINE=a500` (1 MiB Chip, ECS
+8372A Agnus, 8 MiB Fast) and `MACHINE=a500-512k` remain for relative
+comparisons with the older A500 evidence; `VERIFY_CHIP_KB=1024` and `512` are
+their older spellings. The launcher prints the selected machine.
 
 Every measured optimization is part of the normal build. The Amiga Makefile
 options that select an older path (for example `TABLE_CONTACT_ATAN=0`,
@@ -41,14 +42,17 @@ references for paired measurements and pixel/replay oracles; never ship one.
 
 For the deterministic no-input fall, use `bash amiga/profile.sh quiet-fall`
 for the complete 164-update landing/cadence witness, and
-`bash amiga/profile.sh quiet-window` for instruction-level costs. Both default
-to 1 MiB Chip, cap the emulator run at 90 seconds and restore the normal
-binary. The latter captures 75 PAL fields from mark 56, without debugger stops
+`bash amiga/profile.sh quiet-window` for instruction-level costs. Both run on
+`MACHINE` like every other mode, cap the emulator run at 90 seconds and
+restore the normal binary. On `a1200-4m` the fall must present every update
+in one field (164 fields); other machines are judged only with an explicit
+`QUIET_MAX_FIELDS`, otherwise only the landing witness is checked. The latter captures 75 PAL fields from mark 56, without debugger stops
 inside the window, in a fresh `tmp/trace/quiet-window.*` directory. It writes
 `quiet.txt` for complete updates 57–121, `generation-122.txt` for the first
 generation burst, and `frames.json` containing exact cycles and the ELF hash.
 `verify-quiet-window.py` checks that hash against the frozen ELF and compares
-against `docs/amiga-quiet-frame-baseline.json`: quiet mean may rise by at most
+against `docs/amiga-quiet-frame-baseline.json`, an A500 capture, so it runs
+only on a machine with the same CPU clock: quiet mean may rise by at most
 0.5 ms, quiet worst and update 122 by at most 1 ms. These are regression
 tolerances around the recovered build, not the historical restoration target
 or a 20 ms requirement. The guard judges whole windows, not which update owns
@@ -252,8 +256,17 @@ operands, other memory operands, helpers and the wait loop. `--causes`
 charges each stack to a cost owner, such as runner bookkeeping, R-tree upkeep
 or a rendering subsystem. The owner patterns are listed in the tool. `--frames`,
 `--min-fields`, `--focus`, `--lines` and `--collapsed` (folded stacks for
-flame graphs) narrow the view. Cycles are 68000 clocks (142,102 per PAL
-field) in the emulated configuration, not wall-clock time. Gameplay must
+flame graphs) narrow the view. Cycles are CPU clocks of the emulated machine,
+not wall-clock time: a PAL field is 142,102 on the A500's 68000 and 284,204
+on the A1200's 68EC020. The report reads each capture's cycle unit from its
+header, requires every field to be that long, refuses captures of different
+clocks, and records the field length in its summaries; `amiga-fall-budget.py`
+and `amiga-frame-compare.py` scale by it and refuse to mix machines. The
+publication wait is the `runDownwell()` lambda that calls
+`AmigaPlatform::waitPublished` (`{lambda#10}` today); its number moves with the
+code, so check it in the tree before passing `--work-wait` or `--wait`. On the
+020 core a profiled field runs slightly differently from an unprofiled one, so
+compare only captures that profiled the same fields. Gameplay must
 still be checked against deterministic replays. The trace describes one run
 of one tape.
 

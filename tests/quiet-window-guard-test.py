@@ -87,7 +87,7 @@ class Guard(unittest.TestCase):
 
     def test_wrong_clock(self):
         self.current['pal_field_cycles'] = 100000
-        with self.assertRaisesRegex(ValueError, 'PAL clock'):
+        with self.assertRaisesRegex(ValueError, 'different CPU clocks'):
             self.verify()
 
     def test_wrong_executable(self):
