@@ -198,30 +198,6 @@ name. Every change follows their working rules:
 - no tuning of code under the work threshold;
 - delete traces once their numbers are in a commit.
 
-**Gates**
-
-1. **W3.1 Repair the broken regression gates.** W3.8–W3.13 rely on the
-   cross replay and the gameplay cache gate.
-   - `make verify-amiga-gameplay-cache` (now on `a1200-fast`) fails with
-     `raster=64 checks=156`. First mismatch: viewX=160 worldY=1074
-     height=284 row=134 plane=0 word=4, cached `f9ef` against fresh `f800`
-     (the cache holds pixels fresh composition does not paint). Seen
-     2026-11-21, also before the terrain raster ring.
-   - `make test` stops in `game-render-test`: the natural death tape no
-     longer clears a level before dying (it dies on level 1 near y 3600).
-     ba5f503b's sound draws changed its level; at ba5f503b^ it cleared
-     level 1 (210 level-clear updates). Find a tape that clears a level and
-     then dies naturally; do not inject damage.
-   - After it, in the same recipe and already failing at 88925c27:
-     `amiga-player-test` ("ground movement selects and resets the recovered
-     run cycle") and `amiga-port-runtime-test` (segmentation fault).
-     Bisect each with a clean build (compile without `cxx-objects.py`) and
-     the commit's own packs.
-   - `make verify-contact-profile` stops at gameplay frame 13: camera Y 68
-     against the reference's 69 (player 194 against 194.199). The tape
-     fires, so it waits for the reference's W1.4 shot (section 3), as the
-     decoded scene parity does.
-
 **Baseline on the target**
 
 2. **W3.2 Profile on the target.** `amiga/profile.sh` sets
@@ -1098,6 +1074,9 @@ Reference: [area-two recovery](area-two-recovery.md).
   decoded-scene parity at the first landing and its shop parity after the
   exit latch's grants because of these; extend both once the reference
   matches (they ran through the shots, results and later rooms before).
+  `make verify-contact-profile` stops at gameplay frame 13 for the same
+  reason (the tape fires): camera Y 68 against the reference's 69, player
+  194 against 194.199.
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.
