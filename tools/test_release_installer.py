@@ -31,11 +31,11 @@ no copy, rename, delete or converter run is mocked. The converted data must
 equal what the host build of the same converter writes from data/. Saves
 must survive every mode, and unrelated files in the parent drawer too.
 
-Until DownwellInstallData builds every installed file (tools/install-data,
-WI.4), the checks that need the complete set are reported as PENDING instead
-of failing: the installed data's completeness, and the start checks, which
-then supplement the missing files from the development build (amiga/out).
-They run in full by themselves once the converter is complete.
+DownwellInstallData builds every installed file. Should one ever be missing,
+the checks that need the complete set report PENDING instead of failing (the
+installed data's completeness, and the start checks, which then supplement
+the missing files from the development build, amiga/out), so a full pass
+prints no PENDING line. The emulator window stays visible.
 """
 import argparse
 import os
@@ -163,7 +163,7 @@ cd "$1"
 FSUAE_RUN=.
 . "$FSUAE_COMMON"
 trap 'fsuae_stop' EXIT
-AMIGA_SETUP=a1200-4m DEBUG=0 SOUND=0 WINDOW="${INSTALLER_WINDOW:-none}" WARP=1 NTSC=0
+AMIGA_SETUP=a1200-4m DEBUG=0 SOUND=0 WARP=1 NTSC=0
 EXTRA_ARGS='--uae_cpu_speed=max --uae_cpu_cycle_exact=false --uae_cpu_memory_cycle_exact=false'
 fsuae_options
 fsuae_launch --hard_drive_0="$PWD/boot" --hard_drive_0_priority=10 --hard_drive_1="$3" \\
@@ -173,15 +173,14 @@ wait "$FSUAE_PID"
 '''
 
 
-def emulate(base, steam, seconds, window):
+def emulate(base, steam, seconds):
     launch = base / 'launch.sh'
     launch.write_text(LAUNCH)
-    env = dict(os.environ, INSTALLER_WINDOW='front' if window else 'none')
     started = time.monotonic()
     try:
         with (base / 'emulator.log').open('w') as log:
             emu = subprocess.Popen(['/bin/bash', str(launch), str(base), str(ROOT), str(steam)],
-                                   stdout=log, stderr=log, env=env)
+                                   stdout=log, stderr=log)
             deadline = started + seconds
             while time.monotonic() < deadline and not (base / 'finished').exists():
                 if emu.poll() is not None:
@@ -279,7 +278,6 @@ def main():
     p.add_argument('--archive', type=Path)
     p.add_argument('--keep', type=Path, help='copy the last installed drawer to this directory')
     p.add_argument('--seconds', type=int, default=3600, help='wall-clock limit for one Installer run')
-    p.add_argument('--window', action='store_true', help='show the emulator (answers stay scripted)')
     args = p.parse_args()
     assert set(args.modes) <= set(MODES), args.modes
     for name in ('INSTALLER43', 'SETPATCH', 'WORKBENCH_ADF'):
@@ -312,7 +310,7 @@ def main():
         print(base, flush=True)
         steam = fixture(mode, base)
         before = tree(base / 'out/Downwell') if mode in EXISTING else {}
-        seconds = emulate(base, steam, args.seconds, args.window)
+        seconds = emulate(base, steam, args.seconds)
         check(mode, base, before)
         print(f'PASS: Installer {mode} ({seconds:.0f} s)', flush=True)
         if mode == 'fresh':

@@ -59,8 +59,9 @@
  Run the Install icon and choose a parent drawer: a Downwell drawer is
  created in it. Then select your Steam Downwell drawer. The installer
  converts the game's graphics, rooms and sounds from your files into
- Downwell's own data files in Downwell/data. This takes several minutes. If
- the conversion fails, the installer shows why and changes nothing.
+ Downwell's own data files in Downwell/data. This takes about an hour on
+ an A1200's 14 MHz 68020 and about ten minutes on a 50 MHz 68030. If the
+ conversion fails, the installer shows why and changes nothing.
 
  To update, select the same parent drawer and choose Keep. Use existing (the
  default) keeps the converted data; Replace converts your Steam files again.
