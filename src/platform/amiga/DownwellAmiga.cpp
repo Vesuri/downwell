@@ -2154,7 +2154,11 @@ __attribute__((noinline)) static int runDownwell(void) {
     ULONG gamePackBytes = 0; // No gameplay lease has been admitted yet.
     gDownwellGamePlaneExpectedBytes=gamePackBytes;
     const ULONG effectStampBytes=effectStampTable.bytes;
-    const ULONG sceneBankOffset=(AmigaEffectSurface::bytes+3)&~3UL;
+    // The enemy shade's alpha plane (sprite 117, 96x96) follows the effect
+    // surface in Chip: its subtraction is a blit only from Chip.
+    constexpr unsigned shadeChipCapacity=12*96;
+    const ULONG shadeChipOffset=(AmigaEffectSurface::bytes+3)&~3UL;
+    const ULONG sceneBankOffset=shadeChipOffset+shadeChipCapacity;
     // The retired selection cache holds two game rings followed by DMA-only
     // effect words. Other scenes may overwrite them; reload on gameplay entry.
     constexpr unsigned effectStampCacheOffset=2*downwellGameRingBytes;
@@ -2190,6 +2194,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     sceneBank = memory.assets() + sceneBankOffset;
     UBYTE* effectStamps=memory.sceneCache()+effectStampCacheOffset;
     memcpy(effectStamps,effectStampTable.data+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
+    UBYTE* const shadeChip=memory.assets()+shadeChipOffset;
     downwell::BuilderPatternPack builders(nullptr,0);
     static_assert(DOWNWELL_PATTERNS_BANK_BYTES<=DOWNWELL_PATTERNS_BANK_BUDGET,
         "Builder pattern residency budget");
@@ -2402,6 +2407,15 @@ __attribute__((noinline)) static int runDownwell(void) {
     static AmigaActorFrames actorFrames;
 #endif
     static downwell::EffectMaskAssets effectAssets;
+    // The shade's Chip alpha plane, copied from the catalogue when gameplay
+    // art binds and again on each gameplay entry, with the stamp payload.
+    const auto copyShade=[&]()->bool{
+        const auto* shade=effectAssets.shade();
+        if(!shade)return false;
+        const unsigned bytes=shade->mask.stride*shade->mask.height;
+        if(bytes>shadeChipCapacity||shade->mask.bytes<bytes)return false;
+        memcpy(shadeChip,shade->mask.data,bytes);return true;
+    };
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
 #if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
@@ -2545,8 +2559,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_TERRAIN_BATCH
         good=good&&AmigaTerrainPainter::bindBatch(activeGamePack,activeGamePackEnd,sceneBank,sceneBankBytes);
 #endif
-        good=good&&AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
-            effectStampTable.data,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)&&
+        good=good&&copyShade()&&AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
+            effectStampTable.data,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets,shadeChip)&&
             AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)&&
             memory.acquireGameAssets(gamePackBytes)&&
             platform.loadData(planePath,memory.gameAssets(),gamePackBytes)==LONG(gamePackBytes)&&
@@ -3282,6 +3296,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     DW_PROFILE_PHASE(profileEntryAssets);
                     AmigaHardware::blitterDrain();
                     memcpy(effectStamps,effectStampTable.data+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
+                    if(effectAssets.shade())copyShade();
                     const unsigned hudBytes = DOWNWELL_HUD_BANK_BYTES;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,

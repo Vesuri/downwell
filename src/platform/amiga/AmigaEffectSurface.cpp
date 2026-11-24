@@ -12,6 +12,9 @@ using Surface=downwell::PaletteEffectSurface<>;
 const Surface* boundSurface=nullptr;
 UBYTE* boundStorage=nullptr;
 AmigaEffectStampBank stampBank;
+// The enemy shade (sprite 117) mask in the catalogue and its Chip copy.
+const std::uint8_t* shadeSource=nullptr;
+const std::uint8_t* shadeCopy=nullptr;
 #ifdef DOWNWELL_BOB_VERIFY
 alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
 Surface* reference=nullptr;
@@ -42,7 +45,8 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     // and Fast-RAM masks retain the scalar path, after draining queued DMA.
     if((m.stride&1)||m.stride>=8192)return false;
     const auto* combined=AmigaEffectSurface::interleaved&&low?stampBank.find(m,low,high):nullptr;
-    if(!combined&&((reinterpret_cast<ULONG>(m.data)&1)||reinterpret_cast<ULONG>(m.data)>=0x200000UL||
+    const std::uint8_t* maskData=!low&&m.data==shadeSource&&shadeCopy?shadeCopy:m.data;
+    if(!combined&&((reinterpret_cast<ULONG>(maskData)&1)||reinterpret_cast<ULONG>(maskData)>=0x200000UL||
         (low&&((reinterpret_cast<ULONG>(low)|reinterpret_cast<ULONG>(high))&1))||
         (low&&(reinterpret_cast<ULONG>(low)>=0x200000UL||reinterpret_cast<ULONG>(high)>=0x200000UL))))return false;
     unsigned sx=0,sy=0,width=m.width,height=m.height;
@@ -85,7 +89,7 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
         target=ULONG(UWORD(targetY+blitHeight-1))*UWORD(destinationStride)+destLast*2;
         first=edge;last=lead;
     }
-    auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(combined?combined->mask:m.data)+source);
+    auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(combined?combined->mask:maskData)+source);
     if(combined){
         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<unsigned char*>(combined->pixels)+source),
             reinterpret_cast<uint16_t*>(data+target),mask,words,blitHeight,
@@ -110,12 +114,15 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
 }
 bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
     const unsigned char* stamps,unsigned stampBytes,const unsigned char* chipPayload,unsigned payloadBytes,
-    const downwell::EffectMaskAssets& assets){
+    const downwell::EffectMaskAssets& assets,const unsigned char* shadeChip){
     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
     const ULONG stampAddress=reinterpret_cast<ULONG>(chipPayload);
     if(!chipPayload||(stampAddress&1)||stampAddress>=0x200000UL||payloadBytes>0x200000UL-stampAddress)return false;
     auto* data=static_cast<UBYTE*>(storage);
     if(!stampBank.bindPayload(stamps,stampBytes,chipPayload,payloadBytes,assets))return false;
+    if(!assets.shade()||!shadeChip||(reinterpret_cast<ULONG>(shadeChip)&1)||
+       reinterpret_cast<ULONG>(shadeChip)>=0x200000UL)return false;
+    shadeSource=assets.shade()->mask.data;shadeCopy=shadeChip;
 #ifdef DOWNWELL_BOB_VERIFY
     reference=new(referenceStorage) Surface;
 #endif
