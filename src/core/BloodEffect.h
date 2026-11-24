@@ -1,7 +1,7 @@
 #ifndef DOWNWELL_CORE_BLOOD_EFFECT_H
 #define DOWNWELL_CORE_BLOOD_EFFECT_H
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include "RandomBinary64.h"
 #include "UnitSequenceFrames.h"
 #include "RunnerRealComparison.h"
@@ -17,7 +17,7 @@ struct BloodEffect {
         BloodEffect next;
         if(!next.x.assign(px) || !next.y.assign(py) || !next.imageAngle.assign(angle))return false;
         next.xx=next.x.promoted();next.yy=next.y.promoted();
-        if(!SmokeDirection::vector(MotionBinary64::fromInteger(2),angle,next.xsp,next.ysp,smokeTrig))return false;
+        if(!SmokeDirection::vector(MotionBinary64::fromInteger(2),angle,next.xsp,next.ysp,smokeTrigNarrowed))return false;
         *this=next;return true;
     }
     bool advanceImage(){

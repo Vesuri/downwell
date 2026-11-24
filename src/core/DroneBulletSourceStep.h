@@ -64,7 +64,7 @@ struct DroneBulletSourceStep {
     bool step(Random& random,Ops& ops,bool& good){
         if(!good)return false;
         auto check=[&](bool ok){good=good&&ok;return good;};
-        auto vector=[&](){return SmokeDirection::vector(speed,motion.direction,motion.xsp,motion.ysp,smokeTrig);};
+        auto vector=[&](){return SmokeDirection::vector(speed,motion.direction,motion.xsp,motion.ysp,smokeTrigNarrowed);};
         auto angle=[&](){
             RunnerImageValue next;
             if(!next.assign(motion.direction)||!ops.publishAngle(next))return false;

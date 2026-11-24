@@ -1,4 +1,5 @@
-// Every binary32 radian smokeTrigNarrowCandidate admits, both functions:
+// Every binary32 radian smokeTrigNarrowCandidate admits (magnitude in
+// [2^-10, 16), both signs), both functions:
 // its result must equal the binary32 narrowing of the recovered SSE program
 // (evaluated with host binary64 arithmetic, which the soft path matches; a
 // sample re-checks that through smokeTrigNarrow's own fallback).
@@ -24,14 +25,15 @@ struct Scalar {
 static float bitsFloat(std::uint32_t b){float f;std::memcpy(&f,&b,4);return f;}
 static std::uint32_t floatBits(float f){std::uint32_t b;std::memcpy(&b,&f,4);return b;}
 int main(){
-    constexpr std::uint32_t first=117u<<23,last=130u<<23;
+    constexpr std::uint32_t first=117u<<23,last=131u<<23; // both signs below
     std::atomic<unsigned long> admitted{0},rejected{0},failures{0};
     std::atomic<std::uint64_t> worst{0};
     const unsigned threads=std::max(1u,std::thread::hardware_concurrency());
     std::vector<std::thread> pool;
     for(unsigned t=0;t<threads;++t)pool.emplace_back([&,t]{
         unsigned long localAdmitted=0,localRejected=0,localFailures=0;std::uint64_t localWorst=0;
-        for(std::uint32_t bits=first+t;bits<last;bits+=threads)for(int cosine=0;cosine<2;++cosine){
+        for(std::uint32_t magnitude=first+t;magnitude<last;magnitude+=threads)
+        for(std::uint32_t bits:{magnitude,magnitude|0x80000000u})for(int cosine=0;cosine<2;++cosine){
             Scalar exact;
             if(!downwell::smoke_trig_detail::smokeTrigProgram(Scalar{bitsFloat(bits)},cosine!=0,exact)){
                 ++localFailures;continue;
@@ -73,7 +75,7 @@ int main(){
     for(auto& thread:pool)thread.join();
     // Outside the domain the candidate declines.
     RunnerImageValue unused;
-    for(std::uint32_t bits:{first-1,last,0x80000000u|first,0x3f800000u|0x80000000u,0u})
+    for(std::uint32_t bits:{first-1,last,0x80000000u|(first-1),0x80000000u|last,0u,0x80000000u})
         if(downwell::smokeTrigNarrowCandidate({bits},false,unused))++failures;
     const auto margin=downwell::smoke_trig_narrow_detail::margin;
     std::printf("Smoke trig narrow: %lu admitted, %lu to the program (%.4f%%), worst error %llu of margin %llu Q64 units\n",

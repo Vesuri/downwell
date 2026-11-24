@@ -2,7 +2,7 @@
 #define DOWNWELL_CORE_SMOKE_INSTANCES_H
 #include "SmokeEffect.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include "InstanceLifecycle.h"
 #include "FailureSignal.h"
 #include "AlarmBank.h"
@@ -57,7 +57,7 @@ public:
         } publish{*this,key,*r};
         bool okay=true;
         return r->state.stepPublished(random,[](auto speed,auto direction,auto& x,auto& y){
-            return SmokeDirection::vector(speed,direction,x,y,smokeTrig);
+            return SmokeDirection::vector(speed,direction,x,y,smokeTrigNarrowed);
         },publish,smokeEscapedDistance,okay)||fail();
     }
     bool setDirection(InstanceHandle key,MotionBinary64 value){

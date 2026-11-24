@@ -59,7 +59,7 @@ public:
                 narrowed,{0x3f800000u},0xffffffu))return false;
             record.state.imageAngle=narrowed;
             return SmokeDirection::vector(MotionBinary64::fromInteger(2),angle,
-                record.state.xsp,record.state.ysp,smokeTrig);
+                record.state.xsp,record.state.ysp,smokeTrigNarrowed);
         };
         const bool ok=complete();executing_={};return good_=good_&&ok;
     }

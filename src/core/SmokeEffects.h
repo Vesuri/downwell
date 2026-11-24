@@ -2,7 +2,7 @@
 #define DOWNWELL_CORE_SMOKE_EFFECTS_H
 #include "SmokeEffect.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include "SkeletonEffectBursts.h"
 #include "EnemyContact.h"
 namespace downwell {
@@ -76,7 +76,7 @@ public:
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
             if(!slot.effect.step(random,[](MotionBinary64 speed,MotionBinary64 angle,
                                           MotionBinary64& x,MotionBinary64& y){
-                return SmokeDirection::vector(speed,angle,x,y,smokeTrig);
+                return SmokeDirection::vector(speed,angle,x,y,smokeTrigNarrowed);
             }))return false;
         }
         return true;

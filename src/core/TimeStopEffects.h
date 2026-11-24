@@ -5,7 +5,7 @@
 #include "RunnerPointDirection.h"
 #include "PortableAtan.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include "TimeChangeEffects.h"
 #include "TimeStopAudio.h"
 #include "DivideBinary64.h"
@@ -80,7 +80,7 @@ template<unsigned Capacity> struct TimeStopEffects {
                     return RunnerPointDirection::evaluate(ax,ay,bx,by,angle,portableAtan);
                 },[](auto speed,auto angle,bool vertical,auto& result){
                     MotionBinary64 x,y;
-                    if(!SmokeDirection::vector(speed,angle,x,y,smokeTrig))return false;
+                    if(!SmokeDirection::vector(speed,angle,x,y,smokeTrigNarrowed))return false;
                     result=vertical?y:x;return true;
                 });
         });

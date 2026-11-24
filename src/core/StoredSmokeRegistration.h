@@ -2,7 +2,7 @@
 #define DOWNWELL_CORE_STORED_SMOKE_REGISTRATION_H
 #include "SmokeEffect.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include "SkeletonEffectBursts.h"
 #include "InstanceStore.h"
 #include "InstanceLifecycle.h"
@@ -81,7 +81,7 @@ public:
             }
         } publish{*this,*e};
         return e->state.stepPublished(random,[](auto speed,auto direction,auto& x,auto& y){
-            return SmokeDirection::vector(speed,direction,x,y,smokeTrig);
+            return SmokeDirection::vector(speed,direction,x,y,smokeTrigNarrowed);
         },publish,smokeEscapedDistance,good_);
     }
     bool advanceAnimation(const InstanceRecord& source){

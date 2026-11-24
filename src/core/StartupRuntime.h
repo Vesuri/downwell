@@ -78,7 +78,7 @@
 #include "TimeFieldWind.h"
 #include "PlayerCompanionCreate.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -2138,7 +2138,7 @@ public:
                 return RunnerPointDirection::evaluate(ax,ay,bx,by,angle,portableAtan);
             },[](auto speed,auto angle,bool vertical,auto& result){
                 MotionBinary64 vx,vy;
-                if(!SmokeDirection::vector(speed,angle,vx,vy,smokeTrig))return false;
+                if(!SmokeDirection::vector(speed,angle,vx,vy,smokeTrigNarrowed))return false;
                 result=vertical?vy:vx;return true;
             });
         return run_.effectsSucceeded;

@@ -289,7 +289,7 @@ test: test-white-jelly-step
 .PHONY: test-white-jelly-step
 test-white-jelly-step: build/white-jelly-step-test
 	./build/white-jelly-step-test
-build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/SmokeTrigNarrow.h generated/smoke-trig.inc generated/narrow-trig-q64.inc
+build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/SmokeTrigNarrow.h generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/WhiteJellyStepTest.cpp src/core/GameMakerRandom.cpp
 
@@ -454,7 +454,7 @@ build/currency-free-motion-test: tests/core/CurrencyFreeMotionTest.cpp $(wildcar
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
-build/currency-homing-test: tests/core/CurrencyHomingTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/currency-homing-test: tests/core/CurrencyHomingTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
@@ -823,19 +823,19 @@ build/run-controller-instances-test: tests/core/RunControllerInstancesTest.cpp $
 verify-enemy-death-worlds: build/enemy-death-worlds-test generate-room-pack generate-object-pack generate-sprite-pack generate-precise-masks
 	python3 tools/verify-enemy-death.py
 	./build/enemy-death-worlds-test
-build/enemy-death-worlds-test: tests/core/EnemyDeathWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp src/core/FontPack.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/downwell-area-titles.h generated/downwell-fonts.dwfn
+build/enemy-death-worlds-test: tests/core/EnemyDeathWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp src/core/FontPack.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc generated/downwell-area-titles.h generated/downwell-fonts.dwfn
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $(filter %.cpp,$^)
 verify-damage-number-worlds: build/damage-number-worlds-test generate-room-pack generate-object-pack generate-builder-pattern-pack
 	./build/damage-number-worlds-test
-build/damage-number-worlds-test: tests/core/DamageNumberWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/damage-number-worlds-test: tests/core/DamageNumberWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $(filter %.cpp,$^)
 
 .PHONY: verify-smoke-world
 verify-smoke-world: build/smoke-world-test generate-room-pack generate-object-pack generate-builder-pattern-pack
 	./build/smoke-world-test
-build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -ffp-contract=off -Isrc -o $@ $(filter %.cpp,$^)
 test: verify-effect-placement
@@ -850,11 +850,11 @@ verify-palette-effects: build/palette-effects-test generate-amiga-game
 	./build/palette-effects-test generated/amiga-game.dwap interleaved
 test: verify-palette-effects
 
-build/smoke-composition-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/smoke-composition-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $(filter %.cpp,$^)
 .PHONY: verify-smoke-composition
-build/smoke-composition-probes-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/smoke-composition-probes-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -DDOWNWELL_PROBES -Isrc -o $@ $(filter %.cpp,$^)
 verify-smoke-composition: build/smoke-composition-test build/smoke-composition-probes-test generate-amiga-game
@@ -892,11 +892,11 @@ verify-smoke-owner: build/smoke-owner-test
 verify-effect-birth-sequences: build/effect-birth-sequences-test
 	./build/effect-birth-sequences-test
 test: verify-effect-birth-sequences
-build/effect-birth-sequences-test: tests/core/EffectBirthSequenceTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/effect-birth-sequences-test: tests/core/EffectBirthSequenceTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/EffectBirthSequenceTest.cpp src/core/GameMakerRandom.cpp
 
-build/smoke-owner-test: tests/core/SmokeEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/smoke-owner-test: tests/core/SmokeEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeEffectsTest.cpp src/core/GameMakerRandom.cpp
 
@@ -910,7 +910,7 @@ test: verify-smoke-trig-narrow
 .PHONY: verify-smoke-trig-narrow
 verify-smoke-trig-narrow: build/smoke-trig-narrow-test
 	./build/smoke-trig-narrow-test
-build/smoke-trig-narrow-test: tests/core/SmokeTrigNarrowTest.cpp src/core/SmokeTrigNarrow.h src/core/SmokeTrig.h src/core/RunnerImageValue.h src/core/NarrowArithmetic.h src/core/MultiplyBinary64.h generated/smoke-trig.inc generated/narrow-trig-q64.inc
+build/smoke-trig-narrow-test: tests/core/SmokeTrigNarrowTest.cpp src/core/SmokeTrigNarrow.h src/core/SmokeTrig.h src/core/RunnerImageValue.h src/core/NarrowArithmetic.h src/core/MultiplyBinary64.h generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeTrigNarrowTest.cpp -pthread
 
@@ -932,7 +932,7 @@ build/generate-clear-motion: tools/generate-clear-motion.cpp src/core/LevelClear
 generated/clear-motion.inc: build/generate-clear-motion tools/generate-clear-motion.py data/data.win data/Downwell.exe extracted/utmt-0.9.2.0/manifest.json
 	python3 tools/generate-clear-motion.py
 
-build/generate-contact-motion: tools/generate-contact-motion.cpp src/core/ContactMotionCodec.h src/core/RunnerPointDirection.h src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/MotionBinary64.h src/core/MultiplyBinary64.h src/core/RunnerImageValue.h generated/smoke-trig.inc generated/atan-q16.inc
+build/generate-contact-motion: tools/generate-contact-motion.cpp src/core/ContactMotionCodec.h src/core/RunnerPointDirection.h src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/MotionBinary64.h src/core/MultiplyBinary64.h src/core/RunnerImageValue.h generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc generated/atan-q16.inc
 	@mkdir -p build
 	$(CXX_LINK) $(CXXFLAGS) -o $@ $<
 
@@ -962,7 +962,7 @@ build/player-damage-number-test build/player-damage-numbers-test build/damage-nu
 generated/smoke-trig.inc: tools/export-smoke-trig.py data/Downwell.exe
 	python3 tools/export-smoke-trig.py
 
-build/probe-contact-motion-domain: tools/probe-contact-motion-domain.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/atan-q16.inc
+build/probe-contact-motion-domain: tools/probe-contact-motion-domain.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc generated/atan-q16.inc
 	@mkdir -p build
 	$(CXX_LINK) $(CXXFLAGS) -o $@ $<
 
@@ -970,7 +970,7 @@ build/probe-contact-motion-domain: tools/probe-contact-motion-domain.cpp $(wildc
 probe-contact-motion-domain: build/probe-contact-motion-domain
 	./build/probe-contact-motion-domain
 
-build/smoke-trig-test: tests/core/SmokeTrigTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/smoke-trig-test: tests/core/SmokeTrigTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeTrigTest.cpp src/core/GameMakerRandom.cpp
 
@@ -989,7 +989,7 @@ verify-effect-spawn: build/effect-spawn-script-test build/script-spawn-effects-t
 build/script-spawn-effects-test: tests/core/ScriptSpawnEffectsTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $<
-build/effect-spawn-script-test: tests/core/EffectSpawnScriptTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/effect-spawn-script-test: tests/core/EffectSpawnScriptTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: verify-machine-gun-source-motion verify-bullet-solid-script verify-machine-gun-source-step
@@ -1004,7 +1004,7 @@ verify-box-destruction: build/box-destruction-test build/box-destruction-integra
 	python3 tools/verify-box-destruction.py
 	./build/box-destruction-test
 	./build/box-destruction-integration-test
-build/box-destruction-integration-test: tests/core/BoxDestructionIntegrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/box-destruction-integration-test: tests/core/BoxDestructionIntegrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/BoxDestructionIntegrationTest.cpp src/core/GameMakerRandom.cpp
 build/box-destruction-test: tests/core/BoxDestructionScriptTest.cpp $(wildcard src/core/*.h)
@@ -1021,10 +1021,10 @@ verify-drone-bullet: build/drone-bullet-source-step-test
 	python3 tools/verify-runner-alarms.py
 	python3 tools/verify-runner-image-fields.py
 	./build/drone-bullet-source-step-test
-build/drone-bullet-source-step-test: tests/core/DroneBulletSourceStepTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/drone-bullet-source-step-test: tests/core/DroneBulletSourceStepTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $< src/core/GameMakerRandom.cpp
-build/machine-gun-source-step-test: tests/core/MachineGunSourceStepTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/machine-gun-source-step-test: tests/core/MachineGunSourceStepTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $<
 verify-bullet-solid-script: build/bullet-solid-script-test
@@ -1063,7 +1063,7 @@ verify-machine-gun-source-motion: build/machine-gun-source-motion-test
 	python3 tools/verify-runner-effect-ranges.py
 	./build/machine-gun-source-motion-test
 
-build/machine-gun-source-motion-test: tests/core/MachineGunSourceMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/machine-gun-source-motion-test: tests/core/MachineGunSourceMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/MachineGunSourceMotionTest.cpp src/core/GameMakerRandom.cpp
 
@@ -1098,7 +1098,7 @@ test: verify-blood-goal-contact
 verify-blood-goal-contact: build/blood-goal-contact-test
 	./build/blood-goal-contact-test
 
-build/blood-goal-contact-test: tests/core/BloodGoalContactTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/downwell-goal-mask.h generated/downwell-goal-mask.mask generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask
+build/blood-goal-contact-test: tests/core/BloodGoalContactTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc generated/downwell-goal-mask.h generated/downwell-goal-mask.mask generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodGoalContactTest.cpp
 
@@ -1107,7 +1107,7 @@ test: verify-blood-bounds
 verify-blood-bounds: build/blood-bounds-test
 	./build/blood-bounds-test
 
-build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodCollisionBoundsTest.cpp
 
@@ -1320,7 +1320,7 @@ test: verify-player-damage
 test: verify-forced-player-jump
 test: verify-damage-profile
 .PHONY: verify-damage-profile
-verify-damage-profile: generated/smoke-trig.inc generated/downwell-goal-mask.h generated/downwell-time-field-mask.h
+verify-damage-profile: generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc generated/downwell-goal-mask.h generated/downwell-time-field-mask.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o build/damage-profile-test tests/core/DamageProfileTest.cpp
 	./build/damage-profile-test
@@ -1333,7 +1333,7 @@ verify-damage-profile: generated/smoke-trig.inc generated/downwell-goal-mask.h g
 .PHONY: verify-forced-player-jump
 verify-forced-player-jump: build/forced-player-jump-test
 	./build/forced-player-jump-test
-build/forced-player-jump-test: tests/core/ForcedPlayerJumpTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/forced-player-jump-test: tests/core/ForcedPlayerJumpTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/ForcedPlayerJumpTest.cpp src/core/GameMakerRandom.cpp
 test: verify-player-damage-number
@@ -1395,7 +1395,7 @@ build/typical-player-damage-test: tests/core/TypicalPlayerDamageTest.cpp $(wildc
 verify-time-stop-effects: build/time-stop-effects-test
 	./build/time-stop-effects-test
 
-build/time-stop-effects-test: tests/core/TimeStopEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/time-stop-effects-test: tests/core/TimeStopEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeStopEffectsTest.cpp src/core/GameMakerRandom.cpp
 
@@ -1455,7 +1455,7 @@ build/point-direction-test: tests/core/RunnerPointDirectionTest.cpp $(wildcard s
 verify-time-shard-burst: build/time-shard-burst-test
 	./build/time-shard-burst-test
 
-build/time-shard-burst-test: tests/core/TimeShardBurstTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/time-shard-burst-test: tests/core/TimeShardBurstTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardBurstTest.cpp src/core/GameMakerRandom.cpp
 
@@ -1856,7 +1856,7 @@ test: verify-blood-owner
 verify-blood-owner: build/blood-owner-test
 	./build/blood-owner-test
 
-build/blood-owner-test: tests/core/BloodEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/blood-owner-test: tests/core/BloodEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodEffectsTest.cpp src/core/GameMakerRandom.cpp
 
@@ -1866,7 +1866,7 @@ verify-blood-effect: build/blood-effect-test
 	python3 tests/blood-angle-art-test.py
 	./build/blood-effect-test
 
-build/blood-effect-test: tests/core/BloodEffectTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/blood-effect-test: tests/core/BloodEffectTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodEffectTest.cpp src/core/GameMakerRandom.cpp
 
@@ -1881,7 +1881,7 @@ build/smoke-effect-test: tests/core/SmokeEffectTest.cpp $(wildcard src/core/*.h)
 verify-smoke-motion: build/smoke-motion-test
 	./build/smoke-motion-test
 
-build/smoke-motion-test: tests/core/SmokeMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+build/smoke-motion-test: tests/core/SmokeMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeMotionTest.cpp src/core/GameMakerRandom.cpp
 
@@ -3699,7 +3699,7 @@ verify-sdl-sprite-visibility:
 	$(CXX) -Isrc $(CXXFLAGS) -o build/sdl-sprite-visibility-test tests/platform/SDLSpriteVisibilityTest.cpp
 	./build/sdl-sprite-visibility-test
 
-build/live-collision-lifecycle-test: tests/core/LiveCollisionLifecycleTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) $(HOST_CHECK_HEADERS) generated/smoke-trig.inc
+build/live-collision-lifecycle-test: tests/core/LiveCollisionLifecycleTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) $(HOST_CHECK_HEADERS) generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 

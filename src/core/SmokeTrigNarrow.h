@@ -24,11 +24,11 @@ inline bool smokeTrigNarrowFallback(RunnerImageValue radians,bool cosine,RunnerI
 }
 namespace smoke_trig_narrow_detail {
 // Q64 magnitude and sign of the function, abs error far below margin, for
-// binary32 radians in [2^-10, 8); false outside it.
+// binary32 radians with magnitude in [2^-10, 16); false outside it.
 inline bool evaluate(RunnerImageValue radians,bool cosine,U64& value,bool& negative){
-    const unsigned exponent=radians.bits>>23; // sign bit set: not admitted
-    if(exponent<117u||exponent>=130u)return false;
-    // Exact Q60: the significand shifted by exponent - 90 in [27, 39].
+    const unsigned exponent=(radians.bits>>23)&255u;
+    if(exponent<117u||exponent>=131u)return false;
+    // Exact Q60 magnitude: the significand shifted by exponent - 90 in [27, 40].
     U64 y=shiftLeft64((radians.bits&0x7fffffu)|0x800000u,exponent-90u);
     unsigned quadrant=0;
     while(y>=halfPi){y-=halfPi;++quadrant;}
@@ -56,12 +56,15 @@ inline bool evaluate(RunnerImageValue radians,bool cosine,U64& value,bool& negat
         if(value+part<value)return false;
         value+=part;
     }else value=c-high(c,versine)-high(s,sinD);
-    negative=(cosine?quadrant+1u:quadrant)&2u;
+    // The function of the magnitude, then sin(-r) = -sin r. The program
+    // takes the signed input; the exhaustive check covers both signs.
+    negative=((cosine?quadrant+1u:quadrant)&2u)!=0;
+    if(!cosine&&(radians.bits>>31))negative=!negative;
     return true;
 }
 }
 // The binary32 that SmokeDirection::component narrows smokeTrigComponent's
-// double to, for binary32 radians in [2^-10, 8): an integer Q64 evaluation
+// double to, for binary32 radians of magnitude in [2^-10, 16): an integer Q64 evaluation
 // (table every 2^-6 on [0, pi/4], Taylor terms through d^8) accepted only
 // when it is clear of a rounding midpoint. Exact for every admitted input
 // (verify-smoke-trig-narrow checks all of them against the program).
@@ -73,6 +76,16 @@ inline bool smokeTrigNarrowCandidate(RunnerImageValue radians,bool cosine,Runner
 // Elsewhere, and near midpoints, the original program decides.
 inline bool smokeTrigNarrow(RunnerImageValue radians,bool cosine,RunnerImageValue& output){
     return smokeTrigNarrowCandidate(radians,cosine,output)||smokeTrigNarrowFallback(radians,cosine,output);
+}
+// smokeTrig for SmokeDirection::vector only: it narrows both results at
+// once, so their binary32 stands in for the doubles. Radians that are not
+// binary32 keep the program.
+inline bool smokeTrigNarrowed(MotionBinary64 radians,MotionBinary64& cosine,MotionBinary64& sine){
+    RunnerImageValue r,c,s;
+    if(!r.assign(radians)||r.promoted().high!=radians.high||r.promoted().low!=radians.low)
+        return smokeTrig(radians,cosine,sine);
+    if(!smokeTrigNarrow(r,true,c)||!smokeTrigNarrow(r,false,s))return false;
+    cosine=c.promoted();sine=s.promoted();return true;
 }
 }
 #endif

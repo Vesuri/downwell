@@ -2,7 +2,7 @@
 #define DOWNWELL_CORE_MACHINE_GUN_SOURCE_MOTION_H
 #include "RandomBinary64.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 #include "MachineGunProfile.h"
 #include "DivideBinary64.h"
 #include "RunnerLineArguments.h"
@@ -39,7 +39,7 @@ public:
         angle=MotionBinary64::fromInteger(270);
         RunnerImageValue publishedAngle;
         if(!angle.add(spread) ||
-           !SmokeDirection::vector(MotionBinary64::fromInteger(8),angle,vx,vy,smokeTrig) ||
+           !SmokeDirection::vector(MotionBinary64::fromInteger(8),angle,vx,vy,smokeTrigNarrowed) ||
            !publishedAngle.assign(angle))return false;
         direction=angle;xsp=vx;ysp=vy;imageAngle=publishedAngle;
         // image_angle is visible to synchronous muzzle Create. allSet is
