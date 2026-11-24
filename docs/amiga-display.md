@@ -6,6 +6,9 @@ stretching the 160-pixel game surface.
 ## Geometry
 
 - Hardware display window: 352x284 PAL lores pixels.
+- Vertical window: PAL lines $1D-$137 (29-311), the Hardware Reference
+  Manual's displayable range (table 3-13). That is 283 lines, so the last
+  of the 284 raster rows is fetched but never shown.
 - Logical canvas: 380x284 pixels, retained for one-to-one porting.
 - DMA backing width: 384 pixels (24 words, 48 bytes per plane per line).
 - The display window exposes logical pixels 16..367.

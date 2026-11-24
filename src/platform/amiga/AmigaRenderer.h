@@ -24,7 +24,8 @@ enum {
     downwellDisplayHStart = 0x71,
     /* Menu scenes keep their own fetch; their sprites use this origin. */
     downwellMenuSpriteHStart = 0x61,
-    downwellDisplayVStart = 0x12,
+    /* HRM table 3-13: PAL lines $1D-$137 are displayable. */
+    downwellDisplayVStart = 0x1d,
     downwellPlayfieldX = 110,
     downwellPlayfieldWidth = 160
 };

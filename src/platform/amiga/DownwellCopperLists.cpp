@@ -208,7 +208,7 @@ bool DownwellGameplayCopperList::build(
     overlayOffset_ = moveOffset(bpl2pth);
     wrapWaitOffset_ = size();
     // Fixed shape, including the PAL line-255 bridge, permits word patches.
-    if (!wait(255, 0xdf) || !wait(301, 0xdf) ||
+    if (!wait(255, 0xdf) || !wait(downwellDisplayVStartCropped + downwellDisplayHeight - 1, 0xdf) ||
         !showBitmap(game, 1, 2, downwellFetchCropBytes * 8, 0, 2) || !finish())
         return false;
     return update(game, ringOrigin);
@@ -364,8 +364,9 @@ static_assert(downwellDisplayHStartCropped == 0x81,
               "cropped display starts at logical x=16");
 static_assert(downwellDisplayHStopCropped == 0x1d1,
               "336-pixel cropped display window");
-static_assert(downwellDisplayVStopCropped == 0x12e,
-              "284-line display window");
+static_assert(downwellDisplayVStopCropped ==
+                  downwellDisplayVStartCropped + downwellDisplayHeight - 1,
+              "283 of the 284 rows, PAL lines $1D-$137");
 static_assert(downwellFetchStop == 0xd8,
               "21-word lores fetch at hardware limit");
 static_assert(downwellFetchModulo == 6,
