@@ -261,13 +261,36 @@ resets it; that is the first owner to find.
 
    Gate: the quiet-update target re-derived on the target (room for a
    row's work and one enemy), with unchanged state samples.
-9. **W3.9 C, row painting.** Take the `REFERENCE_ROW_PAINTING=0` candidate
-   (painting ahead into the hidden scroll margin, prepared pattern rows)
-   through the full fall, the cadence run and default acceptance on the
-   target. Gate:
-   - no row update over 20 ms in 122–135 or 137–162;
-   - generation and painting in different updates of each row period;
-   - the scalar pixel comparison over all pattern rows and seams.
+9. **W3.9 C, terrain painting.** Measured on the 68020 target (census
+   to tick 700):
+   - **The fall.** The default already presents every update in one field.
+     Its row updates in 122–135 and 137–162 peak at 10.4 ms;
+     `PREPARED_PATTERN_ROWS=1` lowers that peak to 7.3 ms.
+   - **The candidate on the routes.** It saves only about 1% of fields:
+     normal 1,384 → 1,371, constant fire 1,643 → 1,629. 27–48 updates get
+     1–3 ms worse. Its paint-ahead spends only budget left inside 20 ms,
+     and deep in 1-1 almost no update has any, so these routes barely
+     exercise it.
+   - **The candidate stays.** Re-measure it once W3.10 and W3.12 have given
+     those updates spare time again. It is not accepted while those per-update
+     regressions remain.
+
+   The painting that does cost deep in the well is destroyed-block repair,
+   not new rows. At 666 and 670 the normal route breaks 12 blocks in one
+   update. Each is repainted as its own 16×16 cell through
+   `drawMainWorldSpan`'s refresh path: the live painter (1.18 ms per cell),
+   then a 16-row raster transfer (0.55 ms per cell). That comes to 22.7 ms
+   of a 106 ms update; the candidate leaves it unchanged. Constant firing
+   breaks blocks all the time. First item:
+   - **Repair destroyed cells per band.** Merge the cells destroyed in an
+     update into one clipped paint and one transfer per 16-row band.
+     Expected: about 20 ms off 666 and 670.
+   - **Gate:** the destroyed-cell pixel oracle; normal and constant-fire
+     censuses with unchanged state and no update worse.
+
+   The candidate's own gate stays: generation and painting in different
+   updates of each row period, and the scalar pixel comparison over all
+   pattern rows and seams.
 10. **W3.10 E, the bursts at 122, 136 and 163.** First make event cells
     cheaper: breakables become source records under a lent-counter lease,
     and enemy adoption goes through the native roster. Then stage the
