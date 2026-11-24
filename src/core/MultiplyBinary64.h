@@ -1,21 +1,25 @@
 #ifndef DOWNWELL_CORE_MULTIPLY_BINARY64_H
 #define DOWNWELL_CORE_MULTIPLY_BINARY64_H
 #include "MotionBinary64.h"
+#include "NarrowArithmetic.h"
 namespace downwell {
 // Normal/zero binary64 product, rounded once to nearest-even. Like the motion
 // adder, unsupported subnormal/nonfinite operands/results fail atomically.
-// Base-65536 limbs keep every intermediate within 32 bits on a 68000.
+// Base-65536 limbs keep every intermediate within 32 bits on a 68000, and
+// each limb product is one mulu.w (mulu16), not a libgcc 32 x 32 call.
 inline bool multiplyBinary64Portable(MotionBinary64 a, MotionBinary64 b, MotionBinary64& out) {
     if (!a.valid() || !b.valid()) return false;
     const auto sign=(a.high^b.high)&0x80000000u;
     if (a.zero() || b.zero()) {out={sign,0};return true;}
-    const std::uint32_t av[4]={a.low&65535u,a.low>>16,a.high&65535u,((a.high>>16)&15u)|16u};
-    const std::uint32_t bv[4]={b.low&65535u,b.low>>16,b.high&65535u,((b.high>>16)&15u)|16u};
+    const std::uint16_t av[4]={std::uint16_t(a.low),std::uint16_t(a.low>>16),std::uint16_t(a.high),
+        std::uint16_t(((a.high>>16)&15u)|16u)};
+    const std::uint16_t bv[4]={std::uint16_t(b.low),std::uint16_t(b.low>>16),std::uint16_t(b.high),
+        std::uint16_t(((b.high>>16)&15u)|16u)};
     std::uint32_t product[8]={};
     for (unsigned i=0;i<4;++i) {
         std::uint32_t carry=0;
         for (unsigned j=0;j<4;++j) {
-            const auto sum=av[i]*bv[j]+product[i+j]+carry;
+            const auto sum=mulu16(av[i],bv[j])+product[i+j]+carry;
             product[i+j]=sum&65535u;carry=sum>>16;
         }
         product[i+4]=carry;

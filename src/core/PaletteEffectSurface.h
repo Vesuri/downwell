@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_PALETTE_EFFECT_SURFACE_H
 #define DOWNWELL_CORE_PALETTE_EFFECT_SURFACE_H
 #include <cstdint>
+#include "NarrowArithmetic.h"
 namespace downwell {
 // Binary alpha with the native two-bit palette. Painter-order masked replace,
 // not OR of colors: opaque black (pen 0 or 3) also occludes previous effects.
@@ -24,7 +25,7 @@ public:
     PaletteEffectSurface(const PaletteEffectSurface&)=delete;
     PaletteEffectSurface& operator=(const PaletteEffectSurface&)=delete;
     bool bindStorage(std::uint16_t* alpha,std::uint16_t* low,std::uint16_t* high,unsigned stride,Backend backend){
-        if(!alpha||!low||!high||stride<words||!backend.stamp||!backend.clear||!backend.wait||lastRow_)return false;
+        if(!alpha||!low||!high||stride<words||stride>8192||!backend.stamp||!backend.clear||!backend.wait||lastRow_)return false;
         synchronize();
         alpha_=alpha;low_=low;high_=high;stride_=stride;backend_=backend;
         for(unsigned y=0;y<Height;++y)for(unsigned x=0;x<words;++x)
@@ -136,9 +137,11 @@ private:
         const unsigned begin=y<0?unsigned(-y):0;
         unsigned end=mask.height;if(end>unsigned(int(Height)-y))end=unsigned(int(Height)-y);
         for(unsigned sy=begin;sy<end;++sy){
-            const unsigned dy=unsigned(y+int(sy)),offset=sy*mask.stride;
+            // Height and mask rows are at most 65535, strides at most 8192
+            // (bindStorage, the guard above): one mulu.w each.
+            const unsigned dy=unsigned(y+int(sy)),offset=mulu16(std::uint16_t(sy),std::uint16_t(mask.stride));
             if(subtract && first_[dy]==words)continue;
-            const unsigned row=dy*stride_;
+            const unsigned row=mulu16(std::uint16_t(dy),std::uint16_t(stride_));
             unsigned first=words,last=0;
             auto put=[&](int dx,std::uint16_t a,std::uint16_t l,std::uint16_t h){
                 if(!a || dx<0 || unsigned(dx)>=words)return;

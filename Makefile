@@ -841,7 +841,7 @@ build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/St
 test: verify-effect-placement
 test: verify-binary-effects
 .PHONY: verify-binary-effects
-build/palette-effects-test: tests/core/PaletteEffectSurfaceTest.cpp src/core/PaletteEffectSurface.h src/core/EffectMaskAssets.h src/core/BinaryEffectSurface.h
+build/palette-effects-test: tests/core/PaletteEffectSurfaceTest.cpp src/core/PaletteEffectSurface.h src/core/EffectMaskAssets.h src/core/BinaryEffectSurface.h src/core/NarrowArithmetic.h
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 .PHONY: verify-palette-effects
@@ -3032,7 +3032,7 @@ generate-amiga-game: generate-amiga-clear
 
 .PHONY: test-scene-asset-admission
 .PHONY: test-multiply-binary64
-build/multiply-binary64-test: tests/core/MultiplyBinary64Test.cpp src/core/MultiplyBinary64.h src/core/MotionBinary64.h
+build/multiply-binary64-test: tests/core/MultiplyBinary64Test.cpp src/core/MultiplyBinary64.h src/core/MotionBinary64.h src/core/NarrowArithmetic.h
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/MultiplyBinary64Test.cpp
 test-multiply-binary64: build/multiply-binary64-test
