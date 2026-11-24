@@ -275,18 +275,13 @@ resets it; that is the first owner to find.
      those updates spare time again. It is not accepted while those per-update
      regressions remain.
 
-   The painting that does cost deep in the well is destroyed-block repair,
-   not new rows. At 666 and 670 the normal route breaks 12 blocks in one
-   update. Each is repainted as its own 16×16 cell through
-   `drawMainWorldSpan`'s refresh path: the live painter (1.18 ms per cell),
-   then a 16-row raster transfer (0.55 ms per cell). That comes to 22.7 ms
-   of a 106 ms update; the candidate leaves it unchanged. Constant firing
-   breaks blocks all the time. First item:
-   - **Repair destroyed cells per band.** Merge the cells destroyed in an
-     update into one clipped paint and one transfer per 16-row band.
-     Expected: about 20 ms off 666 and 670.
-   - **Gate:** the destroyed-cell pixel oracle; normal and constant-fire
-     censuses with unchanged state and no update worse.
+   Destroyed blocks are now repaired one span of touching rows at a time
+   (`REFERENCE_CELL_REPAIR=1` keeps the per-cell repair). A single
+   destroyed cell still costs about 1.9 ms: 1.18 ms of live painting and a
+   0.55 ms full-width store of its 16 rows. Constant firing breaks blocks
+   one or two at a time, and its census did not change. The next owner
+   there is that fixed cost per span: the indexed wall batch, its
+   decorations and the store of whole raster rows for a 16-pixel cell.
 
    The candidate's own gate stays: generation and painting in different
    updates of each row period, and the scalar pixel comparison over all

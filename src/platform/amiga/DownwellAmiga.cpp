@@ -785,6 +785,11 @@ volatile ULONG gDownwellGameplayBobChecks;
 volatile ULONG gDownwellGameplayBobFailures;
 volatile ULONG gDownwellTerrainRasterFailures;
 volatile ULONG gDownwellTerrainRasterChecks;
+#ifdef DOWNWELL_CELL_REPAIR_VERIFY
+volatile ULONG gDownwellCellRepairChecks;
+volatile ULONG gDownwellCellRepairMerges;
+volatile ULONG gDownwellCellRepairFailures;
+#endif
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UWORD* gDownwellControlsCopper;
@@ -4286,6 +4291,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             if (destroyedBlockCount != 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
                 gameplayScene.invalidateStage();
+                struct Cell { int top, bottom, left, right; };
+                Cell cells[AmigaPortRuntime::destroyedCapacity];
+                unsigned cellCount = 0;
                 for (unsigned block = 0;
                      block < destroyedBlockCount; ++block) {
                     const int centerY = 176 + destroyedBlockY[block];
@@ -4305,13 +4313,87 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (right > downwellPlayfieldX + downwellPlayfieldWidth)
                         right = downwellPlayfieldX + downwellPlayfieldWidth;
                     if (top >= bottom || left >= right) continue;
-                    amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
-                    amigaRendererSetClipRect(&renderer, left, top, right - left, bottom - top);
-                    amigaRendererFillRect(&renderer, left, top, right - left, bottom - top, 0);
-                    drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
-                        fragments, liveBuilder.fragmentCount(),
-                        generatedDecorations, liveBuilder.decorationCount(),
-                        &port, worldViewX, worldViewY, top, bottom - top, left, right - left, true, 3);
+#ifdef DOWNWELL_REFERENCE_CELL_REPAIR
+                    cells[0] = {top, bottom, left, right}; cellCount = 1;
+#else
+                    // In top order, for the merge below.
+                    unsigned at = cellCount++;
+                    for (; at && cells[at - 1].top > top; --at) cells[at] = cells[at - 1];
+                    cells[at] = {top, bottom, left, right};
+                    continue;
+                }
+                {
+#endif
+                    // Each repaint has a fixed cost per span of rows (the
+                    // indexed wall batch, decorations, a full-width store
+                    // into the raster), so cells whose rows overlap or touch
+                    // share one repaint of their bounding rectangle. The
+                    // painter's output is the backing for any terrain pixel,
+                    // so cells inside that rectangle that did not change are
+                    // repainted as they were.
+                    const auto repaint = [&](const Cell& cell) {
+                        amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
+                        amigaRendererSetClipRect(&renderer, cell.left, cell.top,
+                            cell.right - cell.left, cell.bottom - cell.top);
+                        amigaRendererFillRect(&renderer, cell.left, cell.top,
+                            cell.right - cell.left, cell.bottom - cell.top, 0);
+                        drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
+                            fragments, liveBuilder.fragmentCount(),
+                            generatedDecorations, liveBuilder.decorationCount(),
+                            &port, worldViewX, worldViewY, cell.top, cell.bottom - cell.top,
+                            cell.left, cell.right - cell.left, true, 3);
+                    };
+                    for (unsigned first = 0; first < cellCount;) {
+                        Cell span = cells[first];
+                        unsigned next = first + 1;
+                        for (; next < cellCount && cells[next].top <= span.bottom; ++next) {
+                            if (cells[next].bottom > span.bottom) span.bottom = cells[next].bottom;
+                            if (cells[next].left < span.left) span.left = cells[next].left;
+                            if (cells[next].right > span.right) span.right = cells[next].right;
+                        }
+#if defined(DOWNWELL_CELL_REPAIR_VERIFY) && !defined(DOWNWELL_REFERENCE_CELL_REPAIR)
+                        // The span's rows after one merged repaint must equal
+                        // the per-cell reference applied to the same rows.
+                        // Live input, so the world-one route can drive it.
+                        static UBYTE before[downwellLayerBytes], merged[downwellLayerBytes];
+                        const auto rows = [&](UBYTE* buffer, bool save) {
+                            AmigaHardware::blitterDrain();
+                            for (int y = span.top; y < span.bottom; ++y)
+                                for (unsigned plane = 0; plane < 2; ++plane) {
+                                    UBYTE* chip = renderer.game + plane * downwellGameRingPlaneBytes +
+                                        ((port.ringOrigin() + unsigned(y)) % downwellGameRingHeight) *
+                                        downwellBytesPerPlaneLine;
+                                    UBYTE* copy = buffer + (unsigned(y - span.top) * 2 + plane) *
+                                        downwellBytesPerPlaneLine;
+                                    if (save) std::memcpy(copy, chip, downwellBytesPerPlaneLine);
+                                    else std::memcpy(chip, copy, downwellBytesPerPlaneLine);
+                                }
+                        };
+                        rows(before, true);
+                        repaint(span);
+                        rows(merged, true);
+                        rows(before, false);
+                        for (unsigned cell = first; cell < next; ++cell) repaint(cells[cell]);
+                        AmigaHardware::blitterDrain();
+                        bool same = true;
+                        for (int y = span.top; same && y < span.bottom; ++y)
+                            for (unsigned plane = 0; plane < 2; ++plane) {
+                                const UBYTE* chip = renderer.game + plane * downwellGameRingPlaneBytes +
+                                    ((port.ringOrigin() + unsigned(y)) % downwellGameRingHeight) *
+                                    downwellBytesPerPlaneLine;
+                                const UBYTE* copy = merged + (unsigned(y - span.top) * 2 + plane) *
+                                    downwellBytesPerPlaneLine;
+                                for (unsigned byte = 0; byte < downwellBytesPerPlaneLine; ++byte)
+                                    if (chip[byte] != copy[byte]) same = false;
+                            }
+                        if (!same) ++gDownwellCellRepairFailures;
+                        ++gDownwellCellRepairChecks;
+                        if (next - first > 1) ++gDownwellCellRepairMerges;
+#else
+                        repaint(span);
+#endif
+                        first = next;
+                    }
                 }
             }
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS

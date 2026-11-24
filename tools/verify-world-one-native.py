@@ -348,6 +348,14 @@ def main():
                     packed=tape[tick]
                     if tick==shotTick:
                         dumpCensus()
+                        if os.environ.get('DOWNWELL_ROUTE_CELL_ORACLE')=='1':
+                            # CELL_REPAIR_VERIFY builds: merged destroyed-cell
+                            # repair against the per-cell reference.
+                            oracle=checked('printf "CELL ORACLE checks=%lu merges=%lu failures=%lu\\n", gDownwellCellRepairChecks,gDownwellCellRepairMerges,gDownwellCellRepairFailures').strip()
+                            print(oracle,flush=True)
+                            counts=[int(n) for n in re.findall(r'\d+',oracle.split('ORACLE',1)[1])]
+                            if counts[0]==0 or counts[1]==0 or counts[2]:
+                                raise RuntimeError('cell repair oracle failed: '+oracle)
                         # Evidence mode ends here: the capture runs the
                         # emulator past the following samples.
                         checked('delete breakpoints')

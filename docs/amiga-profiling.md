@@ -257,7 +257,11 @@ build without autorun: `tools/verify-world-one-native.py` keeps its witness
 and sound checks and reads the ring where the route ends, with the VBlank
 field count as a check on the beam clock. `hard-mode-death*` routes start
 from a hard-mode save and end at the results. `ROUTE_END_TICK=T` ends the
-route at simulation tick T, for a short census. Without the census,
+route at simulation tick T, for a short census. With
+`CELL_REPAIR_VERIFY=1 DOWNWELL_ROUTE_CELL_ORACLE=1` (not a timing build), each
+merged destroyed-cell repair is compared with the per-cell reference, and
+the route fails at T unless spans were merged and all of them matched.
+Without the census,
 `ROUTE_TRACE=N` records `ROUTE_TRACE_FIELDS` (default 20) whole fields of
 every instruction from the input sample of gameplay update N-1 into
 `TRACE_OUTPUT` (default `tmp/trace/route-name-N`), then ends; read it with
