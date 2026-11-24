@@ -35,6 +35,52 @@ int main(){
             }
         }
     }
+    {
+        // The unit-scale integer axis against its binary32 oracle: margins
+        // across and beyond the gate, any finite position, both modes.
+        std::uint32_t seed=0x9e3779b9u;
+        auto random=[&](){seed=seed*1664525u+1013904223u;return seed;};
+        auto margin=[&]()->Real{
+            switch(random()%6){
+            case 0:return {};
+            case 1:return Real{0x80000000u};
+            case 2:return packed(float(int(random()%4194305u)-2097152)); // to +/-2^22
+            case 3:return packed(float(int(random()%2001u)-1000)+(random()&1?0.5f:0.f));
+            default:return packed(float(int(random()%129u)-64));
+            }
+        };
+        auto position=[&]()->Real{
+            switch(random()%4){
+            case 0:return Real{random()&0x80000000u}; // signed zero
+            case 1:{Real r{random()};if(((r.bits>>23)&255)==255)r.bits^=0x40000000u;return r;}
+            case 2:return Real{(random()&0x80000000u)|((random()%40u+107u)<<23)|(random()&0x7fffffu)};
+            default:return packed(float(int(random()%4001u)-2000)+float(random()%1024u)/1024.f);
+            }
+        };
+        unsigned fastAxes=0;
+        for(unsigned i=0;i<4000000;++i){
+            const Real low=margin(),high=margin(),pos=position();
+            const int origin=i%23==0?int(random()%80000u)-40000:int(random()%201u)-100;
+            const Real scale=i%29==0?packed(-1.f):packed(1.f);
+            const bool compatibility=i&1;
+            fastAxes+=scale.bits==0x3f800000u&&low.bits!=0x80000000u&&
+                origin>=-32768&&origin<=32767&&std::fabs(unpacked(low))<2097152.f&&
+                unpacked(low)==std::floor(unpacked(low))&&unpacked(high)==std::floor(unpacked(high))&&
+                std::fabs(unpacked(high))<2097152.f;
+            Real n1,f1,n2,f2;unsigned c1=0,c2=0;
+            auto r1=[&](Real v,std::int32_t& out){++c1;return v.promoted().roundPixel(out);};
+            auto r2=[&](Real v,std::int32_t& out){++c2;return v.promoted().roundPixel(out);};
+            const bool a=Bounds::axis(low,high,origin,pos,scale,compatibility,r1,n1,f1);
+            const bool b=Bounds::axisBinary32(low,high,origin,pos,scale,compatibility,r2,n2,f2);
+            if(a!=b||c1!=c2||(a&&(n1.bits!=n2.bits||f1.bits!=f2.bits))){
+                std::printf("axis mismatch low=%08x high=%08x origin=%d pos=%08x compat=%d: %d %08x %08x / %d %08x %08x\n",
+                    unsigned(low.bits),unsigned(high.bits),origin,unsigned(pos.bits),int(compatibility),
+                    int(a),unsigned(n1.bits),unsigned(f1.bits),int(b),unsigned(n2.bits),unsigned(f2.bits));
+                return 1;
+            }
+        }
+        std::printf("Unit-scale integer axis: 4000000 axes match binary32 (%u on the integer path)\n",fastAxes);
+    }
     auto round=[](Real value,std::int32_t& result){return value.promoted().roundPixel(result);};
     unsigned comparisons=0,roundCalls=0,reassociatedDifferences=0;
     auto counted=[&](Real value,std::int32_t& result){++roundCalls;return round(value,result);};

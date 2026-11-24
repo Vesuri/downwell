@@ -72,7 +72,41 @@ struct RunnerSpriteBounds {
            !axis(margins.top,margins.bottom,originY,y,scaleY,compatibility,round,next.top,next.bottom))return false;
         result=next;return true;
     }
+    // Unit scale with integer margins: low-origin, high-low+1 and both
+    // products by one are exact small integers, so only the two additions
+    // of the position round. Integer arithmetic gives those operands; the
+    // additions keep the reference's operand order. axisBinary32 is the oracle.
+    template<class Round> static bool axis(Real low,Real high,int origin,Real position,
+        Real scale,bool compatibility,Round& round,Real& near,Real& far){
+        std::int32_t l,h;
+        // A -0 low edge keeps its sign through low-origin; unitReal makes +0.
+        if(scale.bits!=0x3f800000u||low.bits==0x80000000u||!small(origin)||
+           !unitPixel(low,l)||!unitPixel(high,h))
+            return axisBinary32(low,high,origin,position,scale,compatibility,round,near,far);
+        if(!add(unitReal(l-origin),position,near)||!add(unitReal(h-l+1),near,far))return false;
+        return finishAxis(compatibility,round,near,far);
+    }
+    template<class Round> static bool axisBinary32(Real low,Real high,int origin,Real position,
+        Real scale,bool compatibility,Round& round,Real& near,Real& far){
+        Real width,offset;const Real one{0x3f800000};
+        if(!offset.assignInteger(origin)||
+           !Math::sub(high,low,width)||!add(width,one,width)||
+           !Math::sub(low,offset,near)||!mul(near,scale,near)||
+           !mul(scale,width,far)||!add(near,position,near)||!add(far,near,far))return false;
+        return finishAxis(compatibility,round,near,far);
+    }
 private:
+    template<class Round> static bool finishAxis(bool compatibility,Round& round,Real& near,Real& far){
+        const Real one{0x3f800000};
+        if(compatibility){
+            std::int32_t a,b;
+            if(!round(near,a)||!round(far,b)||
+               !near.assignInteger(a)||!far.assignInteger(b))return false;
+        }
+        if(Math::less(far,near)){const auto saved=near;near=far;far=saved;}
+        // Subtract AFTER rounding and sorting, including zero-scale bounds.
+        return !compatibility || Math::sub(far,one,far);
+    }
     static bool small(std::int32_t value){return value>=-32768&&value<=32767;}
     static bool unitPixel(Real value,std::int32_t& out){
         if(!(value.bits&0x7fffffffu)){out=0;return true;}
@@ -130,22 +164,6 @@ private:
     static bool add(Real a,Real b,Real& out){return Math::sub(a,Math::negate(b),out);}
     static bool mul(Real a,Real b,Real& out){
         return multiplyBinary32(a,b,out);
-    }
-    template<class Round> static bool axis(Real low,Real high,int origin,Real position,
-        Real scale,bool compatibility,Round& round,Real& near,Real& far){
-        Real width,offset;const Real one{0x3f800000};
-        if(!offset.assignInteger(origin)||
-           !Math::sub(high,low,width)||!add(width,one,width)||
-           !Math::sub(low,offset,near)||!mul(near,scale,near)||
-           !mul(scale,width,far)||!add(near,position,near)||!add(far,near,far))return false;
-        if(compatibility){
-            std::int32_t a,b;
-            if(!round(near,a)||!round(far,b)||
-               !near.assignInteger(a)||!far.assignInteger(b))return false;
-        }
-        if(Math::less(far,near)){const auto saved=near;near=far;far=saved;}
-        // Subtract AFTER rounding and sorting, including zero-scale bounds.
-        return !compatibility || Math::sub(far,one,far);
     }
 };
 }
