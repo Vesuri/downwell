@@ -15,9 +15,11 @@ public:
     struct Asset {Mask alpha;const std::uint8_t* low;const std::uint8_t* high;};
     // Optional platform-owned planar storage and operations. A declined stamp
     // must not modify storage. All CPU reads/writes synchronize queued work.
+    // Half-open clip in surface words and rows; a stamp writes only inside it.
+    struct Clip {unsigned left,top,right,bottom;};
     struct Backend {
         void* context=nullptr;
-        bool (*stamp)(void*,const Mask&,const std::uint8_t*,const std::uint8_t*,int,int)=nullptr;
+        bool (*stamp)(void*,const Mask&,const std::uint8_t*,const std::uint8_t*,int,int,const Clip&)=nullptr;
         // One touched rectangle (visitRectangles, in words and rows); every
         // stored word outside them is already zero.
         void (*clear)(void*,unsigned left,unsigned top,unsigned words,unsigned rows)=nullptr;
@@ -48,9 +50,18 @@ public:
     }
     bool add(const Asset& asset,int x,int y){
         if(!asset.low || !asset.high)return false;
-        return stamp(asset.alpha,asset.low,asset.high,x,y);
+        return stamp(asset.alpha,asset.low,asset.high,x,y,{0,0,words,Height});
     }
-    bool subtract(const Mask& mask,int x,int y){return stamp(mask,nullptr,nullptr,x,y);}
+    // All alpha lies in the tracked rectangles, and subtraction elsewhere
+    // changes nothing: a queued backend subtracts only their overlap.
+    bool subtract(const Mask& mask,int x,int y){
+        if(!backend_.stamp)return stamp(mask,nullptr,nullptr,x,y,{0,0,words,Height});
+        bool okay=true;
+        visitRectangles([&](unsigned left,unsigned top,unsigned width,unsigned height){
+            if(okay)okay=stamp(mask,nullptr,nullptr,x,y,{left/16,top,(left+width)/16,top+height});
+        });
+        return okay;
+    }
     // Half-open viewport rectangle. Test final alpha, including shade holes
     // and opaque black; stale color bits are never evidence of overlap.
     bool intersects(int left,int top,int right,int bottom)const{
@@ -119,12 +130,13 @@ private:
         if(left<16)value&=0xffffu<<(16-left);
         return std::uint16_t(value);
     }
-    bool stamp(const Mask& mask,const std::uint8_t* lo,const std::uint8_t* hi,int x,int y){
+    bool stamp(const Mask& mask,const std::uint8_t* lo,const std::uint8_t* hi,int x,int y,const Clip& clip){
         if(!mask.data || !mask.width || mask.width>65535 || !mask.height || mask.height>65535 ||
            mask.stride>8192 || mask.stride<(mask.width+7)/8 || mask.bytes<mask.stride*mask.height)return false;
-        if(x>=int(Width) || y>=int(Height) || x<=-int(mask.width) || y<=-int(mask.height))return true;
+        if(x>=int(clip.right*16) || y>=int(clip.bottom) || x+int(mask.width)<=int(clip.left*16) ||
+           y+int(mask.height)<=int(clip.top))return true;
         const bool subtract=!lo;
-        if(backend_.stamp&&backend_.stamp(backend_.context,mask,lo,hi,x,y)){
+        if(backend_.stamp&&backend_.stamp(backend_.context,mask,lo,hi,x,y,clip)){
             if(!subtract){
                 const unsigned left=x<0?0:unsigned(x)/16;
                 const unsigned right=x+int(mask.width)>int(Width)?words:unsigned(x+int(mask.width)+15)/16;
@@ -140,8 +152,8 @@ private:
         }
         synchronize();
         int column=x/16,shift=x%16;if(shift<0){shift+=16;--column;}
-        const unsigned begin=y<0?unsigned(-y):0;
-        unsigned end=mask.height;if(end>unsigned(int(Height)-y))end=unsigned(int(Height)-y);
+        const unsigned begin=y<int(clip.top)?unsigned(int(clip.top)-y):0;
+        unsigned end=mask.height;if(end>unsigned(int(clip.bottom)-y))end=unsigned(int(clip.bottom)-y);
         for(unsigned sy=begin;sy<end;++sy){
             // Height and mask rows are at most 65535, strides at most 8192
             // (bindStorage, the guard above): one mulu.w each.
@@ -150,7 +162,7 @@ private:
             const unsigned row=mulu16(std::uint16_t(dy),std::uint16_t(stride_));
             unsigned first=words,last=0;
             auto put=[&](int dx,std::uint16_t a,std::uint16_t l,std::uint16_t h){
-                if(!a || dx<0 || unsigned(dx)>=words)return;
+                if(!a || dx<int(clip.left) || dx>=int(clip.right))return;
                 const unsigned at=row+unsigned(dx);
                 if(subtract){alpha_[at]&=std::uint16_t(~a);return;}
                 alpha_[at]|=a;

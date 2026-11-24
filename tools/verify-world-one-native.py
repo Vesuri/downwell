@@ -359,6 +359,15 @@ def main():
                             counts=[int(n) for n in re.findall(r'\d+',oracle.split('ORACLE',1)[1])]
                             if counts[0]==0 or counts[1]==0 or counts[2]:
                                 raise RuntimeError('cell repair oracle failed: '+oracle)
+                        if os.environ.get('DOWNWELL_ROUTE_EFFECT_PIXEL_ORACLE')=='1':
+                            # EFFECT_PIXEL_VERIFY builds: every composition's
+                            # blitter surface against the CPU reference (a
+                            # mismatch already stopped the route).
+                            pixels=checked('printf "EFFECT PIXEL ORACLE checks=%u failures=%u stamps=%u\\n", gDownwellEffectDmaChecks,gDownwellEffectDmaFailures,gDownwellEffectDmaStamps').strip()
+                            print(pixels,flush=True)
+                            counts=[int(n) for n in re.findall(r'\d+',pixels.split('ORACLE',1)[1])]
+                            if counts[0]==0 or counts[1]:
+                                raise RuntimeError('effect pixel oracle failed: '+pixels)
                         if os.environ.get('DOWNWELL_ROUTE_EFFECT_CLEAR_ORACLE')=='1':
                             # EFFECT_CLEAR_VERIFY builds: the rectangle clear
                             # left the whole effect surface zero.

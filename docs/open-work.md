@@ -1309,20 +1309,20 @@ under 80 ms while removing remaining threshold-sized computations.
 ### C. Combat composition shortfall
 
 Blitter time per update on constant fire, 560–569 (`EFFECT_BLIT_CENSUS=2`,
-each effect blit timed alone), after the surface clear was narrowed to the
-touched rectangles (6.9 → 1.5 ms):
-- 14.4 smoke stamps, 84 words each: 4.1 ms (0.29 ms per stamp);
-- 2 gem stamps: 1.1 ms;
-- 4 shade subtractions (the 96×96 enemy shade, 458 words each): 3.5 ms;
-- the clear, 1,575 words in 2.7 rectangles: 1.5 ms;
+each effect blit timed alone), now that the clear covers only the touched
+rectangles (6.9 → 1.5 ms) and each shade subtraction only their overlap
+(3.5 → 0.5 ms):
+- 14.4 smoke stamps, 84 words each: 4.1 ms (0.28 ms per stamp);
+- 2 gem stamps: 1.2 ms;
+- shade subtraction, 2.7 clipped blits of 56 words: 0.5 ms;
+- the clear, 1,575 words in 2.7 rectangles: 1.6 ms;
 - the publish copy to the display, 1,265 words: 3.9 ms.
 
-The CPU still waits 3.75 ms (was 5.5) in the visibility test: the shade
-subtractions are queued last, just before it. Next: clip each shade
-subtraction to the surface's tracked rectangles, where all the alpha it can
-remove lies (exact: subtraction outside alpha changes nothing). Then measure
-the wait again before choosing between fewer smoke stamps and CPU work
-between queueing and the first read.
+The visibility test's wait fell 5.5 → 1.1 ms, but constant fire's update
+totals barely moved (560–569 54.7 → 54.1 ms): the freed blitter time is
+waited for later in the update. Next: find that wait (trace 560–569 for
+`blitterDrain`/`blitterWait` callers) and the blitter work queued ahead of
+it, before choosing between fewer smoke stamps and moving CPU work.
 
 Remaining effect work is the raster fallback for mixed producers, actual
 shade subtraction and entry cover. Measure those

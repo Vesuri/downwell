@@ -102,6 +102,9 @@ CELL_REPAIR_VERIFY ?= 0
 # Section 5 C: after each effect-surface clear, check that every stored word
 # is zero (the clear covers only touched rectangles). Combines with CENSUS.
 EFFECT_CLEAR_VERIFY ?= 0
+# Section 5 C: compare the blitter effect surface with the CPU reference
+# surface after every composition (BOB_VERIFY's oracle, on a route).
+EFFECT_PIXEL_VERIFY ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
 AMMO_DAMAGE_RANGE ?= 1
@@ -483,6 +486,9 @@ CFLAGS += -DDOWNWELL_CELL_REPAIR_VERIFY
 endif
 ifeq ($(EFFECT_CLEAR_VERIFY),1)
 CFLAGS += -DDOWNWELL_EFFECT_CLEAR_VERIFY
+endif
+ifeq ($(EFFECT_PIXEL_VERIFY),1)
+CFLAGS += -DDOWNWELL_EFFECT_PIXEL_VERIFY
 endif
 ifeq ($(PREPARED_PATTERN_ROWS),1)
 CFLAGS += -DDOWNWELL_PREPARED_PATTERN_ROWS
@@ -902,6 +908,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(CELL_REPAIR_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(EFFECT_BLIT_CENSUS)' >> $@.tmp
 	@printf '%s\n' '$(EFFECT_CLEAR_VERIFY)' >> $@.tmp
+	@printf '%s\n' '$(EFFECT_PIXEL_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp

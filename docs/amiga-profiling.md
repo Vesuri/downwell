@@ -265,6 +265,10 @@ the route fails at T unless spans were merged and all of them matched.
 build) checks the effect surface's rectangle clear: before every stamp and
 clear, each nonzero stored word must lie in the tracked rectangles, and
 after each clear the whole storage, guard words included, must be zero.
+`EFFECT_PIXEL_VERIFY=1 DOWNWELL_ROUTE_EFFECT_PIXEL_ORACLE=1` compares the
+blitter surface with BOB_VERIFY's CPU reference surface after every
+composition, without SCENE_VERIFY's scripted input; the route stops at the
+first mismatch.
 `EFFECT_BLIT_CENSUS=1` (with the census) adds a parallel ring, dumped to
 `.run/effect-census.bin`: per update, the effect stamps and their blit
 words by kind (smoke, gems, other, shade), the clear's and the publish

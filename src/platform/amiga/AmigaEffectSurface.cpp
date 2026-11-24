@@ -1,4 +1,9 @@
 #include "AmigaEffectSurface.h"
+// The CPU reference surface: BOB_VERIFY's oracle, and EFFECT_PIXEL_VERIFY's
+// on a replayed route (without SCENE_VERIFY's scripted input).
+#if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_EFFECT_PIXEL_VERIFY)
+#define DOWNWELL_EFFECT_REFERENCE
+#endif
 #include "AmigaEffectStampBank.h"
 #include <exec/types.h>
 #include "framework/Bitmap.h"
@@ -45,7 +50,7 @@ const std::uint8_t* mirrored(const std::uint8_t* block,unsigned bytes){
     mirrorUsed+=bytes;mirrors[mirrorCount++]={block,copy};
     return copy;
 }
-#ifdef DOWNWELL_BOB_VERIFY
+#ifdef DOWNWELL_EFFECT_REFERENCE
 alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
 Surface* reference=nullptr;
 #endif
@@ -119,7 +124,7 @@ void clear(void* context,unsigned left,unsigned top,unsigned words,unsigned rows
     if(!clearPending)checkCoverage();
     clearPending=true;
 #endif
-#ifdef DOWNWELL_BOB_VERIFY
+#ifdef DOWNWELL_EFFECT_REFERENCE
     reference->clear();
 #endif
 #if defined(DOWNWELL_EFFECT_BLIT_CENSUS) && DOWNWELL_EFFECT_BLIT_CENSUS==2
@@ -140,12 +145,13 @@ void clear(void* context,unsigned left,unsigned top,unsigned words,unsigned rows
         AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+plane*AmigaEffectSurface::planeBytes+
             top*AmigaEffectSurface::rowBytes),words,rows,modulo);
 }
-bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const std::uint8_t* high,int x,int y){
+bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const std::uint8_t* high,int x,int y,
+           const Surface::Clip& clip){
 #ifdef DOWNWELL_EFFECT_CLEAR_VERIFY
     checkCleared();checkCoverage();
     lastStamp={x,y,m.width,m.height,m.stride,low?(stampBank.find(m,low,high)?2u:1u):0u};
 #endif
-#ifdef DOWNWELL_BOB_VERIFY
+#ifdef DOWNWELL_EFFECT_REFERENCE
     if(low)reference->add({m,low,high},x,y);else reference->subtract(m,x,y);
 #endif
     // The stamp bank's Chip copies of the smoke and currency stamps serve
@@ -167,11 +173,13 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     if(!combined&&((reinterpret_cast<ULONG>(maskData)&1)||reinterpret_cast<ULONG>(maskData)>=0x200000UL||
         (low&&((reinterpret_cast<ULONG>(low)|reinterpret_cast<ULONG>(high))&1))||
         (low&&(reinterpret_cast<ULONG>(low)>=0x200000UL||reinterpret_cast<ULONG>(high)>=0x200000UL))))return false;
+    // The core passes only clips that overlap the stamp.
+    const int clipLeft=int(clip.left*16),clipRight=int(clip.right*16),clipTop=int(clip.top),clipBottom=int(clip.bottom);
     unsigned sx=0,sy=0,width=m.width,height=m.height;
-    if(x<0){sx=unsigned(-x);width-=sx;x=0;}
-    if(y<0){sy=unsigned(-y);height-=sy;y=0;}
-    if(width>unsigned(160-x))width=160-x;
-    if(height>unsigned(284-y))height=284-y;
+    if(x<clipLeft){sx=unsigned(clipLeft-x);width-=sx;x=clipLeft;}
+    if(y<clipTop){sy=unsigned(clipTop-y);height-=sy;y=clipTop;}
+    if(width>unsigned(clipRight-x))width=clipRight-x;
+    if(height>unsigned(clipBottom-y))height=clipBottom-y;
     if(!width||!height)return true;
     const unsigned sourceY=combined?sy*3:sy;
     const unsigned targetY=combined?unsigned(y)*3:unsigned(y);
@@ -228,7 +236,7 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     AmigaHardware::blitterPatternWithMask(low?0xffff:0,reinterpret_cast<uint16_t*>(data+target),mask,
         words,height,0,surfaceModulo,sourceModulo,0,shift,first,last,false);
     }
-#ifdef DOWNWELL_BOB_VERIFY
+#ifdef DOWNWELL_EFFECT_REFERENCE
     ++gDownwellEffectDmaStamps;
 #endif
 #ifdef DOWNWELL_EFFECT_BLIT_CENSUS
@@ -257,7 +265,7 @@ bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* st
     // Guard words included: the clear covers only touched surface words.
     for(unsigned i=0;i<bytes;++i)data[i]=0;
     mirrorArena=mirrorChip;mirrorCapacity=mirrorBytes;mirrorUsed=mirrorCount=0;
-#ifdef DOWNWELL_BOB_VERIFY
+#ifdef DOWNWELL_EFFECT_REFERENCE
     reference=new(referenceStorage) Surface;
 #endif
     constexpr unsigned planeOffset=interleaved?rowBytes:planeBytes;
@@ -317,7 +325,7 @@ bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
     return true;
 }
 bool AmigaEffectSurface::verify(const downwell::PaletteEffectSurface<>& surface){
-#ifdef DOWNWELL_BOB_VERIFY
+#ifdef DOWNWELL_EFFECT_REFERENCE
     ++gDownwellEffectDmaChecks;
     if(!reference->samePixels(surface)){++gDownwellEffectDmaFailures;downwellEffectSurfaceFailed();return false;}
     return true;

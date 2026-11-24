@@ -43,7 +43,7 @@ int main(int argc,char**argv){
     auto& external=storage.data;external.fill(0x5a5a);
     assert(surface.bindStorage(external.data()+1,external.data()+storage.plane+1,
         external.data()+storage.plane*2+1,storage.stride,{&storage,
-            [](void*,const Surface::Mask&,const std::uint8_t*,const std::uint8_t*,int,int){return false;},
+            [](void*,const Surface::Mask&,const std::uint8_t*,const std::uint8_t*,int,int,const Surface::Clip&){return false;},
             [](void* p,unsigned left,unsigned top,unsigned words,unsigned rows){auto& s=*static_cast<Storage*>(p);
                 assert(words&&rows&&left+words<=10&&top+rows<=284);
                 for(unsigned plane=0;plane<3;++plane)for(unsigned y=top;y<top+rows;++y)
