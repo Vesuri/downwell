@@ -83,8 +83,52 @@ struct RunnerSpriteBounds {
         if(scale.bits!=0x3f800000u||low.bits==0x80000000u||!small(origin)||
            !unitPixel(low,l)||!unitPixel(high,h))
             return axisBinary32(low,high,origin,position,scale,compatibility,round,near,far);
-        if(!add(unitReal(l-origin),position,near)||!add(unitReal(h-l+1),near,far))return false;
+        if((!sumInteger(l-origin,position,near)&&!add(unitReal(l-origin),position,near))||
+           (!sumInteger(h-l+1,near,far)&&!add(unitReal(h-l+1),near,far)))return false;
         return finishAxis(compatibility,round,near,far);
+    }
+    // axis() for unit scale, origin 0, no compatibility rounding and integer
+    // margins [low, high]: false (nothing written) outside sumInteger's domain.
+    static bool unitIntegerAxis(std::int32_t low,std::int32_t high,Real position,Real& near,Real& far){
+        if(!small(low)||!small(high)||!Math::valid(position))return false;
+        Real n,f;
+        if(!sumInteger(low,position,n)||!sumInteger(high-low+1,n,f))return false;
+        if(Math::less(f,n)){near=f;far=n;}else{near=n;far=f;}
+        return true;
+    }
+    // fl32(n + p) for |n| <= 2^22 and p zero or 2^-8 <= |p| < 2^22, from the
+    // exact integer sum n*2^k + significand (p = significand*2^-k) rounded to
+    // 24 bits, ties to even: subtractBinary32(unitReal(n), -p) bit for bit.
+    // False outside that domain.
+    static bool sumInteger(std::int32_t n,Real p,Real& out){
+        if(n<-(1<<22)||n>(1<<22))return false;
+        if(!(p.bits&0x7fffffffu)){out=unitReal(n);return true;} // |n| < 2^24 is exact; 0+-0 = +0
+        const unsigned field=(p.bits>>23)&255u;
+        if(field<119u||field>148u)return false;
+        const unsigned k=150u-field; // 2..31
+        const std::uint32_t significand=(p.bits&0x7fffffu)|0x800000u;
+        const bool nNegative=n<0,pNegative=(p.bits>>31)!=0;
+        const std::uint64_t scaled=shiftLeft64(nNegative?0u-std::uint32_t(n):std::uint32_t(n),k);
+        std::uint64_t magnitude;bool negative;
+        if(nNegative==pNegative){magnitude=scaled+significand;negative=nNegative;}
+        else if(scaled>=significand){magnitude=scaled-significand;negative=nNegative;}
+        else{magnitude=significand-scaled;negative=pNegative;}
+        if(!magnitude){out={};return true;} // exact cancellation: +0
+        const auto high=std::uint32_t(magnitude>>32),low=std::uint32_t(magnitude);
+        // Bit length at most 54 (2^53 + 2^24), so a shift below 31 suffices.
+        const unsigned length=high?64u-MotionBinary64::Words::leadingZeros32(high):
+                                   32u-MotionBinary64::Words::leadingZeros32(low);
+        int exponent=int(length)-1-int(k)+127;
+        std::uint32_t rounded;
+        if(length<=24)rounded=low<<(24u-length);
+        else{
+            const unsigned shift=length-24u;
+            rounded=(shift<32u&&high?high<<(32u-shift):0u)|(low>>shift);
+            const std::uint32_t rest=low&((1u<<shift)-1u),half=1u<<(shift-1u);
+            if((rest>half||(rest==half&&(rounded&1u)))&&++rounded==0x1000000u){rounded>>=1;++exponent;}
+        }
+        out.bits=(negative?0x80000000u:0u)|(std::uint32_t(exponent)<<23)|(rounded&0x7fffffu);
+        return true;
     }
     template<class Round> static bool axisBinary32(Real low,Real high,int origin,Real position,
         Real scale,bool compatibility,Round& round,Real& near,Real& far){

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 using Bounds=downwell::RunnerSpriteBounds;
 using Real=Bounds::Real;
 Real packed(float x){Real r;std::memcpy(&r.bits,&x,4);return r;}
@@ -80,6 +81,53 @@ int main(){
             }
         }
         std::printf("Unit-scale integer axis: 4000000 axes match binary32 (%u on the integer path)\n",fastAxes);
+        // sumInteger against host IEEE binary32 addition, and the integer
+        // margin axis against its binary32 oracle.
+        unsigned admitted=0;
+        for(unsigned i=0;i<20000000;++i){
+            std::int32_t n;
+            switch(random()%4){
+            case 0:n=int(random()%129u)-64;break;
+            case 1:n=int(random()%8388609u)-4194304;break; // beyond the gate too
+            case 2:n=i&1?(1<<22):-(1<<22);break;
+            default:n=int(random()%2001u)-1000;
+            }
+            Real p=position();
+            if(i%5==0)p=Real{(random()&0x80000000u)|((random()%32u+118u)<<23)|(random()&0x7fffffu)};
+            if(i%7==0)p=packed(-float(n)+float(int(random()%5u)-2)*0.5f); // cancellations
+            if(i%11==0){ // ties: an odd multiple of half n's ulp
+                n=int(65536u+random()%(4194304u-65536u));if(random()&1)n=-n;
+                int top=0;for(unsigned m=unsigned(n<0?-n:n);m>1;m>>=1)++top;
+                const float half=std::ldexp(1.f,top-24);
+                p=packed(float(int(2*(random()%64u)+1))*half*(random()&1?-1.f:1.f));
+            }
+            Real out;
+            if(!Bounds::sumInteger(n,p,out))continue;
+            ++admitted;
+            const float expected=float(n)+unpacked(p);
+            Real e=packed(expected);
+            if(out.bits!=e.bits){
+                std::printf("sumInteger %d + %08x = %08x, IEEE %08x\n",int(n),unsigned(p.bits),unsigned(out.bits),unsigned(e.bits));
+                std::exit(1);
+            }
+        }
+        unsigned integerAxes=0;
+        for(unsigned i=0;i<4000000;++i){
+            const int low=int(random()%601u)-300,high=low+int(random()%64u)-(i%31==0?70:0);
+            const Real pos=position();
+            Real n1,f1,n2,f2;
+            auto never=[](Real,std::int32_t&){return false;};
+            if(!Bounds::unitIntegerAxis(low,high,pos,n1,f1))continue;
+            ++integerAxes;
+            Real lo,hi;assert(lo.assignInteger(low)&&hi.assignInteger(high));
+            assert(Bounds::axisBinary32(lo,hi,0,pos,packed(1.f),false,never,n2,f2));
+            if(n1.bits!=n2.bits||f1.bits!=f2.bits){
+                std::printf("unitIntegerAxis %d..%d at %08x: %08x %08x vs %08x %08x\n",low,high,unsigned(pos.bits),
+                    unsigned(n1.bits),unsigned(f1.bits),unsigned(n2.bits),unsigned(f2.bits));
+                std::exit(1);
+            }
+        }
+        std::printf("sumInteger: %u admitted sums match IEEE; %u integer-margin axes match binary32\n",admitted,integerAxes);
     }
     auto round=[](Real value,std::int32_t& result){return value.promoted().roundPixel(result);};
     unsigned comparisons=0,roundCalls=0,reassociatedDifferences=0;

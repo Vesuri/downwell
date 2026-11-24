@@ -16,7 +16,20 @@ struct CurrencyCollisionBounds {
         RunnerImageValue px,py;RunnerSpriteBounds::Box margins,edges;
         const auto local=contactSpriteBounds(sprite);
         if(local.left>=local.right||local.top>=local.bottom)return false;
-        if(!px.assign(x)||!py.assign(y)||!margins.left.assignInteger(local.left)||
+        if(!px.assign(x)||!py.assign(y))return false;
+        {   // Integer margins at unit scale: the same edges without the
+            // binary32 margin conversions, where sumInteger admits them.
+            RunnerSpriteBounds::Box fast;ContactBounds next;
+            if(RunnerSpriteBounds::unitIntegerAxis(local.left,local.right-1,px,fast.left,fast.right)&&
+               RunnerSpriteBounds::unitIntegerAxis(local.top,local.bottom-1,py,fast.top,fast.bottom)){
+                std::int32_t l,r,t,b;
+                if(!fast.left.roundPixel(l)||!fast.right.roundPixel(r)||
+                   !fast.top.roundPixel(t)||!fast.bottom.roundPixel(b))return false;
+                next.left=int(l);next.right=int(r);next.top=int(t);next.bottom=int(b);
+                out=next;return true;
+            }
+        }
+        if(!margins.left.assignInteger(local.left)||
             !margins.right.assignInteger(local.right-1)||!margins.top.assignInteger(local.top)||
             !margins.bottom.assignInteger(local.bottom-1))return false;
         const RunnerImageValue unit{0x3f800000u};
