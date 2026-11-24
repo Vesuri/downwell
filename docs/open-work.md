@@ -278,10 +278,24 @@ resets it; that is the first owner to find.
    Destroyed blocks are now repaired one span of touching rows at a time
    (`REFERENCE_CELL_REPAIR=1` keeps the per-cell repair). A single
    destroyed cell still costs about 1.9 ms: 1.18 ms of live painting and a
-   0.55 ms full-width store of its 16 rows. Constant firing breaks blocks
-   one or two at a time, and its census did not change. The next owner
-   there is that fixed cost per span: the indexed wall batch, its
-   decorations and the store of whole raster rows for a 16-pixel cell.
+   0.55 ms full-width store of its 16 rows. That is not an owner on
+   constant fire: a trace of 560–587 on that route shows one repair, 1.1 ms
+   at 587, in 28 updates (31–51 ms each).
+
+   What constant fire does cost (mean of 560–569, 49.1 ms per update):
+   - **The simulation step, 21.6 ms.** White jelly 5.0 ms, the smoke step
+     3.5 ms, smoke against walls 1.9 ms, the enemy room effect 1.7 ms,
+     enemy alarms 1.5 ms.
+   - **Smoke composition, 15.4 ms.** `visitNewest`, queueing the smoke
+     stamps, takes 6.9 ms. The visibility test then spends 5.1 ms in
+     `blitterDrain`: `intersects` synchronizes the surface before it reads
+     alpha. Actor assignment tests actors against the same surface right
+     after, so moving the test alone only moves the wait.
+
+   The CPU wait and the blitter time behind it are section 5 C (combat
+   composition). Measure the blitter's time per smoke stamp first. Then
+   compare two options: fewer stamps, or CPU work placed between queueing
+   and the first read.
 
    The candidate's own gate stays: generation and painting in different
    updates of each row period, and the scalar pixel comparison over all
