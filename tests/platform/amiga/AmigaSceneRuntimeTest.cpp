@@ -2486,6 +2486,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // W1.9 coverage (DOWNWELL_SLICE_MODULE_SHOT): with Reverse Engineering,
     // jump onto a resting GunModule and shoot it down before collecting it.
     const bool moduleShot=std::getenv("DOWNWELL_SLICE_MODULE_SHOT")!=nullptr;
+    // W3.7 workload (DOWNWELL_SLICE_SPRAY): tap fire every other pair of
+    // updates throughout, breaking every block below (a profiling route; it
+    // is not expected to meet the coverage checks).
+    const bool spray=std::getenv("DOWNWELL_SLICE_SPRAY")!=nullptr;
     std::vector<unsigned> slicePicks;
     if(const char* picks=std::getenv("DOWNWELL_SLICE_PICK"))
         for(const char* p=picks;*p;){char* end=nullptr;slicePicks.push_back(unsigned(std::strtoul(p,&end,10)));
@@ -2603,6 +2607,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
             input.fire=cadence==0||cadence==3;
             if(chased)input.fire=false;
             if(below&&std::abs(threatX)<=12)input.fire=updates%4<2;
+            if(spray)input.fire=updates%4<2;
             // W1.3 detour: visit a gem chunk in a side room off the shaft, jump
             // onto it and shoot it open. Bounded per target.
             {

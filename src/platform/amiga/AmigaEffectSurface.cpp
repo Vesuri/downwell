@@ -36,19 +36,21 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
 #ifdef DOWNWELL_BOB_VERIFY
     if(low)reference->add({m,low,high},x,y);else reference->subtract(m,x,y);
 #endif
-    // Immutable DWAP images are word-aligned. Unusual host-style masks and
-    // Fast-RAM entry masks retain the scalar path, after draining queued DMA.
-    if((reinterpret_cast<ULONG>(m.data)&1)||reinterpret_cast<ULONG>(m.data)>=0x200000UL||
+    // The stamp bank's Chip copies of the smoke and currency stamps serve
+    // wherever the CPU catalogue lives (Fast RAM on an expanded machine).
+    // Other immutable DWAP images are word-aligned; unusual host-style masks
+    // and Fast-RAM masks retain the scalar path, after draining queued DMA.
+    if((m.stride&1)||m.stride>=8192)return false;
+    const auto* combined=AmigaEffectSurface::interleaved&&low?stampBank.find(m,low,high):nullptr;
+    if(!combined&&((reinterpret_cast<ULONG>(m.data)&1)||reinterpret_cast<ULONG>(m.data)>=0x200000UL||
         (low&&((reinterpret_cast<ULONG>(low)|reinterpret_cast<ULONG>(high))&1))||
-        (low&&(reinterpret_cast<ULONG>(low)>=0x200000UL||reinterpret_cast<ULONG>(high)>=0x200000UL))||
-        (m.stride&1)||m.stride>=8192)return false;
+        (low&&(reinterpret_cast<ULONG>(low)>=0x200000UL||reinterpret_cast<ULONG>(high)>=0x200000UL))))return false;
     unsigned sx=0,sy=0,width=m.width,height=m.height;
     if(x<0){sx=unsigned(-x);width-=sx;x=0;}
     if(y<0){sy=unsigned(-y);height-=sy;y=0;}
     if(width>unsigned(160-x))width=160-x;
     if(height>unsigned(284-y))height=284-y;
     if(!width||!height)return true;
-    const auto* combined=AmigaEffectSurface::interleaved&&low?stampBank.find(m,low,high):nullptr;
     const unsigned sourceY=combined?sy*3:sy;
     const unsigned targetY=combined?unsigned(y)*3:unsigned(y);
     const unsigned blitHeight=combined?height*3:height;
