@@ -2,6 +2,18 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
+# INSTANCE=name (default: default) runs another emulator beside the first.
+# Each instance has its own pidfile, disks, state and gdb port, so a run.sh
+# stops only its own instance's previous emulator. It never touches the
+# verification and profile scripts' emulators (they use .run itself), and
+# never replaces the executable they have mounted.
+INSTANCE="${INSTANCE:-default}"
+case "$INSTANCE" in ""|*[!a-zA-Z0-9_-]*) echo "INSTANCE must be a plain name"; exit 1 ;; esac
+RUN=".run/instances/$INSTANCE"
+export FSUAE_RUN="$RUN"
+# Default gdb port: per instance, and outside the range the verification
+# scripts derive from this directory. An explicit $DEBUG_PORT still wins.
+[ -n "${DEBUG_PORT:-}" ] || { export DEBUG_PORT=$(( 2745 + $(printf '%s' "$PWD/$INSTANCE" | cksum | cut -d' ' -f1) % 400 )); export FSUAE_PORT_PINNED=0; }
 . "$FSUAE_COMMON"
 . ./machine.sh
 
@@ -10,7 +22,6 @@ EXE="${DOWNWELL_EXE:-out/Downwell.exe}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
 [ -f "$EXE" ] || { echo "not found: $EXE (build first)"; exit 1; }
 
-RUN=.run
 DH0="$RUN/dh0"
 DH1="$RUN/dh1"
 
@@ -34,6 +45,11 @@ for bank in results shop pause clear fields columns patterns exitmask selectionm
   cp -f "${EXE%.exe}.$bank" "$DH1/Downwell.$bank"
 done
 # W1.10: save.ini persists in dh1 between runs; DOWNWELL_SAVE replaces it.
+# The default instance carries the save over once from .run/dh1, which
+# interactive runs used to share with the verification scripts.
+if [ "$INSTANCE" = default ] && [ ! -f "$DH1/save.ini" ] && [ -f .run/dh1/save.ini ]; then
+  cp -f .run/dh1/save.ini "$DH1/save.ini"
+fi
 if [ -n "${DOWNWELL_SAVE:-}" ]; then cp -f "$DOWNWELL_SAVE" "$DH1/save.ini"; fi
 echo "running $EXE"
 rm -f "$RUN"/state/*.uss

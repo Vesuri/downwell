@@ -84,4 +84,7 @@ Downwell.
 
 - Host: `make`, then `make run`.
 - Amiga environment: `. amiga/env.sh`.
+- Test runs and user runs never interfere. `amiga/run.sh`'s `default`
+  instance belongs to the user; agents that need an interactive run use their
+  own `INSTANCE=`, and never stop an emulator they did not start.
 - Amiga scaffold/tool check: `make amiga` or `cd amiga && . ./env.sh && make`.

@@ -55,6 +55,11 @@ overridden before sourcing `env.sh`. The verification scripts are debug runs:
 they are silent and open their window behind the others (`WINDOW=none` runs
 without one). `amiga/run.sh` plays with sound in front; `DEBUG=1` adds the gdb
 stub, and `SOUND`, `WINDOW` and the other shared FS-UAE options apply.
+`run.sh` runs in `amiga/.run/instances/<INSTANCE>` (default `default`), with
+its own drives, state, pidfile and gdb port. It only ever stops that
+instance's previous emulator, and the verification and profile scripts (which
+use `amiga/.run`) never stop it. `INSTANCE=b ./run.sh` runs a second emulator
+beside the first.
 
 ## GameMaker extraction
 
