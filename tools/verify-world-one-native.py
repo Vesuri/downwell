@@ -69,6 +69,11 @@ def main():
     deathRoute=os.environ.get('DOWNWELL_ROUTE_DEATH')=='1'
     retryRoute=deathRoute and os.environ.get('DOWNWELL_ROUTE_RETRY')=='1'
     retrySamples=-1;retryLive=0
+    # DOWNWELL_ROUTE_CENSUS=1 (W3.6): a CENSUS=1 FPSCOUNT build; read the
+    # per-update work census once where the route ends (census_dump.gdb).
+    # The stops at every input sample halt the whole emulated machine, beam
+    # included, so they add no work to the measured updates.
+    census=os.environ.get('DOWNWELL_ROUTE_CENSUS')=='1'
     gardenShot=os.environ.get('DOWNWELL_GARDEN_SHOT')=='1'
     tape=Path(base+'.inputs').read_bytes()
     witnesses={row[0]:row[1:] for row in
@@ -89,6 +94,11 @@ def main():
         checked(f"set $a=(downwell::AmigaSoundBanks*)&'{storageSymbol(r'_ZZL11runDownwellvE16soundBankStorage')}'")
         voiceFormat='printf "VOICES'+' %d %d %u'*4+'\\n"'+''.join(
             f',$a->audio_.plan_.voices_[{c}].active,$a->audio_.plan_.voices_[{c}].asset,$a->audio_.plan_.voices_[{c}].serial' for c in range(4))
+        def dumpCensus():
+            if not census: return
+            print(checked('source census_dump.gdb').strip(),flush=True)
+            # The VBlank count is independent of the ring's beam clock.
+            print(checked('printf "CENSUS fields gameplay frames=%lu fields=%lu\\n", gDownwellProfileFrames[3],gDownwellProfileFields[3]').strip(),flush=True)
         seenSerials=set()
         nativeStarts={}
         # DOWNWELL_MEMORY_SAMPLE=1 (WR.1): the free bytes of every exec
@@ -206,6 +216,7 @@ def main():
                     raise TimeoutError('bounded world-one route')
                 stop=checked('continue')
                 if 'downwellWorldOneComplete' in stop:
+                    dumpCensus()
                     state=checked('printf "END %d %d %u %d %u\\n", $w->run_.stage.area,$w->run_.stage.level,$w->tick_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
                     print(state,flush=True)
                     reportMemory()
@@ -253,6 +264,7 @@ def main():
                         retryLive+=1
                         packed=0
                         if retryLive==200:
+                            dumpCensus()
                             print(state,flush=True)
                             checked('delete breakpoints')
                             shot('world-one-retry')
@@ -271,6 +283,7 @@ def main():
                     if deathSamples%50==0: print(notice,flush=True)
                     stage=int(re.search(r'NOTICE (-?\d+)',notice)[1])
                     if 330 in nativeStarts:
+                        if not retryRoute: dumpCensus()
                         reportMemory()
                         # Without a gem seed no goal is reached: the bar's
                         # completion sound (sfxUiRetry 330) ends the results.
@@ -283,6 +296,7 @@ def main():
                         Path('.run/gdb-ready.marker').touch()
                         return
                     if stage>=3:
+                        dumpCensus()
                         reportMemory()
                         checkSounds()
                         for _ in range(20): checked('continue')
@@ -319,6 +333,7 @@ def main():
                             raise RuntimeError(f'first checked divergence tick={tick}: native={actual}, host={witnesses[tick]}')
                     packed=tape[tick]
                     if tick==shotTick:
+                        dumpCensus()
                         # Evidence mode ends here: the capture runs the
                         # emulator past the following samples.
                         checked('delete breakpoints')

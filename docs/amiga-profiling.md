@@ -242,12 +242,21 @@ record per iteration, mark to mark as the trace splits frames:
 
 Times are beam positions (313 × 256 ticks per PAL field), so they mean the
 same on every CPU. The ring is written in Fast RAM and read once by the
-debugger at the mode's ready marker; nothing stops inside a measured update.
+debugger at the mode's ready marker or where a route ends. A debugger stop
+halts the whole emulated machine, beam included: with a stop at every input
+sample of the quiet fall, plus a memory read or a joystick event at each, the
+ring stayed byte-identical to a run without stops.
 A full ring keeps the newest records and the report says how many were
 overwritten. The modes that run to the freeze take it as they are (`fps`,
 `idle`, `quiet-fall`, `shop`, `overflow-state`, `draw-cache`, `draw-order`,
 `ammo`); `entry` and `transition` run their routes as census builds without
-probes (`census.gdb`).
+probes (`census.gdb`). `CENSUS=1 ROUTE=name bash amiga/profile.sh route`
+replays a host route (`tmp/sound-route-name`, from `make
+test-sound-routes`) from boot with joystick events only, on an FPSCOUNT
+build without autorun: `tools/verify-world-one-native.py` keeps its witness
+and sound checks and reads the ring where the route ends, with the VBlank
+field count as a check on the beam clock. `hard-mode-death*` routes start
+from a hard-mode save and end at the results.
 
 `tools/amiga-census-report.py census.bin capture.log` (run by profile.sh,
 output in `CENSUS_OUTPUT`, default `tmp/census/MODE`) prints the work mean,

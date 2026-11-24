@@ -4,6 +4,7 @@ cd "$(dirname "$0")"
 . ./env.sh
 mode="${1:-probes}"
 transition=0
+autorun=1
 ready_marker=DOWNWELL_PROFILE_READY
 case "$mode" in
   probes) flags=(PROBES=1); script=profile.gdb ;;
@@ -143,15 +144,41 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: [CENSUS=1] bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-state|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  route)
+    # W3.6: CENSUS=1 ROUTE=name replays the host route tmp/sound-route-name
+    # (make test-sound-routes) from boot with joystick events only
+    # (tools/verify-world-one-native.py, its witness and sound checks), on an
+    # FPSCOUNT build without autorun. hard-mode-death* routes start from a
+    # save with hard mode on and end at the results.
+    route="${ROUTE:-world-one}"
+    [[ -f ../tmp/sound-route-$route.inputs ]] || {
+      echo "no host route tmp/sound-route-$route (make test-sound-routes)" >&2; exit 1; }
+    flags=(FPSCOUNT=1); autorun=0; script=verify_startup.gdb
+    ready_marker=DOWNWELL_WORLD_ONE_READY
+    export GDB=../tools/verify-world-one-native.py DOWNWELL_ROUTE_TAPE="../tmp/sound-route-$route"
+    export DOWNWELL_ROUTE_CENSUS=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
+    export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0 PROFILE_IDLE=0
+    export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-3000}"
+    export DOWNWELL_ROUTE_SECONDS="$VERIFY_TIMEOUT_SECONDS"
+    if [[ $route == hard-mode-death* ]]; then
+      mkdir -p .run
+      printf '[stats]\nhardUnlocked="1.000000"\n[option]\nhardMode="1.000000"\n' > .run/route-save.ini
+      export DOWNWELL_ROUTE_DEATH=1 VERIFY_SAVE="$PWD/.run/route-save.ini"
+      ready_marker=DOWNWELL_WORLD_ONE_RESULTS_READY
+    fi
+    ;;
+  *) echo "usage: [CENSUS=1] bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-state|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear|route]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
 fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # W3.5: CENSUS=1 adds the per-update work census to a mode that runs to the
-# profile freeze without probes, traces or per-update stops. The debugger
-# reads its ring once, just before the mode's ready marker.
+# profile freeze without probes or traces. The debugger reads its ring once,
+# just before the mode's ready marker. A debugger stop halts the whole
+# emulated machine, beam included: 165 stops inside the quiet fall left the
+# ring byte-identical, so the route driver's stops at every input sample
+# add nothing to the measured updates.
 census="${CENSUS:-0}"
 unset CENSUS
 if [[ $census == 1 ]]; then
@@ -159,12 +186,14 @@ if [[ $census == 1 ]]; then
     fps|idle|quiet-fall|shop|overflow-state|draw-cache|draw-order|ammo) ;;
     # Their routes, without the probes: census.gdb only waits for the freeze.
     entry|transition) flags=(FPSCOUNT=1); script=census.gdb; ready_marker=DOWNWELL_PROFILE_READY ;;
-    *) echo "CENSUS=1 needs a mode that runs to the profile freeze without traces or per-update stops" >&2
+    # The route driver reads the ring itself where the route ends.
+    route) ;;
+    *) echo "CENSUS=1 needs a mode that runs to the profile freeze or a route, without probes or traces" >&2
        exit 1 ;;
   esac
   [[ " ${flags[*]} " != *" PROBES=1 "* ]] || { echo "CENSUS=1 cannot measure a probes build" >&2; exit 1; }
   flags+=(CENSUS=1 CENSUS_UPDATES="${CENSUS_UPDATES:-16384}")
-  if [[ $script != census.gdb ]]; then
+  if [[ $script != census.gdb && $mode != route ]]; then
     mkdir -p .run/census
     awk '/^shell touch \.run\/gdb-ready\.marker$/ && !done {print "source census_dump.gdb"; done=1} {print}' \
       "$script" > .run/census/profile.gdb
@@ -173,6 +202,9 @@ if [[ $census == 1 ]]; then
     script=.run/census/profile.gdb
   fi
   rm -f .run/census.bin
+elif [[ $mode == route ]]; then
+  echo "route measures nothing without CENSUS=1 (tools/verify-world-one-native.py replays it)" >&2
+  exit 1
 fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
@@ -262,7 +294,7 @@ if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
 fi
 trap restore EXIT
 make clean
-make -j4 "${flags[@]}" PROFILE_AUTORUN=1 PROFILE_TRANSITION="$transition"
+make -j4 "${flags[@]}" PROFILE_AUTORUN="$autorun" PROFILE_TRANSITION="$transition"
 printf 'Profile optimization: %s\n' "${AMIGA_OPTIMIZATION:--O3}"
 printf 'Profile prepared field reference: %s\n' "${PROFILE_FIELD_REFERENCE:-0}"
 printf 'Profile Laser Sight fixture: %s\n' "${PROFILE_LASER:-0}"
@@ -287,7 +319,7 @@ if [[ ${PROFILE_ENTRY:-0} == 1 && $census != 1 ]]; then
 fi
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
 if [[ $census == 1 ]]; then
-  census_out="${CENSUS_OUTPUT:-$PWD/../tmp/census/$mode}"
+  census_out="${CENSUS_OUTPUT:-$PWD/../tmp/census/$mode${route:+-$route}}"
   mkdir -p "$census_out"
   cp .run/census.bin "$census_out/census.bin"
   cp ".run/profile-${mode}.log" "$census_out/capture.log"

@@ -182,9 +182,10 @@ not frame cost: `fxTimeChange` (two fields per update at room speed 30, plus
 a 30 ms sleep), `momentDelay` (30 for one update) and player damage (40 for
 40 updates).
 
-No world-1 timing has been measured on the target yet. Every number in
-sections 0 and 5 and in the [frame-cost audit](amiga-frame-cost.md) is from
-the A500 and predates most of W1 and W2, so it is relative evidence only.
+The target's numbers for the initial fall and the normal run are below.
+Every number in sections 0 and 5 and in the [frame-cost
+audit](amiga-frame-cost.md) is from the A500 and predates most of W1 and W2,
+so it is relative evidence only.
 Work the steps in order; sections 0 and 5 hold the detail for the items they
 name. Every change follows their working rules:
 
@@ -205,28 +206,38 @@ On the target the quiet fall already presents every update in one field
 its field count cannot show a smaller regression: judge the quiet fall on
 the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
 
-6. **W3.6 Census of world 1.** Run `CENSUS=1 bash amiga/profile.sh` (the
-   [census](amiga-profiling.md#per-update-work-census)) over:
-   - the initial fall;
-   - the contact tape (`profile.sh fps`) and the shop tape
-     (`profile.sh shop`);
-   - the native world-one route (`tools/verify-world-one-native.py`: 1-1 to
-     1-3 with shops, side rooms, time-stop, and the clear and upgrade
-     screens) and the hard-mode death route;
-   - the upgrade routes that add per-update work (`UPGRADE_ROUTES`: Hot
-     Casing, Heart Balloon, Gunpowder and Drone, Rocket Jump, the laser);
-   - a dense-encounter tape (section 5 H), chosen with the seeded input
-     search and its parity checks;
-   - the gameplay entry (`profile.sh entry`) and the transitions.
+The normal run: `CENSUS=1 ROUTE=world-one bash amiga/profile.sh route` (the
+[census](amiga-profiling.md#per-update-work-census) of the host route
+`world-one`: boot, the garden, normal mode 1-1 to 1-3 with shops, side
+rooms, time-stop and the clear and upgrade screens, to the hand-off to area
+2; 9,001 updates, END 2 1 8138, witnesses and sounds passed). Frames count
+gameplay updates from the start of the run.
 
-   For each, record the work mean, the worst update, and the updates over
-   20 ms with their excess. Three tapes wait for the host reference's W1.4
-   shot (section 3): `verify-contact-profile` fails at frame 13,
-   `generate-shop-profile` at parity frame 3 (camera X 159 against 160) and
-   the overflow witness at frame 7, group 1. The world-one route stops GDB at
-   every input sample; run it under the census without those stops.
-7. **W3.7 Owners and ranking.** Trace the worst updates with short captures
-   that start one update early. Rank owners by their total excess across
+| Updates | Count | Work mean ms | Worst ms (frame) | Over 20 ms | Excess s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Gameplay 1-1 | 1,994 | 90.8 | 494.4 (1574) | 1,822 | 143.0 |
+| Gameplay 1-2 | 1,571 | 109.2 | 578.4 (3468) | 1,571 | 140.2 |
+| Gameplay 1-3 | 2,678 | 112.3 | 569.9 (5780) | 2,678 | 247.2 |
+| Side-room camera | 896 | 198.0 | 736.2 (7407) | 896 | 159.5 |
+| Room speed below 60 | 362 | 184.6 | 722.2 (7615) | 362 | 59.6 |
+| Clear and upgrade overlays | 636 | 6.4 | 127.0 (7931) | 40 | 0.5 |
+| Front end | 854 | 1.2 | 17.7 | 0 | 0 |
+
+Handoffs: splash to menu 222 ms, menu to style select 56 ms, style select to
+1-1 1,426 ms, 1-1 to 1-2 1,157 ms, 1-2 to 1-3 1,155 ms.
+
+The gameplay floor rises within each level. 1-1 starts at the quiet fall's
+4–8 ms, but by frame 400 the cheapest update of each stretch costs 50–100 ms,
+and from frame 272 ten updates in a row exceed 40 ms. 1-2 starts at 22 ms.
+So a per-update cost grows through a level and the level change only partly
+resets it; that is the first owner to find.
+
+7. **W3.7 Owners and ranking.** Start with the normal run's rising floor,
+   on the shortest workload that shows it: the route from boot to about
+   frame 700 of 1-1 (`DOWNWELL_CAPTURE_TICK` ends the route driver early).
+   Trace the worst updates with short captures that start one update early
+   (the route driver can run `monitor profile` at a tick, as its screenshots
+   do). Rank owners by their total excess across
    all workloads. Replace the A500 numbers in this section, sections 0 and
    5 and the audit with the target's, and drop any item the target already
    meets. Then review the order of W3.8–W3.13 with the user: CPU-side work
@@ -304,14 +315,32 @@ the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
     level transitions and shop re-entry, the clear and upgrade screens,
     results and Retry, and the pause menus.
 
+14. **W3.14 The other workloads,** each a separate census once the normal
+    run meets its target:
+    - hard mode (`ROUTE=hard-mode-death`, to its death in 1-3 and the
+      results). Measured with the normal run: gameplay 5,729 updates, work
+      mean 133.8 ms, worst 556.1 ms (frame 864), 5,522 over 20 ms (654 s of
+      excess); side-room camera 611 updates, mean 222.5 ms; room speed
+      below 60 462 updates, mean 177.4 ms. Its 7,230 gameplay updates took
+      50,022 VBlank fields, and the census spans sum to 50,117;
+    - the upgrade routes that add per-update work (`UPGRADE_ROUTES`: Hot
+      Casing `upgrade-8-v17`, Heart Balloon `upgrade-15-v2`, Gunpowder and
+      Drone `upgrade-5-9-v96`, Rocket Jump `upgrade-0-18-v58`, the laser
+      `upgrade-12-v155`);
+    - the contact tape (`profile.sh fps`), the shop tape (`profile.sh
+      shop`) and a dense-encounter tape (section 5 H). These wait for the
+      host reference's W1.4 shot (section 3): `verify-contact-profile`
+      fails at frame 13, `generate-shop-profile` at parity frame 3 (camera
+      X 159 against 160) and the overflow witness at frame 7, group 1.
+
 **Close**
 
-14. **W3.14 Re-audit and lock in.** Repeat the census on the target, with
+15. **W3.15 Re-audit and lock in.** Repeat the census on the target, with
     every active-gameplay update within 20 ms. Commit the results to the
     audit, and turn the cadences into regression ceilings: the quiet fall
     at 164 fields, and a ceiling for the world-one route. Check that the
     shipping footprint still fits the target.
-15. **W3.15 Close W3:** remove this section and the world-1 parts of
+16. **W3.16 Close W3:** remove this section and the world-1 parts of
     section 5. Its other items stay parked for world 2.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms

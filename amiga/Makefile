@@ -195,13 +195,14 @@ ifeq ($(PROFILE_AUTORUN)$(PROBES)$(FPSCOUNT),100)
 $(error PROFILE_AUTORUN requires PROBES=1 or FPSCOUNT=1)
 endif
 # W3.5 per-update work census: a ring of CENSUS_UPDATES records (16 bytes
-# each, a power of two), read by the debugger at the profile freeze.
+# each, a power of two), read by the debugger at the profile freeze or, for
+# a joystick route without autorun (profile.sh route), where the route ends.
 CENSUS ?= 0
 CENSUS_UPDATES ?= 16384
 ifeq ($(CENSUS),1)
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING)$(PROFILE_AUTORUN),10001)
-$(error CENSUS=1 requires FPSCOUNT=1 PROFILE_AUTORUN=1 without probes, coarse timing or sampling)
+ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING),1000)
+$(error CENSUS=1 requires FPSCOUNT=1 without probes, coarse timing or sampling)
 endif
 endif
 endif
