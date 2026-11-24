@@ -3578,6 +3578,7 @@ named holds the numbers. Do not retry a row without removing the reason in its l
 | Fields | Chained adjacent-raster XOR packets | 32.2 → 39.3 ms | Packet traversal on the CPU | 3de03179, [`field-delta-rejected.patch`](rejected/field-delta-rejected.patch) |
 | Fields | Prepared transfer-list batches | 32.4 → 40.0 ms | Queue scheduling overhead | e558b6a3, [`field-batch-rejected.patch`](rejected/field-batch-rejected.patch) |
 | Terrain | All-phase CPU tile bank (80 KB) | 844 painting 26 → 15 ms | Superseded by direct run composition | 947e8004, [`terrain-words-experiment.patch`](rejected/terrain-words-experiment.patch) |
+| Trig | Shared sine/cosine evaluation and one degree conversion per lengthdir pair (jelly effects, smokeTrigNarrowed) | Spray 400–700 within ±0.2 ms; spray fields 1906 → 1912 | Exact, but the duplicated reduction and series are a small part of each effect spawn | 200a76af, [`trig-pair-rejected.patch`](rejected/trig-pair-rejected.patch) |
 
 ## Prepared terrain: scene-entry versus live publication
 

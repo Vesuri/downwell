@@ -1,0 +1,236 @@
+diff --git a/src/core/CompactRoomEffects.h b/src/core/CompactRoomEffects.h
+index 2815cbdd..93c1c8d2 100644
+--- a/src/core/CompactRoomEffects.h
++++ b/src/core/CompactRoomEffects.h
+@@ -66,7 +66,7 @@ public:
+     // lengthdir velocity components.
+     bool spawnMoving(Real x,Real y,int sprite,Real imageSpeed,Real angle,Real speed){
+         unsigned count;Moving record;record.handle=next_;
+-        auto& e=record.effect;RunnerImageValue px,py,rate,turn;Real component;
++        auto& e=record.effect;RunnerImageValue px,py,rate,turn;
+         if(!good_||!frames(sprite,count))return fail();
+         if(movingCount_==MovingCapacity){++dropped_;return true;}
+         if(
+@@ -74,10 +74,7 @@ public:
+            !e.setSprite(sprite,count,[](const auto&){return true;})||
+            !rate.assign(imageSpeed)||!turn.assign(angle))return fail();
+         e.imageSpeed=rate;e.angle=turn;
+-        if(!WhiteJellyStep::movementComponent(false,speed,angle,component))return fail();
+-        e.xsp=component;
+-        if(!WhiteJellyStep::movementComponent(true,speed,angle,component))return fail();
+-        e.ysp=component;
++        if(!WhiteJellyStep::movementVector(speed,angle,e.xsp,e.ysp))return fail();
+         moving_[movingCount_++]=record;++next_;return true;
+     }
+     // Runner animation precedes Begin Step. Animation End destroys both.
+diff --git a/src/core/SmokeTrigNarrow.h b/src/core/SmokeTrigNarrow.h
+index 1904d2fb..75327ccc 100644
+--- a/src/core/SmokeTrigNarrow.h
++++ b/src/core/SmokeTrigNarrow.h
+@@ -62,6 +62,46 @@ inline bool evaluate(RunnerImageValue radians,bool cosine,U64& value,bool& negat
+     if(!cosine&&(radians.bits>>31))negative=!negative;
+     return true;
+ }
++// Both functions of one input from one range reduction and one set of
++// Taylor terms: [0] is sine, [1] cosine. Each value, sign and admission
++// equals evaluate(radians, function) (verify-smoke-trig-narrow checks every
++// admitted input); false where evaluate declines for both.
++struct Pair {U64 value[2];bool negative[2],admitted[2];};
++inline bool evaluatePair(RunnerImageValue radians,Pair& out){
++    const unsigned exponent=(radians.bits>>23)&255u;
++    if(exponent<117u||exponent>=131u)return false;
++    U64 y=shiftLeft64((radians.bits&0x7fffffu)|0x800000u,exponent-90u);
++    unsigned quadrant=0;
++    while(y>=halfPi){y-=halfPi;++quadrant;}
++    const bool reflect=y>quarterPi;
++    if(reflect)y=halfPi-y;
++    y<<=4;
++    const unsigned index=unsigned(y>>58);
++    const U64 d=y&((U64(1)<<58)-1);
++    const U64 D=d<<6,D2=high(D,D),D3=high(D2,D);
++    const auto Dw=std::uint32_t(D>>32),D2w=std::uint32_t(D2>>32);
++    const auto D4w=std::uint32_t(mulu32(D2w,D2w)>>32),D5w=std::uint32_t(mulu32(D4w,Dw)>>32);
++    const auto D6h=mulu16(std::uint16_t(D4w>>16),std::uint16_t(D2w>>16)),D7h=mulu16(std::uint16_t(D6h>>16),std::uint16_t(Dw>>16));
++    const U64 sinD=d-(high(D3,inverse6)>>18)+(mulu32(D5w,std::uint32_t(inverse120w))>>30)-
++        (mulu16(std::uint16_t(D7h>>16),std::uint16_t(inverse5040h))>>22);
++    const U64 versine=(D2>>13)-(mulu32(D4w,std::uint32_t(inverse24w))>>24)+
++        (mulu16(std::uint16_t(D6h>>16),std::uint16_t(inverse720h))>>13);
++    const U64 s=sines[index],c=cosines[index];
++    U64 rising=s-high(s,versine);
++    const U64 part=high(c,sinD);
++    const bool risingAdmitted=rising+part>=rising;
++    rising+=part;
++    const U64 falling=c-high(c,versine)-high(s,sinD);
++    for(unsigned cosine=0;cosine<2;++cosine){
++        const bool useRising=((cosine!=0)==((quadrant&1u)!=0))!=reflect;
++        out.value[cosine]=useRising?rising:falling;
++        out.admitted[cosine]=!useRising||risingAdmitted;
++        bool negative=((cosine?quadrant+1u:quadrant)&2u)!=0;
++        if(!cosine&&(radians.bits>>31))negative=!negative;
++        out.negative[cosine]=negative;
++    }
++    return true;
++}
+ }
+ // The binary32 that SmokeDirection::component narrows smokeTrigComponent's
+ // double to, for binary32 radians of magnitude in [2^-10, 16): an integer Q64 evaluation
+@@ -77,6 +117,18 @@ inline bool smokeTrigNarrowCandidate(RunnerImageValue radians,bool cosine,Runner
+ inline bool smokeTrigNarrow(RunnerImageValue radians,bool cosine,RunnerImageValue& output){
+     return smokeTrigNarrowCandidate(radians,cosine,output)||smokeTrigNarrowFallback(radians,cosine,output);
+ }
++// smokeTrigNarrow(radians,true,cosine) && smokeTrigNarrow(radians,false,sine)
++// with one shared evaluation; each value still falls back on its own.
++inline bool smokeTrigNarrowBoth(RunnerImageValue radians,RunnerImageValue& cosine,RunnerImageValue& sine){
++    smoke_trig_narrow_detail::Pair pair;
++    const bool evaluated=smoke_trig_narrow_detail::evaluatePair(radians,pair);
++    RunnerImageValue result[2];
++    for(int function=1;function>=0;--function)
++        if(!(evaluated&&pair.admitted[function]&&
++             smoke_trig_narrow_detail::narrow(pair.value[function],pair.negative[function],result[function]))&&
++           !smokeTrigNarrowFallback(radians,function!=0,result[function]))return false;
++    cosine=result[1];sine=result[0];return true;
++}
+ // smokeTrig for SmokeDirection::vector only: it narrows both results at
+ // once, so their binary32 stands in for the doubles. Radians that are not
+ // binary32 keep the program.
+@@ -84,7 +136,7 @@ inline bool smokeTrigNarrowed(MotionBinary64 radians,MotionBinary64& cosine,Moti
+     RunnerImageValue r,c,s;
+     if(!r.assign(radians)||r.promoted().high!=radians.high||r.promoted().low!=radians.low)
+         return smokeTrig(radians,cosine,sine);
+-    if(!smokeTrigNarrow(r,true,c)||!smokeTrigNarrow(r,false,s))return false;
++    if(!smokeTrigNarrowBoth(r,c,s))return false;
+     cosine=c.promoted();sine=s.promoted();return true;
+ }
+ }
+diff --git a/src/core/WhiteJellyStep.h b/src/core/WhiteJellyStep.h
+index 82aa0ac1..adea0120 100644
+--- a/src/core/WhiteJellyStep.h
++++ b/src/core/WhiteJellyStep.h
+@@ -27,6 +27,18 @@ struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
+             !SmokeDirection::component<0x40400000u>(length,trig.promoted(),vertical,component))return false;
+         output=component;return true;
+     }
++    // movementComponent(false, ...) then movementComponent(true, ...) with the
++    // narrowing, degree conversion and trig evaluated once for both.
++    static bool movementVector(Real speed,Real direction,Real& x,Real& y){
++        RunnerImageValue length,angle,radians,cosine,sine;Real horizontal,vertical;
++        if(!length.assign(speed)||length.bits>0x40400000u||!angle.assign(direction)||
++            ((angle.bits&0x80000000u)&&(angle.bits&0x7fffffffu))||
++            !SmokeDirection::radians<0x43b40000u>(angle,radians)||
++            !smokeTrigNarrowBoth(radians,cosine,sine)||
++            !SmokeDirection::component<0x40400000u>(length,cosine.promoted(),false,horizontal)||
++            !SmokeDirection::component<0x40400000u>(length,sine.promoted(),true,vertical))return false;
++        x=horizontal;y=vertical;return true;
++    }
+     template<class Player> bool playerContact(Player& player){
+         if(!initialized)return false;
+         Real threshold;int order;
+diff --git a/tests/core/SmokeTrigNarrowTest.cpp b/tests/core/SmokeTrigNarrowTest.cpp
+index c4560732..071ca37f 100644
+--- a/tests/core/SmokeTrigNarrowTest.cpp
++++ b/tests/core/SmokeTrigNarrowTest.cpp
+@@ -26,13 +26,31 @@ static float bitsFloat(std::uint32_t b){float f;std::memcpy(&f,&b,4);return f;}
+ static std::uint32_t floatBits(float f){std::uint32_t b;std::memcpy(&b,&f,4);return b;}
+ int main(){
+     constexpr std::uint32_t first=117u<<23,last=131u<<23; // both signs below
+-    std::atomic<unsigned long> admitted{0},rejected{0},failures{0};
++    std::atomic<unsigned long> admitted{0},rejected{0},failures{0},pairs{0};
+     std::atomic<std::uint64_t> worst{0};
+     const unsigned threads=std::max(1u,std::thread::hardware_concurrency());
+     std::vector<std::thread> pool;
+     for(unsigned t=0;t<threads;++t)pool.emplace_back([&,t]{
+-        unsigned long localAdmitted=0,localRejected=0,localFailures=0;std::uint64_t localWorst=0;
+-        for(std::uint32_t magnitude=first+t;magnitude<last;magnitude+=threads)
++        unsigned long localAdmitted=0,localRejected=0,localFailures=0,localPairs=0;std::uint64_t localWorst=0;
++        for(std::uint32_t magnitude=first+t;magnitude<last;magnitude+=threads){
++        for(std::uint32_t bits:{magnitude,magnitude|0x80000000u}){
++            // The shared pair against each single evaluation, and the paired
++            // narrowing against the two single narrowings.
++            downwell::smoke_trig_narrow_detail::Pair pair;
++            if(!downwell::smoke_trig_narrow_detail::evaluatePair({bits},pair))++localFailures;
++            else for(int function=0;function<2;++function){
++                downwell::smoke_trig_narrow_detail::U64 single;bool negative;
++                const bool admitted=downwell::smoke_trig_narrow_detail::evaluate({bits},function!=0,single,negative);
++                if(admitted!=pair.admitted[function]||
++                   (admitted&&(single!=pair.value[function]||negative!=pair.negative[function])))++localFailures;
++            }
++            RunnerImageValue cosine,sine,singleCosine,singleSine;
++            const bool both=downwell::smokeTrigNarrowBoth({bits},cosine,sine);
++            const bool singles=downwell::smokeTrigNarrow({bits},true,singleCosine)&&
++                downwell::smokeTrigNarrow({bits},false,singleSine);
++            if(both!=singles||(both&&(cosine.bits!=singleCosine.bits||sine.bits!=singleSine.bits)))++localFailures;
++            ++localPairs;
++        }
+         for(std::uint32_t bits:{magnitude,magnitude|0x80000000u})for(int cosine=0;cosine<2;++cosine){
+             Scalar exact;
+             if(!downwell::smoke_trig_detail::smokeTrigProgram(Scalar{bitsFloat(bits)},cosine!=0,exact)){
+@@ -69,7 +87,8 @@ int main(){
+                 if(!downwell::smokeTrigNarrowFallback({bits},cosine!=0,soft)||soft.bits!=fast.bits)++localFailures;
+             }
+         }
+-        admitted+=localAdmitted;rejected+=localRejected;failures+=localFailures;
++        }
++        admitted+=localAdmitted;rejected+=localRejected;failures+=localFailures;pairs+=localPairs;
+         for(auto w=worst.load();localWorst>w&&!worst.compare_exchange_weak(w,localWorst););
+     });
+     for(auto& thread:pool)thread.join();
+@@ -77,6 +96,11 @@ int main(){
+     RunnerImageValue unused;
+     for(std::uint32_t bits:{first-1,last,0x80000000u|(first-1),0x80000000u|last,0u,0x80000000u})
+         if(downwell::smokeTrigNarrowCandidate({bits},false,unused))++failures;
++    // Outside the domain the pair declines too.
++    downwell::smoke_trig_narrow_detail::Pair outside;
++    for(std::uint32_t bits:{first-1,last,0x80000000u|(first-1),0x80000000u|last,0u,0x80000000u})
++        if(downwell::smoke_trig_narrow_detail::evaluatePair({bits},outside))++failures;
++    std::printf("Smoke trig pair: %lu inputs equal to both single evaluations\n",pairs.load());
+     const auto margin=downwell::smoke_trig_narrow_detail::margin;
+     std::printf("Smoke trig narrow: %lu admitted, %lu to the program (%.4f%%), worst error %llu of margin %llu Q64 units\n",
+         admitted.load(),rejected.load(),100.0*double(rejected)/double(admitted+rejected),
+diff --git a/tests/core/WhiteJellyStepTest.cpp b/tests/core/WhiteJellyStepTest.cpp
+index 58d4665d..bc9b49ac 100644
+--- a/tests/core/WhiteJellyStepTest.cpp
++++ b/tests/core/WhiteJellyStepTest.cpp
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "core/WhiteJellyStep.h"
+ #include "core/GameMakerRandom.h"
+ #include <cassert>
+@@ -61,12 +62,38 @@ int main(){
+                 assert(downwell::SmokeDirection::vector(speed,scaled,x,y,downwell::smokeTrig));
+                 assert(S::movementComponent(false,speed,scaled,actualX)&&same(x,actualX));
+                 assert(S::movementComponent(true,speed,scaled,actualY)&&same(y,actualY));
++                N vectorX,vectorY;
++                assert(S::movementVector(speed,scaled,vectorX,vectorY)&&same(vectorX,x)&&same(vectorY,y));
+             }
+         }
++        // The shared vector against both single components over random
++        // binary32 headings and speeds, including the domain edges.
++        std::uint32_t state=0x9e3779b9u;
++        unsigned vectors=0;
++        for(unsigned i=0;i<400000;++i){
++            state^=state<<13;state^=state>>17;state^=state<<5;
++            const float heading=float(state%3610000u)/10000.0f;
++            state^=state<<13;state^=state>>17;state^=state<<5;
++            const float length=float(state%3100u)/1000.0f;
++            downwell::RunnerImageValue h,l;h.bits=0;l.bits=0;
++            std::memcpy(&h.bits,&heading,4);std::memcpy(&l.bits,&length,4);
++            const N angle=h.promoted(),speed=l.promoted();
++            N x=N::fromInteger(7),y=N::fromInteger(7),vx=x,vy=y;
++            const bool singles=S::movementComponent(false,speed,angle,x)&&S::movementComponent(true,speed,angle,y);
++            const bool vector=S::movementVector(speed,angle,vx,vy);
++            assert(singles==vector);
++            if(vector){assert(same(vx,x)&&same(vy,y));++vectors;}
++            else assert(same(vx,N::fromInteger(7))&&same(vy,N::fromInteger(7)));
++        }
++        assert(vectors>370000&&vectors<400000); // headings past 360 and speeds past 3 decline
+         N out=N::fromInteger(99);
+         assert(!S::movementComponent(false,N::fromInteger(4),{},out)&&same(out,N::fromInteger(99)));
+         assert(!S::movementComponent(false,N::fromInteger(1),N::fromInteger(-1),out)&&same(out,N::fromInteger(99)));
+         assert(!S::movementComponent(false,N::fromInteger(1),N::fromInteger(361),out)&&same(out,N::fromInteger(99)));
++        N outY=N::fromInteger(99);
++        assert(!S::movementVector(N::fromInteger(4),{},out,outY)&&same(out,N::fromInteger(99))&&same(outY,N::fromInteger(99)));
++        assert(!S::movementVector(N::fromInteger(1),N::fromInteger(-1),out,outY)&&same(outY,N::fromInteger(99)));
++        assert(!S::movementVector(N::fromInteger(1),N::fromInteger(361),out,outY)&&same(outY,N::fromInteger(99)));
+     }
+     for(int mode=0;mode<5;++mode){
+         auto baseline=initial();
