@@ -19,8 +19,8 @@ struct DebrisDraw {
         const unsigned exponent=magnitude>>23;
         if(!count||magnitude>0x40e00000u||((index.bits>>31)&&magnitude)||
            (!exponent&&magnitude))return false;
-        const unsigned whole=exponent<127?0:((magnitude&0x7fffffu)|0x800000u)>>(150-exponent);
-        out=whole%count;return true;
+        const unsigned whole=exponent<127?0:((magnitude&0x7fffffu)|0x800000u)>>(150-exponent); // <= 7
+        out=std::uint16_t(whole)%std::uint16_t(count);return true;
     }
     template<class Emit>
     static bool surface(const DebrisAnimation& effect,const EffectMaskAssets& assets,

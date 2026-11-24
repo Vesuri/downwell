@@ -46,7 +46,8 @@ bool resolveVerticalSolidCollisionChecked(typename Math::Number x,
     const int sign = (vy > zero) - (vy < zero);
     const N delta = sign * Math::unit();
     const N magnitude = vy < zero ? -vy : vy;
-    const N probe = Math::round(y) + sign * Math::ceilAbs(vy);
+    const N step = Math::ceilAbs(vy); // sign * step, without a multiply
+    const N probe = Math::round(y) + (sign > 0 ? step : sign < 0 ? -step : N{});
     bool hit=false;
     if(!meeting(x,probe,hit))return false;
     if(!hit){result=0;return true;}

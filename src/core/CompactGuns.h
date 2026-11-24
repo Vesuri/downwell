@@ -45,7 +45,7 @@ struct CompactCasingRecord {
     void advanceAnimation() {
         frameTenths = (frameTenths + speedTenths + frames * 10) % (frames * 10);
     }
-    unsigned frame() const { return unsigned(frameTenths / 10); }
+    unsigned frame() const { return unsigned(std::uint16_t(frameTenths) / 10); } // [0, 80)
     bool visible() const { return dFlash > 0; }
     // Alarm index 0 or 1; returns false when Alarm 1 destroys the casing.
     bool alarmEvent(unsigned index) {

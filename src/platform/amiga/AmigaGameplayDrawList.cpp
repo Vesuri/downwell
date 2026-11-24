@@ -248,7 +248,7 @@ bool quarterTurn(downwell::RunnerImageValue angle,unsigned& turn){
     std::int32_t degrees;
     if(!angle.promoted().roundPixel(degrees))return false;
     degrees%=360;if(degrees<0)degrees+=360;
-    turn=unsigned((degrees+45)/90)&3u;return true;
+    turn=unsigned(std::uint16_t(degrees+45)/90)&3u;return true;
 }
 }
 

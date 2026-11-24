@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_TERRAIN_RUN_SURFACE_H
 #include "AmigaRenderer.h"
 #include "AmigaPatternTerrain.h"
+#include "core/NarrowArithmetic.h"
 
 // A dirty span of the retained Fast-RAM raster, not an intermediate bitmap.
 // Native words are row-interleaved: eleven PF1 words, then eleven PF2 words.
@@ -73,7 +74,7 @@ public:
             const unsigned l=px<left_?unsigned(left_-px):0;
             const unsigned r=px+16>right_?unsigned(px+16-right_):0;
             const UWORD clip=UWORD((0xffffu>>l)&(0xffffu<<r));
-            const auto* source=art.pixels+((first-top)*art.words+col)*6;
+            const auto* source=art.pixels+(downwell::mulu16(first-top,art.words)+col)*6; // 0<=first-top<height, both words
             auto* target=pixels_+(first-firstY_)*words*2+(px-x)/16;
             for(int y=first;y<end;++y,source+=art.words*6,target+=words*2){
                 const UWORD mask=word(source)&clip;

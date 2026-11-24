@@ -24,7 +24,8 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
         union { std::uint32_t source=0; const unsigned char* cells; };
         Slot first=0,count=0,live=0,next=End,previous=End;
         int objectAt(unsigned i)const{return object==-2?((cells[2*i]&128)?93:60):object;}
-        int xAt(unsigned i)const{return object==-2?(int(cells[2*i]&127)-32)*16:x+int(i)*step;}
+        // step is 0, 16 or -16 (append and appendSpan): i * step without a multiply.
+        int xAt(unsigned i)const{return object==-2?(int(cells[2*i]&127)-32)*16:x+(step<0?-int(i<<4):step?int(i<<4):0);}
         std::uint32_t sourceId()const{return object==-2?0:source;}
         void advance(unsigned n){if(object==-2)cells+=2*n;else x+=int(n)*step;}
     };
@@ -184,7 +185,7 @@ public:
             if(r.object!=-2&&!r.source&&r.creationCode==-1&&r.object==object&&r.y==y&&
                 unsigned(r.first)+r.count==h.slot&&r.generation+r.count==h.generation){
                 // Avoid subtraction overflow, including unusual caller coordinates.
-                const int last=r.x+int(r.count-1)*r.step;
+                const int last=r.xAt(r.count-1u);
                 const bool right=last<=0x7fffffff-16&&x==last+16;
                 const bool left=last>=(-2147483647-1)+16&&x==last-16;
                 const int step=right?16:left?-16:0;

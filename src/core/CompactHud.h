@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_COMPACT_HUD_H
 #define DOWNWELL_CORE_COMPACT_HUD_H
 #include <cstdint>
+#include "NarrowArithmetic.h"
 namespace downwell {
 // Compact world-one combo and controller-HUD owners (W1.7): levelNumber 372,
 // comboRewardText 383, objPlayer_n's combo counter and objControlerN's
@@ -153,7 +154,7 @@ struct CompactGemStreakHud {
         show = timer >= 120 || !(time & 1);
         if (stopped) { show = true; time = 0; }
         // 0.4 - (0.35 - 0.35 * timer / 300) = 0.05 + 0.35 * timer / 300.
-        else gemhighFrame += 3277 + long((timer * 22938UL) / 300);
+        else gemhighFrame += 3277 + long((fitsU16(timer) ? mulu16(std::uint16_t(timer), 22938) : timer * 22938UL) / 300); // timer <= 480
         if (!show) return true;
         const bool high = streak >= threshold;
         const long actual = high ? roundRatio(58UL * timer, timerStart)
@@ -167,8 +168,12 @@ struct CompactGemStreakHud {
         return true;
     }
     // round() of a non-negative ratio: GameMaker rounds half to even.
+    // Callers: 58 * timer, 54 * streak (< 100) or 8 * timer (< 300) over 300
+    // or 100; CurrencyAccount's timer <= 480, so every operand fits 16 bits.
     static long roundRatio(unsigned long numerator, unsigned long denominator) {
-        const unsigned long q = numerator / denominator, r = numerator % denominator;
+        const bool narrow = fitsU16(numerator) && fitsU16(denominator);
+        const unsigned long q = narrow ? std::uint16_t(numerator) / std::uint16_t(denominator) : numerator / denominator,
+            r = narrow ? std::uint16_t(numerator) % std::uint16_t(denominator) : numerator % denominator;
         if (2 * r > denominator || (2 * r == denominator && (q & 1))) return long(q + 1);
         return long(q);
     }

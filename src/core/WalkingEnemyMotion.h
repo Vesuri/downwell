@@ -3,6 +3,7 @@
 #include <limits>
 #include "SolidCollision.h"
 #include "EnemyContact.h"
+#include "NarrowArithmetic.h"
 namespace downwell {
 struct NoWalkingPresentation {
     bool operator()(int,int)const{return true;}
@@ -44,7 +45,7 @@ struct BasicWalkingEnemyMotion {
         vy += Math::fixed(256);
         if (vy >= Math::pixels(7)) vy = Math::pixels(7);
         // Source clears active whenever grounded, then checks !active && grounded.
-        if (grounded && !meeting(x + Math::pixels(((vx > zero) - (vx < zero)) * (turtle ? 12 : 8)),
+        if (grounded && !meeting(x + Math::pixels(muls16((vx > zero) - (vx < zero), turtle ? 12 : 8)),
                                   y + one)) vx = -vx;
         if (meeting(x + vx, y)) {
             const Number delta = Math::pixels((vx > zero) - (vx < zero));

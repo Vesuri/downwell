@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_AMIGA_PREPARED_DIVIDERS_H
 #define DOWNWELL_AMIGA_PREPARED_DIVIDERS_H
 #include "AmigaRenderer.h"
+#include "core/NarrowArithmetic.h"
 #ifdef DOWNWELL_INSTALLED_TABLES
 #include "../../../generated/installed/amiga-ammo-dividers.h" // WI.3: bound from Downwell.tables
 #else
@@ -18,8 +19,9 @@ inline bool amigaPreparedDividersMatch(const AmigaWordStamp* stamps) {
     return true;
 }
 
+// The only caller admits capacity<=16.
 inline AmigaHudBlockedColumn amigaPreparedDividers(unsigned ammo, unsigned capacity) {
-    return {downwell_ammo_dividers::images[capacity*(capacity+1)/2 + ammo],
+    return {downwell_ammo_dividers::images[downwell::mulu16(capacity,capacity+1)/2 + ammo],
             &downwell_ammo_dividers::blocks[0][0]};
 }
 #endif

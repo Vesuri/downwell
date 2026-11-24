@@ -57,19 +57,19 @@ class AmigaHealthHud {
             text_[y][w].low&=keep;text_[y][w].high&=keep;
         }
     }
-    void composeText(unsigned health,unsigned maximum,bool initial){
+    void composeText(unsigned health,unsigned maximum,bool initial){ // draw(): both <100
         if(initial){
             for(auto& row:text_)for(auto& word:row)word={0,0};
             glyph(10,48);
         }
         if(initial||health_!=health){
             clearText(31,48);
-            if(health>=10)glyph(health/10,31);
-            glyph(health%10,39);
+            if(health>=10)glyph(UWORD(health)/10,31);
+            glyph(UWORD(health)%10,39);
         }
         if(initial||maximum_!=maximum){
             clearText(57,74);
-            if(maximum>=10){glyph(maximum/10,57);glyph(maximum%10,65);}
+            if(maximum>=10){glyph(UWORD(maximum)/10,57);glyph(UWORD(maximum)%10,65);}
             else glyph(maximum,57);
         }
     }
@@ -174,12 +174,12 @@ public:
             amigaRendererDrawAsset(r,pack,end,415,0,8,6,0);capture(rim_,r->hud);
         }
         if(initial||health_!=health||maximum_!=maximum)composeText(health,maximum,initial);
-        const unsigned fill=maximum?health*80/maximum:0,reserve=perHeart?pieces*80/perHeart:0;
+        const unsigned fill=maximum?UWORD(health*80)/UWORD(maximum):0,reserve=perHeart?pieces*80/perHeart:0;
         if(initial)rectangle(r->hud,8,6,100,34,fill,reserve);
         else{
             if(health_!=health)rectangle(r->hud,31,10,48,19,fill,reserve);
             if(maximum_!=maximum)rectangle(r->hud,57,10,74,19,fill,reserve);
-            const unsigned oldFill=maximum_?health_*80/maximum_:0;
+            const unsigned oldFill=maximum_?UWORD(health_*80)/UWORD(maximum_):0; // both <100, as draw() admitted
             if(oldFill!=fill)rectangle(r->hud,12+(oldFill<fill?oldFill:fill),11,
                 12+(oldFill>fill?oldFill:fill),17,fill,reserve);
             const unsigned oldReserve=perHeart?pieces_*80/perHeart:0;

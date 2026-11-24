@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_PACKED_MASK_INTERSECTION_H
 #define DOWNWELL_PACKED_MASK_INTERSECTION_H
 #include "BinaryEffectSurface.h"
+#include "NarrowArithmetic.h"
 namespace downwell {
 // Exact intersection of two admitted immutable packed masks inside an already
 // clipped rectangle. No temporary raster and no per-pixel source extraction.
@@ -19,8 +20,9 @@ struct PackedMaskIntersection {
         for(int x=left;x<right;x+=16){
             const unsigned width=unsigned(right-x)<16?unsigned(right-x):16;
             const unsigned mask=(65535u<<(16-width))&65535u;
-            const auto* ar=a.data+(top-ay)*a.stride;
-            const auto* br=b.data+(top-by)*b.stride;
+            // Clipped rows lie in both masks; EffectMaskAssets' sizes are 16-bit.
+            const auto* ar=a.data+mulu16(top-ay,a.stride);
+            const auto* br=b.data+mulu16(top-by,b.stride);
             for(int y=top;y<bottom;++y,ar+=a.stride,br+=b.stride)
                 if(word(ar,a.stride,unsigned(x-ax))&word(br,b.stride,unsigned(x-bx))&mask)return true;
         }

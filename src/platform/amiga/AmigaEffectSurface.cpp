@@ -75,12 +75,12 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     ULONG source,target;uint16_t first,last;
     if(shift>=0){
         source=ULONG(UWORD(sourceY))*UWORD(m.stride)+sourceFirst*2;
-        target=ULONG(UWORD(targetY))*destinationStride+destFirst*2;
+        target=ULONG(UWORD(targetY))*UWORD(destinationStride)+destFirst*2;
         first=lead;last=edge;
     }else{
         // Descending: start at the last word of the last row.
         source=ULONG(UWORD(sourceY+blitHeight-1))*UWORD(m.stride)+sourceLast*2;
-        target=ULONG(UWORD(targetY+blitHeight-1))*destinationStride+destLast*2;
+        target=ULONG(UWORD(targetY+blitHeight-1))*UWORD(destinationStride)+destLast*2;
         first=edge;last=lead;
     }
     auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(combined?combined->mask:m.data)+source);
@@ -135,7 +135,7 @@ bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
             downwellDmaWidth,downwellGameRingHeight,1,false,false,downwellDmaWidth);
         surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
             rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
-            unsigned destination=(origin+y)%downwellGameRingHeight;
+            unsigned destination=UWORD(origin+y)%downwellGameRingHeight;
             while(height){
                 const unsigned count=height<downwellGameRingHeight-destination?height:downwellGameRingHeight-destination;
                 targetLow.copyWithMask(low,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
@@ -149,7 +149,7 @@ bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
     Bitmap colors(boundStorage+planeBytes,192,284,2,false,false,192);
     surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
         rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
-        unsigned destination=(origin+y)%downwellGameRingHeight;
+        unsigned destination=UWORD(origin+y)%downwellGameRingHeight;
         while(height){
             const unsigned count=height<downwellGameRingHeight-destination?
                 height:downwellGameRingHeight-destination;

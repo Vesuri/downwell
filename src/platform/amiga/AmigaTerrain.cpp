@@ -641,7 +641,8 @@ bool AmigaTerrainRunIndex::publishSpan(AmigaTerrainTiles& tiles){
         }
     }else for(unsigned i=0;i<count;++i,cell+=step)*cell|=flags;
     index_.nextLanding.insertSpan(column_,step,count,row_);
-    x_+=step*16*int(count);column_=unsigned(int(column_)+step*int(count));remaining_=0;
+    const int span=step<0?-int(count):int(count); // step_ is -1 or 1
+    x_+=span*16;column_=unsigned(int(column_)+span);remaining_=0;
     return true;
 }
 

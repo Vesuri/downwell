@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_BITMAP_COPY_PLAN_H
 #define DOWNWELL_BITMAP_COPY_PLAN_H
 #include "AmigaHardware.h"
+#include "core/NarrowArithmetic.h"
 
 // Prepared form of Bitmap::copyWithMaskOperation for one non-interleaved
 // plane. The original Bitmap path remains the native comparison. Only row
@@ -51,22 +52,23 @@ public:
         targetModulo_=(int(targetWords)-int(words_))*2;
         return true;
     }
+    // Rows (after the reverse adjustment) fit a word: the field bands' are <320.
     void copy(uint16_t* source,uint16_t* mask,uint16_t* target,
               unsigned sourceY,unsigned maskY,unsigned targetY,unsigned height,bool invert=false) const {
         if(!words_||!height)return;
         if(reverse_){sourceY+=height-1;maskY+=height-1;targetY+=height-1;}
         AmigaHardware::blitterCopyWithMaskOperation(
-            source+sourceY*sourceStride_+sourceWord_,target+targetY*targetStride_+targetWord_,
-            mask+maskY*maskStride_+maskWord_,words_,height,sourceModulo_,targetModulo_,maskModulo_,
+            source+downwell::mulu16(sourceY,sourceStride_)+sourceWord_,target+downwell::mulu16(targetY,targetStride_)+targetWord_,
+            mask+downwell::mulu16(maskY,maskStride_)+maskWord_,words_,height,sourceModulo_,targetModulo_,maskModulo_,
             sourceShift_,maskShift_,first_,last_,false,invert);
     }
     void compose(uint16_t* source,uint16_t* mask,uint16_t* background,uint16_t* target,
                  unsigned sourceY,unsigned maskY,unsigned targetY,unsigned height,bool invert=false) const {
         if(!words_||!height)return;
         if(reverse_){sourceY+=height-1;maskY+=height-1;targetY+=height-1;}
-        const unsigned at=targetY*targetStride_+targetWord_;
+        const unsigned at=downwell::mulu16(targetY,targetStride_)+targetWord_;
         AmigaHardware::blitterCopyWithMaskBackgroundOperation(
-            source+sourceY*sourceStride_+sourceWord_,target+at,mask+maskY*maskStride_+maskWord_,background+at,
+            source+downwell::mulu16(sourceY,sourceStride_)+sourceWord_,target+at,mask+downwell::mulu16(maskY,maskStride_)+maskWord_,background+at,
             words_,height,sourceModulo_,targetModulo_,maskModulo_,sourceShift_,maskShift_,first_,last_,false,invert);
     }
 };

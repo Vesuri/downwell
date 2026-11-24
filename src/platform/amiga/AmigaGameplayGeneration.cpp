@@ -151,8 +151,9 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
         return run.executeSpan([&]{
             if(!index.publishSpan(self.tiles_))return false;
             return !self.lifetimes_||self.lifetimes_->publishRun([&]{
-                for(unsigned i=0;i<run.count;++i)
-                    if(!self.birth(run.objectId,run.x+int(i)*run.stepX,run.y))return false;
+                int x=run.x;
+                for(unsigned i=0;i<run.count;++i,x+=run.stepX)
+                    if(!self.birth(run.objectId,x,run.y))return false;
                 return true;
             });
         });

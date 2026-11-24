@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_INITIAL_TERRAIN_H
 #include <cstdint>
 #include <cstring>
+#include "core/NarrowArithmetic.h"
 
 // Immutable host-composed rows. This owns no gameplay geometry or instances.
 // Destination words use the retained raster's row/plane/word ordering.
@@ -45,7 +46,7 @@ public:
     // host oracle decodes byte order into caller-owned scratch instead.
     const std::uint16_t* row(unsigned column,unsigned y,std::uint16_t* scratch)const{
         if(!references_||column>=columns||y>=rows_)return nullptr;
-        const auto* source=dictionary_+word(references_+(column*rows_+y)*2)*rowBytes;
+        const auto* source=dictionary_+word(references_+(downwell::mulu16(column,rows_)+y)*2)*rowBytes;
 #ifdef DOWNWELL_PLATFORM_AMIGA
         (void)scratch;
         return reinterpret_cast<const std::uint16_t*>(source);

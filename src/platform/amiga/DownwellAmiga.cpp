@@ -1291,7 +1291,7 @@ static void composeResultsChoices(AmigaRenderer* renderer,
             const int halfWidths[] = {20, 48, 28};
             amigaRendererDrawAssetPen(renderer, gDownwellResultsPack,
                 gDownwellResultsPack + gDownwellResultsAssetBytes, 65301 + index, 0,
-                downwellPlayfieldX + xTenths / 10 + halfWidths[index], y, 0, pen);
+                downwellPlayfieldX + std::uint16_t(xTenths) / 10 + halfWidths[index], y, 0, pen); // 150..332
         }
     } sink{renderer};
     downwell::drawDeathResultsChoices(sink, menu);
@@ -1447,10 +1447,10 @@ static void drawMainWorldSpan(
     if (runtime) invalidateShopRaster(runtime->shops());
     dirtyGameRows(renderer->gameOrigin, clipY, clipHeight);
     const bool cacheable = viewX >= mainViewX - 160 && viewX <= mainViewX + 160 &&
-        (viewX - mainViewX) % 160 == 0 && firstWorldY >= 0 &&
+        std::int16_t(viewX - mainViewX) % 160 == 0 && firstWorldY >= 0 &&
         finalWorldY <= terrainRasterRows;
     if (terrainRaster.ready && cacheable && !refresh) {
-        const int column = (viewX - mainViewX + 160) / 160;
+        const int column = std::uint16_t(viewX - mainViewX + 160) / 160; // cacheable: 0..320
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
         if(column==1&&clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
            (terrainRaster.dirty(column,firstWorldY)||
@@ -1514,7 +1514,7 @@ static void drawMainWorldSpan(
     if (terrainRaster.ready && cacheable && refresh) {
         AmigaHardware::blitterDrain();
         transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, true);
-        const int column = (viewX - mainViewX + 160) / 160;
+        const int column = std::uint16_t(viewX - mainViewX + 160) / 160; // cacheable: 0..320
         for (int y = firstWorldY; y < finalWorldY; ++y)
             terrainRaster.setDirty(column,y,false);
     }
@@ -1583,7 +1583,7 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
             // The raster is the destination, not a copy of scratch Chip RAM.
             // This shares runtime's exact compositor and its unsupported-art
             // fallback; it neither publishes pixels nor advances game state.
-            const unsigned column=unsigned((x-mainViewX+160)/160);
+            const unsigned column=unsigned(std::uint16_t(x-mainViewX+160)/160);
             if(AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,y,height),renderer,
                 rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
                 runtime,activeGamePack,activeGamePackEnd,x,y,0,height))continue;
@@ -1700,7 +1700,7 @@ static void drawFutureGameBlock(
     const AmigaPortRuntime* runtime,
     unsigned ringOrigin, int viewX, int viewY) {
     const unsigned futureOrigin =
-        (ringOrigin + gameplayPrefetchLines) % downwellGameRingHeight;
+        std::uint16_t(ringOrigin + gameplayPrefetchLines) % downwellGameRingHeight; // callers pass the ring origin (<320)
     const int futureViewY = viewY + gameplayPrefetchLines;
     amigaRendererSetGameOrigin(renderer, futureOrigin);
     if (!terrainRaster.ready)
@@ -3688,7 +3688,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 }
                 DW_PROFILE_PHASE(profileClearCopper);
                 const UBYTE* mask = port.exitDither().active ? memory.menuForeground() +
-                    AmigaExitMask::offset(port.exitDither().y - room.motion.viewY()) /
+                    std::uint16_t(AmigaExitMask::offset(port.exitDither().y - room.motion.viewY())) /
                     AmigaExitMask::stride * AmigaExitMask::selectionStride : nullptr;
                 if (!ready || !clear.updateDisplay(back, frame, mask, playerSprites[back],
                         bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette)) {
@@ -4207,7 +4207,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
                 int origin = (int)port.ringOrigin() + missingFirst - worldViewY;
                 while (origin < 0) origin += downwellGameRingHeight;
-                amigaRendererSetGameOrigin(&renderer, origin % downwellGameRingHeight);
+                amigaRendererSetGameOrigin(&renderer, std::uint16_t(origin) % downwellGameRingHeight); // 0..603
                 if (!terrainRaster.ready)
                     amigaRendererClearGameRows(&renderer, 0, missingHeight, 0);
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
@@ -4341,7 +4341,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         AmigaTerrainRaster::stagePaintRows);
                     const int first = span.first, count = span.count;
                     if (count > 0) {
-                        const unsigned column = (targetX - mainViewX + 160) / 160;
+                        const unsigned column = std::uint16_t(targetX - mainViewX + 160) / 160; // wanted is -160, 0 or 160
                         AmigaRenderer stage = renderer;
                         stage.game = stage.target = stagedBuffer;
                         int origin = port.ringOrigin() + first - worldViewY;

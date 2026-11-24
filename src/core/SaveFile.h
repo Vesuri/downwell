@@ -55,7 +55,7 @@ struct SaveFile {
                 ++place; ++p; digits = true;
             }
             while (place < 3) { scaled *= 10; ++place; }
-            n.tenths = (scaled + 50) / 100;
+            n.tenths = std::uint16_t(scaled + 50) / 100u; // scaled <= 999
             if (n.tenths == 10) { n.tenths = 0; ++n.whole; }
         }
         n.valid = digits;
@@ -178,7 +178,7 @@ struct SaveFile {
         w.integer("recordFastestGame", fastestGame);
         w.integer("recordFastestGameHard", fastestGameHard);
         w.text("[option]\r\n");
-        w.real("masterGain", false, masterGainTenths / 10, masterGainTenths % 10);
+        w.real("masterGain", false, std::uint16_t(masterGainTenths) / 10u, std::uint16_t(masterGainTenths) % 10u); // [0, 10]
         w.toggle("hardMode", hardMode);
         w.toggle("showtimer", showTimer);
         return w.good ? w.length : 0;

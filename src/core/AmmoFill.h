@@ -14,7 +14,7 @@ struct AmmoFill {
         // powers of two through eight divide 184 exactly. Avoid reconstructing
         // binary64 arithmetic for the usual gun's integral rectangle.
         if (capacity <= 8 && !(capacity & (capacity-1)) && ammo <= capacity) {
-            const unsigned length = ammo * (184 / capacity);
+            const unsigned length = (ammo * 184) >> (capacity == 8 ? 3 : capacity >> 1); // log2
             return {HudReal::integer(237-length), HudReal::integer(length-5)};
         }
         const auto meter = HudReal::ratio(ammo, capacity).times184();

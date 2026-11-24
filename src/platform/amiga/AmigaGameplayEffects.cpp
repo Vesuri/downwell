@@ -68,7 +68,7 @@ void publish(AmigaRenderer renderer, Bitmap& display,
         if(y!=cachedY){
             cachedY=y;
             row=static_cast<UBYTE*>(display.data)+
-                ((origin+y)%downwellGameRingHeight)*downwellBytesPerPlaneLine;
+                (UWORD(origin+y)%downwellGameRingHeight)*downwellBytesPerPlaneLine; // ring origin<320, y<284
         }
         paint(row,x,planes...);
     });

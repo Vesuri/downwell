@@ -2,6 +2,7 @@
 #define DOWNWELL_TABLE_ATAN_H
 #include "PortableAtan.h"
 #include "RunnerImageValue.h"
+#include "NarrowArithmetic.h"
 namespace downwell {
 #ifdef DOWNWELL_COMPARE_CONTACT_ATAN
 // Test-only selector: run the host oracle with the retained calculation while
@@ -53,7 +54,7 @@ inline bool tableAtanCandidate(MotionBinary64 y,MotionBinary64 x,MotionBinary64&
         const unsigned index=ratio>>16,fraction=ratio&65535u;
         const auto base=table_atan_detail::samples[index];
         const auto slope=table_atan_detail::samples[index+1]-base;
-        angle=base+((slope*fraction)>>16);
+        angle=base+(mulu16(slope,fraction)>>16); // monotonic samples: slope <= 256
     }
     if(swap)angle=table_atan_detail::halfPi-angle;
     if(fx.bits>>31)angle=table_atan_detail::pi-angle;

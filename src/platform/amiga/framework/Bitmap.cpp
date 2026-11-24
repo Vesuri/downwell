@@ -2,6 +2,7 @@
 #include <exec/memory.h>
 #include "AmigaHardware.h"
 #include "Bitmap.h"
+#include "core/NarrowArithmetic.h"
 
 Bitmap::Bitmap(void* data, uint16_t width, uint16_t height, uint16_t bitplanes, bool interleaved, bool takeOwnership, uint16_t bitmapDataWidth) :
     data(data),
@@ -211,7 +212,7 @@ void Bitmap::clear(uint16_t x, uint16_t y, uint16_t width, uint16_t height)
     uint16_t widthWords = destLastWord - destFirstWord + 1;
     uint16_t destWidthWords = this->widthInWords();
     int16_t destRowModulo = destWidthWords - widthWords;
-    uint16_t* destData = (uint16_t*)data + y * this->rowSizeInWords() + destFirstWord;
+    uint16_t* destData = (uint16_t*)data + downwell::mulu16(y, this->rowSizeInWords()) + destFirstWord;
 
     if (blittable) {
         if (interleaved) {
@@ -283,8 +284,9 @@ void Bitmap::copy(const Bitmap& source, uint16_t destX, uint16_t destY, uint16_t
         firstWordMask >>= sourceLeftShift;
     } else {
         // Shift is to the left: blit reverse starting from the last word
-        sourceData += (sourceY + height) * source.rowSizeInWords() - sourceWidthWords + sourceLastWord;
-        destData += (destY + height) * this->rowSizeInWords() - destWidthWords + destLastWord;
+        // (y + height) * row as two word products: the sum may exceed 16 bits.
+        sourceData += int(downwell::mulu16(sourceY, source.rowSizeInWords()) + downwell::mulu16(height, source.rowSizeInWords())) - sourceWidthWords + sourceLastWord;
+        destData += int(downwell::mulu16(destY, this->rowSizeInWords()) + downwell::mulu16(height, this->rowSizeInWords())) - destWidthWords + destLastWord;
         firstWordMask <<= ((sourceLastWord << 4) + 16 - sourceX - width);
         lastWordMask >>= sourceLeftShift;
     }

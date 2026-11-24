@@ -3,6 +3,7 @@
 #include "GunTable.h"
 #include "LevelClearTrig.h"
 #include "MachineGunTrajectory.h"
+#include "NarrowArithmetic.h"
 #include "RandomBinary64.h"
 #include "UnitSequenceFrames.h"
 #include <cstdint>
@@ -31,10 +32,13 @@ struct RangedShot {
 
     // 68000 note: only 32-bit products and quotients (no __muldi3/__divdi3).
     // floor(degrees * 2^32 / 360), as 2^32 = 360 * 11930464 + 256.
+    // Callers pass aim angles (270 +- aimLimit +- spread) or [0, 360).
     static std::uint32_t degreesToTurns(int degrees) {
-        degrees %= 360; if (degrees < 0) degrees += 360;
-        const auto d = static_cast<std::uint32_t>(degrees);
-        return d * 11930464u + (d * 256u) / 360u;
+        degrees = fitsS16(degrees) ? std::int16_t(degrees) % 360 : degrees % 360;
+        if (degrees < 0) degrees += 360;
+        const auto d = static_cast<std::uint16_t>(degrees);
+        // 11930464 = 182 * 2^16 + 2912; 256/360 = 32/45 and 32 * 359 < 2^16.
+        return (mulu16(d, 182) << 16) + mulu16(d, 2912) + std::uint16_t(d * 32u) / 45u;
     }
     // |trig| (Q30, taken at Q15) times bSpeed (Q20, below 2^25), rounded.
     static std::int32_t component(std::uint32_t magnitudeQ30, std::uint32_t speedQ20, bool negative) {
@@ -60,9 +64,10 @@ struct RangedShot {
         const std::uint32_t range = static_cast<std::uint32_t>(gun.rangeRandom);
         // floor(word * range / 2^12): bSpeed - rangeRandom + u * rangeRandom.
         speed = (static_cast<std::uint32_t>(gun.speed - gun.rangeRandom) << 20) +
-            (word >> 12) * range + (((word & 4095u) * range) >> 12);
+            (mulu16(word >> 16, range) << 4) + mulu16((word >> 12) & 15u, range) + // rangeRandom <= 10
+            (mulu16(word & 4095u, range) >> 12);
         int timer = gun.rangeTimer;
-        if (laserSight) timer += timer / 3;
+        if (laserSight) timer += std::int16_t(timer) / 3; // rangeTimer <= 20
         decelerateAlarm = timer;
         return true;
     }

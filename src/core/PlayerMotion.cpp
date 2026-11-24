@@ -7,6 +7,7 @@
 #include "core/ForcedPlayerJump.h"
 #include "core/PlayerBoxContact.h"
 #include "core/GameMakerRounding.h"
+#include <cstdint>
 
 namespace {
 enum {
@@ -515,7 +516,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
                         return found;
                     });
                 if(!motionSucceeded_)return {};
-                speedY_ = response / 5;
+                speedY_ = std::int16_t(response) / 5; // 0 or unit() 1280
                 gravityRemainder_ = 0;
             }
         }
@@ -568,9 +569,9 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     }
     if (nowBalancing) {
         if (!balancing_)
-            balancePhaseQuarters_ = (idlePhaseTenths_ / 10) * 4;
+            balancePhaseQuarters_ = (std::uint16_t(idlePhaseTenths_) / 10) * 4;
         else
-            balancePhaseQuarters_ = (balancePhaseQuarters_ + 1) % 20;
+            balancePhaseQuarters_ = std::uint16_t(balancePhaseQuarters_ + 1) % 20;
     } else {
         balancePhaseQuarters_ = 0;
     }
@@ -595,7 +596,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         if (!idling_)
             idlePhaseTenths_ = 0;
         else
-            idlePhaseTenths_ = (idlePhaseTenths_ + (playStyle_ == 2 ? 2 : 1)) % 40;
+            idlePhaseTenths_ = std::uint16_t(idlePhaseTenths_ + (playStyle_ == 2 ? 2 : 1)) % 40;
     } else {
         idlePhaseTenths_ = 0;
     }
@@ -610,7 +611,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     }
 
     if (spinJumping_ && wasSpinning)
-        spinPhaseTwentieths_ = (spinPhaseTwentieths_ + 6) % 160;
+        spinPhaseTwentieths_ = std::uint16_t(spinPhaseTwentieths_ + 6) % 160;
     if (!spinJumping_) spinPhaseTwentieths_ = 0;
     // alarm[6] clears hardLandJump, alarm[10] tinyJumpThreshold.
     if (hardLandAlarm_ && --hardLandAlarm_ == 0) hardLandJump_ = false;
@@ -672,14 +673,16 @@ int PlayerMotion::spriteId(bool dead) const
 
 unsigned PlayerMotion::spriteFrame(bool dead, int deathAnimation) const
 {
+    // The phases stay below 160 (every writer is a modulus or a small
+    // multiple of another phase), so 16-bit division is exact.
     // Source death branch is not an animated living/spinning pose. Its second
     // frame requires grounded, abs(xsp)<0.5 and deathani==0, all together.
     if (dead) return grounded_ && speedX_ > -128 && speedX_ < 128 && deathAnimation == 0 ? 1 : 0;
     if (grounded_)
-        return running_ ? runPhaseTenths_ / 10
+        return running_ ? std::uint16_t(runPhaseTenths_) / 10
                         : balancing_ ? balancePhaseQuarters_ / 4
-                                     : idlePhaseTenths_ / 10;
-    if (spinJumping_) return wallPose_ ? 0 : spinPhaseTwentieths_ / 20;
+                                     : std::uint16_t(idlePhaseTenths_) / 10;
+    if (spinJumping_) return wallPose_ ? 0 : std::uint16_t(spinPhaseTwentieths_) / 20;
     if (airborneShot_)
         return shotPhaseQuarters_ / 4 < 3 ? shotPhaseQuarters_ / 4 : 3;
     return downwell::playerAirFrame(speedYFifths());

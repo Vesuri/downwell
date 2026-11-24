@@ -3,6 +3,7 @@
 #include "Bitmap.h"
 #include "Palette.h"
 #include "Sprite.h"
+#include "core/NarrowArithmetic.h"
 
 CopperList::CopperList(UWORD* words, unsigned capacityWords)
     : words_(words), capacity_(capacityWords), count_(0), valid_(words != 0)
@@ -52,7 +53,7 @@ bool CopperList::showBitmap(const Bitmap& bitmap, UWORD firstBitplane,
 {
     ULONG address = (ULONG)bitmap.data;
     if (xOffset) address += xOffset >> 3;
-    if (yOffset) address += yOffset * bitmap.rowSizeInBytes;
+    if (yOffset) address += downwell::mulsu16(yOffset, bitmap.rowSizeInBytes); // 0 or a ring origin (<320)
     if (!bitplaneCount) bitplaneCount = bitmap.bitplanes;
 
     UWORD reg = (UWORD)(bpl1pth + ((firstBitplane - 1) << 2));

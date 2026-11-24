@@ -30,6 +30,7 @@
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
+#include "core/NarrowArithmetic.h"
 #include "PlacementNew.h"
 #include "core/ProjectilePublication.h"
 #include "core/BoxDestructionScript.h"
@@ -1944,7 +1945,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(input.left){aimAngle_-=gun.aimAcceleration;if(aimAngle_>0)aimAngle_-=gun.aimDeceleration;}
         if(input.right){aimAngle_+=gun.aimAcceleration;if(aimAngle_<0)aimAngle_+=gun.aimDeceleration;}
         if(!input.left&&!input.right){
-            if(aimAngle_)aimAngle_-=(aimAngle_>0?1:-1)*gun.aimDeceleration;
+            if(aimAngle_)aimAngle_-=aimAngle_>0?gun.aimDeceleration:-gun.aimDeceleration;
             if(aimAngle_>-2&&aimAngle_<2)aimAngle_=0;
         }
         if(aimAngle_>gun.aimLimit)aimAngle_=gun.aimLimit;
@@ -3466,11 +3467,12 @@ bool GameplayWorld::emitPlayerBullets(int muzzleX,int muzzleY,int playerY,int an
         return run_.effectsSucceeded=false;
     if(!createCompactBullet(emitX,muzzleY,angle,false))return false;
     for(int i=1;i<=gun.sp1&&gun.spType;++i){
+        const int spread=downwell::muls16(gun.sp2,i); // gunTable: sp1 <= 2, sp2 <= 14
         if(gun.spType==1){
-            if(!createCompactBullet(emitX,muzzleY,angle+gun.sp2*i,false)||
-               !createCompactBullet(emitX,muzzleY,angle-gun.sp2*i,false))return false;
-        }else if(!createCompactBullet(emitX+gun.sp2*i,muzzleY-2,angle,false)||
-                 !createCompactBullet(emitX-gun.sp2*i,muzzleY-2,angle,false))return false;
+            if(!createCompactBullet(emitX,muzzleY,angle+spread,false)||
+               !createCompactBullet(emitX,muzzleY,angle-spread,false))return false;
+        }else if(!createCompactBullet(emitX+spread,muzzleY-2,angle,false)||
+                 !createCompactBullet(emitX-spread,muzzleY-2,angle,false))return false;
     }
     if(lastGetsLaserSight&&run_.upgrades.levels[12]!=0){
         BulletState& last=bullets_[bulletSlotEnd_-1];
@@ -3750,7 +3752,7 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
     int quarterIndex=4*4;
     if(!bullet.wallMet){
         if(distance<120){
-            int whole=distance/20;const int remainder=distance%20;
+            int whole=std::uint16_t(distance)/20;const int remainder=std::uint16_t(distance)%20; // 0 <= distance < 120
             if(remainder>10||(remainder==10&&(whole&1)))++whole; // round(): ties to even
             quarterIndex=(whole+2)*4;
         }else quarterIndex=8*4;
@@ -3898,7 +3900,7 @@ bool GameplayWorld::stepGunModules(){
             const int sign=m.ysp>0?1:-1;
             const long step=((m.ysp>0?m.ysp:-m.ysp)+65535)>>16;
             bool hit=false;
-            if(!solidMeeting(m.sprite(),GunReal::fromInteger(m.x),GunReal::fromInteger(int(rounded+sign*step)),true,hit))return false;
+            if(!solidMeeting(m.sprite(),GunReal::fromInteger(m.x),GunReal::fromInteger(int(rounded+(sign>0?step:-step))),true,hit))return false;
             if(hit){
                 long move=0;const long limit=m.ysp>0?m.ysp:-m.ysp;
                 for(;;){

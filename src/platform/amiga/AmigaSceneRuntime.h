@@ -28,7 +28,7 @@ public:
     unsigned tick() const { return tick_; }
     int splashStage() const { return splashStage_; }
     unsigned splashDitherFrame() const {
-        return (unsigned)(splashDitherTenths_ / 10);
+        return (unsigned)(std::uint16_t(splashDitherTenths_) / 10); // 7..113
     }
     bool menuPlayerNapping() const { return menuNapping_; }
     bool menuPlayerVisible() const { return !menuTeleport_; }

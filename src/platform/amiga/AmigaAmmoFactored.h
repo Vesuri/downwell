@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_AMMO_FACTORED_H
 #include "AmigaRenderer.h"
 #include "core/AmmoGaugeRows.h"
+#include "core/NarrowArithmetic.h"
 #include "core/Profile.h"
 #ifdef DOWNWELL_INSTALLED_TABLES
 #include "../../../generated/installed/amiga-ammo-factored.h" // WI.3: bound from Downwell.tables
@@ -129,7 +130,7 @@ public:
         }
         const unsigned label=ammo*3+offset;
         const auto* glyph=labels[label];
-        const unsigned config=starts[capacity-1]+(ammo*4+meter)*capacity;
+        const unsigned config=starts[capacity-1]+downwell::mulu16(ammo*4+meter,capacity);
         for(unsigned segment=0;segment<capacity;++segment){
             unsigned y=segment==capacity-1?40:229+4*meter-boundaries[segment+1]+8;
             const unsigned bottom=segment?229+4*meter-boundaries[segment]+8:256;

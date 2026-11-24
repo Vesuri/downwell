@@ -56,7 +56,7 @@ public:
     bool prepare(UBYTE* target, unsigned origin, const downwell::LaserSightLine* line,
                  bool underlyingChanged) {
         lastByteWrites = 0;
-        origin %= downwellGameRingHeight;
+        origin = UWORD(origin) % downwellGameRingHeight; // the caller passes the ring origin (<320)
         if (target != target_) {
             // Different storage is a new scene, not permission to write into
             // the old allocation. Caller owns restoration before reusing it.

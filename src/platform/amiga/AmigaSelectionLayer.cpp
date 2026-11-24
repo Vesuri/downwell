@@ -1,5 +1,6 @@
 #include "AmigaSelectionLayer.h"
 #include "framework/Bitmap.h"
+#include "core/NarrowArithmetic.h"
 
 namespace {
 unsigned word(const UBYTE* p) { return (unsigned(p[0]) << 8) | p[1]; }
@@ -86,7 +87,7 @@ bool AmigaSelectionLayer::render(UBYTE* target, const UBYTE* pack, const UBYTE* 
         // Bitmap::clear is word-aligned; partial damage needs its masked
         // rectangle helper so adjacent retained pixels are not erased.
         if (!fresh) destination.solidRect(d.x, d.y, d.width, d.height, 0);
-        paintedPixels += unsigned(d.width)*unsigned(d.height);
+        paintedPixels += downwell::mulu16(d.width, d.height); // clipped to the 160x608 layer
         for (unsigned j = 0; j < count; ++j) {
             // Both masked operations replace, rather than blend, every set
             // mask bit. An immediately following identical mask/position

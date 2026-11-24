@@ -1,6 +1,7 @@
 #pragma once
 #include "core/EffectMaskAssets.h"
 #include "core/PaletteEffectSurface.h"
+#include "core/NarrowArithmetic.h"
 
 // Immutable offline streams, indexed once by their original planar identity.
 // Queries and producer coverage remain owned by PaletteEffectSurface.
@@ -42,7 +43,7 @@ public:
                 sprite==133||sprite==134?assets.currency(sprite==134,frame):nullptr;
             if(!source||!width||!height||height>32||stride>8||
                source->mask.width!=width||source->mask.height!=height||source->mask.stride!=stride)return false;
-            const unsigned span=stride*height*3;
+            const unsigned span=downwell::mulu16(stride,height)*3;
             if(pixels!=end||mask!=pixels+span||mask>bytes||span>bytes-mask)return false;
             entries_[i]={*source,payload+(pixels-payloadOffset),payload+(mask-payloadOffset)};end=mask+span;
             unsigned slot=hash(source->mask.data);

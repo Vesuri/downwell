@@ -14,7 +14,7 @@ void drawDeathResultsChoices(Sink& sink, const DeathMenuSequence& menu) {
         if (menu.cursor == static_cast<int>(i)) {
             sink.choice(i, x + menu.cursorBounceTenths - 10, y + 1, 2);
             sink.choice(i, x + menu.cursorBounceTenths,
-                        y + 1 - menu.cursorBounceTenths / 10, 1);
+                        y + 1 - std::int16_t(menu.cursorBounceTenths) / 10, 1); // [0, 12]
         } else sink.choice(i, x, y, 2);
     }
 }

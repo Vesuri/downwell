@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_STYLE_DRAW_LIST_H
 #include "AmigaSelectionLayer.h"
 #include "AmigaSceneRuntime.h"
+#include "core/NarrowArithmetic.h"
 
 // Source-order carousel and individual labels, as in the full style oracle.
 // Common vertical translation belongs to the DMA viewport, not these commands.
@@ -32,7 +33,7 @@ struct AmigaStyleDrawList {
             const bool unlocked=scenes.styleUnlocked(style);
             add(unlocked ? runId(style) : 65501,
                 unlocked && style==cursor ? scenes.styleRunFrame() : 0,
-                x,center-14-distance*distance/200);
+                x,center-14-int(std::uint16_t(downwell::muls16(distance,distance))/200)); // |distance|<=95
         }
         if(scenes.hardUnlocked()) {
             const int x=80-hardApart-scenes.styleSmoothX();

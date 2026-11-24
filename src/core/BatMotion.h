@@ -5,6 +5,7 @@
 #include "BatHitState.h"
 #include "SolidCollision.h"
 #include "EnemyContact.h"
+#include "NarrowArithmetic.h"
 #include <cstdint>
 
 namespace downwell {
@@ -41,7 +42,9 @@ inline long batPointDirection(long dx, long screenDy) {
 }
 
 inline int batNormalizeDirection(int direction) {
-    direction %= 360;
+    // Headings are normally in [-10, 460] (a pursuit turn moves 10,
+    // batSine's callers add at most 91 to a normalized one).
+    direction = fitsS16(direction) ? std::int16_t(direction) % 360 : direction % 360;
     return direction < 0 ? direction + 360 : direction;
 }
 
@@ -136,8 +139,16 @@ bool stepBatMotion(BatMotion& bat, long targetX, long targetY,
     if (difference > 0) bat.direction -= 10;
     else if (difference < 0) bat.direction += 10;
     bat.direction = batNormalizeDirection(bat.direction);
-    bat.speedX = batFractionalSine(bat.direction + 90, bat.directionFraction) * bat.speedFortieths / 5120;
-    bat.speedY = -batFractionalSine(bat.direction, bat.directionFraction) * bat.speedFortieths / 5120;
+    // |sine| <= 32768; with speed in [0, 120] (hits, growth below 50 and the
+    // configured 50/80/120) the /1024 quotient fits 16 bits, and truncating
+    // /1024 then /5 is truncating /5120. Other configured speeds take /5120.
+    if (unsigned(bat.speedFortieths) <= 120u) {
+        bat.speedX = std::int16_t(mulsu16(batFractionalSine(bat.direction + 90, bat.directionFraction), std::uint16_t(bat.speedFortieths)) / 1024) / 5;
+        bat.speedY = std::int16_t(-mulsu16(batFractionalSine(bat.direction, bat.directionFraction), std::uint16_t(bat.speedFortieths)) / 1024) / 5;
+    } else {
+        bat.speedX = batFractionalSine(bat.direction + 90, bat.directionFraction) * bat.speedFortieths / 5120;
+        bat.speedY = -batFractionalSine(bat.direction, bat.directionFraction) * bat.speedFortieths / 5120;
+    }
     return resolveBatMotion(bat, solid,scale);
 }
 

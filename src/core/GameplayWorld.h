@@ -1606,7 +1606,7 @@ public:
             downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
             if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
             if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
-               (!assets.jetFlame(sprite,(player_.jetHalves()/2)%3,asset)||!emit(asset,x,y)))return false;
+               (!assets.jetFlame(sprite,std::uint16_t(player_.jetHalves()/2)%3,asset)||!emit(asset,x,y)))return false;
           }
           for(unsigned i=blastEnd_;ok&&i-->0;){
             const auto& b=blasts_[i];

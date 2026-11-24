@@ -223,7 +223,7 @@ struct PauseMenu {
             out[n++] = char('0' + record / 10); out[n++] = '-'; out[n++] = char('0' + record % 10); out[n] = 0;
         }
     }
-    int powan() const { return powanTenths / 10; } // draw_text pixel snap
+    int powan() const { return std::int16_t(powanTenths) / 10; } // draw_text pixel snap; [0, 12]
     template<class Sink> void item(Sink& sink, const char* s, int i, int x, int y, int halign) const {
         if (cursor == i) {
             sink.text(s, x + powan() - 1, y + 1, halign, Kind::red);
