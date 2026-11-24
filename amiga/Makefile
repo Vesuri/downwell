@@ -186,8 +186,8 @@ endif
 endif
 ifneq ($(TRACE_FRAMES),)
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING)$(PROFILE_AUTORUN),10001)
-$(error TRACE_FRAMES requires FPSCOUNT=1 PROFILE_AUTORUN=1 without probes, coarse timing or sampling)
+ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING),1000)
+$(error TRACE_FRAMES requires FPSCOUNT=1 without probes, coarse timing or sampling)
 endif
 endif
 endif

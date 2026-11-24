@@ -74,6 +74,18 @@ def main():
     # The stops at every input sample halt the whole emulated machine, beam
     # included, so they add no work to the measured updates.
     census=os.environ.get('DOWNWELL_ROUTE_CENSUS')=='1'
+    # DOWNWELL_ROUTE_TRACE=N (W3.7, a TRACE_FRAMES build): at the input
+    # sample of gameplay update N-1, after its input, record
+    # DOWNWELL_ROUTE_TRACE_FIELDS whole fields of every instruction into
+    # DOWNWELL_ROUTE_TRACE_OUTPUT/trace-<N-1>.bin, then end the route
+    # (tools/amiga-trace-report.py excludes the partial first and last
+    # updates). No input changes during the capture, so update N gets
+    # update N-1's input; the driver reports when the tape differs there.
+    traceFrame=int(os.environ.get('DOWNWELL_ROUTE_TRACE','0'))
+    traceFields=int(os.environ.get('DOWNWELL_ROUTE_TRACE_FIELDS','20'))
+    traceOutput=os.environ.get('DOWNWELL_ROUTE_TRACE_OUTPUT','')
+    if traceFrame and (traceFrame<3 or not traceOutput):
+        raise RuntimeError('DOWNWELL_ROUTE_TRACE needs a gameplay update >= 3 and DOWNWELL_ROUTE_TRACE_OUTPUT')
     gardenShot=os.environ.get('DOWNWELL_GARDEN_SHOT')=='1'
     tape=Path(base+'.inputs').read_bytes()
     witnesses={row[0]:row[1:] for row in
@@ -239,7 +251,9 @@ def main():
                 m=re.search(r'STATE (\d+) (\d+) (\d+) (\d+) (-?\d+) (\d+) (\d+) (-?\d+)',state)
                 if not m: raise RuntimeError(state)
                 scene,tick,area,level,hp,good,resultPending,gardenX=map(int,m.groups())
-                sampleVoices(tick)
+                # Runs that end early (a trace or capture tick) never check
+                # sounds; skip the voice table's round trip at every sample.
+                if not traceFrame and shotTick<0: sampleVoices(tick)
                 sampleMemory(tick,scene)
                 if scene!=oldScene:
                     # W1.14: the garden's own sounds (jump, hop, landings and
@@ -347,6 +361,22 @@ def main():
                     if previous<0 or bool(previous&bit)!=bool(packed&bit):
                         controls.button(event,bool(packed&bit))
                 previous=packed
+                if traceFrame and scene==3:
+                    update=int(re.search(r'UPDATE (\d+)',checked('printf "UPDATE %lu\\n", gDownwellProfileFrames[3]+1'))[1])
+                    if update>traceFrame-1: raise RuntimeError(f'route passed update {traceFrame-1} before the trace')
+                    if update==traceFrame-1:
+                        nextInput=tape[tick+1] if tick+1<len(tape) else None
+                        print(f'TRACE input update={traceFrame} tick={tick+1} tape={nextInput} held={packed}'
+                              f'{"" if nextInput==packed else " (differs)"}',flush=True)
+                        checked('delete breakpoints')
+                        out=Path(traceOutput)/f'trace-{update}.bin'
+                        print(f'TRACE start frame={update}',flush=True)
+                        out.parent.mkdir(parents=True,exist_ok=True)
+                        profile(g,traceFields,out.resolve())
+                        print(checked('printf "TRACE end start=%lu frames_completed=%lu\\n", '+str(update)+', gDownwellProfileFrames[3]').strip(),flush=True)
+                        print('DOWNWELL_WORLD_ONE_TRACE_READY',flush=True)
+                        Path('.run/gdb-ready.marker').touch()
+                        return
         raise RuntimeError('route exhausted frame bound')
     finally:
         log.close()

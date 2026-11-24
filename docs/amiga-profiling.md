@@ -256,7 +256,15 @@ test-sound-routes`) from boot with joystick events only, on an FPSCOUNT
 build without autorun: `tools/verify-world-one-native.py` keeps its witness
 and sound checks and reads the ring where the route ends, with the VBlank
 field count as a check on the beam clock. `hard-mode-death*` routes start
-from a hard-mode save and end at the results.
+from a hard-mode save and end at the results. `ROUTE_END_TICK=T` ends the
+route at simulation tick T, for a short census. Without the census,
+`ROUTE_TRACE=N` records `ROUTE_TRACE_FIELDS` (default 20) whole fields of
+every instruction from the input sample of gameplay update N-1 into
+`TRACE_OUTPUT` (default `tmp/trace/route-name-N`), then ends; read it with
+`tools/amiga-trace-report.py`. No input changes during the capture, so
+update N uses update N-1's input, and the log says when the tape differs
+there. Every verification run is warped (`verify_startup.sh`), so wall time
+goes to the builds and the route driver's per-sample round trips.
 
 `tools/amiga-census-report.py census.bin capture.log` (run by profile.sh,
 output in `CENSUS_OUTPUT`, default `tmp/census/MODE`) prints the work mean,

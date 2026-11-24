@@ -150,6 +150,10 @@ case "$mode" in
     # (tools/verify-world-one-native.py, its witness and sound checks), on an
     # FPSCOUNT build without autorun. hard-mode-death* routes start from a
     # save with hard mode on and end at the results.
+    # ROUTE_END_TICK=T ends the route at simulation tick T (a short census).
+    # ROUTE_TRACE=N (W3.7, without CENSUS) records ROUTE_TRACE_FIELDS
+    # (default 20) whole fields of every instruction from the input sample
+    # of gameplay update N-1, into TRACE_OUTPUT, and ends there.
     route="${ROUTE:-world-one}"
     [[ -f ../tmp/sound-route-$route.inputs ]] || {
       echo "no host route tmp/sound-route-$route (make test-sound-routes)" >&2; exit 1; }
@@ -165,6 +169,24 @@ case "$mode" in
       printf '[stats]\nhardUnlocked="1.000000"\n[option]\nhardMode="1.000000"\n' > .run/route-save.ini
       export DOWNWELL_ROUTE_DEATH=1 VERIFY_SAVE="$PWD/.run/route-save.ini"
       ready_marker=DOWNWELL_WORLD_ONE_RESULTS_READY
+    fi
+    if [[ -n ${ROUTE_END_TICK:-} ]]; then
+      [[ $ROUTE_END_TICK =~ ^[1-9][0-9]*$ ]] || { echo "ROUTE_END_TICK must be a tick" >&2; exit 1; }
+      export DOWNWELL_CAPTURE_TICK="$ROUTE_END_TICK"
+      ready_marker=DOWNWELL_WORLD_ONE_CAPTURE_READY
+    fi
+    if [[ -n ${ROUTE_TRACE:-} ]]; then
+      [[ $ROUTE_TRACE =~ ^[1-9][0-9]*$ && ${ROUTE_TRACE_FIELDS:-20} =~ ^[1-9][0-9]*$ ]] || {
+        echo "ROUTE_TRACE must be a gameplay update and ROUTE_TRACE_FIELDS a field count" >&2; exit 1; }
+      (( ${ROUTE_TRACE_FIELDS:-20} <= 100 )) || { echo "ROUTE_TRACE_FIELDS must not exceed 100" >&2; exit 1; }
+      trace_out="${TRACE_OUTPUT:-$PWD/../tmp/trace/route-$route-$ROUTE_TRACE}"
+      mkdir -p "$trace_out"
+      trace_out="$(cd "$trace_out" && pwd)"
+      rm -f "$trace_out"/trace-*.bin
+      flags+=(TRACE_FRAMES="$ROUTE_TRACE")
+      export DOWNWELL_ROUTE_TRACE="$ROUTE_TRACE" DOWNWELL_ROUTE_TRACE_FIELDS="${ROUTE_TRACE_FIELDS:-20}"
+      export DOWNWELL_ROUTE_TRACE_OUTPUT="$trace_out"
+      ready_marker=DOWNWELL_WORLD_ONE_TRACE_READY
     fi
     ;;
   *) echo "usage: [CENSUS=1] bash amiga/profile.sh [probes|fps|idle|quiet-fall|quiet-state|quiet-window|terrain-reads|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear|route]" >&2; exit 1 ;;
@@ -202,9 +224,12 @@ if [[ $census == 1 ]]; then
     script=.run/census/profile.gdb
   fi
   rm -f .run/census.bin
-elif [[ $mode == route ]]; then
-  echo "route measures nothing without CENSUS=1 (tools/verify-world-one-native.py replays it)" >&2
+elif [[ $mode == route && -z ${ROUTE_TRACE:-} ]]; then
+  echo "route measures nothing without CENSUS=1 or ROUTE_TRACE (tools/verify-world-one-native.py replays it)" >&2
   exit 1
+fi
+if [[ $mode == route && -n ${ROUTE_TRACE:-} && $census == 1 ]]; then
+  echo "ROUTE_TRACE traces a build without the census" >&2; exit 1
 fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
@@ -339,6 +364,14 @@ fi
 if [[ $mode == frames ]]; then
   for bin in "$dump_out"/frame-*.bin; do python3 ../tools/decode-amiga-gameplay-frame.py "$bin" "${bin%.bin}.png"; done
   echo "Frames: $dump_out"
+  exit 0
+fi
+if [[ $mode == route && -n ${ROUTE_TRACE:-} ]]; then
+  ls "$trace_out"/trace-*.bin > /dev/null 2>&1 || { echo "FS-UAE wrote no trace" >&2; exit 1; }
+  cp out/Downwell.elf "$trace_out/Downwell.elf"
+  cp ".run/profile-${mode}.log" "$trace_out/capture.log"
+  grep '^TRACE' "$trace_out/capture.log"
+  echo "Traces: $trace_out (report: python3 tools/amiga-trace-report.py $trace_out)"
   exit 0
 fi
 if [[ $mode == trace || $mode == quiet-window ]]; then
