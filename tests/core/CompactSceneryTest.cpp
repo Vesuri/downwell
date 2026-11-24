@@ -87,8 +87,45 @@ void gemChunk(){
     for(unsigned i=10;i<20;++i)assert(ops.bursts[i].amount==10&&ops.bursts[i].large);
     assert(chunk.step(random,ops)&&ops.bursts.size()==20&&ops.masks==1);
 }
+// The Q32 particle sums against the binary64 sums they certify: a twin
+// record with every particle held on the binary64 path (the original
+// arithmetic) must draw, respawn and consume the RNG identically.
+void fixedParticles(){
+    using Fire=downwell::CompactTorchFireRecord;
+    unsigned decisions=0,fixedParts=0;
+    auto hold=[](Fire& f){for(auto& p:f.part)if(!p.exact&&p.steps==0)p.exact=true;};
+    for(unsigned seed=1;seed<=3000;++seed){
+        downwell::GameMakerRandom ra(seed),rb(seed),pick(seed*7919u);Ops oa,ob;
+        Fire a,b;
+        const int x=int(pick.nextU32()%60000u)-10000,y=int(pick.nextU32()%300000u)-20000;
+        a.create(x,y);b.create(x,y);hold(b);
+        const unsigned douse=seed%3?200+pick.nextU32()%400:1000;
+        for(unsigned t=0;t<700;++t){
+            if(t==douse){a.objHp=b.objHp=0;a.stomped=b.stomped=seed&1;}
+            const bool sa=a.step(ra,oa),sb=b.step(rb,ob);hold(b);
+            assert(sa&&sb&&ra.drawCount()==rb.drawCount()&&oa.moving.size()==ob.moving.size()&&
+                   oa.coins==ob.coins&&oa.sounds==ob.sounds&&a.active==b.active);
+            for(unsigned i=0;i<Fire::parts;++i){
+                const auto& pa=a.part[i];const auto& pb=b.part[i];
+                fixedParts+=!pa.exact;
+                std::int32_t xa,ya,xb,yb,fa=0,fb=0;bool ba,bb;
+                assert(pa.pixels(xa,ya)&&pb.pixels(xb,yb)&&pa.lifeBelow8(ba)&&pb.lifeBelow8(bb));
+                if(ba)assert(pa.frame(fa));
+                if(bb)assert(pb.frame(fb));
+                if(xa!=xb||ya!=yb||ba!=bb||fa!=fb){
+                    std::printf("particle %u differs at seed %u update %u: %d,%d %d %d vs %d,%d %d %d\n",
+                        i,seed,t,xa,ya,int(ba),fa,xb,yb,int(bb),fb);
+                    assert(false);
+                }
+                ++decisions;
+            }
+        }
+    }
+    std::printf("Torch fire Q32 particles: %u particle-updates match binary64 (%u on Q32 sums)\n",decisions,fixedParts);
+}
 }
 int main(){
+    fixedParticles();
     dousedFire(false);dousedFire(true);offscreenFireDrawsNothing();torchPlacement();gemChunk();
     std::puts("compact scenery events passed");
 }

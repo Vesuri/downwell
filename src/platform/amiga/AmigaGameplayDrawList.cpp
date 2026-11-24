@@ -295,18 +295,11 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
         if(!fire.live||fire.y<viewY-32||fire.y>viewY+downwellDisplayHeight+32)continue;
         for(unsigned layer=0;layer<(fire.active?2u:1u);++layer)
             for(const auto& part:fire.part){
-                std::int32_t x,y,life=0;
-                if(!part.x.roundPixel(x)||!part.y.roundPixel(y))return false;
-                int order;
-                if(!downwell::compareRunnerReal(part.life,downwell::MotionBinary64::fromInteger(8),order))return false;
-                if(order>=0)continue;
-                // draw_sprite floors the fractional subimage. Life is a
-                // nonnegative double below 8: take its integer part.
-                {
-                    const int exponent=int((part.life.high>>20)&0x7ffu)-1023;
-                    if((part.life.high>>31)||exponent<0)life=0;
-                    else life=std::int32_t(((part.life.high&0xfffffu)|0x100000u)>>(20-exponent));
-                }
+                std::int32_t x,y,life=0;bool below;
+                if(!part.pixels(x,y)||!part.lifeBelow8(below))return false;
+                if(!below)continue;
+                // draw_sprite floors the fractional subimage.
+                if(!part.frame(life))return false;
                 const int sprite=fire.active?(layer?712:711):83;
                 if(!append(UWORD(sprite),UWORD(life&7),downwellPlayfieldX+x-viewX,y-viewY,0))return false;
             }
