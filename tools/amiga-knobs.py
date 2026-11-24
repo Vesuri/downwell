@@ -16,7 +16,7 @@ import sys
 
 # Explicit names or shell-style patterns, in priority order of listing.
 SETS = {
-    "shipping": ["STRIP", "AMIGA_OPTIMIZATION", "AMIGA_HOT_OPTIMIZATION", "AMIGA_HOT_OBJECTS",
+    "shipping": ["STRIP", "AMIGA_CPU", "AMIGA_OPTIMIZATION", "AMIGA_HOT_OPTIMIZATION", "AMIGA_HOT_OBJECTS",
                  "TABLE_CONTACT_ATAN", "RETAIN_HEALTH_HUD", "AMMO_DAMAGE_RANGE",
                  "PREPARED_AMMO_DIVIDERS", "LOCAL_DRAW_CAPTURE", "AMMO_FACTORED",
                  "PREPARED_FIELDS", "PREPARED_FIELDS_BACKING", "SCENERY_LAYERS", "NATIVE_BOXES",

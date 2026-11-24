@@ -3,9 +3,10 @@
 This repository is a behavior-first port of the Windows Steam release of
 Downwell to an SDL host reference implementation and then to native Amiga
 code. The target machine is an Amiga 1200 with 4 MB Fast RAM (68EC020, AGA,
-2 MB Chip, 4 MB Fast); the code stays 68000-compatible for now. The game must
-start on any Amiga with enough Chip memory for its DMA data and enough public
-memory (Chip or Fast) for everything else.
+2 MB Chip, 4 MB Fast); the game is built for the 68020 and refuses a 68000
+or 68010 at start. The game must start on any Amiga with a 68020 or later,
+enough Chip memory for its DMA data and enough public memory (Chip or Fast)
+for everything else.
 
 ## Commits
 

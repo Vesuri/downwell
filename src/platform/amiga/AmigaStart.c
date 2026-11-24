@@ -64,11 +64,24 @@ void __attribute__((noinline, used)) downwellRefuse(const char* message)
     struct IntuitionBase* IntuitionBase =
         (struct IntuitionBase*)OpenLibrary((CONST_STRPTR)"intuition.library", 36);
     if (!IntuitionBase) return;
-    struct EasyStruct request = {sizeof(struct EasyStruct), 0, (UBYTE*)"Downwell",
-                                 (UBYTE*)"%s", (UBYTE*)"OK"};
+    /* Static: a local aggregate would be copied in by memcpy, which is not
+     * 68000 code (this file must call nothing built for AMIGA_CPU). */
+    static struct EasyStruct request = {sizeof(struct EasyStruct), 0, (UBYTE*)"Downwell",
+                                        (UBYTE*)"%s", (UBYTE*)"OK"};
     EasyRequestArgs(0, &request, 0, (APTR)&message);
     CloseLibrary((struct Library*)IntuitionBase);
 }
+
+#ifdef DOWNWELL_REQUIRE_68020
+/* Before the constructors: downwellRefuse's library calls go through the
+ * global SysBase, which GCCRuntime.cpp's constructor has not set yet. */
+extern struct ExecBase* SysBase;
+static void __attribute__((noinline)) downwellRefuseProcessor(struct ExecBase* exec)
+{
+    SysBase = exec;
+    downwellRefuse("Downwell needs a 68020 or later.");
+}
+#endif
 
 /* Audit seam (amiga/workbench_check.sh): the result DOS or Workbench gets. */
 void __attribute__((noinline, used)) downwellStartReturn(int result)
@@ -113,6 +126,19 @@ __attribute__((used, section(".text.unlikely"))) int _start(void)
         WaitPort(&self->pr_MsgPort);
         gDownwellWorkbenchStartup = (struct WBStartup*)GetMsg(&self->pr_MsgPort);
     }
+#ifdef DOWNWELL_REQUIRE_68020
+    /* Everything after this point, constructors included, is 68020 code;
+     * this file is built for the 68000 so an older CPU hears why. */
+    if (!(SysBase->AttnFlags & AFF_68020)) {
+        downwellRefuseProcessor(SysBase);
+        downwellStartReturn(20);
+        if (gDownwellWorkbenchStartup) {
+            Forbid();
+            ReplyMsg(&gDownwellWorkbenchStartup->sm_Message);
+        }
+        return 20;
+    }
+#endif
     for (DownwellInitFunction* p = __preinit_array_start; p != __preinit_array_end; ++p) (*p)();
     for (DownwellInitFunction* p = __init_array_start; p != __init_array_end; ++p) (*p)();
     const ULONG lower = (ULONG)self->pr_Task.tc_SPLower, upper = (ULONG)self->pr_Task.tc_SPUpper;
@@ -122,8 +148,10 @@ __attribute__((used, section(".text.unlikely"))) int _start(void)
     } else {
         UBYTE* const stack = (UBYTE*)AllocMem(downwellStackBytes, MEMF_PUBLIC);
         if (stack) {
-            struct StackSwapStruct swap = {stack, (ULONG)(stack + downwellStackBytes),
-                                           stack + downwellStackBytes};
+            struct StackSwapStruct swap;
+            swap.stk_Lower = stack;
+            swap.stk_Upper = (ULONG)(stack + downwellStackBytes);
+            swap.stk_Pointer = stack + downwellStackBytes;
             result = downwellCallOnStack(&swap, main);
             FreeMem(stack, downwellStackBytes);
         } else {

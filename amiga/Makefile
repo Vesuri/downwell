@@ -249,9 +249,18 @@ endif
 endif
 endif
 
-CFLAGS := -g $(AMIGA_OPTIMIZATION) -flto -m68000 -msoft-float -nostdlib -MP -MMD \
+# The instruction set. The game ships for the 68020 and later; AmigaStart.c
+# stays 68000 code so a 68000 or 68010 is refused with a message.
+AMIGA_CPU ?= 68020
+CFLAGS := -g $(AMIGA_OPTIMIZATION) -flto -m$(AMIGA_CPU) -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA -DDOWNWELL_INSTALLED_TABLES
+# A 68020 build takes the converter's 32x32->64 binary64 multiply and its
+# add (tools/install-data/binary64_amiga.s, oracle-checked there); a 68040
+# or 68060 falls back to the portable multiply at run time.
+ifeq ($(AMIGA_CPU),68020)
+CFLAGS += -DDOWNWELL_MULTIPLY_BINARY64_HOOK -DDOWNWELL_ADD_BINARY64_HOOK -DDOWNWELL_REQUIRE_68020
+endif
 ifeq ($(EXIT_WIPE_VERIFY),1)
 CFLAGS += -DDOWNWELL_EXIT_WIPE_VERIFY
 endif
@@ -632,7 +641,7 @@ endif
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src
-ASFLAGS := -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
+ASFLAGS := -mcpu=$(AMIGA_CPU) -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 ifeq ($(ENTRY_WIPE_VERIFY),1)
 ASFLAGS += --defsym DOWNWELL_ENTRY_WIPE_VERIFY=1
 endif
@@ -690,6 +699,9 @@ OBJECTS := obj/AmigaStart.o obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInpu
 	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 OBJECTS += obj/AmigaPatternTransfer.o
+ifeq ($(AMIGA_CPU),68020)
+OBJECTS += obj/Binary64Hooks.o obj/Binary64HooksAsm.o
+endif
 ifeq ($(PREPARED_FIELDS),1)
 OBJECTS += obj/AmigaFieldPrepared.o
 endif
@@ -932,7 +944,7 @@ check:
 	@set -e; for tool in $(CC) $(AS) $(OBJDUMP) elf2hunk; do \
 		command -v $$tool >/dev/null || { echo "missing Amiga tool: $$tool"; exit 1; }; \
 	done
-	@echo "Amiga 68000 toolchain OK"
+	@echo "Amiga toolchain OK"
 	@python3 $(REPO)/tools/amiga-knobs.py --check
 
 # WR.2: knob sets (shipping, gate, development, verify, profile, reference)
@@ -1389,13 +1401,24 @@ obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c Makefile
 	$(CC) $(CFLAGS) -fno-builtin -Dmemcpy=downwellToolchainMemcpy -Dmemset=downwellToolchainMemset \
 		-D_start=downwellUnusedSharedStart -c -o $@ $<
 
+# 68000 code outside LTO: it runs before anything built for AMIGA_CPU.
 obj/AmigaStart.o: $(AMIGA_SRC)/AmigaStart.c Makefile
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -fno-lto -m68000 -fno-tree-loop-distribute-patterns -c -o $@ $<
+	@! $(OBJDUMP) -r $@ | grep -E ' (memcpy|memset|memmove|strlen|__[a-z]+si3)$$' || \
+		{ echo "*** AmigaStart.o must not call code built for AMIGA_CPU"; rm -f $@; exit 1; }
 
 obj/AmigaMemoryCopy.o: $(AMIGA_SRC)/AmigaMemoryCopy.cpp $(AMIGA_SRC)/AmigaMemoryCopy.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Binary64Hooks.o: $(REPO)/tools/install-data/binary64_amiga.cpp $(REPO)/src/core/MultiplyBinary64.h Makefile
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Binary64HooksAsm.o: $(REPO)/tools/install-data/binary64_amiga.s Makefile
+	@mkdir -p $(@D)
+	$(AS) $(ASFLAGS) -o $@ $<
 
 obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	@mkdir -p $(@D)

@@ -7,7 +7,8 @@
 #   quits on Escape with result 0 (tools/verify-workbench-start.py);
 # - the others refuse (tools/verify-start-refusal.py, its docstring has the
 #   checks): a missing data file, a short one, one with a wrong header, and
-#   too little Chip memory (MACHINE=a500-512k).
+#   too little Chip memory (MACHINE=a500-512k-020), and a 68000
+#   (MACHINE=a500).
 # Run under the shared lock (make verify-amiga-refusals).
 # VERIFY_REFUSAL_CASES picks cases by name.
 set -euo pipefail
@@ -20,11 +21,13 @@ cases=(
   "shell-missing         VERIFY_SHELL_LOG=1 VERIFY_DATA_MISSING=shop"
   "shell-short           VERIFY_SHELL_LOG=1 VERIFY_DATA_SHORT=sndrun"
   "shell-header          VERIFY_SHELL_LOG=1 VERIFY_DATA_CORRUPT=tables"
-  "shell-memory          VERIFY_SHELL_LOG=1 MACHINE=a500-512k"
+  "shell-memory          VERIFY_SHELL_LOG=1 MACHINE=a500-512k-020"
+  "shell-cpu             VERIFY_SHELL_LOG=1 MACHINE=a500"
   "workbench-stack       VERIFY_WORKBENCH=1 VERIFY_STACK_BYTES=4096"
   "workbench-missing     VERIFY_WORKBENCH=1 VERIFY_DATA_MISSING=tables"
   "workbench-short       VERIFY_WORKBENCH=1 VERIFY_DATA_SHORT=clear"
-  "workbench-memory      VERIFY_WORKBENCH=1 MACHINE=a500-512k"
+  "workbench-memory      VERIFY_WORKBENCH=1 MACHINE=a500-512k-020"
+  "workbench-cpu         VERIFY_WORKBENCH=1 MACHINE=a500"
 )
 expected() {
   case "$1" in
@@ -34,6 +37,7 @@ expected() {
     workbench-missing) echo 'Cannot read data/Downwell\.tables: reinstall Downwell\.' ;;
     workbench-short) echo 'data/Downwell\.clear is not the file Downwell needs: reinstall Downwell\.' ;;
     *-memory) echo "$memory" ;;
+    *-cpu) echo 'Downwell needs a 68020 or later\.' ;;
   esac
 }
 

@@ -13,10 +13,12 @@ agreement alone is insufficient. Let gameplay run slower on PAL; do not add
 **Target machine (set 2026-11-21, replacing the A500):** an Amiga 1200
 with 4 MB Fast RAM (68EC020 at 14 MHz, AGA, 2 MB Chip, 4 MB Fast;
 `MACHINE=a1200-4m`, the gates' default). The unexpanded A1200 was the
-first choice the same day, but the game needs about 3.4 MB. The code stays
-68000-compatible (`-m68000`) for now. The game must start on any Amiga with
-enough Chip memory for its DMA data and enough public memory (Chip or Fast)
-for everything else, and refuse with a clear message otherwise.
+first choice the same day, but the game needs about 3.4 MB. The game is
+built for the 68020 (`AMIGA_CPU=68020`, since 2026-11-24; AmigaStart.c stays
+68000 code and refuses a 68000 or 68010). The game must start on any Amiga
+with a 68020 or later, enough Chip memory for its DMA data and enough public
+memory (Chip or Fast) for everything else, and refuse with a clear message
+otherwise.
 
 ## Priority and scope
 
@@ -241,10 +243,7 @@ resets it; that is the first owner to find.
    all workloads. Replace the A500 numbers in this section, sections 0 and
    5 and the audit with the target's, and drop any item the target already
    meets. Then review the order of W3.8–W3.13 with the user: CPU-side work
-   should shrink more than Chip-bus work, so C may rank ahead of D. A 68020
-   build (`-m68020`: 32-bit multiply and divide for the binary64
-   arithmetic) is the user's decision; the code stays 68000-compatible
-   until then.
+   should shrink more than Chip-bus work, so C may rank ahead of D.
 
 **The initial fall (section 0)**
 
@@ -1045,8 +1044,8 @@ block implementing or testing the other tasks locally.
 **Depends on:** 1.15–1.16.
 **Work:** Run bounded native natural-encounter captures, including dense smoke,
 debris, gems, fields, shops and Retry. Measure actual per-owner costs, worst
-gameplay frames, Chip/Fast peaks and stack/capacity margins. Confirm 68000-only
-output and meaningful allocation failures. Use offline assets and retained
+gameplay frames, Chip/Fast peaks and stack/capacity margins. Confirm 68020-only
+output outside AmigaStart.c and meaningful allocation failures. Use offline assets and retained
 hardware scrolling; no runtime sprite conversion or silent RAM expansion.
 **Done when:** Reproducible measurements and coverage are recorded in the commit;
 newly exposed costs and fit failures have concrete entries in §5/§7. Do not claim
@@ -1416,7 +1415,7 @@ Reference: [scene architecture](scene-architecture.md).
   residency before admitting additional encounter artwork on a stock-memory machine.
   Keep the gate unchanged until residency is reduced or a new whole-program
   allocation measurement justifies a different budget.
-  Keep the 68000 CPU target; do not silently increase emulator Chip RAM
+  Keep the 68020 CPU target; do not silently increase emulator Chip RAM
   to make memory checks pass.
 - The effect stamps are still linked into the
   executable, so ordinary memory holds them beside any Chip copy. Give them
@@ -1427,8 +1426,9 @@ Reference: [scene architecture](scene-architecture.md).
 - Propagate terminal failures through the remaining direct actor, reward and
   collision loops: stop later work in the same frame without rolling back
   completed effects. Checked event dispatch alone does not cover these loops.
-- Maintain reproducible offline assets and 68000 instruction/helper checks
-  across supported build configurations.
+- Maintain reproducible offline assets and instruction/helper checks
+  (68000 for AmigaStart.c, 68020 elsewhere) across supported build
+  configurations.
 
 ## 8. Broaden end-to-end verification
 

@@ -4735,6 +4735,9 @@ __attribute__((noinline)) static int runDownwell(void) {
     return exitCode;
 }
 
+#ifdef DOWNWELL_MULTIPLY_BINARY64_HOOK
+extern "C" void install_cpu_init(void);
+#endif
 int main(void){
     const ULONG lower=(ULONG)SysBase->ThisTask->tc_SPLower;
     const ULONG upper=(ULONG)SysBase->ThisTask->tc_SPUpper;
@@ -4743,6 +4746,9 @@ int main(void){
         downwellRefuse("Downwell needs Kickstart 2.0 or later.");
         return 20;
     }
+#ifdef DOWNWELL_MULTIPLY_BINARY64_HOOK
+    install_cpu_init(); // the wide multiply only on a 68020 or 68030
+#endif
     const int result=runDownwell();
     // WI.6: a failure that has not said why yet says so now, with the display
     // given back: an allocation at startup, else the internal failure's code.

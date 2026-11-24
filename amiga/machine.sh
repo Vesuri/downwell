@@ -6,7 +6,9 @@
 #   a1200       the unexpanded A1200 (2 MB Chip, no Fast RAM);
 #   a1200-fast  the A1200 with 8 MB Fast RAM;
 #   a500        A500 with 1 MiB Chip (ECS 8372A Agnus) and 8 MiB Fast;
-#   a500-512k   A500 with 512 KiB Chip (OCS) and 8 MiB Fast.
+#   a500-512k   A500 with 512 KiB Chip (OCS) and 8 MiB Fast;
+#   a500-512k-020  the same with a 68020 accelerator (the Chip refusal on a
+#               CPU the game accepts).
 # The A1200 machines use the shared AMIGA_SETUP presets, which also select
 # the A1200 Kickstart and override the launch script's chipset argument.
 DOWNWELL_DEFAULT_MACHINE=a1200-4m
@@ -20,11 +22,14 @@ downwell_machine() {
       AMIGA_MODEL=A500 CHIP_KB=1024 FAST_KB=8192 MACHINE_CHIPSET=ecs_agnus ;;
     a500-512k)
       AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=8192 MACHINE_CHIPSET=ocs ;;
+    a500-512k-020)
+      AMIGA_MODEL=A500 CPU=68020 CHIP_KB=512 FAST_KB=8192 MACHINE_CHIPSET=ocs ;;
     *)
-      echo "MACHINE must be a1200-4m, a1200, a1200-fast, a500 or a500-512k" >&2
+      echo "MACHINE must be a1200-4m, a1200, a1200-fast, a500, a500-512k or a500-512k-020" >&2
       return 1 ;;
   esac
   export MACHINE
+  [ -z "${CPU:-}" ] || export CPU
   [ -z "${AMIGA_SETUP:-}" ] || export AMIGA_SETUP
 }
 
@@ -35,5 +40,6 @@ downwell_machine_description() {
     a1200-fast) echo "A1200 (2 MB Chip, 8 MB Fast)" ;;
     a500) echo "A500 (1 MiB Chip, 8 MiB Fast)" ;;
     a500-512k) echo "A500 (512 KiB Chip, 8 MiB Fast)" ;;
+    a500-512k-020) echo "A500 with a 68020 (512 KiB Chip, 8 MiB Fast)" ;;
   esac
 }
