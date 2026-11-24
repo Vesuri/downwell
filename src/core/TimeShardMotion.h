@@ -27,6 +27,9 @@ struct TimeShardMotion : TimeShardLifecycle {
         }
         auto probe=xx;bool hit=false;
         if(!probe.add(xsp) || !meeting(probe,yy,hit))return false;
+        // The final query below repeats this one when the shard ends where
+        // the probe was (a resting shard); nothing in between moves solids.
+        const MotionBinary64 firstX=probe,firstY=yy;const bool firstHit=hit;
         if(hit){xsp.high^=0x80000000u;if(!scale(xsp,{0x3fe66666u,0x66666666u}))return false;}
         probe=yy;
         if(!probe.add(ysp) || !meeting(xx,probe,hit))return false;
@@ -50,7 +53,8 @@ struct TimeShardMotion : TimeShardLifecycle {
            !scale(ysp,{0x3fecccccu,0xcccccccdu}))return false;
         if(small(xsp))xsp={};
         if(small(ysp))ysp={};
-        if(!meeting(xx,yy,hit))return false;
+        if(same(xx,firstX)&&same(yy,firstY))hit=firstHit;
+        else if(!meeting(xx,yy,hit))return false;
         if(hit){
             probe=xx;
             if(!probe.add(MotionBinary64::fromInteger(8)) || !meeting(probe,yy,hit))return false;
@@ -92,6 +96,7 @@ private:
             ((a.high&0x7fffffffu)==(b.high&0x7fffffffu) && a.low<b.low);
         return an?(!magnitude && (a.high!=b.high || a.low!=b.low)):magnitude;
     }
+    static bool same(MotionBinary64 a,MotionBinary64 b){return a.high==b.high&&a.low==b.low;}
     static bool small(MotionBinary64 v){v.high&=0x7fffffffu;return less(v,{0x3fa99999u,0x9999999au});}
     static bool scale(MotionBinary64& v,MotionBinary64 factor){MotionBinary64 out;if(!multiplyBinary64(v,factor,out))return false;v=out;return true;}
 };

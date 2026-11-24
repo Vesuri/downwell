@@ -2960,7 +2960,7 @@ bool GameplayWorld::segmentSolid(const downwell::ProjectileSegment& path)const{
 
 bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
     downwell::ContactBounds bounds;
-    if(!run_.effectsSucceeded||!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))
+    if(!run_.effectsSucceeded||!maskBounds_.calculate(mask,x,y,bounds))
         return run_.effectsSucceeded=false;
     bool found=false;
     if(wallContactResolver_&&(!platforms||platformContactResolver_)){

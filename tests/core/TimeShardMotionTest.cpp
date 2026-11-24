@@ -10,7 +10,7 @@ using namespace downwell;
 static MotionBinary64 number(double d){unsigned long long n;std::memcpy(&n,&d,8);return {unsigned(n>>32),unsigned(n)};}
 static void same(MotionBinary64 a,double d){const auto b=number(d);assert(a.high==b.high && a.low==b.low);}
 int main(){
-    unsigned cases=0;
+    unsigned cases=0,skipped=0;
     for(unsigned mask=0;mask<256;++mask)for(bool stopped:{false,true})
     for(double initialX:{-2.,-.04,0.,.05,1.})for(double initialY:{-2.,-1.,0.,2.}){
         const unsigned seed=mask*31+cases;GameMakerRandom rng(seed),oracle(seed);
@@ -19,8 +19,14 @@ int main(){
         shard.xsp=number(initialX);shard.ysp=number(initialY);shard.savedSpeed=number(-.3);
         shard.alarm0=3;shard.alarm1=0;shard.alarm2=5;shard.disappearing=true;
         double xx=240.25,yy=176.75,vx=initialX,vy=initialY;float speed=0;
-        bool dead=false;std::vector<std::pair<double,double>> probes;
-        auto hit=[&](double x,double y){const auto i=probes.size();probes.emplace_back(x,y);return (mask>>i)&1;};
+        // A solid query is a pure function of position within one Step:
+        // each distinct position takes the mask bit of its first query.
+        bool dead=false;std::vector<std::pair<double,double>> probes,distinct;
+        auto answer=[&](double x,double y){
+            for(unsigned i=0;i<distinct.size();++i)if(distinct[i].first==x&&distinct[i].second==y)return bool((mask>>i)&1);
+            distinct.emplace_back(x,y);return bool((mask>>(distinct.size()-1))&1);
+        };
+        auto hit=[&](double x,double y){probes.emplace_back(x,y);return answer(x,y);};
         if(!stopped){vy+=vy<-1?.1:.08;speed=float(-.3);}
         if(hit(xx+vx,yy)){vx*=-1;vx*=.7;}
         if(hit(xx,yy+vy)){
@@ -36,13 +42,17 @@ int main(){
             if(!hit(xx,yy-8))yy-=8;else if(!hit(xx,yy+8))yy+=8;
             if(hit(xx,yy))dead=true;
         }
-        unsigned calls=0;bool counted=false,outside=false;
+        // The Step may skip a query that repeats the first probe's position
+        // (the resting shard's final meeting); the rest come in order.
+        unsigned calls=0,next=0;bool counted=false,outside=false;
         assert(shard.step(stopped,rng,[&](auto x,auto y,bool& result){
-            assert(calls<probes.size());same(x,probes[calls].first);same(y,probes[calls].second);
-            result=(mask>>calls++)&1;return true;
+            if(next==2&&probes.size()>2&&probes[2]==probes[0]){++next;++skipped;}
+            assert(next<probes.size());same(x,probes[next].first);same(y,probes[next].second);
+            ++next;++calls;result=answer(probes[next-1].first,probes[next-1].second);return true;
         },[&](){assert(shard.destroyRequested==dead);counted=true;return 20;},
         [&](const auto& state,bool& retire){assert(counted);same(state.y.promoted(),176.75);outside=true;retire=false;return true;}));
-        assert(calls==probes.size() && outside && shard.destroyRequested==dead);
+        if(probes.size()>2&&probes[2]==probes[0]&&calls==2){++next;++skipped;}
+        assert(next==probes.size() && outside && shard.destroyRequested==dead);
         same(shard.xx,xx);same(shard.yy,yy);same(shard.xsp,vx);same(shard.ysp,vy);
         same(shard.x.promoted(),std::nearbyint(xx));same(shard.y.promoted(),std::nearbyint(yy));
         same(shard.imageSpeed.promoted(),double(speed));assert(shard.dflash==1);
@@ -64,5 +74,6 @@ int main(){
     assert(!failed.step(true,rng,[&](auto,auto,bool&){++queries;return false;},
         [](){assert(false);return 0;},[](const auto&,bool&){assert(false);return true;}));
     assert(queries==1 && rng.drawCount()==0);
-    std::printf("Time-shard Step: %u cases, exact motion, ordered probes/RNG, stop behavior and post-retirement publication passed\n",cases);
+    assert(skipped>0);
+    std::printf("Time-shard Step: %u cases (%u repeated final queries reused), exact motion, ordered probes/RNG, stop behavior and post-retirement publication passed\n",cases,skipped);
 }
