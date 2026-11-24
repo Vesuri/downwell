@@ -80,6 +80,11 @@ void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bit
 
 void amigaRendererDrawTextWords(AmigaRenderer* r,int x,int y,
     const UWORD* mask,const UWORD* white,unsigned words,unsigned height,unsigned stride) {
+    amigaRendererDrawTextWordsPen(r,x,y,mask,white,words,height,stride,2);
+}
+
+void amigaRendererDrawTextWordsPen(AmigaRenderer* r,int x,int y,
+    const UWORD* mask,const UWORD* white,unsigned words,unsigned height,unsigned stride,unsigned pen) {
     int left=r->clipX>0?r->clipX:0, right=r->clipX+r->clipWidth;
     int top=r->clipY>0?r->clipY:0, bottom=r->clipY+r->clipHeight;
     int base,first,last,shift,column,row,endRow;
@@ -126,8 +131,8 @@ void amigaRendererDrawTextWords(AmigaRenderer* r,int x,int y,
             }
             bits&=clips[column-first];
             if(bits) {
-                writeWord(out,readWord(out)&(UWORD)~bits);
-                writeWord(out+planeBytes,(readWord(out+planeBytes)&(UWORD)~bits)|(ink&bits));
+                writeWord(out,(readWord(out)&(UWORD)~bits)|(pen&1u?ink&bits:0));
+                writeWord(out+planeBytes,(readWord(out+planeBytes)&(UWORD)~bits)|(pen&2u?ink&bits:0));
             }
         }
         mask+=stride;white+=stride;
@@ -1067,21 +1072,45 @@ void amigaRendererBatchTerrainWallRow(AmigaTerrainBatch* batch,int x,int y,
 
 int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs* glyphs, const UBYTE* pack,
                                      const UBYTE* end) {
-    unsigned digit, row;
-    for (digit = 0; digit < 11; ++digit) {
-        const UBYTE* record = findAsset(pack, end, (UWORD)(65100 + digit), 0);
-        const UBYTE* data;
-        ULONG offset;
-        if (!record || readWord(record+4) != 4 || readWord(record+6) ||
-            readWord(record+8) != 8 || readWord(record+10) != 10 ||
-            readWord(record+12) != 16) return 0;
-        offset = readLong(record+16);
-        if (offset > (ULONG)(end-pack) || (ULONG)(end-pack)-offset < 40) return 0;
-        data = pack + offset;
-        for (row = 0; row < 10; ++row)
-            glyphs->rows[digit][row] = data[row*2] | data[20+row*2];
-    }
+    unsigned digit;
+    for (digit = 0; digit < 11; ++digit)
+        if (!amigaRendererPrepareGlyphRows(glyphs->rows[digit], pack, end, (UWORD)(65100 + digit)))
+            return 0;
     return 1;
+}
+
+int amigaRendererPrepareGlyphRows(UBYTE rows[10], const UBYTE* pack, const UBYTE* end, UWORD sprite) {
+    const UBYTE* record = findAsset(pack, end, sprite, 0);
+    const UBYTE* data;
+    ULONG offset;
+    unsigned row;
+    if (!record || readWord(record+4) != 4 || readWord(record+6) ||
+        readWord(record+8) != 8 || readWord(record+10) != 10 ||
+        readWord(record+12) != 16) return 0;
+    offset = readLong(record+16);
+    if (offset > (ULONG)(end-pack) || (ULONG)(end-pack)-offset < 40) return 0;
+    data = pack + offset;
+    for (row = 0; row < 10; ++row)
+        rows[row] = data[row*2] | data[20+row*2];
+    return 1;
+}
+
+/* scrDrawBorderTextBlack for one 8x10 glyph of origin (4,0): its four pen-0
+   neighbours, then the glyph in pen. All outline passes share pen 0 and the
+   fill comes last, so their union written once is the same picture. One word
+   spans x-5 .. x+10; rows y-1 .. y+10. */
+void amigaRendererDrawBorderGlyph(AmigaRenderer* renderer, const UBYTE rows[10],
+                                  int x, int y, unsigned pen) {
+    UWORD mask[12], ink[12];
+    unsigned row;
+    for (row = 0; row < 12; ++row) {
+        const UWORD above = row >= 2 ? (UWORD)((UWORD)rows[row-2] << 7) : 0;
+        const UWORD shape = row >= 1 && row <= 10 ? (UWORD)((UWORD)rows[row-1] << 7) : 0;
+        const UWORD below = row <= 9 ? (UWORD)((UWORD)rows[row] << 7) : 0;
+        ink[row] = shape;
+        mask[row] = (UWORD)(shape | (UWORD)(shape << 1) | (UWORD)(shape >> 1) | above | below);
+    }
+    amigaRendererDrawTextWordsPen(renderer, x - 5, y - 1, mask, ink, 1, 12, 1, pen & 3u);
 }
 
 int amigaRendererPrepareHudGlyph(AmigaHudGlyph* glyph, const UBYTE* pack,

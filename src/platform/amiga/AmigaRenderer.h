@@ -62,9 +62,16 @@ void amigaRendererDrawPlanarWord(AmigaRenderer*,int x,int y,UWORD alpha,UWORD lo
    clip and circular destination placement are resolved once per rectangle. */
 void amigaRendererDrawTextWords(AmigaRenderer*,int x,int y,
     const UWORD* mask,const UWORD* white,unsigned words,unsigned height,unsigned stride);
+/* As above with the ink in pen (0..3) instead of pen 2. */
+void amigaRendererDrawTextWordsPen(AmigaRenderer*,int x,int y,
+    const UWORD* mask,const UWORD* ink,unsigned words,unsigned height,unsigned stride,unsigned pen);
 /* Coverage copied from the existing offline numeric glyph planes at startup. */
 typedef struct AmigaDamageGlyphs { UBYTE rows[11][10]; } AmigaDamageGlyphs;
 int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs*, const UBYTE*, const UBYTE*);
+/* One 8x10, origin (4,0) offline glyph's coverage rows; 0 if the record differs. */
+int amigaRendererPrepareGlyphRows(UBYTE rows[10], const UBYTE*, const UBYTE*, UWORD sprite);
+/* The glyph's four pen-0 neighbours, then the glyph in pen, as one CPU write. */
+void amigaRendererDrawBorderGlyph(AmigaRenderer*, const UBYTE rows[10], int x, int y, unsigned pen);
 void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,

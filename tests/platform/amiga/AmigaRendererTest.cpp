@@ -1097,6 +1097,52 @@ int main(int argc, char** argv) {
     }
     require(smallComparisons > 10000 && wideRows > 100, "small asset oracle covers one- and two-word rows");
     std::cout << smallComparisons << " small asset scalar comparisons\n";
+    // Bordered font-2 glyphs: the single prepared write against the source's
+    // four pen-0 neighbour passes and the pen fill, over a patterned target,
+    // at every pen, across both edges, the clip rectangle and the ring wrap.
+    unsigned borderComparisons = 0, borderGlyphs = 0;
+    {
+        const UBYTE* const packBegin = gamePack.data();
+        const UBYTE* const packEnd = gamePack.data() + gamePack.size();
+        AmigaRenderer expectedRenderer;
+        static const int dx[] = {1,-1,0,0,0}, dy[] = {0,0,1,-1,0};
+        const int ys[] = {-11,-10,-1,0,3,downwellDisplayHeight-11,downwellDisplayHeight-1,downwellDisplayHeight};
+        for (unsigned slot = 0; slot < 40; ++slot) {
+            const UWORD id = UWORD(slot < 14 ? 65100 + slot : 65120 + slot - 14);
+            UBYTE rows[10];
+            if (!amigaRendererPrepareGlyphRows(rows, packBegin, packEnd, id)) continue;
+            ++borderGlyphs;
+            for (int x = -6; x <= downwellVisibleWidth + 6; x += 5)
+                for (int y : ys)
+                    for (int variant = 0; variant < 2; ++variant) {
+                        const unsigned origin = variant ? downwellGameRingHeight - 3u : 311u;
+                        for (unsigned at = 0; at < actualGame.size(); ++at)
+                            actualGame[at] = UBYTE(at * 37u + slot);
+                        expectedGame = actualGame;
+                        amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());
+                        amigaRendererInit(&expectedRenderer, expectedGame.data(), actualHud.data());
+                        amigaRendererSetGameOrigin(&actualRenderer, origin);
+                        amigaRendererSetGameOrigin(&expectedRenderer, origin);
+                        if (variant) {
+                            amigaRendererSetClipRect(&actualRenderer, x - 2, y + 2, 7, 6);
+                            amigaRendererSetClipRect(&expectedRenderer, x - 2, y + 2, 7, 6);
+                        }
+                        const unsigned pen = unsigned(x + y + int(slot)) & 3u;
+                        amigaRendererDrawBorderGlyph(&actualRenderer, rows, x, y, pen);
+                        for (unsigned pass = 0; pass < 5; ++pass)
+                            amigaRendererDrawAssetPen(&expectedRenderer, packBegin, packEnd, id, 0,
+                                x + dx[pass], y + dy[pass], 0, pass == 4 ? pen : 0u);
+                        if (actualGame != expectedGame) {
+                            std::cerr << "border glyph " << id << " x " << x << " y " << y
+                                      << " variant " << variant << " pen " << pen << "\n";
+                            require(false, "bordered glyph write matches the five source passes");
+                        }
+                        ++borderComparisons;
+                    }
+        }
+    }
+    require(borderGlyphs == 35 && borderComparisons > 20000, "bordered glyph oracle covers every packed font-2 glyph (F, J, Q, X, Z are unused)");
+    std::cout << borderComparisons << " bordered glyph comparisons\n";
     std::fill(actualGame.begin(), actualGame.end(), 0);
     std::fill(expectedGame.begin(), expectedGame.end(), 0);
     amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());

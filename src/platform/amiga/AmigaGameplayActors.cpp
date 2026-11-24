@@ -15,10 +15,26 @@ extern "C" { volatile unsigned gDownwellDamageTextChecks; }
 #endif
 #endif
 
-namespace { AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; AmigaDamageTextCache damageText; }
-void AmigaGameplayActors::releaseDamageText(){damageGlyphsReady=false;damageText.invalidate();}
+namespace {
+AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; AmigaDamageTextCache damageText;
+// Font-2 border glyphs 65100..65113 and 65120..65145, as amigaBorderGlyph maps them.
+constexpr unsigned borderGlyphCount=40;
+UBYTE borderRows[borderGlyphCount][10]; bool borderReady[borderGlyphCount];
+int borderSlot(unsigned id){
+    if(id>=65100u&&id<65114u)return int(id-65100u);
+    if(id>=65120u&&id<65146u)return int(id-65120u+14u);
+    return -1;
+}
+UWORD borderId(unsigned slot){return UWORD(slot<14u?65100u+slot:65120u+slot-14u);}
+}
+void AmigaGameplayActors::releaseDamageText(){
+    damageGlyphsReady=false;damageText.invalidate();
+    for(bool& ready:borderReady)ready=false;
+}
 bool AmigaGameplayActors::prepareDamageText(const UBYTE* pack, const UBYTE* end) {
     damageText.invalidate();
+    for(unsigned slot=0;slot<borderGlyphCount;++slot)
+        borderReady[slot]=amigaRendererPrepareGlyphRows(borderRows[slot],pack,end,borderId(slot))!=0;
     damageGlyphsReady=amigaRendererPrepareDamageGlyphs(&damageGlyphs,pack,end)!=0;
     if(damageGlyphsReady)damageText.bindGlyphs(damageGlyphs);
     return damageGlyphsReady;
@@ -65,14 +81,17 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
             AmigaHardware::blitterDrain();
             AmigaRenderer textRenderer=renderer;textRenderer.blitterEnabled=0;
             static const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
-            for(unsigned pass=0;pass<5;++pass){
+            const int slot=borderSlot(bob.frame);
+            if(slot>=0&&borderReady[slot])
+                amigaRendererDrawBorderGlyph(&textRenderer,borderRows[slot],bob.x,bob.y,unsigned(bob.flip));
+            else for(unsigned pass=0;pass<5;++pass)
                 amigaRendererDrawAssetPen(&textRenderer,pack,packEnd,bob.frame,0,bob.x+dx[pass],bob.y+dy[pass],0,
                     pass==4?unsigned(bob.flip):0u);
 #ifdef DOWNWELL_SCENE_VERIFY
+            for(unsigned pass=0;pass<5;++pass)
                 amigaRendererDrawAssetPen(&oracle,pack,packEnd,bob.frame,0,bob.x+dx[pass],bob.y+dy[pass],0,
                     pass==4?unsigned(bob.flip):0u);
 #endif
-            }
             int top=bob.y-1,bottom=bob.y+11;
             if(top<0)top=0;
             if(bottom>downwellDisplayHeight)bottom=downwellDisplayHeight;
