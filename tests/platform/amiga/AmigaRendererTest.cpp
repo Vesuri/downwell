@@ -1043,6 +1043,60 @@ int main(int argc, char** argv) {
     }
     require(tileComparisons > 1000, "terrain tile oracle exercises all frames and word shifts");
     std::cout << tileComparisons << " terrain tile scalar comparisons\n";
+    // Every small asset (one- and two-word source rows) through the word
+    // compositor: aligned, shifted, left-negative and right-clipped anchors,
+    // clip rectangles and the ring wrap, against the scalar oracle.
+    unsigned smallComparisons = 0, wideRows = 0;
+    for (unsigned i = 0; i < records; ++i) {
+        const auto* r = gamePack.data() + 20 + i * 24;
+        const int width = word(r+8), height = word(r+10), stride = word(r+12)/8;
+        if (width > 32 || height > 40 || !width || !height || (stride & 1) || stride > 4) continue;
+        const int ox = static_cast<short>(word(r+4)), oy = static_cast<short>(word(r+6));
+        const auto* data = gamePack.data() + (word(r+16)*65536u + word(r+18));
+        wideRows += stride == 4;
+        const int shifts[2] = {int(i % 16), int((i * 7 + 5) % 16)};
+        for (int shift : shifts)
+            for (int place = 0; place < 3; ++place)
+                for (int clipped = 0; clipped < 2; ++clipped) {
+                    const unsigned origin = place == 2 ? downwellGameRingHeight - 3u : 311u;
+                    std::fill(actualGame.begin(), actualGame.end(), 0x5a);
+                    expectedGame = actualGame;
+                    amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());
+                    amigaRendererSetGameOrigin(&actualRenderer, origin);
+                    const int x = place == 0 ? 110 + shift : place == 1 ? ox - width/2 + shift - 8 : downwellVisibleWidth - 9 + shift;
+                    const int y = place == 2 ? 2 + oy : 20 + shift;
+                    const int cx = clipped ? x - ox + 3 : 0, cy = clipped ? y - oy + 1 : 0;
+                    const int cw = clipped ? 13 : downwellVisibleWidth, ch = clipped ? 5 : downwellDisplayHeight;
+                    amigaRendererSetClipRect(&actualRenderer, cx, cy, cw, ch);
+                    amigaRendererDrawAsset(&actualRenderer, gamePack.data(), gamePack.data()+gamePack.size(),
+                        word(r), word(r+2), x, y, 0);
+                    for (int sy = 0; sy < height; ++sy)
+                        for (int sx = 0; sx < width; ++sx) {
+                            const int dx = x-ox+sx, dy = y-oy+sy;
+                            if (dx < cx || dx >= cx+cw || dy < cy || dy >= cy+ch ||
+                                dx < 0 || dx >= downwellVisibleWidth || dy < 0 || dy >= downwellDisplayHeight) continue;
+                            const unsigned bit = 0x80u >> (sx&7);
+                            const unsigned offset = sy*stride + sx/8;
+                            const unsigned pen = ((data[offset]&bit) ? 1 : 0) |
+                                ((data[offset+stride*height]&bit) ? 2 : 0);
+                            if (!pen) continue;
+                            for (unsigned plane = 0; plane < 2; ++plane) {
+                                auto& dest = expectedGame[plane*downwellGameRingPlaneBytes +
+                                    ((origin+dy)%downwellGameRingHeight)*downwellBytesPerPlaneLine + dx/8];
+                                const unsigned mask = 0x80u >> (dx&7);
+                                dest = (dest & ~mask) | ((pen&(1u<<plane)) ? mask : 0);
+                            }
+                        }
+                    if (actualGame != expectedGame) {
+                        std::cerr << "small asset " << word(r) << ":" << word(r+2) << " place " << place
+                                  << " shift " << shift << " clipped " << clipped << "\n";
+                        require(false, "small asset word composition matches the scalar oracle");
+                    }
+                    ++smallComparisons;
+                }
+    }
+    require(smallComparisons > 10000 && wideRows > 100, "small asset oracle covers one- and two-word rows");
+    std::cout << smallComparisons << " small asset scalar comparisons\n";
     std::fill(actualGame.begin(), actualGame.end(), 0);
     std::fill(expectedGame.begin(), expectedGame.end(), 0);
     amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());

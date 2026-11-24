@@ -282,6 +282,51 @@ static void drawAssetNormal(AmigaRenderer* renderer,
             targetY = (UWORD)(renderer->gameOrigin + targetY) % downwellGameRingHeight;
         UBYTE* targetRow = renderer->target + targetY * downwellBytesPerPlaneLine;
         const UBYTE* source = data + (ULONG)(UWORD)(firstY-top)*(UWORD)planeBytes;
+        if (planeBytes <= 4) {
+            /* A source row is at most 32 bits: load each plane once and
+               derive the (up to three) destination-aligned words with one
+               shift each, instead of re-reading and re-aligning per word. */
+            const int shift = left & 15;
+            const int baseWord = (left - shift) / 16;
+            const int k0 = firstWord - baseWord, k1 = lastWord - baseWord;
+            for (y = firstY; y < lastY; ++y) {
+                ULONG a, b;
+                if (planeBytes == 4) {
+                    a = readLong(source); b = readLong(source + sourcePlaneBytes);
+                } else {
+                    a = (ULONG)readWord(source) << 16;
+                    b = (ULONG)readWord(source + sourcePlaneBytes) << 16;
+                }
+                if (a | b) {
+                    UWORD lows[3], highs[3];
+                    int k;
+                    lows[0] = (UWORD)((UWORD)(a >> 16) >> shift);
+                    lows[1] = (UWORD)(a >> shift);
+                    lows[2] = (UWORD)((UWORD)a << (16 - shift));
+                    highs[0] = (UWORD)((UWORD)(b >> 16) >> shift);
+                    highs[1] = (UWORD)(b >> shift);
+                    highs[2] = (UWORD)((UWORD)b << (16 - shift));
+                    for (k = k0; k <= k1; ++k) {
+                        UWORD low = lows[k], high = highs[k];
+                        UWORD mask = low | high;
+                        UBYTE* target = targetRow + (baseWord + k) * 2;
+                        if (k == k0) mask &= firstMask;
+                        if (k == k1) mask &= lastMask;
+                        if (!mask) continue;
+                        if (outputPen >= 0) { low = outputPen & 1 ? 0xffff : 0; high = outputPen & 2 ? 0xffff : 0; }
+                        writeWord(target, (readWord(target) & (UWORD)~mask) | (low & mask));
+                        writeWord(target+destinationPlaneBytes,
+                            (readWord(target+destinationPlaneBytes) & (UWORD)~mask) | (high & mask));
+                    }
+                }
+                source += planeBytes; targetRow += downwellBytesPerPlaneLine;
+                if (++targetY == targetHeight) {
+                    targetY = 0;
+                    targetRow = renderer->target;
+                }
+            }
+            return;
+        }
         for (y = firstY; y < lastY; ++y) {
             int word;
             for (word = firstWord; word <= lastWord; ++word) {
