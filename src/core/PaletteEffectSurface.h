@@ -46,7 +46,7 @@ public:
             if(!backend_.clear)for(unsigned x=first_[y];x<last_[y];++x){const unsigned at=y*stride_+x;alpha_[at]=low_[at]=high_[at]=0;}
             first_[y]=words;last_[y]=0;
         }
-        firstRow_=Height;lastRow_=0;
+        firstRow_=Height;lastRow_=0;rectanglesValid_=false;
     }
     bool add(const Asset& asset,int x,int y){
         if(!asset.low || !asset.high)return false;
@@ -97,18 +97,27 @@ public:
     // storage. A queued backend can consume these after its preceding stamps.
     // Subtraction may leave transparent rows/words inside a rectangle; alpha
     // remains authoritative. Disjoint row bands never damage their gaps.
+    // The list is built once per change of coverage (adds and clears) and
+    // replayed to every consumer: subtraction clips, publication, the clear.
     template<class Emit> void visitRectangles(Emit emit)const{
-        unsigned y=firstRow_;
-        while(y<lastRow_){
-            if(first_[y]>=last_[y]){++y;continue;}
-            const unsigned top=y;
-            unsigned left=first_[y],right=last_[y];
-            do{
-                if(first_[y]<left)left=first_[y];
-                if(last_[y]>right)right=last_[y];
-                ++y;
-            }while(y<lastRow_&&first_[y]<last_[y]);
-            emit(left*16,top,(right-left)*16,y-top);
+        if(!rectanglesValid_){
+            rectangleCount_=0;
+            scanRectangles([&](unsigned left,unsigned top,unsigned right,unsigned bottom){
+                if(rectangleCount_<rectangleCapacity)
+                    rectangles_[rectangleCount_]={std::uint16_t(left),std::uint16_t(top),std::uint16_t(right),std::uint16_t(bottom)};
+                ++rectangleCount_;
+            });
+            rectanglesValid_=true;
+        }
+        if(rectangleCount_>rectangleCapacity){
+            scanRectangles([&](unsigned left,unsigned top,unsigned right,unsigned bottom){
+                emit(left*16,top,(right-left)*16,bottom-top);
+            });
+            return;
+        }
+        for(unsigned i=0;i<rectangleCount_;++i){
+            const auto& r=rectangles_[i];
+            emit(unsigned(r.left)*16,r.top,unsigned(r.right-r.left)*16,unsigned(r.bottom-r.top));
         }
     }
     bool samePixels(const PaletteEffectSurface& other)const{
@@ -122,6 +131,21 @@ public:
         return true;
     }
 private:
+    // Words and rows, half-open.
+    template<class Emit> void scanRectangles(Emit emit)const{
+        unsigned y=firstRow_;
+        while(y<lastRow_){
+            if(first_[y]>=last_[y]){++y;continue;}
+            const unsigned top=y;
+            unsigned left=first_[y],right=last_[y];
+            do{
+                if(first_[y]<left)left=first_[y];
+                if(last_[y]>right)right=last_[y];
+                ++y;
+            }while(y<lastRow_&&first_[y]<last_[y]);
+            emit(left,top,right,y);
+        }
+    }
     void synchronize()const{if(backend_.wait)backend_.wait(backend_.context);}
     static std::uint16_t read(const std::uint8_t* row,unsigned sx,unsigned left){
         if(!row)return 0;
@@ -147,6 +171,7 @@ private:
                     if(right>last_[row])last_[row]=right;
                 }
                 if(top<firstRow_)firstRow_=top;if(bottom>lastRow_)lastRow_=bottom;
+                rectanglesValid_=false;
             }
             return true;
         }
@@ -182,6 +207,7 @@ private:
                     std::uint16_t(unsigned(l)<<(16-shift)),std::uint16_t(unsigned(h)<<(16-shift)));
             }
             if(last){
+                rectanglesValid_=false;
                 if(first<first_[dy])first_[dy]=first;
                 if(last>last_[dy])last_[dy]=last;
                 if(dy<firstRow_)firstRow_=dy;
@@ -200,6 +226,11 @@ private:
     // Clear/publication of an untouched surface is constant-time. Subtraction
     // never expands this conservative range, including when it removes all alpha.
     std::uint16_t firstRow_=Height,lastRow_=0;
+    struct Rectangle {std::uint16_t left,top,right,bottom;};
+    static constexpr unsigned rectangleCapacity=16;
+    mutable Rectangle rectangles_[rectangleCapacity]{};
+    mutable unsigned rectangleCount_=0;
+    mutable bool rectanglesValid_=true;
 };
 }
 #endif

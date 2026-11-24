@@ -1318,11 +1318,19 @@ rectangles (6.9 → 1.5 ms) and each shade subtraction only their overlap
 - the clear, 1,575 words in 2.7 rectangles: 1.6 ms;
 - the publish copy to the display, 1,265 words: 3.9 ms.
 
-The visibility test's wait fell 5.5 → 1.1 ms, but constant fire's update
-totals barely moved (560–569 54.7 → 54.1 ms): the freed blitter time is
-waited for later in the update. Next: find that wait (trace 560–569 for
-`blitterDrain`/`blitterWait` callers) and the blitter work queued ahead of
-it, before choosing between fewer smoke stamps and moving CPU work.
+The visibility test's wait fell 5.5 → 1.3 ms. The tracked rectangles are
+built once per change of coverage and replayed to the subtraction clips,
+the publish copy and the clear (six row scans were 3.4 ms of CPU). Against
+the full-band clear, census to tick 700: constant fire 1,643 → 1,606
+fields, 560–569 54.7 → 51.6 ms, worst 140.8 → 139.2 ms; normal
+1,376 → 1,353 fields, worst 134.6 → 131.5 ms.
+
+Next: the CPU still spins on the blitter (`isBlitterBusy` 2.2 ms and
+`processBlitterQueue` 1.9 ms per update in a 561–567 trace before the
+cache). Trace again, find the drains and the work queued ahead of them,
+then choose between fewer smoke stamps (4.1 ms of blitter, the largest
+effect cost left), a cheaper publish (3.9 ms) and CPU work moved between
+queueing and the first read.
 
 Remaining effect work is the raster fallback for mixed producers, actual
 shade subtraction and entry cover. Measure those
