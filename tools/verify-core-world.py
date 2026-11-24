@@ -13,7 +13,8 @@ compiler = shlex.split(sys.argv[1] if len(sys.argv) > 1 else "clang++")
 # target-only planar artwork or backend implementation dependencies.
 core_generated = {root / "generated" / name for name in (
     "downwell-goal-mask.h", "downwell-time-field-mask.h", "smoke-trig.inc",
-    "atan-q16.inc", "contact-motion.inc", "clear-motion.inc",
+    "atan-q16.inc", "narrow-trig-q64.inc", "narrow-atan-q64.inc",
+    "contact-motion.inc", "clear-motion.inc",
     "sound-durations.inc", "sound-gains.inc")}
 
 

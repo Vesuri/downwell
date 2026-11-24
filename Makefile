@@ -289,7 +289,7 @@ test: test-white-jelly-step
 .PHONY: test-white-jelly-step
 test-white-jelly-step: build/white-jelly-step-test
 	./build/white-jelly-step-test
-build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp src/core/SmokeDirection.h src/core/SmokeTrig.h generated/smoke-trig.inc
+build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/SmokeTrigNarrow.h generated/smoke-trig.inc generated/narrow-trig-q64.inc
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/WhiteJellyStepTest.cpp src/core/GameMakerRandom.cpp
 
@@ -905,7 +905,25 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc generated/clear-motion.inc generated/sound-durations.inc generated/sound-gains.inc
+# Every admitted binary32 radian, both functions (about 5 s on all cores).
+test: verify-smoke-trig-narrow
+.PHONY: verify-smoke-trig-narrow
+verify-smoke-trig-narrow: build/smoke-trig-narrow-test
+	./build/smoke-trig-narrow-test
+build/smoke-trig-narrow-test: tests/core/SmokeTrigNarrowTest.cpp src/core/SmokeTrigNarrow.h src/core/SmokeTrig.h src/core/RunnerImageValue.h src/core/NarrowArithmetic.h src/core/MultiplyBinary64.h generated/smoke-trig.inc generated/narrow-trig-q64.inc
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeTrigNarrowTest.cpp -pthread
+
+# Random binary32 pairs against portableAtan (a few seconds on all cores).
+test: verify-narrow-atan
+.PHONY: verify-narrow-atan
+verify-narrow-atan: build/narrow-atan-test
+	./build/narrow-atan-test 300000
+build/narrow-atan-test: tests/core/NarrowAtanTest.cpp src/core/NarrowAtan.h src/core/PortableAtan.h src/core/DivideBinary64.h src/core/RunnerImageValue.h src/core/NarrowArithmetic.h src/core/MultiplyBinary64.h generated/narrow-atan-q64.inc
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/NarrowAtanTest.cpp -pthread
+
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/narrow-trig-q64.inc generated/narrow-atan-q64.inc generated/contact-motion.inc generated/clear-motion.inc generated/sound-durations.inc generated/sound-gains.inc
 
 build/generate-clear-motion: tools/generate-clear-motion.cpp src/core/LevelClearMotion.h src/core/HudReal.h
 	@mkdir -p build
@@ -1391,6 +1409,12 @@ build/portable-atan-test: tests/core/PortableAtanTest.cpp $(wildcard src/core/*.
 
 .PHONY: probe-runner-atan-x86-macos
 generated/atan-q16.inc: tools/generate-atan-table.py
+	python3 $<
+
+generated/narrow-trig-q64.inc: tools/generate-narrow-trig-table.py
+	python3 $<
+
+generated/narrow-atan-q64.inc: tools/generate-narrow-atan-table.py
 	python3 $<
 
 .PHONY: probe-table-atan-x86-macos

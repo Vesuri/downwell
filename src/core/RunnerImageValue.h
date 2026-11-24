@@ -1,12 +1,31 @@
 #ifndef DOWNWELL_CORE_RUNNER_IMAGE_VALUE_H
 #define DOWNWELL_CORE_RUNNER_IMAGE_VALUE_H
 #include "MotionBinary64.h"
+#include "NarrowArithmetic.h"
 namespace downwell {
 // Windows image_index/image_speed setters narrow VM doubles to binary32.
 // Integer-only normal/zero subset for native animation fields. Unsupported
 // subnormal/nonfinite/overflow values fail without changing the destination.
 struct RunnerImageValue {
     std::uint32_t bits = 0;
+    // Nearest binary32 of a fixed-point magnitude (2^32 <= magnitude, value
+    // magnitude/2^fractionBits) known within margin < 2^24 units: false when
+    // a rounding midpoint lies within margin, since the value's rounding is
+    // then undecided. 32-bit word operations only.
+    bool assignFixed(std::uint64_t magnitude,unsigned fractionBits,bool negative,std::uint64_t margin){
+        const auto top=std::uint32_t(magnitude>>32);
+        if(!top)return false;
+        const unsigned zeros=MotionBinary64::Words::leadingZeros32(top);
+        const auto normal=shiftLeft64(magnitude,zeros); // top bit 63
+        auto mantissa=std::uint32_t(normal>>40);
+        const std::uint64_t remainder=normal&((std::uint64_t(1)<<40)-1),half=std::uint64_t(1)<<39;
+        if((remainder>half?remainder-half:half-remainder)<=shiftLeft64(margin,zeros))return false;
+        int exponent=127+63-int(zeros)-int(fractionBits);
+        if(remainder>half&&++mantissa==0x1000000u){mantissa>>=1;++exponent;}
+        if(exponent<=0||exponent>=255)return false;
+        bits=(negative?0x80000000u:0u)|(std::uint32_t(exponent)<<23)|(mantissa&0x7fffffu);
+        return true;
+    }
     // Same nearest-even pixel conversion as promoted().roundPixel(), without
     // building a split binary64 mantissa. Preserve that adapter's range (even
     // -2^31 rejects) and its exponent-zero promotion to signed zero. Callers

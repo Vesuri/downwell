@@ -915,6 +915,12 @@ $(REPO)/generated/sound-durations.inc $(REPO)/generated/sound-gains.inc: $(REPO)
 $(OBJECTS): $(REPO)/generated/atan-q16.inc
 $(REPO)/generated/atan-q16.inc: $(REPO)/tools/generate-atan-table.py
 	$(MAKE) -C $(REPO) generated/atan-q16.inc
+$(OBJECTS): $(REPO)/generated/narrow-trig-q64.inc
+$(REPO)/generated/narrow-trig-q64.inc: $(REPO)/tools/generate-narrow-trig-table.py
+	$(MAKE) -C $(REPO) generated/narrow-trig-q64.inc
+$(OBJECTS): $(REPO)/generated/narrow-atan-q64.inc
+$(REPO)/generated/narrow-atan-q64.inc: $(REPO)/tools/generate-narrow-atan-table.py
+	$(MAKE) -C $(REPO) generated/narrow-atan-q64.inc
 
 $(REPO)/generated/smoke-trig.inc: $(REPO)/tools/export-smoke-trig.py $(REPO)/data/Downwell.exe
 	$(MAKE) -C $(REPO) generated/smoke-trig.inc

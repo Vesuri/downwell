@@ -297,8 +297,7 @@ resets it; that is the first owner to find.
       shootables) and up to 96 trail BOBs;
     - every shot's RNG draws (spread, speed, image speed, three casing
       draws);
-    - jellies and red balls: `portableAtan` and binary64 trig every update;
-      the eyefish's wall tests; the neon ball's test against every enemy;
+    - the eyefish's wall tests; the neon ball's test against every enemy;
     - gem high: up to nine afterimage BOBs with two RNG draws each, and the
       streak block recomposed and published every update; `currencyText`
       while it counts; the Timer's 16 HUD rows while shown;

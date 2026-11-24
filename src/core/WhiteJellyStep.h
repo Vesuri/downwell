@@ -6,7 +6,7 @@
 #include "EnemyStompScript.h"
 #include "ContactDamageScripts.h"
 #include "SmokeDirection.h"
-#include "SmokeTrig.h"
+#include "SmokeTrigNarrow.h"
 namespace downwell {
 // enmWhiteJelly Step_0. Operations are synchronous checked owner boundaries:
 // meeting must query the caller's current mask against the selected target;
@@ -18,12 +18,13 @@ struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
     // assigned 3 on a hit. Direction is read back from its builtin setter.
     // Reuse the recovered lengthdir wrappers, not host libm or steering LUTs.
     static bool movementComponent(bool vertical,Real speed,Real direction,Real& output){
-        RunnerImageValue length,angle,radians;Real trig,component;
+        // component narrows the trig double at once: take that binary32.
+        RunnerImageValue length,angle,radians,trig;Real component;
         if(!length.assign(speed)||length.bits>0x40400000u||!angle.assign(direction)||
             ((angle.bits&0x80000000u)&&(angle.bits&0x7fffffffu))||
             !SmokeDirection::radians<0x43b40000u>(angle,radians)||
-            !smokeTrigComponent(radians.promoted(),!vertical,trig)||
-            !SmokeDirection::component<0x40400000u>(length,trig,vertical,component))return false;
+            !smokeTrigNarrow(radians,!vertical,trig)||
+            !SmokeDirection::component<0x40400000u>(length,trig.promoted(),vertical,component))return false;
         output=component;return true;
     }
     template<class Player> bool playerContact(Player& player){

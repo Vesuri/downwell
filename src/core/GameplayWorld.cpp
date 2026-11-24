@@ -3,6 +3,7 @@
 #include "PlayerBoxContact.h"
 #include "PlayerHorizontalBinary64.h"
 #include "DivideBinary64.h"
+#include "NarrowAtan.h"
 #include "UnitSequenceFrames.h"
 #include "GameplayPlayerStep.h"
 #include "core/MainRoomLifetime.h"
@@ -2416,8 +2417,7 @@ struct GameplayWorld::SteeringOps {
         return player(true,value);
     }
     bool pointDirection(Real x,Real y,Real targetX,Real targetY,Real& value){
-        return downwell::RunnerPointDirection::evaluate(x,y,targetX,targetY,value,
-            [](Real dy,Real dx,Real& radians){return downwell::portableAtan(dy,dx,radians);});
+        return downwell::RunnerPointDirection::evaluate(x,y,targetX,targetY,value,downwell::narrowAtan);
     }
     bool direction(Real wanted,Real& accepted){
         Image value;if(!downwell::RunnerDirectionValue::normalize(wanted,value))return false;
