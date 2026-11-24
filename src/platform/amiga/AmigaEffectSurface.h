@@ -16,7 +16,10 @@ public:
     static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage,
                      const unsigned char* stamps,unsigned stampBytes,
                      const unsigned char* chipPayload,unsigned payloadBytes,
-                     const downwell::EffectMaskAssets& assets,const unsigned char* shadeChip);
+                     const downwell::EffectMaskAssets& assets,const unsigned char* shadeChip,
+                     unsigned char* mirrorChip,unsigned mirrorBytes);
+    // Forget the Chip mirrors (their arena may have been reused).
+    static void resetMirrors();
     static bool verify(const downwell::PaletteEffectSurface<>& surface);
     static bool fixtures(downwell::PaletteEffectSurface<>& surface,const downwell::EffectMaskAssets& assets);
     static bool publish(const downwell::PaletteEffectSurface<>& surface,Bitmap& display,

@@ -2156,9 +2156,10 @@ __attribute__((noinline)) static int runDownwell(void) {
     const ULONG effectStampBytes=effectStampTable.bytes;
     // The enemy shade's alpha plane (sprite 117, 96x96) follows the effect
     // surface in Chip: its subtraction is a blit only from Chip.
-    constexpr unsigned shadeChipCapacity=12*96;
+    // Then the Chip mirror arena for other catalogue effect assets.
+    constexpr unsigned shadeChipCapacity=12*96,effectMirrorBytes=6144;
     const ULONG shadeChipOffset=(AmigaEffectSurface::bytes+3)&~3UL;
-    const ULONG sceneBankOffset=shadeChipOffset+shadeChipCapacity;
+    const ULONG sceneBankOffset=shadeChipOffset+shadeChipCapacity+effectMirrorBytes;
     // The retired selection cache holds two game rings followed by DMA-only
     // effect words. Other scenes may overwrite them; reload on gameplay entry.
     constexpr unsigned effectStampCacheOffset=2*downwellGameRingBytes;
@@ -2560,7 +2561,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         good=good&&AmigaTerrainPainter::bindBatch(activeGamePack,activeGamePackEnd,sceneBank,sceneBankBytes);
 #endif
         good=good&&copyShade()&&AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
-            effectStampTable.data,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets,shadeChip)&&
+            effectStampTable.data,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets,shadeChip,
+            shadeChip+shadeChipCapacity,effectMirrorBytes)&&
             AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)&&
             memory.acquireGameAssets(gamePackBytes)&&
             platform.loadData(planePath,memory.gameAssets(),gamePackBytes)==LONG(gamePackBytes)&&
@@ -3297,6 +3299,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaHardware::blitterDrain();
                     memcpy(effectStamps,effectStampTable.data+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
                     if(effectAssets.shade())copyShade();
+                    AmigaEffectSurface::resetMirrors();
                     const unsigned hudBytes = DOWNWELL_HUD_BANK_BYTES;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,

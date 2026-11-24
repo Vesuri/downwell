@@ -5,7 +5,7 @@
 #include "framework/AmigaHardware.h"
 #include "AmigaGameplayRows.h"
 inline void* operator new(__SIZE_TYPE__,void* address)noexcept{return address;}
-extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures; }
+extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures,gDownwellEffectMirrorChecks; }
 extern "C" __attribute__((noinline)) void downwellEffectSurfaceFailed(){__asm__ volatile("":::"memory");}
 namespace {
 using Surface=downwell::PaletteEffectSurface<>;
@@ -15,6 +15,26 @@ AmigaEffectStampBank stampBank;
 // The enemy shade (sprite 117) mask in the catalogue and its Chip copy.
 const std::uint8_t* shadeSource=nullptr;
 const std::uint8_t* shadeCopy=nullptr;
+// Chip mirrors of other catalogue assets (debris, corpses, explosions...):
+// each asset's consecutive low/high/alpha planes, copied on first use. A
+// full arena restarts after draining the blits that may still read it.
+struct Mirror {const std::uint8_t* source;const std::uint8_t* copy;};
+constexpr unsigned mirrorSlots=32;
+Mirror mirrors[mirrorSlots];
+unsigned mirrorCount=0,mirrorUsed=0,mirrorCapacity=0;
+UBYTE* mirrorArena=nullptr;
+const std::uint8_t* mirrored(const std::uint8_t* block,unsigned bytes){
+    for(unsigned i=0;i<mirrorCount;++i)if(mirrors[i].source==block)return mirrors[i].copy;
+    bytes=(bytes+1)&~1u;
+    if(!mirrorArena||bytes>mirrorCapacity)return nullptr;
+    if(mirrorUsed+bytes>mirrorCapacity||mirrorCount==mirrorSlots){
+        AmigaHardware::blitterDrain();mirrorUsed=mirrorCount=0;
+    }
+    UBYTE* copy=mirrorArena+mirrorUsed;
+    for(unsigned i=0;i<bytes;++i)copy[i]=block[i];
+    mirrorUsed+=bytes;mirrors[mirrorCount++]={block,copy};
+    return copy;
+}
 #ifdef DOWNWELL_BOB_VERIFY
 alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
 Surface* reference=nullptr;
@@ -46,6 +66,15 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     if((m.stride&1)||m.stride>=8192)return false;
     const auto* combined=AmigaEffectSurface::interleaved&&low?stampBank.find(m,low,high):nullptr;
     const std::uint8_t* maskData=!low&&m.data==shadeSource&&shadeCopy?shadeCopy:m.data;
+    if(!combined&&maskData==m.data&&reinterpret_cast<ULONG>(m.data)>=0x200000UL){
+        // A catalogue asset in Fast RAM: blit from its Chip mirror.
+        const unsigned plane=m.bytes;
+        if(low&&high==low+plane&&m.data==high+plane){
+            if(const auto* copy=mirrored(low,plane*3)){low=copy;high=copy+plane;maskData=copy+plane*2;}
+        }else if(!low){
+            if(const auto* copy=mirrored(m.data,plane))maskData=copy;
+        }
+    }
     if(!combined&&((reinterpret_cast<ULONG>(maskData)&1)||reinterpret_cast<ULONG>(maskData)>=0x200000UL||
         (low&&((reinterpret_cast<ULONG>(low)|reinterpret_cast<ULONG>(high))&1))||
         (low&&(reinterpret_cast<ULONG>(low)>=0x200000UL||reinterpret_cast<ULONG>(high)>=0x200000UL))))return false;
@@ -114,7 +143,7 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
 }
 bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
     const unsigned char* stamps,unsigned stampBytes,const unsigned char* chipPayload,unsigned payloadBytes,
-    const downwell::EffectMaskAssets& assets,const unsigned char* shadeChip){
+    const downwell::EffectMaskAssets& assets,const unsigned char* shadeChip,unsigned char* mirrorChip,unsigned mirrorBytes){
     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
     const ULONG stampAddress=reinterpret_cast<ULONG>(chipPayload);
     if(!chipPayload||(stampAddress&1)||stampAddress>=0x200000UL||payloadBytes>0x200000UL-stampAddress)return false;
@@ -123,6 +152,10 @@ bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* st
     if(!assets.shade()||!shadeChip||(reinterpret_cast<ULONG>(shadeChip)&1)||
        reinterpret_cast<ULONG>(shadeChip)>=0x200000UL)return false;
     shadeSource=assets.shade()->mask.data;shadeCopy=shadeChip;
+    if(!mirrorChip||(reinterpret_cast<ULONG>(mirrorChip)&1)||reinterpret_cast<ULONG>(mirrorChip)>=0x200000UL||
+       mirrorBytes>0x200000UL-reinterpret_cast<ULONG>(mirrorChip))return false;
+    AmigaHardware::blitterDrain();
+    mirrorArena=mirrorChip;mirrorCapacity=mirrorBytes;mirrorUsed=mirrorCount=0;
 #ifdef DOWNWELL_BOB_VERIFY
     reference=new(referenceStorage) Surface;
 #endif
@@ -131,6 +164,9 @@ bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* st
         reinterpret_cast<UWORD*>(data+planeOffset+2),reinterpret_cast<UWORD*>(data+planeOffset*2+2),
         rowBytes/2*(interleaved?3:1),{storage,stamp,clear,wait}))return false;
     boundSurface=&surface;boundStorage=data;return true;
+}
+void AmigaEffectSurface::resetMirrors(){
+    AmigaHardware::blitterDrain();mirrorUsed=mirrorCount=0;
 }
 bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
     unsigned buffer,unsigned origin,AmigaGameplayRows& rows){
@@ -191,6 +227,33 @@ bool AmigaEffectSurface::fixtures(downwell::PaletteEffectSurface<>& surface,cons
         const auto& shade=assets.shade()->mask;
         if(!surface.subtract({shade.data,shade.bytes,shade.width,shade.height,shade.stride},x-2,y-3)||!verify(surface))return false;
     }
+    // Catalogue assets through the Chip mirrors: every debris frame and
+    // each admitted corpse sprite, plain and mirrored, more than one arena
+    // holds, each a blit (counted) matching the CPU reference.
+    static const unsigned debrisSprites[]={115,116,91};
+    static const unsigned corpseSprites[]={158,165,172,179,206,281,291,337};
+    unsigned placed=0;
+    const auto place=[&](const downwell::EffectMaskAssets::Asset& image)->bool{
+        const auto& m=image.mask;
+        const Surface::Mask mask{m.data,m.bytes,m.width,m.height,m.stride};
+        const int x=int(placed*37%150)-8,y=int(placed*53%270)-8;
+        const unsigned before=gDownwellEffectDmaStamps;
+        surface.clear();
+        if(!surface.add({mask,image.low,image.high},x,y)||gDownwellEffectDmaStamps!=before+1||!verify(surface)||
+           !surface.subtract(mask,x+5,y+3)||gDownwellEffectDmaStamps!=before+2||!verify(surface))return false;
+        ++placed;return true;
+    };
+    for(unsigned pass=0;pass<2;++pass){
+        for(unsigned sprite:debrisSprites)for(unsigned frame=0;frame<6;++frame){
+            downwell::EffectMaskAssets::Asset image;
+            if(assets.debris(sprite,frame,image)&&!place(image))return false;
+        }
+        for(unsigned sprite:corpseSprites)for(unsigned mirrored=0;mirrored<2;++mirrored){
+            downwell::EffectMaskAssets::Asset image;
+            if(assets.corpse(sprite,mirrored!=0,image)&&!place(image))return false;
+        }
+    }
+    gDownwellEffectMirrorChecks=placed;
     surface.clear();if(!verify(surface))return false;
 #else
     (void)surface;(void)assets;

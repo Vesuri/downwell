@@ -34,6 +34,11 @@ if gDownwellEffectDmaStamps < 1 || gDownwellEffectDmaChecks < 129 || gDownwellEf
     quit 1
 end
 printf "DMA effects verified: %u pixel comparisons, %u stamps\n", gDownwellEffectDmaChecks, gDownwellEffectDmaStamps
+if gDownwellEffectMirrorChecks < 40
+    printf "Chip mirror verification failed: %u placements\n", gDownwellEffectMirrorChecks
+    quit 1
+end
+printf "Chip mirrors verified: %u catalogue asset placements\n", gDownwellEffectMirrorChecks
 # The actor-ready breakpoint precedes effect publication on frame 100.
 if gDownwellEffectPublishChecks < 99 || gDownwellEffectPublishFailures != 0
     printf "DMA effect publication failed: checks=%u failures=%u\n", gDownwellEffectPublishChecks, gDownwellEffectPublishFailures
