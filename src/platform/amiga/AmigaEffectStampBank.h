@@ -52,6 +52,7 @@ public:
         }
         return ready_=end==bytes;
     }
+    bool smoke(const Entry* entry)const{return entry<entries_+9;}
     const Entry* find(const downwell::PaletteEffectSurface<>::Mask& mask,
                       const unsigned char* low,const unsigned char* high)const{
         if(!ready_)return nullptr;

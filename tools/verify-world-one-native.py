@@ -111,6 +111,9 @@ def main():
             print(checked('source census_dump.gdb').strip(),flush=True)
             # The VBlank count is independent of the ring's beam clock.
             print(checked('printf "CENSUS fields gameplay frames=%lu fields=%lu\\n", gDownwellProfileFrames[3],gDownwellProfileFields[3]').strip(),flush=True)
+            if os.environ.get('EFFECT_BLIT_CENSUS') in ('1','2'):
+                # Section 5 C: the parallel effect-blit ring, same indices.
+                checked('dump binary memory .run/effect-census.bin &gDownwellEffectCensus[0] &gDownwellEffectCensus[gDownwellCensusCapacity]')
         seenSerials=set()
         nativeStarts={}
         # DOWNWELL_MEMORY_SAMPLE=1 (WR.1): the free bytes of every exec
@@ -356,6 +359,17 @@ def main():
                             counts=[int(n) for n in re.findall(r'\d+',oracle.split('ORACLE',1)[1])]
                             if counts[0]==0 or counts[1]==0 or counts[2]:
                                 raise RuntimeError('cell repair oracle failed: '+oracle)
+                        if os.environ.get('DOWNWELL_ROUTE_EFFECT_CLEAR_ORACLE')=='1':
+                            # EFFECT_CLEAR_VERIFY builds: the rectangle clear
+                            # left the whole effect surface zero.
+                            oracle=checked('printf "EFFECT CLEAR ORACLE checks=%lu failures=%lu first=%lu at=%lu bytes=%lu last=%lu\\n", gDownwellEffectClearChecks,gDownwellEffectClearFailures,gDownwellEffectClearOffset,gDownwellEffectClearFirstCheck,gDownwellEffectClearBytes,gDownwellEffectClearLast').strip()
+                            print(oracle,flush=True)
+                            coverage=checked('printf "EFFECT COVERAGE checks=%lu failures=%lu row=%lu word=%lu plane=%lu stamp=%ld,%ld %ldx%ld stride=%ld kind=%ld\\n", gDownwellEffectCoverageChecks,gDownwellEffectCoverageFailures,gDownwellEffectCoverageRow,gDownwellEffectCoverageWord,gDownwellEffectCoveragePlane,gDownwellEffectCoverageStamp[0],gDownwellEffectCoverageStamp[1],gDownwellEffectCoverageStamp[2],gDownwellEffectCoverageStamp[3],gDownwellEffectCoverageStamp[4],gDownwellEffectCoverageStamp[5]').strip()
+                            print(coverage,flush=True)
+                            counts=[int(n) for n in re.findall(r'\d+',oracle.split('ORACLE',1)[1])]
+                            covered=[int(n) for n in re.findall(r'\d+',coverage.split('COVERAGE',1)[1])[:2]]
+                            if counts[0]==0 or counts[1] or covered[0]==0 or covered[1]:
+                                raise RuntimeError('effect clear oracle failed: '+oracle+'; '+coverage)
                         # Evidence mode ends here: the capture runs the
                         # emulator past the following samples.
                         checked('delete breakpoints')

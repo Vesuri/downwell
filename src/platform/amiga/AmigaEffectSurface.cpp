@@ -4,9 +4,19 @@
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
 #include "AmigaGameplayRows.h"
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+#include "AmigaProfile.h"
+#endif
 inline void* operator new(__SIZE_TYPE__,void* address)noexcept{return address;}
 extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures,gDownwellEffectMirrorChecks; }
 extern "C" __attribute__((noinline)) void downwellEffectSurfaceFailed(){__asm__ volatile("":::"memory");}
+#ifdef DOWNWELL_EFFECT_CLEAR_VERIFY
+extern "C" { volatile unsigned long gDownwellEffectClearChecks,gDownwellEffectClearFailures,
+    gDownwellEffectClearOffset,gDownwellEffectClearFirstCheck,
+    gDownwellEffectClearBytes,gDownwellEffectClearLast,
+    gDownwellEffectCoverageChecks,gDownwellEffectCoverageFailures,gDownwellEffectCoverageRow,
+    gDownwellEffectCoverageWord,gDownwellEffectCoveragePlane; volatile long gDownwellEffectCoverageStamp[6]; }
+#endif
 namespace {
 using Surface=downwell::PaletteEffectSurface<>;
 const Surface* boundSurface=nullptr;
@@ -39,23 +49,102 @@ const std::uint8_t* mirrored(const std::uint8_t* block,unsigned bytes){
 alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
 Surface* reference=nullptr;
 #endif
-void wait(void*){AmigaHardware::blitterDrain();}
-void clear(void* context,unsigned first,unsigned end){
+void wait(void*){
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    downwellEffectWaitCensus(true);
+    AmigaHardware::blitterDrain();
+    downwellEffectWaitCensus(false);
+#else
+    AmigaHardware::blitterDrain();
+#endif
+}
+#if defined(DOWNWELL_EFFECT_BLIT_CENSUS) && DOWNWELL_EFFECT_BLIT_CENSUS==2
+// Serial census: time one stretch of queued blits from an idle blitter.
+struct SerialBlit {
+    DownwellEffectBlit kind;unsigned long start;
+    explicit SerialBlit(DownwellEffectBlit k):kind(k){AmigaHardware::blitterDrain();start=downwellEffectCensusTick();}
+    ~SerialBlit(){AmigaHardware::blitterDrain();downwellEffectSerialCensus(kind,downwellEffectCensusTick()-start);}
+};
+#endif
+#ifdef DOWNWELL_EFFECT_CLEAR_VERIFY
+// The clear covers only touched rectangles: once it completes, before the
+// next stamp, every stored word (guards included) must be zero. Before each
+// stamp and clear, every nonzero word must lie in the surface's tracked
+// rectangles; the first violation records the stamp before it.
+bool clearPending=false;
+struct LastStamp {int x,y;unsigned width,height,stride,kind;};
+LastStamp lastStamp{};
+void checkCoverage(){
+    AmigaHardware::blitterDrain();
+    ++gDownwellEffectCoverageChecks;
+    static UBYTE covered[284][10];
+    for(auto& row:covered)for(auto& word:row)word=0;
+    boundSurface->visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
+        for(unsigned r=y;r<y+height;++r)for(unsigned w=x/16;w<(x+width)/16;++w)covered[r][w]=1;
+    });
+    for(unsigned i=0;i<AmigaEffectSurface::bytes;++i){
+        if(!boundStorage[i])continue;
+        const unsigned physical=i/AmigaEffectSurface::rowBytes,row=physical/3,column=i%AmigaEffectSurface::rowBytes;
+        // Guard words (the first and last of each row) are never covered.
+        const unsigned word=column<2||column>=AmigaEffectSurface::rowBytes-2?10:(column-2)/2;
+        if(word<10&&covered[row][word])continue;
+        if(!gDownwellEffectCoverageFailures++){
+            gDownwellEffectCoverageRow=row;gDownwellEffectCoverageWord=word;gDownwellEffectCoveragePlane=physical%3;
+            gDownwellEffectCoverageStamp[0]=lastStamp.x;gDownwellEffectCoverageStamp[1]=lastStamp.y;
+            gDownwellEffectCoverageStamp[2]=lastStamp.width;gDownwellEffectCoverageStamp[3]=lastStamp.height;
+            gDownwellEffectCoverageStamp[4]=lastStamp.stride;gDownwellEffectCoverageStamp[5]=lastStamp.kind;
+            downwellEffectSurfaceFailed();
+        }
+        return;
+    }
+}
+void checkCleared(){
+    if(!clearPending)return;
+    clearPending=false;
+    AmigaHardware::blitterDrain();
+    ++gDownwellEffectClearChecks;
+    bool failed=false;
+    for(unsigned i=0;i<AmigaEffectSurface::bytes;++i)if(boundStorage[i]){
+        if(!gDownwellEffectClearFailures){
+            if(!failed){gDownwellEffectClearOffset=i;gDownwellEffectClearFirstCheck=gDownwellEffectClearChecks;}
+            ++gDownwellEffectClearBytes;gDownwellEffectClearLast=i;
+        }
+        failed=true;
+    }
+    if(failed){++gDownwellEffectClearFailures;downwellEffectSurfaceFailed();}
+}
+#endif
+void clear(void* context,unsigned left,unsigned top,unsigned words,unsigned rows){
+#ifdef DOWNWELL_EFFECT_CLEAR_VERIFY
+    if(!clearPending)checkCoverage();
+    clearPending=true;
+#endif
 #ifdef DOWNWELL_BOB_VERIFY
     reference->clear();
 #endif
-    if(first>=end)return;
-    auto* data=static_cast<UBYTE*>(context);
+#if defined(DOWNWELL_EFFECT_BLIT_CENSUS) && DOWNWELL_EFFECT_BLIT_CENSUS==2
+    SerialBlit timed(effectBlitClear);
+#endif
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    downwellEffectBlitCensus(effectBlitClear,3ul*words*rows);
+#endif
+    // Storage word 0 is the left guard word; surface word 0 follows it.
+    auto* data=static_cast<UBYTE*>(context)+2+left*2;
+    const int16_t modulo=int16_t(AmigaEffectSurface::rowBytes-words*2);
     if constexpr(AmigaEffectSurface::interleaved){
-        AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+first*AmigaEffectSurface::rowBytes*3),
-            12,(end-first)*3,0);
+        AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+top*AmigaEffectSurface::rowBytes*3),
+            words,rows*3,modulo);
         return;
     }
     for(unsigned plane=0;plane<3;++plane)
         AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+plane*AmigaEffectSurface::planeBytes+
-            first*AmigaEffectSurface::rowBytes),12,end-first,0);
+            top*AmigaEffectSurface::rowBytes),words,rows,modulo);
 }
 bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const std::uint8_t* high,int x,int y){
+#ifdef DOWNWELL_EFFECT_CLEAR_VERIFY
+    checkCleared();checkCoverage();
+    lastStamp={x,y,m.width,m.height,m.stride,low?(stampBank.find(m,low,high)?2u:1u):0u};
+#endif
 #ifdef DOWNWELL_BOB_VERIFY
     if(low)reference->add({m,low,high},x,y);else reference->subtract(m,x,y);
 #endif
@@ -97,6 +186,10 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     // patternWithMask's for these strides (mask rows of m.stride bytes, the
     // surface's 24-byte rows with a guard word left of x=0).
     auto* data=static_cast<UBYTE*>(context);
+#if defined(DOWNWELL_EFFECT_BLIT_CENSUS) && DOWNWELL_EFFECT_BLIT_CENSUS==2
+    SerialBlit timed(combined?(stampBank.smoke(combined)?effectBlitSmoke:effectBlitCurrency):
+        low?effectBlitOther:effectBlitShade);
+#endif
     const unsigned sourceWords=m.stride/2,surfaceWords=destinationStride/2;
     const unsigned dx=unsigned(x)+16;
     const unsigned sourceFirst=sx>>4,destFirst=dx>>4;
@@ -138,6 +231,12 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
 #ifdef DOWNWELL_BOB_VERIFY
     ++gDownwellEffectDmaStamps;
 #endif
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    if(combined)downwellEffectBlitCensus(stampBank.smoke(combined)?effectBlitSmoke:effectBlitCurrency,
+        static_cast<unsigned long>(words)*blitHeight);
+    else downwellEffectBlitCensus(low?effectBlitOther:effectBlitShade,
+        static_cast<unsigned long>(words)*height*(low?3:1));
+#endif
     return true;
 }
 }
@@ -155,6 +254,8 @@ bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* st
     if(!mirrorChip||(reinterpret_cast<ULONG>(mirrorChip)&1)||reinterpret_cast<ULONG>(mirrorChip)>=0x200000UL||
        mirrorBytes>0x200000UL-reinterpret_cast<ULONG>(mirrorChip))return false;
     AmigaHardware::blitterDrain();
+    // Guard words included: the clear covers only touched surface words.
+    for(unsigned i=0;i<bytes;++i)data[i]=0;
     mirrorArena=mirrorChip;mirrorCapacity=mirrorBytes;mirrorUsed=mirrorCount=0;
 #ifdef DOWNWELL_BOB_VERIFY
     reference=new(referenceStorage) Surface;
@@ -171,6 +272,16 @@ void AmigaEffectSurface::resetMirrors(){
 bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
     unsigned buffer,unsigned origin,AmigaGameplayRows& rows){
     if(&surface!=boundSurface)return false;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    unsigned long publishWords=0;
+    surface.visitRectangles([&](unsigned x,unsigned,unsigned width,unsigned height){
+        publishWords+=2ul*(((downwellPlayfieldX+x)%16+width+15)/16)*height;
+    });
+    downwellEffectPublishCensus(publishWords);
+#endif
+#if defined(DOWNWELL_EFFECT_BLIT_CENSUS) && DOWNWELL_EFFECT_BLIT_CENSUS==2
+    SerialBlit timed(effectBlitPublish);
+#endif
     if constexpr(interleaved){
         Bitmap mask(boundStorage,192,284,1,false,false,576);
         Bitmap low(boundStorage+rowBytes,192,284,1,false,false,576);

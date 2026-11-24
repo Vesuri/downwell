@@ -261,6 +261,17 @@ route at simulation tick T, for a short census. With
 `CELL_REPAIR_VERIFY=1 DOWNWELL_ROUTE_CELL_ORACLE=1` (not a timing build), each
 merged destroyed-cell repair is compared with the per-cell reference, and
 the route fails at T unless spans were merged and all of them matched.
+`EFFECT_CLEAR_VERIFY=1 DOWNWELL_ROUTE_EFFECT_CLEAR_ORACLE=1` (not a timing
+build) checks the effect surface's rectangle clear: before every stamp and
+clear, each nonzero stored word must lie in the tracked rectangles, and
+after each clear the whole storage, guard words included, must be zero.
+`EFFECT_BLIT_CENSUS=1` (with the census) adds a parallel ring, dumped to
+`.run/effect-census.bin`: per update, the effect stamps and their blit
+words by kind (smoke, gems, other, shade), the clear's and the publish
+copy's words, the CPU's waits for the effect queue, and the time from the
+first stamp to the end of the first wait. `EFFECT_BLIT_CENSUS=2` also
+drains around each effect blit and times it alone; its update totals no
+longer describe the overlapped game.
 Without the census,
 `ROUTE_TRACE=N` records `ROUTE_TRACE_FIELDS` (default 20) whole fields of
 every instruction from the input sample of gameplay update N-1 into

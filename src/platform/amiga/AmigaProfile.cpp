@@ -321,6 +321,43 @@ static ULONG censusStart, censusWaitStart, censusWaited;
 static unsigned censusWaitDepth;
 static DownwellCensusRecord censusCurrent;
 static int censusCameraX;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+// Parallel to gDownwellCensus, same index. words: blit words queued (each
+// row of each blit; the surface clear's are its D words). wait: ticks the CPU
+// spent draining the effect queue. busy: ticks from the update's first
+// queued effect stamp to the end of its first drain (everything queued ahead
+// of the stamps included). serial: EFFECT_BLIT_CENSUS=2's blitter ticks per
+// DownwellEffectBlit kind. clears: the clear's rectangle blits.
+struct DownwellEffectCensusRecord {
+    ULONG words[4], clearWords, publishWords, wait, busy, serial[6];
+    UWORD stamps[4], drains, clears;
+};
+static_assert(sizeof(DownwellEffectCensusRecord) == 68, "effect census layout");
+extern "C" { DownwellEffectCensusRecord gDownwellEffectCensus[DOWNWELL_CENSUS_UPDATES]; }
+static DownwellEffectCensusRecord effectCurrent;
+static ULONG effectFirst, effectWaitStart;
+static bool effectStamped;
+void downwellEffectBlitCensus(DownwellEffectBlit kind, unsigned long words)
+{
+    if (kind == effectBlitClear) { effectCurrent.clearWords += words; ++effectCurrent.clears; return; }
+    if (!effectStamped) { effectStamped = true; effectFirst = beamTick(); }
+    ++effectCurrent.stamps[kind];
+    effectCurrent.words[kind] += words;
+}
+void downwellEffectWaitCensus(bool begin)
+{
+    const ULONG now = beamTick();
+    if (begin) { effectWaitStart = now; return; }
+    effectCurrent.wait += now - effectWaitStart;
+    if (!effectCurrent.drains++ && effectStamped) effectCurrent.busy = now - effectFirst;
+}
+unsigned long downwellEffectCensusTick() { return beamTick(); }
+void downwellEffectPublishCensus(unsigned long words) { effectCurrent.publishWords += words; }
+void downwellEffectSerialCensus(DownwellEffectBlit kind, unsigned long ticks)
+{
+    effectCurrent.serial[kind] += ticks;
+}
+#endif
 static void censusWait(bool begin)
 {
     if (begin) {
@@ -350,6 +387,10 @@ void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool ov
         censusCurrent.span = now - censusStart;
         censusCurrent.work = censusCurrent.span - censusWaited;
         gDownwellCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = censusCurrent;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+        gDownwellEffectCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = effectCurrent;
+        __asm__ volatile("" :: "g"(gDownwellEffectCensus) : "memory");
+#endif
         ++gDownwellCensusCount;
         // Only the debugger reads the ring: keep its stores, and keep the
         // ring and its constants through section GC.
@@ -363,6 +404,10 @@ void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool ov
     censusOpen = true;
     censusStart = now;
     censusWaited = 0;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    effectCurrent = DownwellEffectCensusRecord();
+    effectStamped = false;
+#endif
     censusCameraX = cameraX;
     censusCurrent.scene = static_cast<UBYTE>(scene);
     censusCurrent.stage = static_cast<UBYTE>(stage);

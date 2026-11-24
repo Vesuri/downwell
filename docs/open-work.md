@@ -292,10 +292,8 @@ resets it; that is the first owner to find.
      alpha. Actor assignment tests actors against the same surface right
      after, so moving the test alone only moves the wait.
 
-   The CPU wait and the blitter time behind it are section 5 C (combat
-   composition). Measure the blitter's time per smoke stamp first. Then
-   compare two options: fewer stamps, or CPU work placed between queueing
-   and the first read.
+   That wait is section 5 C (combat composition), which now holds its
+   blitter measurements.
 
    The candidate's own gate stays: generation and painting in different
    updates of each row period, and the scalar pixel comparison over all
@@ -1310,6 +1308,22 @@ under 80 ms while removing remaining threshold-sized computations.
 
 ### C. Combat composition shortfall
 
+Blitter time per update on constant fire, 560–569 (`EFFECT_BLIT_CENSUS=2`,
+each effect blit timed alone), after the surface clear was narrowed to the
+touched rectangles (6.9 → 1.5 ms):
+- 14.4 smoke stamps, 84 words each: 4.1 ms (0.29 ms per stamp);
+- 2 gem stamps: 1.1 ms;
+- 4 shade subtractions (the 96×96 enemy shade, 458 words each): 3.5 ms;
+- the clear, 1,575 words in 2.7 rectangles: 1.5 ms;
+- the publish copy to the display, 1,265 words: 3.9 ms.
+
+The CPU still waits 3.75 ms (was 5.5) in the visibility test: the shade
+subtractions are queued last, just before it. Next: clip each shade
+subtraction to the surface's tracked rectangles, where all the alpha it can
+remove lies (exact: subtraction outside alpha changes nothing). Then measure
+the wait again before choosing between fewer smoke stamps and CPU work
+between queueing and the first read.
+
 Remaining effect work is the raster fallback for mixed producers, actual
 shade subtraction and entry cover. Measure those
 cases separately from eligible gem-only frames before another compositor
@@ -1464,6 +1478,11 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
+- Restore `make verify-amiga-gameplay-bobs` (the blitter-against-CPU effect
+  pixel oracle and overflow actors). At 7c49136c it never reaches
+  `downwellGameplayBobsReady`: no failure breakpoint fires and the emulator
+  runs past 100,000 fields (480 s budget). Its script now sets
+  `remotetimeout`; the hang is in the game run, not the connection.
 - Restore the damage-number shared-world capacity-failure/reset regression:
   `StartupRuntime::reset` must recover a session after number capacity is
   exhausted. The committed reference also fails this assertion; do not weaken

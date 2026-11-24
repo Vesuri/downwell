@@ -23,4 +23,20 @@ enum DownwellCensusFlag : unsigned char {
 void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool overlay, int cameraX);
 void downwellCensusMark(unsigned flags);
 #endif
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+// Effect-surface blits in the current census update (section 5 C): every
+// queued blit's words and kind, and the CPU's waits for the queue.
+// EFFECT_BLIT_CENSUS=2 serializes them: the backend drains before the clear
+// and around each blit, and reports each one's blitter time (update totals
+// then stop describing the overlapped game).
+enum DownwellEffectBlit : unsigned char {
+    effectBlitSmoke, effectBlitCurrency, effectBlitOther, effectBlitShade,
+    effectBlitClear, effectBlitPublish };
+// The publish copy's words (two planes).
+void downwellEffectPublishCensus(unsigned long words);
+void downwellEffectBlitCensus(DownwellEffectBlit kind, unsigned long words);
+void downwellEffectWaitCensus(bool begin);
+unsigned long downwellEffectCensusTick();
+void downwellEffectSerialCensus(DownwellEffectBlit kind, unsigned long ticks);
+#endif
 #endif

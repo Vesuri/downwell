@@ -99,6 +99,9 @@ REFERENCE_CELL_REPAIR ?= 0
 # W3.9: compare each merged destroyed-cell repair with the per-cell
 # reference (live input; combines with CENSUS for the world-one route).
 CELL_REPAIR_VERIFY ?= 0
+# Section 5 C: after each effect-surface clear, check that every stored word
+# is zero (the clear covers only touched rectangles). Combines with CENSUS.
+EFFECT_CLEAR_VERIFY ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
 AMMO_DAMAGE_RANGE ?= 1
@@ -205,6 +208,10 @@ endif
 # a joystick route without autorun (profile.sh route), where the route ends.
 CENSUS ?= 0
 CENSUS_UPDATES ?= 16384
+# Section 5 C: a parallel ring of effect-surface blits per census update
+# (stamps, blit words, queue waits), dumped to .run/effect-census.bin.
+# Needs CENSUS=1. 2 also times each effect blit alone (serialized).
+EFFECT_BLIT_CENSUS ?= 0
 ifeq ($(CENSUS),1)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING),1000)
@@ -474,6 +481,9 @@ endif
 ifeq ($(CELL_REPAIR_VERIFY),1)
 CFLAGS += -DDOWNWELL_CELL_REPAIR_VERIFY
 endif
+ifeq ($(EFFECT_CLEAR_VERIFY),1)
+CFLAGS += -DDOWNWELL_EFFECT_CLEAR_VERIFY
+endif
 ifeq ($(PREPARED_PATTERN_ROWS),1)
 CFLAGS += -DDOWNWELL_PREPARED_PATTERN_ROWS
 endif
@@ -577,6 +587,12 @@ CFLAGS += -DDOWNWELL_TRACE_FRAMES=$(TRACE_FRAMES)
 endif
 ifeq ($(CENSUS),1)
 CFLAGS += -DDOWNWELL_CENSUS -DDOWNWELL_CENSUS_UPDATES=$(CENSUS_UPDATES)
+endif
+# Only census builds carry it (the playable rebuild ignores the knob).
+ifeq ($(CENSUS),1)
+ifneq ($(filter 1 2,$(EFFECT_BLIT_CENSUS)),)
+CFLAGS += -DDOWNWELL_EFFECT_BLIT_CENSUS=$(EFFECT_BLIT_CENSUS)
+endif
 endif
 ifeq ($(TERRAIN_READ_CENSUS),1)
 ifneq ($(FPSCOUNT),1)
@@ -884,6 +900,8 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_ENEMY_UPDATES)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CELL_REPAIR)' >> $@.tmp
 	@printf '%s\n' '$(CELL_REPAIR_VERIFY)' >> $@.tmp
+	@printf '%s\n' '$(EFFECT_BLIT_CENSUS)' >> $@.tmp
+	@printf '%s\n' '$(EFFECT_CLEAR_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp

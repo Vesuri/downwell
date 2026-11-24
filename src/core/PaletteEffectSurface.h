@@ -18,7 +18,9 @@ public:
     struct Backend {
         void* context=nullptr;
         bool (*stamp)(void*,const Mask&,const std::uint8_t*,const std::uint8_t*,int,int)=nullptr;
-        void (*clear)(void*,unsigned,unsigned)=nullptr;
+        // One touched rectangle (visitRectangles, in words and rows); every
+        // stored word outside them is already zero.
+        void (*clear)(void*,unsigned left,unsigned top,unsigned words,unsigned rows)=nullptr;
         void (*wait)(void*)=nullptr;
     };
     PaletteEffectSurface(){for(unsigned y=0;y<Height;++y)first_[y]=words;}
@@ -32,8 +34,12 @@ public:
             alpha_[y*stride_+x]=low_[y*stride_+x]=high_[y*stride_+x]=0;
         return true;
     }
+    // Clears only the touched rectangles: adds record (a superset of) every
+    // word they write, and subtraction only clears alpha bits.
     void clear(){
-        if(backend_.clear)backend_.clear(backend_.context,firstRow_,lastRow_);
+        if(backend_.clear)visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
+            backend_.clear(backend_.context,x/16,y,width/16,height);
+        });
         for(unsigned y=firstRow_;y<lastRow_;++y){
             if(!backend_.clear)for(unsigned x=first_[y];x<last_[y];++x){const unsigned at=y*stride_+x;alpha_[at]=low_[at]=high_[at]=0;}
             first_[y]=words;last_[y]=0;

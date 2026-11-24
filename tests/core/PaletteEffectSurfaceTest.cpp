@@ -44,15 +44,22 @@ int main(int argc,char**argv){
     assert(surface.bindStorage(external.data()+1,external.data()+storage.plane+1,
         external.data()+storage.plane*2+1,storage.stride,{&storage,
             [](void*,const Surface::Mask&,const std::uint8_t*,const std::uint8_t*,int,int){return false;},
-            [](void* p,unsigned first,unsigned end){auto& s=*static_cast<Storage*>(p);
-                for(unsigned plane=0;plane<3;++plane)for(unsigned y=first;y<end;++y)
-                    for(unsigned x=1;x<=10;++x)s.data[plane*s.plane+y*s.stride+x]=0;
+            [](void* p,unsigned left,unsigned top,unsigned words,unsigned rows){auto& s=*static_cast<Storage*>(p);
+                assert(words&&rows&&left+words<=10&&top+rows<=284);
+                for(unsigned plane=0;plane<3;++plane)for(unsigned y=top;y<top+rows;++y)
+                    for(unsigned x=1+left;x<=left+words;++x)s.data[plane*s.plane+y*s.stride+x]=0;
             },[](void*){++waitCalls;}}));
     const auto boundWaits=waitCalls;
     assert(!surface.intersects(0,0,160,284)&&waitCalls==boundWaits);
     // -1 is transparency; 0 is opaque black and must not be confused with it.
     std::array<int,160*284> expected{},actual{};
-    auto clear=[&](){surface.clear();expected.fill(-1);};
+    // The backend clears only the touched rectangles: every stored word
+    // must be zero afterwards, and the guards untouched.
+    auto clear=[&](){
+        surface.clear();expected.fill(-1);
+        for(unsigned plane=0;plane<3;++plane)for(unsigned y=0;y<284;++y)for(unsigned x=0;x<12;++x)
+            assert(external[plane*storage.plane+y*storage.stride+x]==(x&&x<=10?0:0x5a5a));
+    };
     auto verify=[&](){
         std::array<bool,160*284> covered{};
         unsigned previousEnd=0;
