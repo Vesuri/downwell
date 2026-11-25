@@ -35,7 +35,7 @@ int main(){
         return true;
     },&born);
     world.step(0);assert(born && world.effectsSucceeded() && world.smokeEffects().size()>=4);
-    world.smokeEffects().visitNewest([](auto,const auto& e){assert(!e.allSet && e.imageIndex.bits==0);});
+    world.smokeEffects().visitNewest([](auto,const auto& e){assert(!e.allSet && e.frame16==0);});
     auto random=world.randomState();
     auto expected=world.smokeEffects();
     auto phase=expected.beginPhase();assert(expected.advanceAnimation(phase)&&expected.step(phase,random));
@@ -43,7 +43,7 @@ int main(){
     world.smokeEffects().visitNewest([&](auto handle,const auto& e){
         const auto* r=expected.get(handle);assert(r && e.allSet);
         assert(e.xx==r->xx && e.yy==r->yy);
-        assert(e.imageIndex.bits==r->imageIndex.bits && e.imageSpeed.bits==r->imageSpeed.bits);
+        assert(e.frame16==r->frame16 && e.imageSpeed.bits==r->imageSpeed.bits);
     });
     for(unsigned i=0;i<100;++i)world.step(0);
     assert(world.effectsSucceeded() && world.smokeEffects().size()==0);
@@ -86,7 +86,7 @@ int main(){
     equalRandom(host.randomState(),hostRandom);
     assert(host.smokeEffects().size()==hostOracle.size());
     host.step(false);assert(host.effectsSucceeded());
-    host.smokeEffects().visitNewest([](auto,const auto& e){assert(e.allSet && e.imageIndex.bits!=0);});
+    host.smokeEffects().visitNewest([](auto,const auto& e){assert(e.allSet && e.frame16!=0);});
     for(unsigned i=0;i<100;++i)host.step(false);
     assert(host.effectsSucceeded() && host.smokeEffects().size()==0);
     unsigned attempts=0;

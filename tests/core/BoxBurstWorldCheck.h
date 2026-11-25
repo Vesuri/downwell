@@ -30,7 +30,7 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
                 assert(a.effect.xx==b.effect.xx&&a.effect.yy==b.effect.yy);
                 same64(a.effect.speed,b.effect.speed);same64(a.effect.direction,b.effect.direction);
                 assert(a.effect.imageSpeed.bits==b.effect.imageSpeed.bits);
-                assert(a.effect.imageIndex.bits==b.effect.imageIndex.bits);
+                assert(a.effect.frame16==b.effect.frame16);
             }
             if(i>=32)continue;
             const auto& c=world.flashEffects().slot(i);const auto& d=flash.slot(i);

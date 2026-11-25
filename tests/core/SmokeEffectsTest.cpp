@@ -17,7 +17,7 @@ static void checkAt(bool ok,int line){if(!ok){std::fprintf(stderr,"Smoke owner c
 static bool same(downwell::MotionBinary64 a,downwell::MotionBinary64 b){return a.high==b.high && a.low==b.low;}
 int main(){
     unsigned births=0;
-    long worst=0;unsigned pixelSteps=0,pixelDifferences=0,escapeDifferences=0;
+    long worst=0;unsigned lifeDifferences=0,frameSteps=0,frameDifferences=0,pixelSteps=0,pixelDifferences=0,escapeDifferences=0;
     for(unsigned seed=0;seed<128;++seed)for(bool box:{false,true}){
         downwell::SmokeEffects<16> store;
         downwell::GameMakerRandom rng(seed),reference(seed);
@@ -43,7 +43,9 @@ int main(){
             unsigned live=0;
             for(unsigned i=0;i<count;++i){
                 const auto* actual=store.get(i+1);const auto& wanted=expected[i];
-                check(bool(actual)==!wanted.destroyRequested);
+                // The Q16 animation position may end a smoke one tick
+                // before or after the binary32 timeline.
+                if(bool(actual)!=!wanted.destroyRequested){++lifeDifferences;live+=actual!=nullptr;continue;}
                 if(actual){++live;
                     // Q16 motion against the VM form: positions within 1/64
                     // pixel, published pixels at most one apart.
@@ -62,7 +64,11 @@ int main(){
                     if(actual->noCollision!=wanted.noCollision){
                         check(actual->x!=px||actual->y!=py);++escapeDifferences;
                     }
-                    check(actual->imageIndex.bits==wanted.imageIndex.bits && actual->imageSpeed.bits==wanted.imageSpeed.bits);}
+                    const unsigned exponent=(wanted.imageIndex.bits>>23)&255u;
+                    const unsigned frame=exponent<127?0:((wanted.imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
+                    check(actual->drawFrame()==frame||actual->drawFrame()+1==frame||actual->drawFrame()==frame+1);
+                    ++frameSteps;frameDifferences+=actual->drawFrame()!=frame;
+                    check(actual->imageSpeed.bits==wanted.imageSpeed.bits);}
             }
             check(store.size()==live && rng.drawCount()==reference.drawCount());
             for(unsigned i=0;i<16;++i)check(rng.stateWord(i)==reference.stateWord(i));
@@ -116,7 +122,9 @@ int main(){
     check(collisions.collideWalls(phase,[](auto,auto){check(false);return true;}));
     std::printf("Smoke owner: %u births, phase exclusion, retirement, capacity and stable reuse passed; "
                 "Q16 motion within %.5f px of the VM form, %u of %u published pixels differ by one, "
-                "%u escapes a tick apart\n",births,worst/65536.0,pixelDifferences,2*pixelSteps,escapeDifferences);
-    check(pixelDifferences*1000<2*pixelSteps && escapeDifferences*100<births);
+                "%u escapes a tick apart; Q16 animation: %u of %u frames differ by one, %u lifetimes a tick apart\n",
+                births,worst/65536.0,pixelDifferences,2*pixelSteps,escapeDifferences,frameDifferences,frameSteps,lifeDifferences);
+    check(pixelDifferences*1000<2*pixelSteps && escapeDifferences*100<births &&
+          frameDifferences*100<frameSteps && lifeDifferences*100<births);
 }
 #endif

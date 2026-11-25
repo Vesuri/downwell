@@ -79,7 +79,7 @@ int main(){
         assert(!owner.get(retired)&&owner.get(born));
         const auto draws=random.drawCount();
         assert(owner.advanceAnimation({phase})&&owner.step({phase},random));
-        assert(!owner.get(born)->allSet&&owner.get(born)->timeline.bits==0);
+        assert(!owner.get(born)->allSet&&owner.get(born)->frame16==0);
         assert(random.drawCount()==draws);
     }
     {

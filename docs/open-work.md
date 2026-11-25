@@ -375,9 +375,9 @@ resets it; that is the first owner to find.
     `make test-fixed-point`, and re-searches any sound route whose
     autopilot no longer survives (`DOWNWELL_SLICE_VARIANT`) without losing
     route sound coverage. Done: steering `lengthdir`/`point_direction`;
-    the compact smoke owner's motion (`SmokeParticle`, Q16 position and
-    velocity, whole published pixels; the registered room path still runs
-    `SmokeEffect`); the compact white jelly (`WhiteJellyFixedStep`, Q16
+    the compact smoke owner's motion (`SmokeParticle`, Q16 position,
+    velocity and animation position, whole published pixels; the registered
+    room path still runs `SmokeEffect`); the compact white jelly (`WhiteJellyFixedStep`, Q16
     position, velocity and heading, speed in exact thousandths, Q16
     `scrCheckCollisionWith` and mask bounds; `WhiteJellyStep` remains the
     registered path and oracle); the compact debris (`DebrisParticle`, Q16
@@ -390,8 +390,8 @@ resets it; that is the first owner to find.
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together: smoke's animation (1.0-1.3 ms per worst spray update, binary32
-    timeline) and wall contacts (1.8), then the red ball's stored state.
+    together: smoke's wall contacts (1.5 ms per worst spray update, mostly
+    the terrain query), then the red ball's stored state.
     Debris, jelly and corpse steps are now mostly their terrain queries
     (1.2, 1.3 and 1.1 ms per spray update); corpse drawing (2.0 ms) is
     stamping, not arithmetic. drawFx rounds every
