@@ -397,9 +397,11 @@ resets it; that is the first owner to find.
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together: the gem streak rise draw
-    (0.27 ms), then the red ball's stored state. Smoke's wall contacts
-    (1.5 ms) are mostly the terrain query.
+    together. About 1.1 ms of software binary64 is left per spray update,
+    none of it over 0.3 ms: steering enemies (0.27 ms), compact shootable
+    hits (0.15), casings (0.10), smoke wall contacts (0.10; the contacts'
+    1.5 ms is the terrain query), mask bounds (0.09); then the red ball's
+    stored state.
     Debris, jelly and corpse steps are now mostly their terrain queries
     (1.2, 1.3 and 1.1 ms per spray update); corpse drawing (2.0 ms) is
     stamping, not arithmetic. drawFx rounds every

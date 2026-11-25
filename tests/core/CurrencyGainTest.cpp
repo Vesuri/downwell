@@ -34,32 +34,29 @@ struct Controls {
 };
 int main(){
     // Binary64 source expression, including Draw-only updates, guard freezes,
-    // world-coordinate rounding, both HUD layouts and repeated pickup resets.
-    for(bool landscape:{false,true})for(double view:{-1000.5,0.0,0.5,1024.25}){
+    // world-coordinate rounding, both HUD layouts and repeated pickup resets:
+    // the tabulated rise draws the same pixel at every whole-pixel view.
+    for(bool landscape:{false,true})for(int view:{-100000,-1000,-1,0,1,1024,99999}){
         GemStreakRise rise;double expected=0;
         for(unsigned frame=0;frame<2000;++frame){
             if(frame%117==0){rise.reset();expected=0;}
             const bool death=frame%13==0;const unsigned streak=frame%17?2:0;
-            MotionBinary64 vy;std::uint64_t bits;std::memcpy(&bits,&view,8);
-            vy={std::uint32_t(bits>>32),std::uint32_t(bits)};
             std::int32_t y=-123456;
-            assert(rise.draw(streak,death,vy,landscape,y));
+            assert(rise.draw(streak,death,view,landscape,y));
             if(streak&&!death){
                 expected+=(16-expected)/8;
-                const double coordinate=((view+(landscape?24:50))+4)-expected;
+                const double coordinate=((double(view)+(landscape?24:50))+4)-expected;
                 assert(y==std::nearbyint(coordinate));
             }else assert(y==-123456);
-            std::memcpy(&bits,&expected,8);
-            assert(rise.ascend.high==std::uint32_t(bits>>32)&&rise.ascend.low==std::uint32_t(bits));
         }
     }
     unsigned cases=0,prefixes=0;
     for(unsigned seed=0;seed<8;++seed)for(unsigned flags=0;flags<8;++flags)for(unsigned balance:{0u,2999u,4999u})for(int amount:{2,10}){
         CurrencyCreate state;state.obtainable=true;CurrencyAccount account;account.currency=balance;Trace trace;GameMakerRandom random(seed);
-        GemStreakRise rise;rise.ascend=MotionBinary64::fromInteger(16);
+        GemStreakRise rise;rise.steps=26;
         CurrencyGainAccountOperations<Controls> ops{account,{account,state,trace,flags},&rise};bool good=true;
         assert(CurrencyGainScript::run(state,amount,random,ops,good)&&good&&trace.destroyed);
-        assert(rise.ascend.zero());
+        assert(rise.steps==0);
         assert(account.currency==balance+unsigned(amount)&&account.gameGem==unsigned(amount)&&account.streak==unsigned(amount)&&
             state.gemAmount==amount&&random.drawCount()==((flags&2)?1u:0u));
         int expected[32];unsigned n=0;
@@ -70,11 +67,11 @@ int main(){
         assert(trace.calls==n);for(unsigned i=0;i<n;++i)assert(trace.ids[i]==expected[i]);
         for(unsigned fail=1;fail<=n;++fail){
             CurrencyCreate s;s.obtainable=true;CurrencyAccount a;a.currency=balance;Trace t;t.fail=fail;GameMakerRandom rng(seed);
-            GemStreakRise r;r.ascend=MotionBinary64::fromInteger(16);
+            GemStreakRise r;r.steps=26;
             CurrencyGainAccountOperations<Controls> rejected{a,{a,s,t,flags},&r};bool ok=true;
             assert(!CurrencyGainScript::run(s,amount,rng,rejected,ok)&&!ok&&!t.destroyed&&t.calls==fail&&a.currency==balance+unsigned(amount));
             bool reset=false;for(unsigned i=0;i+1<fail;++i)if(expected[i]==2)reset=true;
-            assert(r.ascend.zero()==reset);
+            assert((r.steps==0)==reset);
             for(unsigned i=0;i<fail;++i)assert(t.ids[i]==expected[i]);const auto draws=rng.drawCount();
             assert(!CurrencyGainScript::run(s,amount,rng,rejected,ok)&&t.calls==fail&&rng.drawCount()==draws);++prefixes;
         }

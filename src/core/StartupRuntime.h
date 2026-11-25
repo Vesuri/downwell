@@ -3082,7 +3082,7 @@ public:
     }
     bool drawGemStreakRise(std::int32_t& worldY) const {
         return run_.gemStreakRise.draw(currencyAccount_.streak,mainDeathSequence().active,
-            MotionBinary64::fromInteger(mainCameraRenderViewY()),true,worldY);
+            mainCameraRenderViewY(),true,worldY);
     }
     std::uint32_t mainGameGemTotal() const { return currencyAccount_.gameGem; }
     std::uint32_t mainGemStreak() const { return currencyAccount_.streak; }
