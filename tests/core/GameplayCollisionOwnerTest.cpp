@@ -2091,7 +2091,7 @@ int main(){
             bool character(unsigned,MotionBinary64,MotionBinary64){std::abort();}
         } noSurface;
         EffectMaskAssets emptyAssets;EffectSurfacePlacement::View emptyView{};
-        auto emit=[](const EffectMaskAssets::Asset&,MotionBinary64,MotionBinary64){return true;};
+        auto emit=[](const EffectMaskAssets::Asset&,auto,auto){return true;};
         assert(world->visitRegisteredEffectSurfaces(emptyAssets,emptyView,emit)); // Titles are not conditional drawFx.
         unsigned titleDraws=0;
         assert(world->visitUnconditionalSurfaceDraw([&](auto kind,auto key,auto){

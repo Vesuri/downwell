@@ -18,7 +18,7 @@ static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell:
     struct Draw {downwell::EffectMaskAssets::Asset art;downwell::MotionBinary64 x,y;};
     std::vector<Draw> reference;
     assert(world.visitRegisteredEffectSurfaces<false>(assets,view,[&](const auto& art,auto x,auto y){
-        reference.push_back({art,x,y});return true;
+        reference.push_back({art,downwell::EffectSpriteDraw::real(x),downwell::EffectSpriteDraw::real(y)});return true;
     }));
     // A producer emitted by the retained reference must never be suppressed
     // by the scene's empty-surface gate, including future producer families.
@@ -26,7 +26,8 @@ static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell:
     // Repeat after capture, and compare each failing emission prefix too.
     for(unsigned stop=0;stop<=reference.size()+1;++stop){
         unsigned count=0;
-        const bool okay=world.visitRegisteredEffectSurfaces(assets,view,[&](const auto& a,auto x,auto y){
+        const bool okay=world.visitRegisteredEffectSurfaces(assets,view,[&](const auto& a,auto ex,auto ey){
+            const auto x=downwell::EffectSpriteDraw::real(ex),y=downwell::EffectSpriteDraw::real(ey);
             assert(count<reference.size());const auto& r=reference[count++];const auto& b=r.art;
             assert(a.mask.data==b.mask.data&&a.mask.bytes==b.mask.bytes&&a.mask.width==b.mask.width&&
                 a.mask.height==b.mask.height&&a.mask.stride==b.mask.stride&&a.low==b.low&&a.high==b.high&&
@@ -296,7 +297,8 @@ int main() {
             const downwell::EffectSurfacePlacement::View effectView{downwell::MotionBinary64::fromInteger(160),
                 downwell::MotionBinary64::fromInteger(34),downwell::MotionBinary64::fromInteger(160),
                 downwell::MotionBinary64::fromInteger(284)};
-            assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto px,auto py){
+            assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto ex,auto ey){
+                const auto px=downwell::EffectSpriteDraw::real(ex),py=downwell::EffectSpriteDraw::real(ey);
                 assert(asset.mask.data==expected.mask.data&&px.high==x.high&&px.low==x.low&&py.high==y.high&&py.low==y.low);
                 ++surfaces;return true;
             })&&surfaces==1);
@@ -396,7 +398,8 @@ int main() {
                 AmigaGameplayDrawList composited;assert(composited.collect(*world,pack,pack+8,160,34,true));
                 for(unsigned i=0;i<composited.count;++i)assert(composited.actors[i].sprite!=84);
                 unsigned surfaces=0;
-                assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto px,auto py){
+                assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto ex,auto ey){
+                    const auto px=downwell::EffectSpriteDraw::real(ex),py=downwell::EffectSpriteDraw::real(ey);
                     assert(asset.mask.data==art.smoke(frame)->mask.data&&px.high==x.high&&px.low==x.low&&
                         py.high==y.high&&py.low==y.low);++surfaces;return true;
                 })&&surfaces==1);

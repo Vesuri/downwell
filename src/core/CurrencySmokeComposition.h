@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_CURRENCY_SMOKE_COMPOSITION_H
 #include "SmokeComposition.h"
 #include "PaletteEffectSurface.h"
+#include "EffectSpriteDraw.h"
 #include "Profile.h"
 
 namespace downwell {
@@ -101,11 +102,16 @@ public:
             }
             { DW_PROFILE_SCOPE(profileEffectSmoke);
             smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
-                if(!effect.destroyRequested)add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
+                if(effect.destroyRequested)return;
+                // Step publishes rounded positions: those take the pixel path.
+                std::int32_t px,py;
+                if(EffectSpriteDraw::pixel(effect.x,px)&&EffectSpriteDraw::pixel(effect.y,py))
+                    add(assets.smoke(effect.drawFrame()),px,py);
+                else add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
             });
             }
             { DW_PROFILE_SCOPE(profileEffectDebris);
-            if(okay)okay=lateEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+            if(okay)okay=lateEffects([&](const EffectMaskAssets::Asset& asset,auto x,auto y){
                 add(&asset,x,y);return okay;
             })&&okay;
             }

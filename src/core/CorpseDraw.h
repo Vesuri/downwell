@@ -12,16 +12,23 @@ struct CorpseDraw {
     template<class Emit> static bool surface(const CorpseAnimation& corpse,const EffectMaskAssets& assets,
         const EffectSurfacePlacement::View& view,Emit emit){
         Command command;
-        if(!prepare(corpse,view,false,false,true,command))return false;
-        if(command.placement.target==EffectSurfacePlacement::hidden)return true;
+        std::int32_t px,py;bool shown;
+        const bool whole=corpse.valid&&EffectSpriteDraw::pixelFx(corpse.x,corpse.y,view,px,py,shown);
+        if(whole){
+            if(corpse.destroyRequested||corpse.flash>0||!shown)return true;
+            command.sprite=corpse.spriteId;command.imageIndex=corpse.imageIndex;command.scaleX=corpse.imageXscale;
+        }else{
+            if(!prepare(corpse,view,false,false,true,command))return false;
+            if(command.placement.target==EffectSurfacePlacement::hidden)return true;
+        }
         const auto scale=command.scaleX.bits;
         if(!(scale&0x7fffffffu))return true;
         if((scale&0x7fffffffu)!=0x3f800000u)return false;
         const auto index=command.imageIndex.bits,magnitude=index&0x7fffffffu;
         if(magnitude>=0x3f800000u||((index>>31)&&magnitude))return false;
         EffectMaskAssets::Asset asset;
-        return assets.corpse(command.sprite,(scale>>31)!=0,asset)&&
-            emit(asset,corpse.x.promoted(),corpse.y.promoted());
+        if(!assets.corpse(command.sprite,(scale>>31)!=0,asset))return false;
+        return whole?emit(asset,px,py):emit(asset,corpse.x.promoted(),corpse.y.promoted());
     }
     static bool prepare(const CorpseAnimation& corpse,const EffectSurfacePlacement::View& view,
                         bool death,bool lowSpec,bool surfaceExists,Command& out){

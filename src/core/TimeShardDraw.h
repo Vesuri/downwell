@@ -19,6 +19,11 @@ struct TimeShardDraw {
     template<class Effect,class Emit> static bool surface(const Effect& effect,const EffectMaskAssets& assets,
         const EffectSurfacePlacement::View& view,Emit emit){
         Command command;unsigned frame;EffectMaskAssets::Asset asset;
+        std::int32_t px,py;bool shown;
+        if(EffectSpriteDraw::pixelFx(effect.x,effect.y,view,px,py,shown)){
+            if(effect.destroyRequested||effect.dflash>0||!shown)return true;
+            return DebrisDraw::frame(91,effect.imageIndex,frame)&&assets.debris(91,frame,asset)&&emit(asset,px,py);
+        }
         if(!prepare(effect,view,false,false,true,command))return false;
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
         return DebrisDraw::frame(91,command.imageIndex,frame)&&assets.debris(91,frame,asset)&&

@@ -1,3 +1,4 @@
+#include <type_traits>
 // WR.5 host replay of the recorded world-one slice routes (the .inputs and
 // .states pairs AmigaSceneRuntimeTest's testWorldOneSlice writes).
 //   build/amiga-world-one-replay-test <rooms> <objects> <patterns> <route base>
@@ -101,7 +102,13 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
             const downwell::EffectSurfacePlacement::View view{Real::fromInteger(vx),Real::fromInteger(vy),
                 Real::fromInteger(160),Real::fromInteger(284)};
             *draws<<" S";
-            const bool good=game.visitRegisteredEffectSurfaces(effects,view,[&](const downwell::EffectMaskAssets::Asset& a,Real x,Real y){
+            const auto real=[](auto n){
+                if constexpr(std::is_same_v<decltype(n),std::int32_t>)return Real::fromInteger(n);
+                else return n;
+            };
+            const bool good=game.visitRegisteredEffectSurfaces(effects,view,[&](const downwell::EffectMaskAssets::Asset& a,auto px,auto py){
+                // Whole-pixel emissions print as the reals they stand for.
+                const Real x=real(px),y=real(py);
                 *draws<<' '<<(a.low?a.low-art.data():-1)<<':'<<a.originX<<':'<<a.originY<<':'<<x.high<<'.'<<x.low<<':'<<y.high<<'.'<<y.low;return true;});
             *draws<<(good?" ok":" FAIL")<<" H";
             for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);

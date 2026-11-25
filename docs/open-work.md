@@ -379,9 +379,11 @@ resets it; that is the first owner to find.
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together: smoke (motion 3.2 ms per worst spray update, plus its drawFx
-    placement), debris 3.9, corpses 3.2, then the steering enemies' stored
-    state and `CheckCollisionWithScript`.
+    together: smoke (motion 3.2 ms per worst spray update, wall contacts
+    1.9), debris 3.9 (its fractional positions still take binary64 drawFx
+    placement twice, 1.1 ms), corpses 3.2, then the steering enemies'
+    stored state and `CheckCollisionWithScript`. Whole-pixel drawFx
+    positions (smoke, corpses, rounded debris) already skip placement.
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,
     level transitions and shop re-entry, the clear and upgrade screens,

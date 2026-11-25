@@ -1,3 +1,4 @@
+#include <type_traits>
 #include "core/BinaryEffectSurface.h"
 #include "core/EffectMaskAssets.h"
 #include "core/CorpseDraw.h"
@@ -43,7 +44,15 @@ int main(int argc,char**argv){
             corpse.x={0x43784000u};corpse.y={0x43008000u}; // 248.25, 128.5
             corpse.imageXscale={mirrored?0xbf800000u:0x3f800000u};corpse.imageIndex={0x3f400000u};
             unsigned emitted=0;
-            auto emit=[&](const auto& actual,Real x,Real y){
+            const auto real=[](auto n){
+                if constexpr(std::is_same_v<decltype(n),std::int32_t>)return Real::fromInteger(n);
+                else return n;
+            };
+            auto emit=[&](const auto& actual,auto px,auto py){
+                const Real x=real(px),y=real(py);
+                // Whole-pixel positions arrive as pixels, fractional ones as reals.
+                constexpr bool pixel=std::is_same_v<decltype(px),std::int32_t>;
+                check(pixel==(corpse.x.bits==0x43780000u&&corpse.y.bits==0x43000000u));
                 const auto expectedAsset=asset(sprite+(mirrored?62000:0),0);
                 check(actual.mask.data==expectedAsset.mask.data&&actual.originX==expectedAsset.ox&&actual.originY==expectedAsset.oy);
                 check(x.high==corpse.x.promoted().high&&x.low==corpse.x.promoted().low&&
@@ -62,6 +71,13 @@ int main(int argc,char**argv){
             corpse.imageXscale={0x40000000u};check(!downwell::CorpseDraw::surface(corpse,shared,view,emit));
             corpse.imageXscale={0x3f800000u};corpse.imageIndex={0x7fc00000u};
             check(!downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+            corpse.imageXscale={mirrored?0xbf800000u:0x3f800000u};corpse.imageIndex={0x3f400000u};
+            corpse.x={0x43780000u};corpse.y={0x43000000u}; // 248, 128
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==2);
+            corpse.x={0x43200000u}; // 160: strict left edge, hidden on the pixel path too.
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==2);
+            corpse.flash=1;corpse.x={0x43780000u};
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==2);
         }
         std::puts("Corpse surface adapter: four offline variants, fractional anchors, visibility and failure gates passed");
     }

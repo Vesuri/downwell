@@ -26,9 +26,15 @@ struct DebrisDraw {
     static bool surface(const DebrisAnimation& effect,const EffectMaskAssets& assets,
                         const EffectSurfacePlacement::View& view,Emit emit){
         Command command;
+        unsigned subimage;EffectMaskAssets::Asset asset;
+        std::int32_t px,py;bool shown;
+        if(EffectSpriteDraw::pixelFx(effect.x,effect.y,view,px,py,shown)){
+            if(effect.destroyRequested||effect.flash>0||!shown)return true;
+            return frame(effect.spriteId,effect.imageIndex,subimage)&&
+                assets.debris(effect.spriteId,subimage,asset)&&emit(asset,px,py);
+        }
         if(!prepare(effect,view,false,false,true,command))return false;
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
-        unsigned subimage;EffectMaskAssets::Asset asset;
         return frame(command.sprite,command.imageIndex,subimage)&&assets.debris(command.sprite,subimage,asset)&&
             emit(asset,effect.x.promoted(),effect.y.promoted());
     }

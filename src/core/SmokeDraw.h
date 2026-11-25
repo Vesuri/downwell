@@ -19,9 +19,16 @@ struct SmokeDraw {
     }
     template<class Emit> static bool surface(RunnerImageValue index,RunnerImageValue x,RunnerImageValue y,
         const EffectMaskAssets& assets,const EffectSurfacePlacement::View& view,Emit emit){
+        unsigned subimage;std::int32_t px,py;bool shown;
+        if(EffectSpriteDraw::pixelFx(x,y,view,px,py,shown)){
+            if(!shown)return true;
+            if(!frame(index,subimage))return false;
+            const auto* asset=assets.smoke(subimage);
+            return asset&&emit(*asset,px,py);
+        }
         Command command;if(!prepare(index,x,y,view,false,false,true,command))return false;
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
-        unsigned subimage;if(!frame(index,subimage))return false;
+        if(!frame(index,subimage))return false;
         const auto* asset=assets.smoke(subimage);
         return asset&&emit(*asset,x.promoted(),y.promoted());
     }
