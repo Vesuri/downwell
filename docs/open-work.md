@@ -397,11 +397,14 @@ resets it; that is the first owner to find.
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together. About 1.1 ms of software binary64 is left per spray update,
-    none of it over 0.3 ms: steering enemies (0.27 ms), compact shootable
-    hits (0.15), casings (0.10), smoke wall contacts (0.10; the contacts'
-    1.5 ms is the terrain query), mask bounds (0.09); then the red ball's
-    stored state.
+    together. About 0.8 ms of software binary64 is left per spray update
+    (updates 693-698), no caller over 0.1 ms: casings' fromInteger, smoke
+    wall-contact scaling, the spawner countdown, mask bounds' binary32
+    narrowing, steering and corpse pixel publication, flash-ball
+    animation. Convert those with their owners' next change, and the
+    upgrade, hard-mode and red-ball owners when those workloads are
+    profiled; the spray route's frame cost is now composition, terrain
+    rows and camera jumps, not arithmetic.
     Debris, jelly and corpse steps are now mostly their terrain queries
     (1.2, 1.3 and 1.1 ms per spray update); corpse drawing (2.0 ms) is
     stamping, not arithmetic. drawFx rounds every
