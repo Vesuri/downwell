@@ -31,12 +31,16 @@ struct CurrencyCollisionBounds {
         const unsigned field=p.bits>>23; // sign bit set: refused below
         if(field<127||field>148||low<-(1<<7)||high>=(1<<7))return false;
         const unsigned k=150-field;
-        const std::int64_t s=std::int64_t((p.bits&0x7fffffu)|0x800000u);
-        const std::int64_t first=s+(std::int64_t(low)<<k),second=first+(std::int64_t(high-low+1)<<k);
-        if(first<0||second>=(std::int64_t(1)<<24))return false;
-        const auto round=[k](std::int64_t sum){
-            std::int64_t whole=sum>>k;
-            const std::int64_t rest=sum&((std::int64_t(1)<<k)-1),half=std::int64_t(1)<<(k-1);
+        // 32-bit only (68020: no 64-bit shifts): |low << k| < 2^30, and the
+        // width is refused before its shift could pass 2^24.
+        const std::uint32_t width=std::uint32_t(high-low+1);
+        if(width>(0xffffffu>>k))return false;
+        const std::int32_t first=std::int32_t((p.bits&0x7fffffu)|0x800000u)+low*(std::int32_t(1)<<k);
+        const std::int32_t second=first+std::int32_t(width<<k);
+        if(first<0||second>=(1<<24))return false;
+        const auto round=[k](std::int32_t sum){
+            std::int32_t whole=sum>>k;
+            const std::int32_t rest=sum&((std::int32_t(1)<<k)-1),half=std::int32_t(1)<<(k-1);
             if(rest>half||(rest==half&&(whole&1)))++whole;
             return int(whole);
         };
