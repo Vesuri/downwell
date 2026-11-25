@@ -59,7 +59,11 @@ stub, and `SOUND`, `WINDOW` and the other shared FS-UAE options apply.
 its own drives, state, pidfile and gdb port. It only ever stops that
 instance's previous emulator, and the verification and profile scripts (which
 use `amiga/.run`) never stop it. `INSTANCE=b ./run.sh` runs a second emulator
-beside the first.
+beside the first. Checks clean and rebuild `amiga/out` in their own
+configurations while they hold `tmp/amiga.lock`, so an instance runs its own
+snapshot of `out/` (in its `build/`). It refreshes the snapshot only when the
+lock is free; while a check holds it, it runs the previous snapshot and says
+so. `DOWNWELL_EXE=path` runs that build directly instead.
 
 ## GameMaker extraction
 

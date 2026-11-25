@@ -8,9 +8,19 @@ calling shell still holds fd 9, so the lock stays held until that shell
 (and every child that inherited fd 9) has exited. The Makefile's
 AMIGA_SERIAL prefix uses it so that recipes which clean and rebuild amiga/
 or run the emulator never overlap under make -j, from one make or several.
+
+    python3 tools/hold-lock.py 9 --try
+
+takes the lock only if it is free (exit status 1, without waiting, if not).
 """
 import fcntl
 import sys
 
 fd = int(sys.argv[1])
-fcntl.flock(fd, fcntl.LOCK_EX)
+if sys.argv[2:] == ['--try']:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        sys.exit(1)
+else:
+    fcntl.flock(fd, fcntl.LOCK_EX)

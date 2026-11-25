@@ -18,9 +18,34 @@ export FSUAE_RUN="$RUN"
 . ./machine.sh
 
 ROM="${1:-$KICKSTART}"
-EXE="${DOWNWELL_EXE:-out/Downwell.exe}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
-[ -f "$EXE" ] || { echo "not found: $EXE (build first)"; exit 1; }
+PARTS="exe boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear tables"
+
+# The verification and profile scripts clean and rebuild out/ in their own
+# configurations while they hold tmp/amiga.lock, and restore the playable
+# build when they finish. Unless DOWNWELL_EXE names a build, the instance
+# runs its own snapshot of out/, refreshed only while nobody holds the lock.
+if [ -n "${DOWNWELL_EXE:-}" ]; then
+  EXE="$DOWNWELL_EXE"
+  [ -f "$EXE" ] || { echo "not found: $EXE"; exit 1; }
+else
+  EXE="$RUN/build/Downwell.exe"
+  mkdir -p "$RUN/build" ../tmp
+  exec 9>>../tmp/amiga.lock
+  if python3 ../tools/hold-lock.py 9 --try; then
+    if [ -f out/Downwell.exe ]; then
+      for part in $PARTS; do cp -f "out/Downwell.$part" "$RUN/build/Downwell.$part.new"; done
+      for part in $PARTS; do mv -f "$RUN/build/Downwell.$part.new" "$RUN/build/Downwell.$part"; done
+    fi
+  elif [ -f "$EXE" ]; then
+    echo "a check is rebuilding out/; running this instance's snapshot from $(date -r "$EXE" '+%Y-%m-%d %H:%M')"
+  else
+    echo "a check is rebuilding out/ and this instance has no snapshot yet; try again when it finishes"
+    exit 1
+  fi
+  exec 9>&-
+  [ -f "$EXE" ] || { echo "not found: out/Downwell.exe (build first)"; exit 1; }
+fi
 
 DH0="$RUN/dh0"
 DH1="$RUN/dh1"
@@ -34,15 +59,8 @@ fsuae_prepare
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
-cp -f "$EXE" "$DH1/Downwell"
-cp -f "${EXE%.exe}.boot" "$DH1/Downwell.boot"
-cp -f "${EXE%.exe}.front" "$DH1/Downwell.front"
-cp -f "${EXE%.exe}.planes" "$DH1/Downwell.planes"
-cp -f "${EXE%.exe}.game" "$DH1/Downwell.game"
-cp -f "${EXE%.exe}.cavern" "$DH1/Downwell.cavern"
-cp -f "${EXE%.exe}.cavernplanes" "$DH1/Downwell.cavernplanes"
-for bank in results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear tables; do
-  cp -f "${EXE%.exe}.$bank" "$DH1/Downwell.$bank"
+for part in $PARTS; do
+  if [ "$part" = exe ]; then cp -f "$EXE" "$DH1/Downwell"; else cp -f "${EXE%.exe}.$part" "$DH1/Downwell.$part"; fi
 done
 # W1.10: save.ini persists in dh1 between runs; DOWNWELL_SAVE replaces it.
 # The default instance carries the save over once from .run/dh1, which
