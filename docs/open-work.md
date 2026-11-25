@@ -175,6 +175,15 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     no outlines. Also seen: partly drawn gems beside `EMPTY!`. Seen with a
     `gemChunk`'s ten gems on the floor of a side room during gem high.
     Check first whether it predates the uncommitted 5 C row-restore queue.
+19. **Gameplay display checks do not run.** The six emulator pixel checks
+    (`verify-amiga-gameplay-frame`, `-active-frame`, `-laser-frame`,
+    `-gemhigh-frame`, `-ammo-frame`, `-recharge-frame`) fail at HEAD
+    0728994a. On `a1200-4m` the verification build does not fit (it exits
+    with "not enough memory" before the debugger attaches, seen as a
+    `vMustReplyEmpty` timeout). On `a1200-fast` the gem-high script reaches
+    landing (tick 164), then its third breakpoint fails with "Cannot
+    execute this command while the target is running". Make them run on
+    the target, or name the machine they need, before relying on them.
 
 ### WM. Music (deferred)
 
@@ -384,14 +393,56 @@ resets it; that is the first owner to find.
       fails at frame 13, `generate-shop-profile` at parity frame 3 (camera
       X 159 against 160) and the overflow witness at frame 7, group 1.
 
+**AGA display experiments** (both need AGA, while the target note above
+says the game must start on any 68020 Amiga. Decide between an ECS fallback
+display and changing that rule before either becomes the default.)
+
+15. **W3.15 FMODE 3 bitplane fetch.** Measured experiment, gameplay display
+    only. The effect composition keeps the blitter busy end to end (5 C);
+    64-bit bitplane fetches use a quarter of the bus slots and leave the
+    rest to the blitter and CPU Chip access. Keep 16-pixel sprites (FMODE
+    bits 2–3 zero) so the offline sprite streams stay valid. Constraints:
+    bitplane pointers and modulos 64-bit aligned, so the 352-pixel fetch
+    with its two-byte inset becomes a 384-pixel fetch (six 64-pixel blocks)
+    cropped by DIW; the 48-byte rows keep the PF1 ring aligned. First
+    question: can a fetch window that meets FMODE 3's DDF rounding keep all
+    eight sprite channels (today DDFSTRT `$38` keeps channel 7)? Work it out
+    from the AGA documentation, then show every channel at both display
+    edges in the emulator. If a channel is lost, stop: more BOBs cost more
+    than the fetch saves. Then check that the profiling emulator times AGA
+    DMA cycle-exactly, and compare constant fire and the normal run to tick
+    700 (mean, fields, worst update, the blitter waits).
+16. **W3.16 Moving objects on their own playfield (design first).** Today
+    PF1 holds terrain, actors and effects together, so every update copies
+    dirtied terrain rows back from the backing (2,182 words and a 1.5 ms
+    wait per update on constant fire) and BOBs sit in the terrain planes.
+    Proposal: terrain alone in PF1, and the BOBs and the effect raster in
+    PF2 inside the well (PF2 already holds the HUD outside it). That removes
+    the row restore and possibly the second terrain buffer; the object layer
+    erases its previous rectangles with D-only blits. Write the design
+    before code:
+    - every source Draw that paints behind terrain or walls, since dual
+      playfield priority cannot change per pixel;
+    - opaque black on PF2 (a non-zero pen set to black, as the HUD does);
+    - shade subtraction and the opaque-black replacement on a separate
+      layer, keeping `REFERENCE_EFFECT_COMPOSITION=1` and the final pixels
+      as oracles;
+    - sprite priority against both playfields (BPLCON2);
+    - sync: the copper list of each displayed frame carries both the PF1
+      pointers and the object buffer for the same camera y; the mid-screen
+      PF1 ring reload touches only PF1, and PF2's horizontal scroll stays 0;
+    - the removed work and expected saving from the census.
+    8 planes (4+4) are not needed: three colours per layer cover white, red
+    and black.
+
 **Close**
 
-15. **W3.15 Re-audit and lock in.** Repeat the census on the target, with
+17. **W3.17 Re-audit and lock in.** Repeat the census on the target, with
     every active-gameplay update within 20 ms. Commit the results to the
     audit, and turn the cadences into regression ceilings: the quiet fall
     at 164 fields, and a ceiling for the world-one route. Check that the
     shipping footprint still fits the target.
-16. **W3.16 Close W3:** remove this section and the world-1 parts of
+18. **W3.18 Close W3:** remove this section and the world-1 parts of
     section 5. Its other items stay parked for world 2.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
