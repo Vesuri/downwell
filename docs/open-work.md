@@ -390,14 +390,14 @@ resets it; that is the first owner to find.
     and velocity, whole published pixels, quarter turn at spawn, and the
     binary32 animation timeline in exact Q27 `Binary32Timeline`;
     `ScriptSpawnEffect` and `MovingFx` remain the registered forms and
-    oracle).
+    oracle); the compact debris, gem and corpse animations (debris and gems
+    on `Binary32Timeline`, bit-exact; compact corpses skip their one-frame
+    timeline).
     Converting at an owner's boundary pays only where trig dominates: for
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together: the remaining `SequenceTimeline` animations (gems, corpses,
-    flash balls, effect sequences; 0.5 ms per spray update) onto
-    `Binary32Timeline`, the spawner's fall depth through
+    together: the spawner's fall depth through
     `ContactCoordinates::playerGlobals` (0.36 ms), the gem streak rise draw
     (0.27 ms), then the red ball's stored state. Smoke's wall contacts
     (1.5 ms) are mostly the terrain query.

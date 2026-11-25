@@ -1623,10 +1623,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // fxTimeShard 238 has no Animation End event.
     if(timeStop_.shards.size()&&!timeStop_.shards.advanceAnimation(timeStop_.shards.beginPhase()))
         run_.effectsSucceeded=false;
-    // Nor does objDeadBody 263 (its one-frame sprites only wrap).
-    if(compactCorpses_.size()){struct Hooks{} hooks;
-        if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),
-            [](auto,downwell::CorpseAnimation& corpse){return corpse.advanceImage();},hooks))run_.effectsSucceeded=false;}
+    // Nor does objDeadBody 263: its admitted sprites have one frame, so the
+    // timeline only wraps within [0, 1) and every draw is frame 0. The
+    // compact corpses skip it and keep image_index 0 (W3 fixed point);
+    // the registered corpses still advance CorpseAnimation.
     if(blastEnd_)advanceCompactBlastAnimation();
     if(bloodEnd_&&!advanceCompactBloodAnimation())return {};
     advanceCompactDroneAnimation();

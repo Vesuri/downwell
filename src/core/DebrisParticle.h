@@ -3,6 +3,7 @@
 #include "DebrisBirth.h"
 #include "EffectSequenceAnimation.h"
 #include "FixedPoint.h"
+#include "Binary32Timeline.h"
 namespace downwell {
 // The compact debris owner's object 370 with Q16 position and velocity (W3
 // fixed point): DebrisAnimation, its VM form and oracle, still runs on the
@@ -13,6 +14,8 @@ namespace downwell {
 struct DebrisParticle {
     std::int32_t x16=0,y16=0,xsp=0,ysp=0; // Q16
     RunnerImageValue imageSpeed{},imageIndex{},timeline{},rate{};
+    std::int32_t frame27=0; // the timeline once timed (Q27)
+    bool timed=false;
     AlarmBank alarms;
     int spriteId=91,flash=-1;
     bool disappearing=false,noTouch=true,destroyRequested=false;
@@ -39,10 +42,25 @@ struct DebrisParticle {
         Fixed16 v;if(!Fixed16::fromBinary64(value,v)||v.v< -8*65536||v.v>8*65536)return false;
         ysp=v.v;return true;
     }
+    // The first advance reconciles Create's random(7) image_index write
+    // through EffectSequenceAnimation; nothing writes image_index after
+    // that, so later advances add image_speed to the binary32 timeline in
+    // exact Q27 (Binary32Timeline) and publish it as image_index.
     bool advanceImage(){
         if(destroyRequested)return true;
         const unsigned frames=spriteId==91?6:spriteId==115||spriteId==116?4:0;
-        return EffectSequenceAnimation::advance(timeline,imageSpeed,frames,imageIndex);
+        std::int32_t rate27;bool exact=false;
+        if(timed&&(!Binary32Timeline::fromBits(imageSpeed.bits,rate27,exact)||!exact))timed=false;
+        if(!timed){
+            if(!EffectSequenceAnimation::advance(timeline,imageSpeed,frames,imageIndex))return false;
+            timed=Binary32Timeline::fromBits(timeline.bits,frame27,exact)&&exact&&frame27>=0&&
+                imageIndex.bits==(timeline.bits&0x7fffffffu);
+            return true;
+        }
+        if(!frames||rate27>std::int32_t(frames)*Binary32Timeline::one||rate27< -std::int32_t(frames)*Binary32Timeline::one)return false;
+        Binary32Timeline::advance(frame27,rate27,std::int32_t(frames)*Binary32Timeline::one);
+        timeline.bits=imageIndex.bits=Binary32Timeline::toBits(frame27);
+        return true;
     }
     void advanceAlarm(unsigned index){
         if(destroyRequested||index>2||!alarms.advanceOne(index))return;

@@ -6,7 +6,8 @@
 #include <cstdlib>
 // The compact world's Q16 debris against DebrisAnimation, its VM form,
 // stepped side by side in a walled pit while their RNG streams agree:
-// published pixels stay within one, and hits (which draw RNG) rarely move.
+// published pixels stay within one, hits (which draw RNG) rarely move and
+// image_index (Q27 after the first advance) matches bit for bit.
 static void checkAt(bool ok,int line){if(!ok){std::fprintf(stderr,"Debris particle check failed at line %d\n",line);std::abort();}}
 #define check(ok) checkAt((ok),__LINE__)
 using N=downwell::MotionBinary64;
@@ -23,7 +24,7 @@ bool overlaps(const downwell::ContactBounds& b){
 int pixel(downwell::RunnerImageValue v){std::int32_t n;checkAt(v.promoted().roundPixel(n),__LINE__);return int(n);}
 }
 int main(){
-    unsigned births=0,steps=0,pixelDifferences=0,streamsParted=0,meetings=0,hits=0;
+    unsigned timed=0,births=0,steps=0,pixelDifferences=0,streamsParted=0,meetings=0,hits=0;
     for(unsigned seed=0;seed<512;++seed){
         downwell::GameMakerRandom referenceRandom(seed),fixedRandom(seed),place(seed+7000);
         const N x=N::fromInteger(60+int(place.irandomSmall(200))),y=N::fromInteger(160+int(place.irandomSmall(30)));
@@ -47,15 +48,16 @@ int main(){
                 hit=overlaps(b);++meetings;hits+=hit;return true;
             },0));
             if(referenceRandom.drawCount()!=fixedRandom.drawCount()){++streamsParted;break;}
-            ++steps;
+            ++steps;timed+=fixed.timed;
             const int rx=pixel(reference.x),ry=pixel(reference.y);
             check(std::abs(rx-fixed.pixelX())<=1&&std::abs(ry-fixed.pixelY())<=1);
             pixelDifferences+=(rx!=fixed.pixelX())+(ry!=fixed.pixelY());
-            check(reference.imageSpeed.bits==fixed.imageSpeed.bits&&reference.flash==fixed.flash&&
+            check(reference.imageSpeed.bits==fixed.imageSpeed.bits&&reference.imageIndex.bits==fixed.imageIndex.bits&&
+                  reference.flash==fixed.flash&&
                   reference.destroyRequested==fixed.destroyRequested);
         }
     }
     std::printf("Debris Q16: %u births, %u steps, %u meetings (%u solid), %u of %u published pixels differ by one, "
-                "%u RNG streams parted by a moved hit\n",births,steps,meetings,hits,pixelDifferences,2*steps,streamsParted);
-    check(hits*10>meetings&&pixelDifferences*100<2*steps&&streamsParted*50<births);
+                "%u RNG streams parted by a moved hit; image_index timed in Q27 on %u steps\n",births,steps,meetings,hits,pixelDifferences,2*steps,streamsParted,timed);
+    check(timed*10>steps*8&&hits*10>meetings&&pixelDifferences*100<2*steps&&streamsParted*50<births);
 }

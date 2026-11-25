@@ -3945,3 +3945,11 @@ verify-compact-room-effects: build/compact-room-effects-test
 build/compact-room-effects-test: tests/core/CompactRoomEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/CompactRoomEffectsTest.cpp src/core/GameMakerRandom.cpp
+
+.PHONY: verify-binary32-timeline
+test: verify-binary32-timeline
+verify-binary32-timeline: build/binary32-timeline-test
+	./build/binary32-timeline-test
+build/binary32-timeline-test: tests/core/Binary32TimelineTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/Binary32TimelineTest.cpp
