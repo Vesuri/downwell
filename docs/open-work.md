@@ -385,54 +385,18 @@ resets it; that is the first owner to find.
       fails at frame 13, `generate-shop-profile` at parity frame 3 (camera
       X 159 against 160) and the overflow witness at frame 7, group 1.
 
-15. **W3.15 Interleave every bitplane bitmap.** Today only the off-screen
-    effect surface is interleaved; the terrain backing, both PF1 display
-    rings, the PF2 HUD and the other scenes' bitmaps keep each plane
-    contiguous. So `Bitmap::copy` and `clear` queue one blit per plane: the
-    row restore, the effect publish, BOB draws and clears each take two
-    blits per rectangle where one would do. The single-buffered HUD is also
-    written plane by plane, so a frame scanned mid-update can show mixed
-    pens (the cause of the ammo-label red box, fixed only for that label in
-    be0576d6). Interleaved, one blit covers both planes and a top-to-bottom
-    copy finishes each row in both planes before the next.
-    Measured (stage 1, `BLIT_CENSUS=1`, a1200-4m, ROUTE_END_TICK=700):
-    - world-one gameplay: 13.7 blits per update, 4.4 of them per-plane
-      twins (4.3 on the PF1 ring, 0.1 on the HUD); camera jumps 20.8 and
-      7.5; the worst update (85.9 ms) has 8 blits, 4 twins.
-    - spray gameplay: 28.6 blits, 6.2 twins (6.0 ring); camera jumps 30.9
-      and 8.1; the worst update (100.5 ms) has 40 blits, 7 twins. Most
-      masked copies are effect stamps, already one blit per stamp.
-    - CPU cost per blit issued (trace spray-561, 8567d702): 3.29 ms per
-      update for about 36 blits, about 1,300 cycles (0.09 ms) each, Chip
-      register waits included. The queue is polled (the blitter interrupt
-      stays off), so a queued blit also waits for the CPU's next poll.
-    - Expected saving from merging twins: 0.4 ms per world-one update,
-      0.6 ms per spray update (under 1.5%), plus the per-plane wrapper
-      calls. The same words move either way.
-    - Blitter time (the census timing each blit to its finished
-      interrupt): world-one gameplay busy 3.7 ms per update, idle with
-      blits still queued 9.6 ms, CPU drain waits 1.7 ms; camera jumps
-      22.8, 11.1 and 19.2 ms. Spray gameplay 9.4, 29.3 and 3.3 ms; camera
-      jumps 26.0, 33.4 and 19.5 ms. Idle counts where it ends, often in
-      the next update. An interrupt-chained queue could overlap that idle
-      time with the CPU: it saves at most the drain waits.
-    The HUD's mixed-pen frames come from CPU writes (plane-major word
-    strips), not blits: row-major writes fix them with or without
-    interleaving.
-    Remaining stages, each committed with its own evidence:
-    - PF2 HUD: the HUD composers, prepared HUD text, health and ammo tables
-      (`generate-amiga-health-art`, `install-data/derived_hud`), BPL2MOD.
-    - PF1 gameplay: backing and both rings, the row tracking and restore,
-      the terrain raster and painter, `AmigaPatternTransfer.s`, the field
-      overlays and `AmigaFieldPrepared.s`, the goal field, laser sight,
-      effect publish, copper ring pointers, BPL1MOD and the wrap reload,
-      `prepare-initial-terrain`. Masked BOB blits need each mask row once
-      per plane: count the Chip cost against the memory fit before
-      changing the bank format.
-    - The other scenes (front end, style, shop, clear, results, pause).
-    - Every frame decoder and gdb dump that reads planes.
-    Keep 64-bit alignment (96-byte interleaved rows) for W3.16. The object
-    layer of W3.17 starts interleaved.
+15. **W3.15 Chain the blitter queue from the interrupt.** The blit queue
+    is polled: the blitter-finished interrupt stays off, so a queued blit
+    starts only when the CPU next queues or drains. The blit census
+    (`BLIT_CENSUS=1`, a1200-4m, ROUTE_END_TICK=700, `11dffb66`) per
+    update: world-one gameplay blitter busy 3.7 ms, idle with blits
+    queued 9.6 ms, CPU drain waits 1.7 ms; camera jumps 22.8, 11.1 and
+    19.2 ms. Spray gameplay 9.4, 29.3 and 3.3 ms; camera jumps 26.0, 33.4
+    and 19.5 ms. Start the next queued blit from the interrupt so the idle
+    time overlaps the CPU: it saves at most the drain waits, less the
+    interrupt entries (about 30 per update). Mask the interrupt while the
+    queue is edited, drain before every OS I/O window, and keep FIFO order.
+    Compare the census work on both routes and the worst updates.
 
 **AGA display experiments** (both need AGA, while the target note above
 says the game must start on any 68020 Amiga. Decide between an ECS fallback
@@ -445,7 +409,7 @@ display and changing that rule before either becomes the default.)
     bits 2–3 zero) so the offline sprite streams stay valid. Constraints:
     bitplane pointers and modulos 64-bit aligned, so the 352-pixel fetch
     with its two-byte inset becomes a 384-pixel fetch (six 64-pixel blocks)
-    cropped by DIW; the 48-byte (96 interleaved) rows keep the PF1 ring aligned. First
+    cropped by DIW; the 48-byte rows keep the PF1 ring aligned. First
     question: can a fetch window that meets FMODE 3's DDF rounding keep all
     eight sprite channels (today DDFSTRT `$38` keeps channel 7)? Work it out
     from the AGA documentation, then show every channel at both display
