@@ -385,19 +385,6 @@ resets it; that is the first owner to find.
       fails at frame 13, `generate-shop-profile` at parity frame 3 (camera
       X 159 against 160) and the overflow witness at frame 7, group 1.
 
-15. **W3.15 Chain the blitter queue from the interrupt.** The blit queue
-    is polled: the blitter-finished interrupt stays off, so a queued blit
-    starts only when the CPU next queues or drains. The blit census
-    (`BLIT_CENSUS=1`, a1200-4m, ROUTE_END_TICK=700, `11dffb66`) per
-    update: world-one gameplay blitter busy 3.7 ms, idle with blits
-    queued 9.6 ms, CPU drain waits 1.7 ms; camera jumps 22.8, 11.1 and
-    19.2 ms. Spray gameplay 9.4, 29.3 and 3.3 ms; camera jumps 26.0, 33.4
-    and 19.5 ms. Start the next queued blit from the interrupt so the idle
-    time overlaps the CPU: it saves at most the drain waits, less the
-    interrupt entries (about 30 per update). Mask the interrupt while the
-    queue is edited, drain before every OS I/O window, and keep FIFO order.
-    Compare the census work on both routes and the worst updates.
-
 **AGA display experiments** (both need AGA, while the target note above
 says the game must start on any 68020 Amiga. Decide between an ECS fallback
 display and changing that rule before either becomes the default.)

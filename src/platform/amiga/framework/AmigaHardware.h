@@ -21,6 +21,8 @@ private:
 public:
     static bool hasAGAChipSet;
     static volatile bool hasQueuedBlits;
+    // Set while AmigaPlatform's handler owns the blitter interrupt (W3.15).
+    static bool blitInterruptChaining;
 #if defined(ASSEMBLER) && defined(__SASC)
     __asm static void* getVBR(void);
 #else
@@ -67,7 +69,7 @@ public:
     static void blitterCopy(uint16_t* source, uint16_t* destination, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t shift, uint16_t firstWordMask, uint16_t lastWordMask, uint16_t mask);
     static void blitterCopyWithMask(uint16_t* source, uint16_t* destination, uint16_t* mask, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked);
     static void blitterLine(uint16_t* data, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t bytesPerRow, bool singleBitPerRow);
-    static void processBlitterQueue();
+    static void processBlitterQueue();  // with the blitter interrupt masked or from its handler
 #endif
     // Masked compositing — portable C++ on both compilers (no hand-written asm
     // counterpart), so unconditional. blitterCombineWithMask draws source through

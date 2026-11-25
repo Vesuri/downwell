@@ -60,12 +60,12 @@ void AmigaPlatform::beginIo()
     // Undo exactly what takeover changed for the OS: its VERTB servers, the
     // blitter interrupt, and multitasking. Disk DMA is never switched off.
     // Our copper, raster and sprite DMA stay live.
+    // The OS gets an idle blitter: no queued blit of ours may finish under
+    // its interrupt vector.
+    AmigaHardware::blitterDrain();
     Disable();
     SysBase->IntVects[INTB_VERTB] = savedVblankVector_;
-#ifdef DOWNWELL_BLIT_CENSUS
-    AmigaHardware::setInterrupts(INTF_BLIT, false);
-    SysBase->IntVects[INTB_BLIT] = savedBlitVector_;
-#endif
+    releaseBlitHandler();
     AmigaHardware::setInterrupts((UWORD)(savedIntena_ & INTF_BLIT), true);
     Enable();
     Permit();
@@ -80,9 +80,7 @@ void AmigaPlatform::endIo()
     SysBase->IntVects[INTB_VERTB].iv_Node = &vblankServer_.is_Node;
     AmigaHardware::setInterrupts(INTF_BLIT, false);
     AmigaHardware::clearInterruptRequests(INTF_BLIT);
-#ifdef DOWNWELL_BLIT_CENSUS
     attachBlitHandler();
-#endif
     Enable();
 }
 
@@ -199,23 +197,42 @@ bool AmigaPlatform::saveFile(const char* name, const UBYTE* source, ULONG bytes)
 
 #ifdef DOWNWELL_BLIT_CENSUS
 void downwellBlitFinishCensus(bool queued);
+#endif
+// The CPU masks this interrupt while it edits or drains the queue, so the
+// handler is the queue's only user while it runs. It enables itself only
+// while blits wait (AmigaHardware), and masks itself once none do.
 ULONG AmigaPlatform::blitHandler()
 {
     AmigaHardware::clearInterruptRequests(INTF_BLIT);
+#ifdef DOWNWELL_BLIT_CENSUS
     downwellBlitFinishCensus(AmigaHardware::hasQueuedBlits);
+#endif
+    AmigaHardware::processBlitterQueue();
+#ifndef DOWNWELL_BLIT_CENSUS
+    if (!AmigaHardware::hasQueuedBlits) AmigaHardware::setInterrupts(INTF_BLIT, false);
+#endif
     return 0;
 }
 
-// Called with interrupts disabled.
+// Both with interrupts disabled, and the queue drained before release.
 void AmigaPlatform::attachBlitHandler()
 {
     SysBase->IntVects[INTB_BLIT].iv_Data = 0;
     SysBase->IntVects[INTB_BLIT].iv_Code = (void (*)())blitHandler;
     SysBase->IntVects[INTB_BLIT].iv_Node = &blitServer_.is_Node;
     AmigaHardware::clearInterruptRequests(INTF_BLIT);
+    AmigaHardware::blitInterruptChaining = true;
+#ifdef DOWNWELL_BLIT_CENSUS
     AmigaHardware::setInterrupts(INTF_BLIT, true);
-}
 #endif
+}
+
+void AmigaPlatform::releaseBlitHandler()
+{
+    AmigaHardware::blitInterruptChaining = false;
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+    SysBase->IntVects[INTB_BLIT] = savedBlitVector_;
+}
 
 ULONG AmigaPlatform::vblankHandler()
 {
@@ -279,13 +296,11 @@ bool AmigaPlatform::takeover(const CopperList& firstCopper,
     SysBase->IntVects[INTB_VERTB].iv_Data = 0;
     SysBase->IntVects[INTB_VERTB].iv_Code = (void (*)())vblankHandler;
     SysBase->IntVects[INTB_VERTB].iv_Node = &vblankServer_.is_Node;
-#ifdef DOWNWELL_BLIT_CENSUS
     blitServer_ = vblankServer_;
-    blitServer_.is_Node.ln_Name = (char*)"Downwell blit census";
+    blitServer_.is_Node.ln_Name = (char*)"Downwell blitter queue";
     blitServer_.is_Code = (void (*)())blitHandler;
     savedBlitVector_ = SysBase->IntVects[INTB_BLIT];
     attachBlitHandler();
-#endif
     Enable();
 
     vblankCount_ = 0;
@@ -373,6 +388,7 @@ void AmigaPlatform::serviceIdleUntilVblank(UWORD start,bool (*idleWork)(void*),v
 void AmigaPlatform::restore()
 {
     if (!active_) return;
+    AmigaHardware::blitterDrain();
 
     // Retire a borrowed device before restoring OS interrupts, including on
     // early-return paths. Its detach clears this callback before freeing state.
@@ -389,10 +405,7 @@ void AmigaPlatform::restore()
 
     Disable();
     SysBase->IntVects[INTB_VERTB] = savedVblankVector_;
-#ifdef DOWNWELL_BLIT_CENSUS
-    AmigaHardware::setInterrupts(INTF_BLIT, false);
-    SysBase->IntVects[INTB_BLIT] = savedBlitVector_;
-#endif
+    releaseBlitHandler();
     Enable();
 
     AmigaHardware::setDMAChannels(DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG,

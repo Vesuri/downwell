@@ -726,7 +726,8 @@ gameplay admission. Use `VERIFY_CHIP_KB=512` for the native memory gate.
 The two scene banks are files beside the executable. Each load is a single
 `Open`/`Read`/`Close` of the whole file into the shared Chip region, through
 `AmigaPlatform::loadFile`. During the load the OS gets back its VERTB
-servers, blitter interrupt and multitasking; the display stays owned and the
+servers, blitter interrupt (after the game's blit queue drains) and
+multitasking; the display stays owned and the
 copper is re-pointed afterwards. Leaving gameplay for the menu or style select
 reloads the front bank before either scene is prepared. Splash scenes run only
 at boot. During gameplay no front/boot bank occupies the region.
