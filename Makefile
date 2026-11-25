@@ -3537,7 +3537,7 @@ verify-amiga-garden-frames: $(AMIGA_MENU_TEST_TARGET)
 
 verify-amiga-gameplay-frame: build/capture-sdl-game
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1' ; } && \
-	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_FRAME_READY READY_DESCRIPTION="first grounded gameplay raster" amiga/verify_startup.sh' ; } && \
+	{ bash -c '. amiga/env.sh && MACHINE=$${MACHINE:-a1200-fast} GDB_SOURCE=verify_gameplay_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_FRAME_READY READY_DESCRIPTION="first grounded gameplay raster" amiga/verify_startup.sh' ; } && \
 	{ printf '%s  %s\n' '$(AMIGA_GAMEPLAY_FRAME_SHA256)' 'amiga/.run/gameplay-frame.bin' | shasum -a 256 -c - ; } && \
 	{ python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-frame.bin build/amiga-gameplay-frame.png ; } && \
 	{ capture_dir=$$(mktemp -d build/landing-XXXXXX); \
@@ -3549,7 +3549,7 @@ verify-amiga-gameplay-frame: build/capture-sdl-game
 .PHONY: verify-amiga-gameplay-laser-frame
 verify-amiga-gameplay-laser-frame: build/capture-sdl-game
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga LASER_VERIFY=1 SKIP_TO_GAME=1' ; } && \
-	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_ammo_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_AMMO_FRAME_READY READY_DESCRIPTION="Laser Sight gameplay frame" VERIFY_TIMEOUT_SECONDS=45 amiga/verify_startup.sh' ; } && \
+	{ bash -c '. amiga/env.sh && MACHINE=$${MACHINE:-a1200-fast} GDB_SOURCE=verify_gameplay_ammo_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_AMMO_FRAME_READY READY_DESCRIPTION="Laser Sight gameplay frame" VERIFY_TIMEOUT_SECONDS=45 amiga/verify_startup.sh' ; } && \
 	{ python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-ammo-frame.bin build/amiga-laser-frame.png ; } && \
 	{ capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/laser-XXXXXX); \
@@ -3560,7 +3560,7 @@ verify-amiga-gameplay-laser-frame: build/capture-sdl-game
 .PHONY: verify-amiga-gameplay-recharge-frame
 verify-amiga-gameplay-recharge-frame: build/capture-sdl-game
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1' ; } && \
-	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_recharge_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_RECHARGE_FRAME_READY READY_DESCRIPTION="gameplay gauge during recharge" amiga/verify_startup.sh' ; } && \
+	{ bash -c '. amiga/env.sh && MACHINE=$${MACHINE:-a1200-fast} GDB_SOURCE=verify_gameplay_recharge_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_RECHARGE_FRAME_READY READY_DESCRIPTION="gameplay gauge during recharge" amiga/verify_startup.sh' ; } && \
 	{ python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-recharge-frame.bin build/amiga-gameplay-recharge-frame.png ; } && \
 	{ capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/recharge-XXXXXX); \
@@ -3570,7 +3570,7 @@ verify-amiga-gameplay-recharge-frame: build/capture-sdl-game
 
 verify-amiga-gameplay-ammo-frame: build/capture-sdl-game
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1' ; } && \
-	{ bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_ammo_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_AMMO_FRAME_READY READY_DESCRIPTION="gameplay gauge during a shot" amiga/verify_startup.sh' ; } && \
+	{ bash -c '. amiga/env.sh && MACHINE=$${MACHINE:-a1200-fast} GDB_SOURCE=verify_gameplay_ammo_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_AMMO_FRAME_READY READY_DESCRIPTION="gameplay gauge during a shot" amiga/verify_startup.sh' ; } && \
 	{ python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-ammo-frame.bin build/amiga-gameplay-ammo-frame.png ; } && \
 	{ capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/ammo-XXXXXX); \
@@ -3579,7 +3579,7 @@ verify-amiga-gameplay-ammo-frame: build/capture-sdl-game
 	{ bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga' ; }
 
 verify-amiga-gameplay-active-frame: build/capture-sdl-game
-	$(AMIGA_SERIAL) { bash -c 'set -e; . amiga/env.sh; trap "$(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j4" EXIT; $(AMIGA_MAKE) -C amiga clean; $(AMIGA_MAKE) -C amiga -j4 SCENE_DESCENT_VERIFY=1 SKIP_TO_GAME=1; GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh' ; } && \
+	$(AMIGA_SERIAL) { bash -c 'set -e; . amiga/env.sh; trap "$(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga -j4" EXIT; $(AMIGA_MAKE) -C amiga clean; $(AMIGA_MAKE) -C amiga -j4 SCENE_DESCENT_VERIFY=1 SKIP_TO_GAME=1; MACHINE=$${MACHINE:-a1200-fast} GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh' ; } && \
 	{ python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-active-frame.bin build/amiga-gameplay-active-frame.png ; } && \
 	{ capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/active-XXXXXX); \
@@ -3589,7 +3589,7 @@ verify-amiga-gameplay-active-frame: build/capture-sdl-game
 .PHONY: verify-amiga-gameplay-gemhigh-frame
 verify-amiga-gameplay-gemhigh-frame: build/capture-sdl-game
 	$(AMIGA_SERIAL) { bash -c '. amiga/env.sh && $(AMIGA_MAKE) -C amiga clean && $(AMIGA_MAKE) -C amiga SCENE_VERIFY=1 GEMHIGH_VERIFY=1 SKIP_TO_GAME=1' ; } && \
-	{ bash -c '. amiga/env.sh && VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} GDB_SOURCE=verify_gameplay_gemhigh_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_GEMHIGH_FRAME_READY READY_DESCRIPTION="visible gem-high projectile" amiga/verify_startup.sh' ; } && \
+	{ bash -c '. amiga/env.sh && MACHINE=$${MACHINE:-a1200-fast} VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} GDB_SOURCE=verify_gameplay_gemhigh_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_GEMHIGH_FRAME_READY READY_DESCRIPTION="visible gem-high projectile" amiga/verify_startup.sh' ; } && \
 	{ python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-gemhigh-frame.bin build/amiga-gameplay-gemhigh-frame.png ; } && \
 	{ capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/gemhigh-XXXXXX); \

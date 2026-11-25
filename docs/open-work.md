@@ -167,15 +167,26 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     no outlines. Also seen: partly drawn gems beside `EMPTY!`. Seen with a
     `gemChunk`'s ten gems on the floor of a side room during gem high.
     Check first whether it predates the uncommitted 5 C row-restore queue.
-18. **Gameplay display checks do not run.** The six emulator pixel checks
+18. **Gameplay display checks fail.** The six emulator pixel checks
     (`verify-amiga-gameplay-frame`, `-active-frame`, `-laser-frame`,
-    `-gemhigh-frame`, `-ammo-frame`, `-recharge-frame`) fail at HEAD
-    0728994a. On `a1200-4m` the verification build does not fit (it exits
-    with "not enough memory" before the debugger attaches, seen as a
-    `vMustReplyEmpty` timeout). On `a1200-fast` the gem-high script reaches
-    landing (tick 164), then its third breakpoint fails with "Cannot
-    execute this command while the target is running". Make them run on
-    the target, or name the machine they need, before relying on them.
+    `-gemhigh-frame`, `-ammo-frame`, `-recharge-frame`) now run on
+    `a1200-fast`, like the terrain cache check: their verification builds
+    carry about 2.8 MB of reference state the 4 MB target cannot hold. Their
+    native raster and display-ring oracles pass. What fails:
+    - the comparison with the SDL host's frame (landing 324 differing
+      pixels, recharge 548, active 951, ammo 3,603, laser 3,605; the landing
+      frame's pinned checksum too). The host reference lacks world-1
+      features the Amiga has: the `levelNumber` title, landing dust and
+      particles, the landing pose, enemy positions, and the W1.4 shot (the
+      laser frame's camera x is 161 on the Amiga, 160 on the host). The
+      differences are the same with the polled blitter queue, so they
+      predate `d1b5dbda`;
+    - gem-high never reaches its capture (a visible gem-high shot after
+      the fixture's combo of 8 at landing), within 45 s or 240 s; the gdb
+      "target is running" message is the timeout's interrupt.
+    Decide what these checks compare against (native frames reviewed and
+    pinned, or a host reference brought up to the world-1 features), then
+    find why the gem-high fixture no longer reaches gem high.
 
 ### WM. Music (deferred)
 
