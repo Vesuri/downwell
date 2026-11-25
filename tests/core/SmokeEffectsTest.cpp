@@ -1,5 +1,8 @@
 #include "core/SmokeEffects.h"
 #include "core/GameMakerRandom.h"
+#include "core/SmokeEffect.h"
+#include "core/SmokeDirection.h"
+#include "core/SmokeTrig.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeBoxSmoke(downwell::SmokeEffects<32>& effects,downwell::MotionBinary64 x,
                     downwell::MotionBinary64 y,downwell::GameMakerRandom& random){
@@ -9,10 +12,12 @@ bool nativeBoxSmoke(downwell::SmokeEffects<32>& effects,downwell::MotionBinary64
 #include <vector>
 #include <cstdlib>
 #include <cstdio>
-static void check(bool ok){if(!ok)std::abort();}
+static void checkAt(bool ok,int line){if(!ok){std::fprintf(stderr,"Smoke owner check failed at line %d\n",line);std::abort();}}
+#define check(ok) checkAt((ok),__LINE__)
 static bool same(downwell::MotionBinary64 a,downwell::MotionBinary64 b){return a.high==b.high && a.low==b.low;}
 int main(){
     unsigned births=0;
+    long worst=0;unsigned pixelSteps=0,pixelDifferences=0,escapeDifferences=0;
     for(unsigned seed=0;seed<128;++seed)for(bool box:{false,true}){
         downwell::SmokeEffects<16> store;
         downwell::GameMakerRandom rng(seed),reference(seed);
@@ -39,7 +44,24 @@ int main(){
             for(unsigned i=0;i<count;++i){
                 const auto* actual=store.get(i+1);const auto& wanted=expected[i];
                 check(bool(actual)==!wanted.destroyRequested);
-                if(actual){++live;check(same(actual->xx,wanted.xx) && same(actual->yy,wanted.yy));
+                if(actual){++live;
+                    // Q16 motion against the VM form: positions within 1/64
+                    // pixel, published pixels at most one apart.
+                    downwell::Fixed16 x,y;std::int32_t px,py;
+                    check(downwell::Fixed16::fromBinary64(wanted.xx,x) && downwell::Fixed16::fromBinary64(wanted.yy,y));
+                    const long ex=std::labs(long(actual->xx)-x.v),ey=std::labs(long(actual->yy)-y.v);
+                    if(ex>worst)worst=ex;
+                    if(ey>worst)worst=ey;
+                    check(ex<=1024 && ey<=1024);
+                    check(wanted.x.promoted().roundPixel(px) && wanted.y.promoted().roundPixel(py));
+                    check(std::abs(actual->x-px)<=1 && std::abs(actual->y-py)<=1);
+                    ++pixelSteps;pixelDifferences+=(actual->x!=px)+(actual->y!=py);
+                    check(actual->allSet==wanted.allSet);
+                    // The escape test reads published pixels: only a pixel
+                    // that rounded the other way can move it by a tick.
+                    if(actual->noCollision!=wanted.noCollision){
+                        check(actual->x!=px||actual->y!=py);++escapeDifferences;
+                    }
                     check(actual->imageIndex.bits==wanted.imageIndex.bits && actual->imageSpeed.bits==wanted.imageSpeed.bits);}
             }
             check(store.size()==live && rng.drawCount()==reference.drawCount());
@@ -75,8 +97,8 @@ int main(){
     check(!queries);
     auto& smoke=*collisions.get(older);
     smoke.noCollision=false;
-    smoke.xx=downwell::MotionBinary64::fromInteger(999); // NOT the collision coordinate
-    const auto oldSpeed=smoke.speed,oldXsp=smoke.xsp,oldYsp=smoke.ysp;
+    smoke.xx=999*65536; // NOT the collision coordinate
+    const auto oldSpeed=smoke.speed;const auto oldXsp=smoke.xsp,oldYsp=smoke.ysp;
     const auto oldRate=smoke.imageSpeed.bits;
     const auto collisionDraws=rng.drawCount();
     auto expectedSpeed=oldSpeed;
@@ -87,11 +109,14 @@ int main(){
         ++queries;check(bounds.left==18 && bounds.right==22 && bounds.top==29 && bounds.bottom==32);
         return emit() && emit() && emit();
     }));
-    check(queries==1 && same(smoke.speed,expectedSpeed) && same(smoke.xsp,oldXsp) &&
-        same(smoke.ysp,oldYsp) && smoke.imageSpeed.bits==oldRate && rng.drawCount()==collisionDraws);
+    check(queries==1 && same(smoke.speed,expectedSpeed) && smoke.xsp==oldXsp &&
+        smoke.ysp==oldYsp && smoke.imageSpeed.bits==oldRate && rng.drawCount()==collisionDraws);
     check(!collisions.collideWalls(phase,[](auto,auto){return false;}));
     smoke.destroyRequested=true;
     check(collisions.collideWalls(phase,[](auto,auto){check(false);return true;}));
-    std::printf("Smoke owner: %u births, phase exclusion, retirement, capacity and stable reuse passed\n",births);
+    std::printf("Smoke owner: %u births, phase exclusion, retirement, capacity and stable reuse passed; "
+                "Q16 motion within %.5f px of the VM form, %u of %u published pixels differ by one, "
+                "%u escapes a tick apart\n",births,worst/65536.0,pixelDifferences,2*pixelSteps,escapeDifferences);
+    check(pixelDifferences*1000<2*pixelSteps && escapeDifferences*100<births);
 }
 #endif

@@ -829,7 +829,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             host.step(false);native.step(0);
             require(host.effectsSucceeded() && native.effectsSucceeded(),"live contact queries succeed");
             const auto& h=*hs.get(hh);const auto& n=*ns.get(nh);
-            require(h.speed.high==n.speed.high && h.speed.low==n.speed.low && h.x.bits==n.x.bits && h.y.bits==n.y.bits,
+            require(h.speed.high==n.speed.high && h.speed.low==n.speed.low && h.x==n.x && h.y==n.y,
                 "live decoded and native terrain collision responses agree bit-for-bit");
         }
         require(hs.get(hh)->speed.high!=initial.high || hs.get(hh)->speed.low!=initial.low,"live terrain contact changed speed");

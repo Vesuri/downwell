@@ -3,8 +3,14 @@
 #include "EffectMaskAssets.h"
 #include "EffectSurfacePlacement.h"
 #include "SmokeEffect.h"
+#include "SmokeParticle.h"
 
 namespace downwell {
+// A smoke effect's published position as reals.
+inline MotionBinary64 smokeRealX(const SmokeEffect& e){return e.x.promoted();}
+inline MotionBinary64 smokeRealY(const SmokeEffect& e){return e.y.promoted();}
+inline MotionBinary64 smokeRealX(const SmokeParticle& e){return MotionBinary64::fromInteger(e.x);}
+inline MotionBinary64 smokeRealY(const SmokeParticle& e){return MotionBinary64::fromInteger(e.y);}
 // Shared logical Draw preparation. The owner publishes the result at the
 // returned boundary, never treating direct fallback as a controller overlay.
 // Raster must implement the backend's verified coordinate sampling policy.
@@ -32,10 +38,10 @@ public:
         if(!assets.ready())return false;
         const bool direct=settings.death || settings.lowSpec;
         bool okay=true;
-        smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
+        smoke.visitNewest([&](std::uint32_t,const auto& effect){
             if(!okay || effect.destroyRequested)return;
             EffectSurfacePlacement::Draw draw;
-            okay=EffectSurfacePlacement::fx(effect.x.promoted(),effect.y.promoted(),view,
+            okay=EffectSurfacePlacement::fx(smokeRealX(effect),smokeRealY(effect),view,
                                             settings.death,settings.lowSpec,settings.effectsExist,draw);
             if(!okay || draw.target==EffectSurfacePlacement::hidden)return;
             if(draw.target==EffectSurfacePlacement::direct){

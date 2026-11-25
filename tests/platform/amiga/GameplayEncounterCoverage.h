@@ -12,6 +12,9 @@ struct GameplayEncounterCoverage {
     Counts maxima{},peak{};
     unsigned maxVisibleCurrency=0,visibleCurrencyFrame=0;
     unsigned peakTotal=0,peakFrame=0,denseFrames=0,longestDenseRun=0,denseRun=0;
+    // Q16 smoke publishes whole pixels; other effects binary32 positions.
+    static bool pixel(std::int32_t value,std::int32_t& out){out=value;return true;}
+    template<class Value> static bool pixel(Value value,std::int32_t& out){return value.promoted().roundPixel(out);}
     template<class World> bool sample(const World& game,unsigned frame) {
         Counts counts{};
         const int left=160+game.cameraOffsetX(),top=34+game.cameraOffsetY();
@@ -32,7 +35,7 @@ struct GameplayEncounterCoverage {
         const auto effect=[&](const auto& e,unsigned family){
             if(e.destroyRequested)return;
             std::int32_t x,y;
-            if(!e.x.promoted().roundPixel(x)||!e.y.promoted().roundPixel(y)){okay=false;return;}
+            if(!pixel(e.x,x)||!pixel(e.y,y)){okay=false;return;}
             if(inside(x,y))++counts[family];
         };
         game.smokeEffects().visitNewest([&](auto,const auto& e){effect(e,3);});

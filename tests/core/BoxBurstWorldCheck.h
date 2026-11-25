@@ -27,7 +27,7 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
             const auto& a=world.smokeEffects().slot(i);const auto& b=smoke.slot(i);
             assert(a.handle==b.handle);
             if(a.handle){
-                same64(a.effect.xx,b.effect.xx);same64(a.effect.yy,b.effect.yy);
+                assert(a.effect.xx==b.effect.xx&&a.effect.yy==b.effect.yy);
                 same64(a.effect.speed,b.effect.speed);same64(a.effect.direction,b.effect.direction);
                 assert(a.effect.imageSpeed.bits==b.effect.imageSpeed.bits);
                 assert(a.effect.imageIndex.bits==b.effect.imageIndex.bits);

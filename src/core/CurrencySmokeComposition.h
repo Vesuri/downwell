@@ -101,13 +101,12 @@ public:
             });
             }
             { DW_PROFILE_SCOPE(profileEffectSmoke);
-            smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
+            smoke.visitNewest([&](std::uint32_t,const auto& effect){
                 if(effect.destroyRequested)return;
                 // Step publishes rounded positions: those take the pixel path.
                 std::int32_t px,py;
-                if(EffectSpriteDraw::pixel(effect.x,px)&&EffectSpriteDraw::pixel(effect.y,py))
-                    add(assets.smoke(effect.drawFrame()),px,py);
-                else add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
+                if(smokePixels(effect,px,py))add(assets.smoke(effect.drawFrame()),px,py);
+                else add(assets.smoke(effect.drawFrame()),smokeRealX(effect),smokeRealY(effect));
             });
             }
             { DW_PROFILE_SCOPE(profileEffectDebris);
@@ -145,6 +144,10 @@ public:
         return true;
     }
 private:
+    static bool smokePixels(const SmokeParticle& e,std::int32_t& x,std::int32_t& y){x=e.x;y=e.y;return true;}
+    static bool smokePixels(const SmokeEffect& e,std::int32_t& x,std::int32_t& y){
+        return EffectSpriteDraw::pixel(e.x,x)&&EffectSpriteDraw::pixel(e.y,y);
+    }
     static constexpr bool pixel(MotionBinary64){return false;}
     static constexpr bool pixel(std::int32_t){return true;}
     static MotionBinary64 real(MotionBinary64 n){return n;}

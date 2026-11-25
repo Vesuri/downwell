@@ -1,8 +1,6 @@
 #ifndef DOWNWELL_CORE_SMOKE_EFFECTS_H
 #define DOWNWELL_CORE_SMOKE_EFFECTS_H
-#include "SmokeEffect.h"
-#include "SmokeDirection.h"
-#include "SmokeTrigNarrow.h"
+#include "SmokeParticle.h"
 #include "SkeletonEffectBursts.h"
 #include "EnemyContact.h"
 namespace downwell {
@@ -20,12 +18,12 @@ public:
         next_=sequence.next;return true;
     }
     struct Phase {Handle newest;};
-    struct Slot {Handle handle=0;SmokeEffect effect;};
+    struct Slot {Handle handle=0;SmokeParticle effect;};
     static constexpr unsigned capacity=Capacity;
     Phase beginPhase()const{return {next_?next_-1u:0xffffffffu};}
     unsigned size()const{return count_;}
     const Slot& slot(unsigned index)const{return slots_[index];}
-    SmokeEffect* get(Handle handle){
+    SmokeParticle* get(Handle handle){
         if(handle)for(unsigned i=0;i<count_;++i)if(slots_[order_[i]].handle==handle)return &slots_[order_[i]].effect;
         return nullptr;
     }
@@ -48,7 +46,7 @@ public:
     template<class Random> bool emitDirected(MotionBinary64 x,MotionBinary64 y,MotionBinary64 direction,
                                              MotionBinary64 speed,Random& random){
         const Handle h=create(x,y,random);
-        SmokeEffect* e=h?get(h):nullptr;
+        SmokeParticle* e=h?get(h):nullptr;
         if(!e)return false;
         e->direction=direction;e->speed=speed;return true;
     }
@@ -74,10 +72,7 @@ public:
         for(unsigned i=0;i<count_;++i){
             auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
-            if(!slot.effect.step(random,[](MotionBinary64 speed,MotionBinary64 angle,
-                                          MotionBinary64& x,MotionBinary64& y){
-                return SmokeDirection::vector(speed,angle,x,y,smokeTrigNarrowed);
-            }))return false;
+            if(!slot.effect.step(random))return false;
         }
         return true;
     }
@@ -99,9 +94,8 @@ public:
             auto& slot=slots_[order_[i]];
             auto& effect=slot.effect;
             if(slot.handle>phase.newest || effect.destroyRequested || effect.noCollision)continue;
-            std::int32_t x,y;
-            if(!effect.x.promoted().roundPixel(x) || !effect.y.promoted().roundPixel(y) ||
-               x<(-2147483647-1)+2 || x>2147483647-2 ||
+            const std::int32_t x=effect.x,y=effect.y;
+            if(x<(-2147483647-1)+2 || x>2147483647-2 ||
                y<(-2147483647-1)+1 || y>2147483647-2)return false;
             auto bounds=contactSpriteBounds(84);
             bounds.left+=x;bounds.right+=x;bounds.top+=y;bounds.bottom+=y;

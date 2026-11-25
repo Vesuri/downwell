@@ -42,7 +42,7 @@ int main(){
     world.step(0);assert(world.effectsSucceeded());equalRandom(world.randomState(),random);
     world.smokeEffects().visitNewest([&](auto handle,const auto& e){
         const auto* r=expected.get(handle);assert(r && e.allSet);
-        assert(e.xx.high==r->xx.high && e.xx.low==r->xx.low && e.yy.high==r->yy.high && e.yy.low==r->yy.low);
+        assert(e.xx==r->xx && e.yy==r->yy);
         assert(e.imageIndex.bits==r->imageIndex.bits && e.imageSpeed.bits==r->imageSpeed.bits);
     });
     for(unsigned i=0;i<100;++i)world.step(0);

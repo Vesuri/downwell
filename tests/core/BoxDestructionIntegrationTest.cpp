@@ -86,7 +86,10 @@ template<unsigned Capacity> static void run(unsigned seed,bool low,int area){
     const float smokeRate=float(smokeSpeed*(oracle.random(.13-.05)+.05));
     const double smokeDirection=oracle.random(359);
     const auto* smoke=ops.smokeOwner.get(1);assert(smoke);
-    equal(smoke->xx,double(float(smokeX)));equal(smoke->yy,double(float(smokeY)));
+    // The compact owner holds Q16 positions (W3 fixed point).
+    Fixed16 birthX,birthY;
+    assert(Fixed16::fromBinary64(real(double(float(smokeX))),birthX)&&smoke->xx==birthX.v);
+    assert(Fixed16::fromBinary64(real(double(float(smokeY))),birthY)&&smoke->yy==birthY.v);
     equal(smoke->speed,smokeSpeed);equal(smoke->direction,smokeDirection);
     equal(smoke->imageSpeed.promoted(),smokeRate);
     oracle.irandom(0);

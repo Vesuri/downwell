@@ -374,13 +374,16 @@ resets it; that is the first owner to find.
     Each owner keeps its VM form as a `...Reference` oracle compared in
     `make test-fixed-point`, and re-searches any sound route whose
     autopilot no longer survives (`DOWNWELL_SLICE_VARIANT`) without losing
-    route sound coverage. Done: steering `lengthdir`/`point_direction`.
+    route sound coverage. Done: steering `lengthdir`/`point_direction`;
+    the compact smoke owner's motion (`SmokeParticle`, Q16 position and
+    velocity, whole published pixels; the registered room path still runs
+    `SmokeEffect`).
     Converting at an owner's boundary pays only where trig dominates: for
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together: smoke (motion 3.2 ms per worst spray update, wall contacts
-    1.9), debris 3.9 (its fractional positions still take binary64 drawFx
+    together: smoke's animation (1.0-1.3 ms per worst spray update, binary32
+    timeline) and wall contacts (1.8), debris 3.9 (its fractional positions still take binary64 drawFx
     placement twice, 1.1 ms), corpses 3.2, then the steering enemies'
     stored state and `CheckCollisionWithScript`. Whole-pixel drawFx
     positions (smoke, corpses, rounded debris) already skip placement.

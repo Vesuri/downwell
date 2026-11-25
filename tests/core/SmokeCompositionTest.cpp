@@ -116,8 +116,8 @@ int main(int argc,char**argv){
                 gems([&](bool large,unsigned frame,MotionBinary64 x,MotionBinary64 y){
                     if(visible(value(x),value(y)))paint(*assets.currency(large,frame),value(x)-vx,value(y)-vy,false);
                 });
-                smoke.visitNewest([&](auto,const SmokeEffect& e){
-                    const double x=value(e.x.promoted()),y=value(e.y.promoted());
+                smoke.visitNewest([&](auto,const auto& e){
+                    const double x=value(smokeRealX(e)),y=value(smokeRealY(e));
                     if(!e.destroyRequested && visible(x,y))paint(*assets.smoke(e.drawFrame()),x-vx,y-vy,false);
                 });
                 assert(debris([&](const auto& asset,auto x,auto y){
@@ -135,8 +135,8 @@ int main(int argc,char**argv){
             });
             bool colorVisible=false;for(int pen:colorExpected)colorVisible|=pen>=0;
             assert(colorActual==colorExpected && colored.visible()==colorVisible && colored.directRequired()==direct);
-            smoke.visitNewest([&](auto,const SmokeEffect& e){
-                const double x=value(e.x.promoted()),y=value(e.y.promoted());
+            smoke.visitNewest([&](auto,const auto& e){
+                const double x=value(smokeRealX(e)),y=value(smokeRealY(e));
                 if(!e.destroyRequested && (direct || (settings.effectsExist && visible(x,y))))
                     stamp(*assets.smoke(e.drawFrame()),x-vx,y-vy,false);
             });
