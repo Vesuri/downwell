@@ -358,6 +358,43 @@ void downwellEffectSerialCensus(DownwellEffectBlit kind, unsigned long ticks)
     effectCurrent.serial[kind] += ticks;
 }
 #endif
+#ifdef DOWNWELL_BLIT_CENSUS
+#include "AmigaRenderer.h"
+// W3.15, parallel to gDownwellCensus, same index: every blit started in the
+// update (AmigaHardware), by kind (clear, copy, masked copy, masked copy with
+// background, line, fill, solid rectangle, combine, pattern), with its words
+// (width x height). A twin repeats the previous blit's kind and size one plane
+// further on: the second plane's blit of a non-interleaved bitmap, which one
+// interleaved blit would cover. twins[0]: the gameplay ring's plane stride,
+// [1]: the display/HUD plane stride, [2]: any other forward stride >= 2 KB.
+// queued: blits that waited in the queue for the CPU to start them.
+struct DownwellBlitCensusRecord {
+    ULONG words[9], twinWords[3];
+    UWORD blits[9], twins[3], queued, pad;
+};
+static_assert(sizeof(DownwellBlitCensusRecord) == 76, "blit census layout");
+extern "C" { DownwellBlitCensusRecord gDownwellBlitCensus[DOWNWELL_CENSUS_UPDATES]; }
+static DownwellBlitCensusRecord blitCurrent;
+static const unsigned char* blitLastDestination;
+static unsigned blitLastKind = ~0u;
+static UWORD blitLastSize;
+void downwellBlitStartCensus(unsigned kind, const void* destination, UWORD size, bool queued)
+{
+    const unsigned height = (size >> 6) ? (size >> 6) : 1024, width = (size & 63) ? (size & 63) : 64;
+    const ULONG words = static_cast<ULONG>(height) * width;
+    ++blitCurrent.blits[kind];
+    blitCurrent.words[kind] += words;
+    if (queued) ++blitCurrent.queued;
+    const unsigned char* target = static_cast<const unsigned char*>(destination);
+    if (kind == blitLastKind && size == blitLastSize && target > blitLastDestination) {
+        const unsigned long stride = static_cast<unsigned long>(target - blitLastDestination);
+        const int twin = stride == downwellGameRingPlaneBytes ? 0 : stride == downwellPlaneBytes ? 1 :
+            stride >= 2048 ? 2 : -1;
+        if (twin >= 0) { ++blitCurrent.twins[twin]; blitCurrent.twinWords[twin] += words; }
+    }
+    blitLastKind = kind; blitLastSize = size; blitLastDestination = target;
+}
+#endif
 static void censusWait(bool begin)
 {
     if (begin) {
@@ -391,6 +428,10 @@ void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool ov
         gDownwellEffectCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = effectCurrent;
         __asm__ volatile("" :: "g"(gDownwellEffectCensus) : "memory");
 #endif
+#ifdef DOWNWELL_BLIT_CENSUS
+        gDownwellBlitCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = blitCurrent;
+        __asm__ volatile("" :: "g"(gDownwellBlitCensus) : "memory");
+#endif
         ++gDownwellCensusCount;
         // Only the debugger reads the ring: keep its stores, and keep the
         // ring and its constants through section GC.
@@ -407,6 +448,9 @@ void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool ov
 #ifdef DOWNWELL_EFFECT_BLIT_CENSUS
     effectCurrent = DownwellEffectCensusRecord();
     effectStamped = false;
+#endif
+#ifdef DOWNWELL_BLIT_CENSUS
+    blitCurrent = DownwellBlitCensusRecord();
 #endif
     censusCameraX = cameraX;
     censusCurrent.scene = static_cast<UBYTE>(scene);

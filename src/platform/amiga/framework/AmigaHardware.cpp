@@ -9,6 +9,13 @@
 #include "CopperList.h"
 #include "Sprite.h"
 #include "Palette.h"
+#ifdef DOWNWELL_BLIT_CENSUS
+// W3.15: every blit start, for the per-update census (AmigaProfile.cpp).
+void downwellBlitStartCensus(unsigned kind, const void* destination, uint16_t size, bool queued);
+#define BLIT_CENSUS(kind, destination, size, queued) downwellBlitStartCensus(kind, destination, size, queued)
+#else
+#define BLIT_CENSUS(kind, destination, size, queued) ((void)0)
+#endif
 #ifndef ASSEMBLER
 #include <proto/exec.h>   // Supervisor(), for getVBR() (GCC build only)
 #endif
@@ -188,6 +195,7 @@ void AmigaHardware::blitterClear(uint16_t* data, uint16_t width, uint16_t height
         *bltcon0Pointer = BC0F_DEST;
         *bltdmodPointer = modulo;
         *bltdptPointer = data;
+        BLIT_CENSUS(0, data, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -211,6 +219,7 @@ void AmigaHardware::blitterClear(uint16_t* data, uint16_t width, uint16_t height
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(data) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)data);
+        BLIT_CENSUS(0, data, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;
@@ -232,6 +241,7 @@ void AmigaHardware::blitterCopy(uint16_t* source, uint16_t* destination, uint16_
         *bltaptPointer = source;
         *bltbdatPointer = mask;
         *bltdptPointer = destination;
+        BLIT_CENSUS(1, destination, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -263,6 +273,7 @@ void AmigaHardware::blitterCopy(uint16_t* source, uint16_t* destination, uint16_
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)destination);
+        BLIT_CENSUS(1, destination, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;
@@ -305,6 +316,7 @@ void AmigaHardware::blitterCopyWithMaskOperation(uint16_t* source, uint16_t* des
         *bltbptPointer = mask;
         *bltcptPointer = destination;
         *bltdptPointer = destination;
+        BLIT_CENSUS(2, destination, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -346,6 +358,7 @@ void AmigaHardware::blitterCopyWithMaskOperation(uint16_t* source, uint16_t* des
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)destination);
+        BLIT_CENSUS(2, destination, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;
@@ -383,6 +396,7 @@ void AmigaHardware::blitterCopyWithMaskBackgroundOperation(uint16_t* source, uin
         *bltbptPointer = mask;
         *bltcptPointer = background;
         *bltdptPointer = destination;
+        BLIT_CENSUS(3, destination, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -424,6 +438,7 @@ void AmigaHardware::blitterCopyWithMaskBackgroundOperation(uint16_t* source, uin
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)destination);
+        BLIT_CENSUS(3, destination, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;
@@ -499,6 +514,7 @@ void AmigaHardware::blitterLine(uint16_t* data, uint16_t x1, uint16_t y1, uint16
         *bltcon1Pointer = bltcon1Value;
         *bltcptPointer = firstWord;
         *bltdptPointer = firstWord;
+        BLIT_CENSUS(4, firstWord, (uint16_t)((dy << 6) | 2), false);
         *bltsizePointer = (uint16_t)((dy << 6) | 2);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -543,6 +559,7 @@ void AmigaHardware::blitterLine(uint16_t* data, uint16_t x1, uint16_t y1, uint16
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(firstWord) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)firstWord);
+        BLIT_CENSUS(4, firstWord, (uint16_t)((dy << 6) | 2), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((dy << 6) | 2);
         hasQueuedBlits = true;
@@ -562,6 +579,7 @@ void AmigaHardware::blitterFill(uint16_t* data, uint16_t width, uint16_t height,
         *bltdmodPointer = modulo;
         *bltaptPointer = data;
         *bltdptPointer = data;
+        BLIT_CENSUS(5, data, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -591,6 +609,7 @@ void AmigaHardware::blitterFill(uint16_t* data, uint16_t width, uint16_t height,
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(data) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)data);
+        BLIT_CENSUS(5, data, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;
@@ -613,6 +632,7 @@ void AmigaHardware::blitterSolidRect(uint16_t* destination, uint16_t widthWords,
     *bltdmodPointer = modulo;
     *bltcptPointer = destination;
     *bltdptPointer = destination;
+    BLIT_CENSUS(6, destination, (uint16_t)((height << 6) | widthWords), false);
     *bltsizePointer = (uint16_t)((height << 6) | widthWords);
 }
 
@@ -817,6 +837,7 @@ void AmigaHardware::blitterCombineWithMask(uint16_t* background, uint16_t* sourc
         *bltbptPointer = mask;
         *bltcptPointer = background;
         *bltdptPointer = destination;
+        BLIT_CENSUS(7, destination, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -863,6 +884,7 @@ void AmigaHardware::blitterCombineWithMask(uint16_t* background, uint16_t* sourc
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)destination);
+        BLIT_CENSUS(7, destination, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;
@@ -892,6 +914,7 @@ void AmigaHardware::blitterPatternWithMask(uint16_t pattern, uint16_t* destinati
         *bltaptPointer = mask;
         *bltcptPointer = destination;
         *bltdptPointer = destination;
+        BLIT_CENSUS(8, destination, (uint16_t)((height << 6) | width), false);
         *bltsizePointer = (uint16_t)((height << 6) | width);
 #ifdef DEBUG
         *color00Pointer = 0xf00;
@@ -929,6 +952,7 @@ void AmigaHardware::blitterPatternWithMask(uint16_t pattern, uint16_t* destinati
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);
         *blitterQueueAddPosition++ = bltdptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)destination);
+        BLIT_CENSUS(8, destination, (uint16_t)((height << 6) | width), true);
         *blitterQueueAddPosition++ = bltsize;
         *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
         hasQueuedBlits = true;

@@ -395,10 +395,24 @@ resets it; that is the first owner to find.
     pens (the cause of the ammo-label red box, fixed only for that label in
     be0576d6). Interleaved, one blit covers both planes and a top-to-bottom
     copy finishes each row in both planes before the next.
-    Stages, each committed with its own evidence:
-    - Measure first: blits per gameplay update by kind and the fixed cost
-      per blit (queue entry, setup, interrupt) on the target, to state the
-      expected saving.
+    Measured (stage 1, `BLIT_CENSUS=1`, a1200-4m, ROUTE_END_TICK=700):
+    - world-one gameplay: 13.7 blits per update, 4.4 of them per-plane
+      twins (4.3 on the PF1 ring, 0.1 on the HUD); camera jumps 20.8 and
+      7.5; the worst update (85.9 ms) has 8 blits, 4 twins.
+    - spray gameplay: 28.6 blits, 6.2 twins (6.0 ring); camera jumps 30.9
+      and 8.1; the worst update (100.5 ms) has 40 blits, 7 twins. Most
+      masked copies are effect stamps, already one blit per stamp.
+    - CPU cost per blit issued (trace spray-561, 8567d702): 3.29 ms per
+      update for about 36 blits, about 1,300 cycles (0.09 ms) each, Chip
+      register waits included. The queue is polled (the blitter interrupt
+      stays off), so a queued blit also waits for the CPU's next poll.
+    - Expected saving from merging twins: 0.4 ms per world-one update,
+      0.6 ms per spray update (under 1.5%), plus the per-plane wrapper
+      calls. The same words move either way.
+    The HUD's mixed-pen frames come from CPU writes (plane-major word
+    strips), not blits: row-major writes fix them with or without
+    interleaving.
+    Remaining stages, each committed with its own evidence:
     - PF2 HUD: the HUD composers, prepared HUD text, health and ammo tables
       (`generate-amiga-health-art`, `install-data/derived_hud`), BPL2MOD.
     - PF1 gameplay: backing and both rings, the row tracking and restore,

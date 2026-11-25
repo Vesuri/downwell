@@ -276,6 +276,12 @@ copy's words, the CPU's waits for the effect queue, and the time from the
 first stamp to the end of the first wait. `EFFECT_BLIT_CENSUS=2` also
 drains around each effect blit and times it alone; its update totals no
 longer describe the overlapped game.
+`BLIT_CENSUS=1` (with the census) adds a ring of every blit started per
+update (`AmigaHardware`), dumped to `blit-census.bin` in the census output:
+counts and words by kind, the queued ones, and the per-plane twins (a blit
+repeating the previous one's kind and size one plane stride further on,
+which one interleaved blit would cover). Read it with
+`tools/amiga-blit-census-report.py CENSUS_DIR`.
 Without the census,
 `ROUTE_TRACE=N` records `ROUTE_TRACE_FIELDS` (default 20) whole fields of
 every instruction from the input sample of gameplay update N-1 into

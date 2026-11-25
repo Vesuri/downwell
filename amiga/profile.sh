@@ -223,7 +223,7 @@ if [[ $census == 1 ]]; then
       echo "$script has no ready marker to read the census at" >&2; exit 1; }
     script=.run/census/profile.gdb
   fi
-  rm -f .run/census.bin
+  rm -f .run/census.bin .run/blit-census.bin
 elif [[ $mode == route && -z ${ROUTE_TRACE:-} ]]; then
   echo "route measures nothing without CENSUS=1 or ROUTE_TRACE (tools/verify-world-one-native.py replays it)" >&2
   exit 1
@@ -290,7 +290,7 @@ restore() {
   unset REFERENCE_HUD_BORDER_EXTENT
   unset REFERENCE_CONTACT_MOTION
   unset REFERENCE_CONTACT_COORDINATES
-  unset REFERENCE_CELL_REPAIR CELL_REPAIR_VERIFY EFFECT_BLIT_CENSUS EFFECT_CLEAR_VERIFY EFFECT_PIXEL_VERIFY
+  unset REFERENCE_CELL_REPAIR CELL_REPAIR_VERIFY EFFECT_BLIT_CENSUS BLIT_CENSUS EFFECT_CLEAR_VERIFY EFFECT_PIXEL_VERIFY
   unset REFERENCE_ENEMY_ALARM_ROSTER
   unset DRAW_CACHE_AUDIT
   unset DRAW_ORDER_AUDIT
@@ -350,6 +350,7 @@ if [[ $census == 1 ]]; then
   cp .run/census.bin "$census_out/census.bin"
   cp ".run/profile-${mode}.log" "$census_out/capture.log"
   cp out/Downwell.elf "$census_out/Downwell.elf"
+  [[ ${BLIT_CENSUS:-0} != 1 ]] || cp .run/blit-census.bin "$census_out/blit-census.bin"
   python3 ../tools/amiga-census-report.py "$census_out/census.bin" "$census_out/capture.log" \
     --list=over --json="$census_out/census.json" | tee "$census_out/census.txt"
   echo "Census: $census_out"

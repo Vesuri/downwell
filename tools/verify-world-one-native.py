@@ -114,6 +114,9 @@ def main():
             if os.environ.get('EFFECT_BLIT_CENSUS') in ('1','2'):
                 # Section 5 C: the parallel effect-blit ring, same indices.
                 checked('dump binary memory .run/effect-census.bin &gDownwellEffectCensus[0] &gDownwellEffectCensus[gDownwellCensusCapacity]')
+            if os.environ.get('BLIT_CENSUS')=='1':
+                # W3.15: every blit started, same indices.
+                checked('dump binary memory .run/blit-census.bin &gDownwellBlitCensus[0] &gDownwellBlitCensus[gDownwellCensusCapacity]')
         seenSerials=set()
         nativeStarts={}
         # DOWNWELL_MEMORY_SAMPLE=1 (WR.1): the free bytes of every exec
