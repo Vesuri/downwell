@@ -7,6 +7,7 @@
 #include "ContactDamageScripts.h"
 #include "SmokeDirection.h"
 #include "SmokeTrigNarrow.h"
+#include "FixedPoint.h"
 namespace downwell {
 // enmWhiteJelly Step_0. Operations are synchronous checked owner boundaries:
 // meeting must query the caller's current mask against the selected target;
@@ -16,9 +17,16 @@ struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
     ContactDamageScripts damageScripts;
     // Source movesp starts at .2, rises only toward maxsp <= .8 and is
     // assigned 3 on a hit. Direction is read back from its builtin setter.
-    // Reuse the recovered lengthdir wrappers, not host libm or steering LUTs.
+    // lengthdir in Q16 fixed point (FixedPoint.h), not the VM's binary64.
     static bool movementComponent(bool vertical,Real speed,Real direction,Real& output){
-        // component narrows the trig double at once: take that binary32.
+        Fixed16 length,angle;
+        if(!Fixed16::fromBinary64(speed,length)||length.v<0||length.v>3*65536||
+            !Fixed16::fromBinary64(direction,angle)||angle.v<0||angle.v>360*65536)return false;
+        output=Fixed16::raw(FixedTrig::lengthdir(vertical,length.v,angle.v)).binary64();return true;
+    }
+    // movementComponent's VM-exact binary64/binary32 form, kept as the
+    // reference its fixed-point replacement is compared with.
+    static bool movementComponentReference(bool vertical,Real speed,Real direction,Real& output){
         RunnerImageValue length,angle,radians,trig;Real component;
         if(!length.assign(speed)||length.bits>0x40400000u||!angle.assign(direction)||
             ((angle.bits&0x80000000u)&&(angle.bits&0x7fffffffu))||

@@ -59,8 +59,8 @@ int main(){
             for(N speed:{N{0x3fc99999u,0x9999999au},N{0x3fe99999u,0x9999999au},N::fromInteger(3)}){
                 N x,y,actualX,actualY;
                 assert(downwell::SmokeDirection::vector(speed,scaled,x,y,downwell::smokeTrig));
-                assert(S::movementComponent(false,speed,scaled,actualX)&&same(x,actualX));
-                assert(S::movementComponent(true,speed,scaled,actualY)&&same(y,actualY));
+                assert(S::movementComponentReference(false,speed,scaled,actualX)&&same(x,actualX));
+                assert(S::movementComponentReference(true,speed,scaled,actualY)&&same(y,actualY));
             }
         }
         N out=N::fromInteger(99);

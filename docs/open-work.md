@@ -365,6 +365,21 @@ resets it; that is the first owner to find.
       tenths of its velocity to place its puff;
     - the 1-HP flicker: four RNG words and two BOBs on 7 Draws in 51;
     - shop speech: up to ten glyph BOBs per rising text.
+    **Fixed point instead of binary64 (decided 2026-11-25).** Core's
+    software binary64 (`MotionBinary64`, `RunnerImageValue` arithmetic,
+    binary64 trig) costs about 14 ms of a worst spray update. Replace it
+    owner by owner with `FixedPoint.h` (Q16.16, table trig), hottest first.
+    Bit-exact VM agreement is given up (about 1e-4 px per lengthdir,
+    0.002 degrees per point_direction); host and Amiga still share core.
+    Each owner keeps its VM form as a `...Reference` oracle compared in
+    `make test-fixed-point`, and re-searches any sound route whose
+    autopilot no longer survives (`DOWNWELL_SLICE_VARIANT`) without losing
+    route sound coverage. Done: steering `lengthdir`/`point_direction`.
+    Next, by the spray trace (ms per worst update): debris steps 3.9,
+    smoke motion 3.2, corpses 3.2, effect placement (`EffectSurfacePlacement::fx`)
+    3.7, the wall probe and comparisons in `CheckCollisionWithScript` and
+    `compareRunnerReal`, then the stored state itself (positions and speeds
+    held as Q16, no boundary conversions).
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,
     level transitions and shop re-entry, the clear and upgrade screens,
@@ -380,7 +395,7 @@ resets it; that is the first owner to find.
       50,022 VBlank fields, and the census spans sum to 50,117;
     - the upgrade routes that add per-update work (`UPGRADE_ROUTES`: Hot
       Casing `upgrade-8-v17`, Heart Balloon `upgrade-15-v2`, Gunpowder and
-      Drone `upgrade-5-9-v96`, Rocket Jump `upgrade-0-18-v58`, the laser
+      Drone `upgrade-5-9-v53`, Rocket Jump `upgrade-0-18-v58`, the laser
       `upgrade-12-v155`);
     - side rooms, which no census tape reaches: a torch room, a `pTimeStop`
       field and gem high with a `gemChunk`'s gems on screen. Room speed 30

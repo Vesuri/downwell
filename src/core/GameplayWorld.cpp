@@ -2416,8 +2416,14 @@ struct GameplayWorld::SteeringOps {
         if(world.balloonHeld()){value=Real::fromInteger(world.balloon_.y);return true;}
         return player(true,value);
     }
+    // point_direction in Q16 fixed point (FixedPoint.h), not the VM's
+    // binary32/binary64 wrapper.
     bool pointDirection(Real x,Real y,Real targetX,Real targetY,Real& value){
-        return downwell::RunnerPointDirection::evaluate(x,y,targetX,targetY,value,downwell::narrowAtan);
+        downwell::Fixed16 ax,ay,bx,by;
+        if(!downwell::Fixed16::fromBinary64(x,ax)||!downwell::Fixed16::fromBinary64(y,ay)||
+            !downwell::Fixed16::fromBinary64(targetX,bx)||!downwell::Fixed16::fromBinary64(targetY,by))return false;
+        value=downwell::Fixed16::raw(downwell::FixedTrig::pointDirection(bx.v-ax.v,by.v-ay.v)).binary64();
+        return true;
     }
     bool direction(Real wanted,Real& accepted){
         Image value;if(!downwell::RunnerDirectionValue::normalize(wanted,value))return false;
