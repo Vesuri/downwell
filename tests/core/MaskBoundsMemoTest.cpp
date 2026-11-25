@@ -59,5 +59,27 @@ int main(){
     }
     assert(collisions==20000);
     assert(failures>0&&total>0);
+    // calculateMask's binary32 shortcut against its reference: whole and
+    // fractional positions, signs, binade edges, NaN-free random bits.
+    unsigned shortcut=0;
+    for(unsigned i=0;i<3000000;++i){
+        const int mask=masks[next()%9];
+        double x,y;
+        switch(next()%4){
+        case 0:x=double(int(next()%40000)-200)+double(next()%65536)/65536.0;break;
+        case 1:x=double(1u<<(next()%23))-double(next()%8)/8.0;break;
+        case 2:x=double(next()%64)/double(1+next()%64);break;
+        default:{std::uint64_t b=(std::uint64_t(next())<<32)|next();b&=~(std::uint64_t(0x7ff)<<52);
+                 b|=std::uint64_t(1000+next()%40)<<52;std::memcpy(&x,&b,8);}
+        }
+        y=next()%7?double(next()%30000)+double(next()%4096)/4096.0:-double(next()%16)/4.0;
+        const auto kx=number(x),ky=number(y);
+        ContactBounds a{},b{};
+        const bool ra=CurrencyCollisionBounds::calculateMask(mask,kx,ky,a),
+                   rb=CurrencyCollisionBounds::calculateMaskReference(mask,kx,ky,b);
+        assert(ra==rb);
+        if(ra){assert(a.left==b.left&&a.right==b.right&&a.top==b.top&&a.bottom==b.bottom);++shortcut;}
+    }
+    std::printf("calculateMask shortcut: %u bounds equal the binary32 reference\n",shortcut);
     std::printf("Mask bounds memo: %u bounds equal calculateMask (%u failures passed through), %u colliding keys with different bounds\n",total,failures,collisions);
 }

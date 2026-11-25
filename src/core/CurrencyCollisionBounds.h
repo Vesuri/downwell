@@ -13,6 +13,38 @@ struct CurrencyCollisionBounds {
     // Any verified unrotated, unit-scale rectangle mask (spawner and
     // steering-family place_meeting queries use 153, 174 and 702).
     static bool calculateMask(int sprite,MotionBinary64 x,MotionBinary64 y,ContactBounds& out){
+        const auto local=contactSpriteBounds(sprite);
+        RunnerImageValue px,py;
+        if(local.left<local.right&&local.top<local.bottom&&px.assign(x)&&py.assign(y)){
+            ContactBounds next;
+            if(pixelAxis(local.left,local.right-1,px,next.left,next.right)&&
+               pixelAxis(local.top,local.bottom-1,py,next.top,next.bottom)){out=next;return true;}
+        }
+        return calculateMaskReference(sprite,x,y,out);
+    }
+    // unitIntegerAxis's rounded edges for a non-negative position p =
+    // s * 2^-k (k 2..23) whose sums with the margins stay in [0, 2^24) at
+    // that scale: every binary32 add is then exact, and each edge is the
+    // sum rounded to a pixel (halves to even). False (nothing written)
+    // elsewhere: calculateMaskReference decides those.
+    static bool pixelAxis(std::int32_t low,std::int32_t high,RunnerImageValue p,int& near,int& far){
+        const unsigned field=p.bits>>23; // sign bit set: refused below
+        if(field<127||field>148||low<-(1<<7)||high>=(1<<7))return false;
+        const unsigned k=150-field;
+        const std::int64_t s=std::int64_t((p.bits&0x7fffffu)|0x800000u);
+        const std::int64_t first=s+(std::int64_t(low)<<k),second=first+(std::int64_t(high-low+1)<<k);
+        if(first<0||second>=(std::int64_t(1)<<24))return false;
+        const auto round=[k](std::int64_t sum){
+            std::int64_t whole=sum>>k;
+            const std::int64_t rest=sum&((std::int64_t(1)<<k)-1),half=std::int64_t(1)<<(k-1);
+            if(rest>half||(rest==half&&(whole&1)))++whole;
+            return int(whole);
+        };
+        near=round(first);far=round(second);
+        return true;
+    }
+    // The binary32 bounds as the runner computes them; calculateMask's oracle.
+    static bool calculateMaskReference(int sprite,MotionBinary64 x,MotionBinary64 y,ContactBounds& out){
         RunnerImageValue px,py;RunnerSpriteBounds::Box margins,edges;
         const auto local=contactSpriteBounds(sprite);
         if(local.left>=local.right||local.top>=local.bottom)return false;
