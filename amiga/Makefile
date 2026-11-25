@@ -995,8 +995,11 @@ knobs:
 .PHONY: FORCE_HUNK_OPTIONS
 # Audit even an up-to-date ELF: a rejected link remains on disk, and a
 # subsequent make must not publish it merely because linking is now skipped.
+# $(OUT).defines records the build's defines: run.sh snapshots only a
+# playable build, never one a check or profile run left behind.
 $(OUT).exe: $(OUT).elf FORCE_HUNK_OPTIONS | audit
 	@mkdir -p $(@D)
+	@printf '%s\n' $(filter -D%,$(CFLAGS)) > $(OUT).defines
 	@printf '%s\n' '$(STRIP)' > $(OUT).hunk-options.tmp
 	@if [ ! -f $@ ] || [ $< -nt $@ ] || ! cmp -s $(OUT).hunk-options.tmp $(OUT).hunk-options; then \
 		elf2hunk $< $@ $(if $(filter 1,$(STRIP)),-s) && \

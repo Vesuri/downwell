@@ -32,19 +32,29 @@ else
   EXE="$RUN/build/Downwell.exe"
   mkdir -p "$RUN/build" ../tmp
   exec 9>>../tmp/amiga.lock
-  if python3 ../tools/hold-lock.py 9 --try; then
-    if [ -f out/Downwell.exe ]; then
-      for part in $PARTS; do cp -f "out/Downwell.$part" "$RUN/build/Downwell.$part.new"; done
-      for part in $PARTS; do mv -f "$RUN/build/Downwell.$part.new" "$RUN/build/Downwell.$part"; done
-    fi
-  elif [ -f "$EXE" ]; then
-    echo "a check is rebuilding out/; running this instance's snapshot from $(date -r "$EXE" '+%Y-%m-%d %H:%M')"
+  # Development-only defines (amiga-knobs.py's verify, profile, reference
+  # and development sets): such a build needs more memory than the target.
+  development='_VERIFY$|_AUDIT$|CENSUS|PROBE|FPSCOUNT|PROFILE_|PHASE_SAMPLING|GENERATION_|TRACE_FRAMES|FRAME_DUMP|SAMPLE_FRAME|REFERENCE_|COLLISION_OWNER|SCENE_COLLISION_BACKEND|FRAME_WORK_CANDIDATE|SKIP_'
+  why=""
+  if ! python3 ../tools/hold-lock.py 9 --try; then
+    why="a check is rebuilding out/"
+  elif [ ! -f out/Downwell.exe ] || [ ! -f out/Downwell.defines ]; then
+    why="out/ has no recorded build"
+  elif found=$(sed 's/=.*//' out/Downwell.defines | grep -E -m1 -- "$development"); then
+    why="out/ holds a development build (${found#-D})"
   else
-    echo "a check is rebuilding out/ and this instance has no snapshot yet; try again when it finishes"
-    exit 1
+    for part in $PARTS; do cp -f "out/Downwell.$part" "$RUN/build/Downwell.$part.new"; done
+    for part in $PARTS; do mv -f "$RUN/build/Downwell.$part.new" "$RUN/build/Downwell.$part"; done
+  fi
+  if [ -n "$why" ]; then
+    if [ -f "$EXE" ]; then
+      echo "$why; running this instance's snapshot from $(date -r "$EXE" '+%Y-%m-%d %H:%M')"
+    else
+      echo "$why and this instance has no playable snapshot yet: build one with 'make -C amiga' when no check is running"
+      exit 1
+    fi
   fi
   exec 9>&-
-  [ -f "$EXE" ] || { echo "not found: out/Downwell.exe (build first)"; exit 1; }
 fi
 
 DH0="$RUN/dh0"
