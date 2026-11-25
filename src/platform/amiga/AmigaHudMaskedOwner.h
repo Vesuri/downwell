@@ -9,7 +9,16 @@
 // non-zero pen; HUD art masks already exclude pen 0.
 struct AmigaHudMaskedOwner {
     bool begin(int x, int y, unsigned words, unsigned rows) {
-        return amigaHudStageBegin(&stage_, x, y, words, rows) != 0;
+        composed_ = amigaHudStageBegin(&stage_, x, y, words, rows) != 0;
+        return composed_;
+    }
+    // Republish the last composed stage at row y without composing it
+    // again: false once a publish folded an erase into it (mergeErase), or
+    // before anything was composed.
+    bool move(int y) {
+        if (!composed_) return false;
+        stage_.y = y;
+        return true;
     }
     AmigaHudStage* stage() { return &stage_; }
     // Publish the composed stage. fresh: the region was just repainted by
@@ -44,6 +53,7 @@ private:
         amigaRendererPublishHudStage(renderer, &erase_, nullptr);
     }
     void mergeErase() {
+        composed_ = false;
         for (unsigned r = 0; r < rows_; ++r)
             for (unsigned w = 0; w < words_; ++w) {
                 const UWORD old = UWORD(shown_[r][w] & ~stage_.mask[r][w]);
@@ -55,7 +65,7 @@ private:
     }
     AmigaHudStage stage_, erase_;
     UWORD shown_[amigaHudStageRows][amigaHudStageWords] = {};
-    bool published_ = false;
+    bool published_ = false, composed_ = false;
     int x_ = 0, y_ = 0;
     unsigned words_ = 0, rows_ = 0;
 };

@@ -132,6 +132,12 @@ int amigaHudStageBegin(AmigaHudStage*, int x, int y, unsigned words, unsigned ro
 int amigaHudStageFill(AmigaHudStage*, int x, int y, int width, int height, unsigned pen);
 /* pen < 0 keeps source colours, as amigaRendererDrawAsset; otherwise as DrawAssetPen. */
 int amigaHudStagePlace(AmigaHudStage*, const AmigaHudArt*, int anchorX, int anchorY, int pen);
+/* scrGemmyText's five layers of a string, each glyph i at anchorX + advance*i:
+   pen 2 at (-1,0) and (0,-1), pen 3 at (1,0) and (0,1), then pen 1 at (0,0).
+   The same result as those 5*count amigaHudStagePlace calls (any layer
+   outside the stage returns 0 and writes nothing), with each glyph read once. */
+int amigaHudStageGemmyText(AmigaHudStage*, const AmigaHudArt* const* glyphs, unsigned count,
+                           int anchorX, int anchorY, int advance);
 /* Publish stage, with overlay (same x, its own rows; may be null) on top. */
 void amigaRendererPublishHudStage(AmigaRenderer*, const AmigaHudStage*, const AmigaHudStage*);
 int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);

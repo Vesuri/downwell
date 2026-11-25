@@ -1221,6 +1221,69 @@ int amigaHudStagePlace(AmigaHudStage* stage, const AmigaHudArt* art,
     return 1;
 }
 
+int amigaHudStageGemmyText(AmigaHudStage* stage, const AmigaHudArt* const* glyphs, unsigned count,
+                           int anchorX, int anchorY, int advance) {
+    /* The string's silhouette with a one-row, one-word border, in stage
+       rows and words offset by one. Every layer's pen is constant, so the
+       last layer covering a pixel decides it: white over black over red. */
+    UWORD silhouette[amigaHudStageRows + 2][amigaHudStageWords + 2];
+    int top = 0x7fff, bottom = -1, left = 0x7fff, right = -1, row, word;
+    unsigned i;
+    if (!count) return 1;
+    for (i = 0; i < count; ++i) {
+        const AmigaHudArt* art = glyphs[i];
+        const int x = anchorX + advance * (int)i + art->left - stage->x, y = anchorY + art->top - stage->y;
+        if (x - 1 < 0 || y - 1 < 0 || x + 1 + (int)art->width > (int)stage->words*16 ||
+            y + 1 + (int)art->height > (int)stage->rows) return 0;
+        if (y < top) top = y;
+        if (y + (int)art->height > bottom) bottom = y + (int)art->height;
+        if (x < left) left = x;
+        if (x + (int)art->width > right) right = x + (int)art->width;
+    }
+    /* Layers reach stage rows top-1 .. bottom and words first .. last, all
+       inside the stage; each reads its neighbours, silhouette entries
+       [top-1 .. bottom+2][first .. last+2]. */
+    {
+        const int first = (left - 1) >> 4, last = right >> 4;
+        for (row = top - 1; row <= bottom + 2; ++row)
+            for (word = first; word <= last + 2; ++word) silhouette[row][word] = 0;
+        for (i = 0; i < count; ++i) {
+            const AmigaHudArt* art = glyphs[i];
+            const int x = anchorX + advance * (int)i + art->left - stage->x, y = anchorY + art->top - stage->y;
+            const unsigned shift = (unsigned)x & 15, sourceWords = art->planeBytes >> 1;
+            const ULONG planeBytes = (ULONG)(UWORD)art->planeBytes * (UWORD)art->height;
+            unsigned r, w;
+            for (r = 0; r < art->height; ++r) {
+                const UBYTE* source = art->data + r * art->planeBytes;
+                UWORD* target = &silhouette[y + (int)r + 1][(x >> 4) + 1];
+                for (w = 0; w < sourceWords; ++w) {
+                    ULONG mask = readWord(source + w*2) | readWord(source + planeBytes + w*2);
+                    if (w*16 + 16 > art->width) {
+                        const unsigned visible = art->width > w*16 ? art->width - w*16 : 0;
+                        mask &= visible ? (UWORD)(0xffffu << (16 - visible)) : 0;
+                    }
+                    mask <<= 16 - shift;
+                    if (mask >> 16) target[w] |= (UWORD)(mask >> 16);
+                    if ((UWORD)mask) target[w + 1] |= (UWORD)mask;
+                }
+            }
+        }
+        for (row = top - 1; row <= bottom; ++row)
+            for (word = first; word <= last; ++word) {
+                const UWORD* line = silhouette[row + 1];
+                const UWORD white = line[word + 1];
+                const UWORD fromRight = (UWORD)((white << 1) | (line[word + 2] >> 15)); /* drawn at x-1 */
+                const UWORD fromLeft = (UWORD)((white >> 1) | (line[word] << 15));      /* drawn at x+1 */
+                const UWORD black = (UWORD)((fromLeft | silhouette[row][word + 1]) & ~white);
+                const UWORD red = (UWORD)((fromRight | silhouette[row + 2][word + 1]) & ~white & ~black);
+                const UWORD mask = (UWORD)(white | black | red);
+                if (mask) hudStageWrite(stage, (unsigned)row, (unsigned)word, mask,
+                                        (UWORD)(white | black), (UWORD)(black | red));
+            }
+    }
+    return 1;
+}
+
 void amigaRendererPublishHudStage(AmigaRenderer* renderer, const AmigaHudStage* stage,
                                   const AmigaHudStage* overlay) {
     UBYTE* row = renderer->hud + stage->y * downwellBytesPerPlaneLine + (stage->x >> 3);

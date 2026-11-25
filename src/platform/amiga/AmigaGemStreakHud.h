@@ -25,6 +25,11 @@ struct AmigaGemStreakHud {
                 (high ? cap == o.cap && motion == o.motion : streak == o.streak);
         }
         bool operator!=(const View& o) const { return !(*this == o); }
+        // The composed block is drawn relative to drawY.
+        bool sameContent(const View& o) const {
+            return visible && o.visible && high == o.high && sick == o.sick && line == o.line &&
+                (high ? cap == o.cap && motion == o.motion : streak == o.streak);
+        }
     };
     // view x + 81 on the logical display. The gem-high line reaches
     // round(58 * 480 / 300) = 93: caps span x 82..300, so the stage spans
@@ -41,7 +46,7 @@ struct AmigaGemStreakHud {
     }
     bool bind(const UBYTE* game, const UBYTE* gameEnd) {
         if (game == game_) return valid_;
-        game_ = game; valid_ = false; owner_.invalidate();
+        game_ = game; valid_ = false; composed_ = false; owner_.invalidate();
         for (unsigned d = 0; d < 10; ++d)
             if (!amigaRendererPrepareHudArt(&digits_[d], game, gameEnd, UWORD(65100 + d), 0)) return false;
         for (unsigned f = 0; f < 3; ++f)
@@ -54,14 +59,14 @@ struct AmigaGemStreakHud {
             amigaRendererPrepareHudArt(&capRight_, game, gameEnd, 393, 0) &&
             amigaRendererPrepareHudArt(&capLeft_, game, gameEnd, 393, 2);
     }
-    void release() { game_ = nullptr; valid_ = false; owner_.invalidate(); }
+    void release() { game_ = nullptr; valid_ = false; composed_ = false; owner_.invalidate(); }
     // The HUD layer was repainted by another writer: forget what is shown.
     void invalidate() { owner_.invalidate(); }
     // Publish v, erasing what the previous publish set and v does not.
     bool draw(AmigaRenderer* renderer, const View& v) {
         if (!valid_ || !renderer || !renderer->hud) return false;
         if (!v.visible) { owner_.hide(renderer); return true; }
-        if (!owner_.begin(stageX, v.drawY - rowsAbove, words, rows) || !compose(v)) return false;
+        if (!stage(v)) return false;
         owner_.publish(renderer);
         return true;
     }
@@ -69,12 +74,19 @@ struct AmigaGemStreakHud {
     bool compose(AmigaRenderer* renderer, const View& v) {
         if (!valid_ || !renderer || !renderer->hud) return false;
         if (!v.visible) { owner_.invalidate(); return true; }
-        if (!owner_.begin(stageX, v.drawY - rowsAbove, words, rows) || !compose(v)) return false;
+        if (!stage(v)) return false;
         owner_.publish(renderer, true);
         return true;
     }
 
 private:
+    // A block that only moved (the camera scrolled) keeps its composed stage.
+    bool stage(const View& v) {
+        if (composed_ && v.sameContent(content_) && owner_.move(v.drawY - rowsAbove)) return true;
+        composed_ = owner_.begin(stageX, v.drawY - rowsAbove, words, rows) && compose(v);
+        content_ = v;
+        return composed_;
+    }
     bool fill(int x0, int x1, int y, unsigned pen) {
         return amigaHudStageFill(owner_.stage(), x0, y, x1 - x0 + 1, 1, pen) != 0;
     }
@@ -105,18 +117,16 @@ private:
         unsigned d[10], n = 0, value = v.streak;
         do { d[n++] = value % 10; value /= 10; } while (value);
         const int first = x - 4 * int(n + 1) + 8 + 4; // glyph origin (4, 0)
-        static const signed char dx[5] = {-1, 0, 1, 0, 0}, dy[5] = {0, -1, 0, 1, 0};
-        static const unsigned char pen[5] = {2, 2, 3, 3, 1};
-        for (unsigned layer = 0; layer < 5; ++layer)
-            for (unsigned i = 0; i < n; ++i)
-                if (!amigaHudStagePlace(owner_.stage(), &digits_[d[n - 1 - i]], first + 8 * int(i) + dx[layer],
-                                        y + 6 + dy[layer], pen[layer])) return false;
+        const AmigaHudArt* glyphs[10];
+        for (unsigned i = 0; i < n; ++i) glyphs[i] = &digits_[d[n - 1 - i]];
+        if (!amigaHudStageGemmyText(owner_.stage(), glyphs, n, first, y + 6, 8)) return false;
         // sprGemS at x - round(string_width(" n") / 2) + 4.
         return amigaHudStagePlace(owner_.stage(), &icon_, x - 4 * int(n + 1) + 4, y + 5, -1) != 0;
     }
 
     const UBYTE* game_ = nullptr;
-    bool valid_ = false;
+    bool valid_ = false, composed_ = false;
+    View content_;
     AmigaHudMaskedOwner owner_;
     AmigaHudArt digits_[10], right_[3], left_[3], high_[14], sick_[14], icon_, capRight_, capLeft_;
 };

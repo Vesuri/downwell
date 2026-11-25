@@ -1,3 +1,4 @@
+#include <algorithm>
 // Sweep every gem streak block view through the real game-bank art: each
 // composed piece must stay inside the staged region (a refusal ends the
 // native game with RETURN_FAIL) and moves must clear the previous rows.
@@ -78,6 +79,41 @@ int main(int argc, char** argv) {
                 track(v);
                 track(v); // unchanged position: merged erase
             }
+            // Unchanged content that only moves reuses its composed stage,
+            // except after a content change at the same position folded an
+            // erase into it. Model the layer: each draw sets the block's
+            // pixels (a fresh owner's single draw) and clears the previous
+            // draw's other pixels; nothing else changes.
+            std::vector<UBYTE> freshLayer(downwellLayerBytes), freshGame(downwellLayerBytes),
+                previous(downwellPlaneBytes);
+            assert(owner.draw(&renderer, AmigaGemStreakHud::View{}));
+            std::vector<UBYTE> expected(hud);
+            AmigaRenderer freshRenderer{};
+            amigaRendererInit(&freshRenderer, freshGame.data(), freshLayer.data());
+            const struct { int y; unsigned streak; } steps[] = {
+                {40, 37}, {40, 37}, {37, 37}, {30, 37}, {30, 38}, {31, 38}, {52, 38}, {12, 38},
+                {12, 9}, {60, 9}, {60, 99}, {59, 99}, {59, 100}, {58, 100}};
+            for (int high = 0; high < 2; ++high)
+                for (const auto& step : steps) {
+                    AmigaGemStreakHud::View v;
+                    v.visible = true; v.high = high; v.streak = step.streak; v.drawY = step.y;
+                    v.line = long(high ? 70 : 20 + int(step.streak % 7)) << 16;
+                    v.cap = high ? int(step.streak % 3) : 1; v.motion = high ? int(step.streak % 14) : 5;
+                    track(v);
+                    AmigaGemStreakHud fresh;
+                    assert(fresh.bind(pack.data(), pack.data() + pack.size()));
+                    std::fill(freshLayer.begin(), freshLayer.end(), UBYTE(0));
+                    assert(fresh.draw(&freshRenderer, v));
+                    for (unsigned i = 0; i < downwellPlaneBytes; ++i) {
+                        const UBYTE block = UBYTE(freshLayer[i] | freshLayer[i + downwellPlaneBytes]);
+                        const UBYTE keep = UBYTE(~block & ~previous[i]);
+                        expected[i] = UBYTE((expected[i] & keep) | freshLayer[i]);
+                        expected[i + downwellPlaneBytes] =
+                            UBYTE((expected[i + downwellPlaneBytes] & keep) | freshLayer[i + downwellPlaneBytes]);
+                        previous[i] = block;
+                    }
+                    assert(expected == hud);
+                }
             assert(owner.draw(&renderer, AmigaGemStreakHud::View{}));
             for (unsigned i = 0; i < downwellLayerBytes; ++i) {
                 // Per pixel (both planes): a pixel the block drew and erased
@@ -89,6 +125,47 @@ int main(int argc, char** argv) {
         }
     }
     std::printf("Gem streak HUD: %u views within the staged region\n", views);
+    // The one-pass gemmy text against its five layered placements.
+    unsigned texts = 0, refused = 0;
+    for (int arg = 1; arg < argc; ++arg) {
+        const auto pack = load(argv[arg]);
+        AmigaHudArt digits[10];
+        for (unsigned d = 0; d < 10; ++d)
+            assert(amigaRendererPrepareHudArt(&digits[d], pack.data(), pack.data() + pack.size(), UWORD(65100 + d), 0));
+        unsigned long random = 12345;
+        auto next = [&]() { random = random * 1103515245UL + 12345UL; return unsigned(random >> 16) & 0xffffu; };
+        static AmigaHudStage layered, single;
+        for (unsigned n = 1; n <= 10; ++n)
+            for (int x = -6; x < 14 * 16 - 8 * int(n) + 8; ++x)
+                for (int y : {-1, 0, 1, 5, 10, 11, 12}) {
+                    assert(amigaHudStageBegin(&layered, 80, 30, 14, 22));
+                    for (unsigned r = 0; r < 22; ++r)
+                        for (unsigned w = 0; w < 14; ++w) {
+                            layered.low[r][w] = UWORD(next()); layered.high[r][w] = UWORD(next());
+                            layered.mask[r][w] = UWORD(next() & next());
+                        }
+                    single = layered;
+                    const AmigaHudArt* glyphs[10];
+                    for (unsigned i = 0; i < n; ++i) glyphs[i] = &digits[next() % 10];
+                    static const signed char dx[5] = {-1, 0, 1, 0, 0}, dy[5] = {0, -1, 0, 1, 0};
+                    static const unsigned char pen[5] = {2, 2, 3, 3, 1};
+                    bool placed = true;
+                    for (unsigned layer = 0; layer < 5 && placed; ++layer)
+                        for (unsigned i = 0; i < n && placed; ++i)
+                            placed = amigaHudStagePlace(&layered, glyphs[i], 80 + x + 8 * int(i) + dx[layer],
+                                                        30 + y + dy[layer], pen[layer]) != 0;
+                    const bool composed = amigaHudStageGemmyText(&single, glyphs, n, 80 + x, 30 + y, 8) != 0;
+                    assert(placed == composed);
+                    ++texts;
+                    if (!composed) { ++refused; continue; }
+                    for (unsigned r = 0; r < 22; ++r)
+                        for (unsigned w = 0; w < 14; ++w) {
+                            assert(single.mask[r][w] == layered.mask[r][w]);
+                            assert(single.low[r][w] == layered.low[r][w] && single.high[r][w] == layered.high[r][w]);
+                        }
+                }
+    }
+    std::printf("Gemmy text: %u strings equal their five layered placements (%u refused by both)\n", texts, refused);
     // levelNumber: whole lifecycles (reveal, hold, fall) of CAVERN-1..99 and
     // a full-capacity title, published on change only; nothing remains.
     unsigned titleFrames = 0, titlePublishes = 0;

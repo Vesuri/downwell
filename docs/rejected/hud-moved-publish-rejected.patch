@@ -1,0 +1,52 @@
+--- a/src/platform/amiga/AmigaHudMaskedOwner.h
++++ b/src/platform/amiga/AmigaHudMaskedOwner.h
+@@ -25,11 +25,13 @@
+     // another writer, so nothing of ours remains to erase.
+     void publish(AmigaRenderer* renderer, bool fresh = false) {
+         amigaRendererClearClipRect(renderer);
++        bool merged = false;
+         if (published_ && !fresh) {
+-            if (stage_.x != x_ || stage_.y != y_ || stage_.words != words_ || stage_.rows != rows_) eraseSeparately(renderer);
+-            else mergeErase();
++            const bool columns = stage_.x == x_ && stage_.words == words_;
++            if (columns && stage_.y == y_ && stage_.rows == rows_) mergeErase();
++            else if (!columns || !(merged = publishMoved(renderer))) eraseSeparately(renderer);
+         }
+-        amigaRendererPublishHudStage(renderer, &stage_, nullptr);
++        if (!merged) amigaRendererPublishHudStage(renderer, &stage_, nullptr);
+         for (unsigned r = 0; r < stage_.rows; ++r)
+             for (unsigned w = 0; w < stage_.words; ++w)
+                 shown_[r][w] = UWORD(stage_.mask[r][w] & (stage_.low[r][w] | stage_.high[r][w]));
+@@ -52,6 +54,32 @@
+             }
+         amigaRendererPublishHudStage(renderer, &erase_, nullptr);
+     }
++    // A moved region: one masked pass over the old and new rows together,
++    // composed in erase_, instead of an erase pass and then a publish.
++    // stage_ itself is left as composed. False when the rows exceed a stage.
++    bool publishMoved(AmigaRenderer* renderer) {
++        const int top = stage_.y < y_ ? stage_.y : y_;
++        const int newEnd = stage_.y + int(stage_.rows), oldEnd = y_ + int(rows_);
++        const int bottom = newEnd > oldEnd ? newEnd : oldEnd;
++        if (bottom - top > int(amigaHudStageRows)) return false;
++        // Every entry is written below: no clearing begin.
++        erase_.x = x_; erase_.y = top; erase_.words = words_; erase_.rows = unsigned(bottom - top);
++        for (int r = 0; r < bottom - top; ++r) {
++            const int fresh = top + r - stage_.y, old = top + r - y_;
++            const bool hasFresh = fresh >= 0 && fresh < int(stage_.rows), hasOld = old >= 0 && old < int(rows_);
++            for (unsigned w = 0; w < words_; ++w) {
++                UWORD mask = 0, low = 0, high = 0;
++                if (hasFresh) { mask = stage_.mask[fresh][w]; low = stage_.low[fresh][w]; high = stage_.high[fresh][w]; }
++                if (hasOld) {
++                    const UWORD gone = UWORD(shown_[old][w] & ~mask);
++                    low = UWORD(low & ~gone); high = UWORD(high & ~gone); mask |= gone;
++                }
++                erase_.mask[r][w] = mask; erase_.low[r][w] = low; erase_.high[r][w] = high;
++            }
++        }
++        amigaRendererPublishHudStage(renderer, &erase_, nullptr);
++        return true;
++    }
+     void mergeErase() {
+         composed_ = false;
+         for (unsigned r = 0; r < rows_; ++r)
