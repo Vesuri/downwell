@@ -385,18 +385,46 @@ resets it; that is the first owner to find.
       fails at frame 13, `generate-shop-profile` at parity frame 3 (camera
       X 159 against 160) and the overflow witness at frame 7, group 1.
 
+15. **W3.15 Interleave every bitplane bitmap.** Today only the off-screen
+    effect surface is interleaved; the terrain backing, both PF1 display
+    rings, the PF2 HUD and the other scenes' bitmaps keep each plane
+    contiguous. So `Bitmap::copy` and `clear` queue one blit per plane: the
+    row restore, the effect publish, BOB draws and clears each take two
+    blits per rectangle where one would do. The single-buffered HUD is also
+    written plane by plane, so a frame scanned mid-update can show mixed
+    pens (the cause of the ammo-label red box, fixed only for that label in
+    be0576d6). Interleaved, one blit covers both planes and a top-to-bottom
+    copy finishes each row in both planes before the next.
+    Stages, each committed with its own evidence:
+    - Measure first: blits per gameplay update by kind and the fixed cost
+      per blit (queue entry, setup, interrupt) on the target, to state the
+      expected saving.
+    - PF2 HUD: the HUD composers, prepared HUD text, health and ammo tables
+      (`generate-amiga-health-art`, `install-data/derived_hud`), BPL2MOD.
+    - PF1 gameplay: backing and both rings, the row tracking and restore,
+      the terrain raster and painter, `AmigaPatternTransfer.s`, the field
+      overlays and `AmigaFieldPrepared.s`, the goal field, laser sight,
+      effect publish, copper ring pointers, BPL1MOD and the wrap reload,
+      `prepare-initial-terrain`. Masked BOB blits need each mask row once
+      per plane: count the Chip cost against the memory fit before
+      changing the bank format.
+    - The other scenes (front end, style, shop, clear, results, pause).
+    - Every frame decoder and gdb dump that reads planes.
+    Keep 64-bit alignment (96-byte interleaved rows) for W3.16. The object
+    layer of W3.17 starts interleaved.
+
 **AGA display experiments** (both need AGA, while the target note above
 says the game must start on any 68020 Amiga. Decide between an ECS fallback
 display and changing that rule before either becomes the default.)
 
-15. **W3.15 FMODE 3 bitplane fetch.** Measured experiment, gameplay display
+16. **W3.16 FMODE 3 bitplane fetch.** Measured experiment, gameplay display
     only. The effect composition keeps the blitter busy end to end (5 C);
     64-bit bitplane fetches use a quarter of the bus slots and leave the
     rest to the blitter and CPU Chip access. Keep 16-pixel sprites (FMODE
     bits 2–3 zero) so the offline sprite streams stay valid. Constraints:
     bitplane pointers and modulos 64-bit aligned, so the 352-pixel fetch
     with its two-byte inset becomes a 384-pixel fetch (six 64-pixel blocks)
-    cropped by DIW; the 48-byte rows keep the PF1 ring aligned. First
+    cropped by DIW; the 48-byte (96 interleaved) rows keep the PF1 ring aligned. First
     question: can a fetch window that meets FMODE 3's DDF rounding keep all
     eight sprite channels (today DDFSTRT `$38` keeps channel 7)? Work it out
     from the AGA documentation, then show every channel at both display
@@ -404,7 +432,7 @@ display and changing that rule before either becomes the default.)
     than the fetch saves. Then check that the profiling emulator times AGA
     DMA cycle-exactly, and compare constant fire and the normal run to tick
     700 (mean, fields, worst update, the blitter waits).
-16. **W3.16 Moving objects on their own playfield (design first).** Today
+17. **W3.17 Moving objects on their own playfield (design first).** Today
     PF1 holds terrain, actors and effects together, so every update copies
     dirtied terrain rows back from the backing (2,182 words and a 1.5 ms
     wait per update on constant fire) and BOBs sit in the terrain planes.
@@ -429,12 +457,12 @@ display and changing that rule before either becomes the default.)
 
 **Close**
 
-17. **W3.17 Re-audit and lock in.** Repeat the census on the target, with
+18. **W3.18 Re-audit and lock in.** Repeat the census on the target, with
     every active-gameplay update within 20 ms. Commit the results to the
     audit, and turn the cadences into regression ceilings: the quiet fall
     at 164 fields, and a ceiling for the world-one route. Check that the
     shipping footprint still fits the target.
-18. **W3.18 Close W3:** remove this section and the world-1 parts of
+19. **W3.19 Close W3:** remove this section and the world-1 parts of
     section 5. Its other items stay parked for world 2.
 
 ## 0. Restore the A500 initial fall: every update within 20 ms
