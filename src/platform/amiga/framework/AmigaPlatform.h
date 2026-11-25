@@ -84,6 +84,13 @@ private:
     UWORD savedIntena_;
     struct Interrupt vblankServer_;
     struct IntVector savedVblankVector_;
+#ifdef DOWNWELL_BLIT_CENSUS
+    // W3.15: the census times each blit to the blitter-finished interrupt.
+    static ULONG blitHandler();
+    void attachBlitHandler();
+    struct Interrupt blitServer_;
+    struct IntVector savedBlitVector_;
+#endif
     bool active_;
 };
 

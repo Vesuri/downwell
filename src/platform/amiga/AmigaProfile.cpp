@@ -368,16 +368,50 @@ void downwellEffectSerialCensus(DownwellEffectBlit kind, unsigned long ticks)
 // interleaved blit would cover. twins[0]: the gameplay ring's plane stride,
 // [1]: the display/HUD plane stride, [2]: any other forward stride >= 2 KB.
 // queued: blits that waited in the queue for the CPU to start them.
+// busy: ticks from each blit's start to its blitter-finished interrupt.
+// idle: ticks the blitter sat finished while blits waited in the queue,
+// until the CPU's next poll started one. drain: ticks the CPU spent in
+// blitterDrain and blitterWait. Each counts in the update where it ends.
 struct DownwellBlitCensusRecord {
-    ULONG words[9], twinWords[3];
+    ULONG words[9], twinWords[3], busy, idle, drain;
     UWORD blits[9], twins[3], queued, pad;
 };
-static_assert(sizeof(DownwellBlitCensusRecord) == 76, "blit census layout");
+static_assert(sizeof(DownwellBlitCensusRecord) == 88, "blit census layout");
 extern "C" { DownwellBlitCensusRecord gDownwellBlitCensus[DOWNWELL_CENSUS_UPDATES]; }
 static DownwellBlitCensusRecord blitCurrent;
 static const unsigned char* blitLastDestination;
 static unsigned blitLastKind = ~0u;
 static UWORD blitLastSize;
+static volatile ULONG blitStartTick, blitFinishTick;
+static volatile bool blitRunning, blitIdlePending;
+static ULONG blitDrainStart;
+static unsigned blitDrainDepth;
+static void blitStarted(ULONG now)
+{
+    // A finish the interrupt has not reported yet (an I/O window has the OS
+    // vector) is not timed.
+    blitStartTick = now;
+    blitRunning = true;
+}
+void downwellBlitFinishCensus(bool queued)
+{
+    const ULONG now = beamTick();
+    if (blitRunning) { blitCurrent.busy += now - blitStartTick; blitRunning = false; }
+    blitFinishTick = now;
+    blitIdlePending = queued;
+}
+void downwellBlitQueueStartCensus()
+{
+    const ULONG now = beamTick();
+    if (blitIdlePending && !blitRunning) blitCurrent.idle += now - blitFinishTick;
+    blitIdlePending = false;
+    blitStarted(now);
+}
+void downwellBlitDrainCensus(bool begin)
+{
+    if (begin) { if (blitDrainDepth++ == 0) blitDrainStart = beamTick(); }
+    else if (blitDrainDepth && --blitDrainDepth == 0) blitCurrent.drain += beamTick() - blitDrainStart;
+}
 void downwellBlitStartCensus(unsigned kind, const void* destination, UWORD size, bool queued)
 {
     const unsigned height = (size >> 6) ? (size >> 6) : 1024, width = (size & 63) ? (size & 63) : 64;
@@ -385,6 +419,7 @@ void downwellBlitStartCensus(unsigned kind, const void* destination, UWORD size,
     ++blitCurrent.blits[kind];
     blitCurrent.words[kind] += words;
     if (queued) ++blitCurrent.queued;
+    else blitStarted(beamTick());
     const unsigned char* target = static_cast<const unsigned char*>(destination);
     if (kind == blitLastKind && size == blitLastSize && target > blitLastDestination) {
         const unsigned long stride = static_cast<unsigned long>(target - blitLastDestination);

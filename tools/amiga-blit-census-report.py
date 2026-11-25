@@ -6,6 +6,8 @@ MODE` (census.bin, blit-census.bin, capture.log). Each update's blit record
 sits at the same ring index as its census record. A twin is a blit that
 repeats the previous blit's kind and size one plane further on: the second
 plane's blit of a non-interleaved bitmap, which one interleaved blit covers.
+It also reports the blitter's busy time, the time it sat finished with blits
+still queued (the queue is polled), and the CPU's drain waits.
 
   python3 tools/amiga-blit-census-report.py tmp/census/DIR [--class=gameplay]
 """
@@ -17,7 +19,7 @@ import struct
 KINDS = ['clear', 'copy', 'masked copy', 'masked copy + background', 'line', 'fill',
          'solid rectangle', 'combine', 'pattern']
 TWINS = ['gameplay ring stride', 'display/HUD stride', 'other stride']
-RECORD = struct.Struct('>9I3I9H3HHH')
+RECORD = struct.Struct('>9I3I3I9H3HHH')
 
 
 def census_module():
@@ -45,8 +47,8 @@ def main():
     groups = {}
     for record in loaded['records']:
         fields = RECORD.unpack_from(ring, (record['index'] % capacity) * RECORD.size)
-        blit = dict(words=fields[0:9], twin_words=fields[9:12], blits=fields[12:21],
-                    twins=fields[21:24], queued=fields[24])
+        blit = dict(words=fields[0:9], twin_words=fields[9:12], busy=fields[12], idle=fields[13],
+                    drain=fields[14], blits=fields[15:24], twins=fields[24:27], queued=fields[27])
         groups.setdefault(record['class'], []).append((record, blit))
     for name in args.classes or census.CLASSES:
         rows = groups.get(name)
@@ -64,6 +66,14 @@ def main():
         print(f'most blits: {sum(busiest[1]["blits"])} ({sum(busiest[1]["twins"])} twins) at frame '
               f'{busiest[0]["frame"]}, {busiest[0]["work_ms"]:.1f} ms; worst update {worst[0]["work_ms"]:.1f} ms '
               f'at frame {worst[0]["frame"]}: {sum(worst[1]["blits"])} blits, {sum(worst[1]["twins"])} twins')
+        ms = 20.0 / loaded['ticks_per_field']
+        timed = lambda key: sum(b[key] for _, b in rows) * ms / count
+        print(f'blitter busy {timed("busy"):.2f} ms/update, idle with blits queued '
+              f'{timed("idle"):.2f} ms, CPU drain waits {timed("drain"):.2f} ms; worst update: busy '
+              f'{worst[1]["busy"] * ms:.2f}, idle {worst[1]["idle"] * ms:.2f}, drain {worst[1]["drain"] * ms:.2f}')
+        idlest = max(rows, key=lambda row: row[1]['idle'])
+        print(f'most idle: {idlest[1]["idle"] * ms:.2f} ms at frame {idlest[0]["frame"]} '
+              f'({idlest[0]["work_ms"]:.1f} ms update, drain {idlest[1]["drain"] * ms:.2f})')
         print('| kind | blits/update | words/update | words/blit |')
         print('| --- | ---: | ---: | ---: |')
         for k, kind in enumerate(KINDS):

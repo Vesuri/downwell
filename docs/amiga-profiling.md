@@ -280,7 +280,11 @@ longer describe the overlapped game.
 update (`AmigaHardware`), dumped to `blit-census.bin` in the census output:
 counts and words by kind, the queued ones, and the per-plane twins (a blit
 repeating the previous one's kind and size one plane stride further on,
-which one interleaved blit would cover). Read it with
+which one interleaved blit would cover). It also times every blit with
+the blitter-finished interrupt, which only this build enables: the
+blitter's busy time, the time it sat finished while blits waited in the
+polled queue, and the CPU's drain waits. The interrupt and hooks add about
+1 ms per gameplay update. Read it with
 `tools/amiga-blit-census-report.py CENSUS_DIR`.
 Without the census,
 `ROUTE_TRACE=N` records `ROUTE_TRACE_FIELDS` (default 20) whole fields of

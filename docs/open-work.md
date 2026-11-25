@@ -409,6 +409,13 @@ resets it; that is the first owner to find.
     - Expected saving from merging twins: 0.4 ms per world-one update,
       0.6 ms per spray update (under 1.5%), plus the per-plane wrapper
       calls. The same words move either way.
+    - Blitter time (the census timing each blit to its finished
+      interrupt): world-one gameplay busy 3.7 ms per update, idle with
+      blits still queued 9.6 ms, CPU drain waits 1.7 ms; camera jumps
+      22.8, 11.1 and 19.2 ms. Spray gameplay 9.4, 29.3 and 3.3 ms; camera
+      jumps 26.0, 33.4 and 19.5 ms. Idle counts where it ends, often in
+      the next update. An interrupt-chained queue could overlap that idle
+      time with the CPU: it saves at most the drain waits.
     The HUD's mixed-pen frames come from CPU writes (plane-major word
     strips), not blits: row-major writes fix them with or without
     interleaving.

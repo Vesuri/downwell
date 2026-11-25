@@ -62,6 +62,10 @@ void AmigaPlatform::beginIo()
     // Our copper, raster and sprite DMA stay live.
     Disable();
     SysBase->IntVects[INTB_VERTB] = savedVblankVector_;
+#ifdef DOWNWELL_BLIT_CENSUS
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+    SysBase->IntVects[INTB_BLIT] = savedBlitVector_;
+#endif
     AmigaHardware::setInterrupts((UWORD)(savedIntena_ & INTF_BLIT), true);
     Enable();
     Permit();
@@ -76,6 +80,9 @@ void AmigaPlatform::endIo()
     SysBase->IntVects[INTB_VERTB].iv_Node = &vblankServer_.is_Node;
     AmigaHardware::setInterrupts(INTF_BLIT, false);
     AmigaHardware::clearInterruptRequests(INTF_BLIT);
+#ifdef DOWNWELL_BLIT_CENSUS
+    attachBlitHandler();
+#endif
     Enable();
 }
 
@@ -190,6 +197,26 @@ bool AmigaPlatform::saveFile(const char* name, const UBYTE* source, ULONG bytes)
     return written;
 }
 
+#ifdef DOWNWELL_BLIT_CENSUS
+void downwellBlitFinishCensus(bool queued);
+ULONG AmigaPlatform::blitHandler()
+{
+    AmigaHardware::clearInterruptRequests(INTF_BLIT);
+    downwellBlitFinishCensus(AmigaHardware::hasQueuedBlits);
+    return 0;
+}
+
+// Called with interrupts disabled.
+void AmigaPlatform::attachBlitHandler()
+{
+    SysBase->IntVects[INTB_BLIT].iv_Data = 0;
+    SysBase->IntVects[INTB_BLIT].iv_Code = (void (*)())blitHandler;
+    SysBase->IntVects[INTB_BLIT].iv_Node = &blitServer_.is_Node;
+    AmigaHardware::clearInterruptRequests(INTF_BLIT);
+    AmigaHardware::setInterrupts(INTF_BLIT, true);
+}
+#endif
+
 ULONG AmigaPlatform::vblankHandler()
 {
     AmigaHardware::clearInterruptRequests(INTF_VERTB);
@@ -252,6 +279,13 @@ bool AmigaPlatform::takeover(const CopperList& firstCopper,
     SysBase->IntVects[INTB_VERTB].iv_Data = 0;
     SysBase->IntVects[INTB_VERTB].iv_Code = (void (*)())vblankHandler;
     SysBase->IntVects[INTB_VERTB].iv_Node = &vblankServer_.is_Node;
+#ifdef DOWNWELL_BLIT_CENSUS
+    blitServer_ = vblankServer_;
+    blitServer_.is_Node.ln_Name = (char*)"Downwell blit census";
+    blitServer_.is_Code = (void (*)())blitHandler;
+    savedBlitVector_ = SysBase->IntVects[INTB_BLIT];
+    attachBlitHandler();
+#endif
     Enable();
 
     vblankCount_ = 0;
@@ -355,6 +389,10 @@ void AmigaPlatform::restore()
 
     Disable();
     SysBase->IntVects[INTB_VERTB] = savedVblankVector_;
+#ifdef DOWNWELL_BLIT_CENSUS
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+    SysBase->IntVects[INTB_BLIT] = savedBlitVector_;
+#endif
     Enable();
 
     AmigaHardware::setDMAChannels(DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG,
