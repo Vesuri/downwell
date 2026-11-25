@@ -21,7 +21,7 @@ class StoredWorldCollision {
                 c.assign(cosine)&&s.assign(sine);
         }
     };
-    struct Round {bool operator()(RunnerImageValue v,std::int32_t& out)const{return v.promoted().roundPixel(out);}};
+    struct Round {bool operator()(RunnerImageValue v,std::int32_t& out)const{return v.roundPixel(out);}};
     static constexpr unsigned capacity=StartupRuntime::instanceCapacity;
     using Owner=RunnerSpatialInstances<capacity,4096>;
     using Families=RunnerObjectFamilies<386>;

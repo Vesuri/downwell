@@ -46,7 +46,7 @@ public:
         for(auto& e:entries_){if(e.local==local&&local)return fail();if(!e.local&&!free)free=&e;}
         PackedObject definition;std::int32_t px,py;
         if(!local||!free||!objects_||!objects_->findObject(211,definition)||
-           !x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+           !x.roundPixel(px)||!y.roundPixel(py)||
            !nextId_||nextId_>0x7fffffffu)return fail();
         id=nextId_;
         if(records_.create(id,211,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();

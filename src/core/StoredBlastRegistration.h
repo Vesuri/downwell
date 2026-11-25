@@ -52,7 +52,7 @@ public:
         Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;
         PackedObject definition;std::int32_t px,py;
         if(!good_||!free||!objects_||!objects_->findObject(276,definition)||definition.spriteId!=471||
-           source.sourceId!=nextId_||!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py))return fail();
+           source.sourceId!=nextId_||!x.roundPixel(px)||!y.roundPixel(py))return fail();
         if(records_.create(nextId_,276,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
         *free={local,records_.handleAt(records_.size()-1),nextId_++};auto* r=record(*free);if(!r)return fail();
         r->x=px;r->y=py;r->preciseX=stored(x);r->preciseY=stored(y);r->spriteId=definition.spriteId;r->maskId=definition.textureMaskId;

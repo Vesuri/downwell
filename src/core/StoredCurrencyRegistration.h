@@ -35,7 +35,7 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredCurrencyRegistrat
     }
     bool publish(Entry& e,RunnerImageValue x,RunnerImageValue y){
         auto* r=record(e);std::int32_t px,py;
-        if(!r||!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+        if(!r||!x.roundPixel(px)||!y.roundPixel(py)||
             !lifecycle_.publishedPosition(e.key,*r,x,y))return fail();
         r=record(e);if(!r)return fail();
         r->x=px;r->y=py;r->preciseX=stored(x);r->preciseY=stored(y);return true;
@@ -185,7 +185,7 @@ public:
         Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;
         PackedObject definition;RunnerImageValue px,py;std::int32_t ix,iy;
         if(!free||!objects_||!objects_->findObject(248,definition)||!nextId_||nextId_>0x7fffffffu||
-            !px.assign(x)||!py.assign(y)||!px.promoted().roundPixel(ix)||!py.promoted().roundPixel(iy))return fail();
+            !px.assign(x)||!py.assign(y)||!px.roundPixel(ix)||!py.roundPixel(iy))return fail();
         if(records_.create(nextId_,248,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
         free->id=nextId_++;free->key=records_.handleAt(records_.size()-1);free->state={};
         auto* r=record(*free);if(!r)return fail();

@@ -13,7 +13,7 @@
             port.step(0);
             if(!port.effectsSucceeded()||!collisionOwner.valid())return 20;
             const auto* r=entries.find(key);std::int32_t y;
-            if(!r||!r->y.promoted().roundPixel(y)||y!=16*int(frame<120?frame:119)||
+            if(!r||!r->y.roundPixel(y)||y!=16*int(frame<120?frame:119)||
                r->effect.alarm0!=120-int(frame)||r->destroyRequested!=(frame==120))return 20;
             ++gDownwellEntryLifetimeChecks;
         }

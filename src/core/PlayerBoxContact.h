@@ -31,9 +31,9 @@ struct PlayerBoxContact {
         }
         Bounds b;
         std::int32_t left,right,top,bottom;
-        if(!prepare(x,y,originX,originY,b)||!b.left.promoted().roundPixel(left)||
-           !b.right.promoted().roundPixel(right)||!b.top.promoted().roundPixel(top)||
-           !b.bottom.promoted().roundPixel(bottom)||right-left!=7||bottom-top!=11)return false;
+        if(!prepare(x,y,originX,originY,b)||!b.left.roundPixel(left)||
+           !b.right.roundPixel(right)||!b.top.roundPixel(top)||
+           !b.bottom.roundPixel(bottom)||right-left!=7||bottom-top!=11)return false;
         outX=left+4-originX;outY=top+4-originY;return true;
     }
     static bool test(long x,long y,int originX,int originY,int boxX,int boxY,bool& hit){
@@ -45,7 +45,7 @@ struct PlayerBoxContact {
     static bool prepare(long x,long y,int originX,int originY,Bounds& result){
         RunnerImageValue px,py;
         if(!coordinate(x,originX,px)||!coordinate(y,originY,py))return false;
-        auto round=[](RunnerImageValue n,std::int32_t& pixel){return n.promoted().roundPixel(pixel);};
+        auto round=[](RunnerImageValue n,std::int32_t& pixel){return n.roundPixel(pixel);};
         const RunnerImageValue one{0x3f800000};
         return RunnerSpriteBounds::fromSprite(player,px,py,one,one,false,one,{},true,round,result);
     }
@@ -84,7 +84,7 @@ private:
         RunnerImageValue bx,by;
         if(!bx.assign(MotionBinary64::fromInteger(boxX))||
            !by.assign(MotionBinary64::fromInteger(boxY)))return false;
-        auto round=[](RunnerImageValue n,std::int32_t& pixel){return n.promoted().roundPixel(pixel);};
+        auto round=[](RunnerImageValue n,std::int32_t& pixel){return n.roundPixel(pixel);};
         const RunnerImageValue one{0x3f800000};
         return RunnerSpriteBounds::fromSprite(box,bx,by,one,one,false,one,{},true,round,b);
     }

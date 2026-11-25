@@ -61,7 +61,7 @@ public:
         Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;
         PackedObject definition;std::int32_t px,py;
         if(!free||!objects_||!objects_->findObject(224,definition)||definition.spriteId!=96||source.sourceId!=nextId_||
-           !x.promoted().roundPixel(px)||!y.promoted().roundPixel(py))return fail();
+           !x.roundPixel(px)||!y.roundPixel(py))return fail();
         if(records_.create(nextId_,224,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
         *free={local,records_.handleAt(records_.size()-1),nextId_++};
         auto* r=record(*free);if(!r)return fail();
@@ -87,7 +87,7 @@ public:
     bool membership(InstanceHandle,const Record&,bool){return fail();}
     bool move(InstanceHandle key,const Record&,RunnerImageValue x,RunnerImageValue y){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;std::int32_t px,py;
-        if(!r||!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+        if(!r||!x.roundPixel(px)||!y.roundPixel(py)||
            !lifecycle_.publishedPosition(e->world,*r,x,y))return fail();
         r->x=px;r->y=py;r->preciseX=stored(x);r->preciseY=stored(y);return true;
     }

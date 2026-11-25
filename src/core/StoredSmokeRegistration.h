@@ -55,7 +55,7 @@ public:
         PackedObject definition;RunnerImageValue px,py;std::int32_t ix,iy;
         if(!free||!objects_||!objects_->findObject(225,definition)||definition.spriteId!=84||
            !nextId_||nextId_>0x7fffffffu||!px.assign(x)||!py.assign(y)||
-           !px.promoted().roundPixel(ix)||!py.promoted().roundPixel(iy))return fail();
+           !px.roundPixel(ix)||!py.roundPixel(iy))return fail();
         if(records_.create(nextId_,225,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
         free->id=nextId_++;free->key=records_.handleAt(records_.size()-1);free->state={};
         auto* r=records_.resolve(free->key);if(!r)return fail();
@@ -75,7 +75,7 @@ public:
             }
             bool position(RunnerImageValue x,RunnerImageValue y){
                 auto* r=owner.records_.resolve(e.key);std::int32_t ix,iy;
-                if(!r||!x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
+                if(!r||!x.roundPixel(ix)||!y.roundPixel(iy)||
                    !owner.lifecycle_.publishedPosition(e.key,*r,x,y))return owner.fail();
                 r->x=ix;r->y=iy;r->preciseX=stored(x);r->preciseY=stored(y);return true;
             }

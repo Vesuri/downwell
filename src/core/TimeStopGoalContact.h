@@ -72,7 +72,7 @@ private:
         RunnerImageValue position,inverse;std::int32_t low=0,high=0;
         std::int32_t roundedOrigin=0;bool roundedSampling=false;
         bool roundPosition(){
-            if(!position.promoted().roundPixel(roundedOrigin))return false;
+            if(!position.roundPixel(roundedOrigin))return false;
             roundedSampling=true;return true;
         }
         bool prepare(RunnerImageValue p,RunnerImageValue scale,int first,int end,bool rounded){
@@ -81,7 +81,7 @@ private:
             // Upper edge is lower + scaled width, not position + scaled end.
             if(!multiply(integer(first-12),scale,start) || !add(start,p,start) ||
                !multiply(integer(end-first),scale,width) || !add(width,start,finish) ||
-               !start.promoted().roundPixel(low) || !finish.promoted().roundPixel(high))return false;
+               !start.roundPixel(low) || !finish.roundPixel(high))return false;
             if(low>high){const int tmp=low;low=high;high=tmp;}
             position=p;
             if(rounded)return roundPosition();

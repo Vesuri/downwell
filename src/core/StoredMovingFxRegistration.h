@@ -43,7 +43,7 @@ public:
         PackedObject definition;RunnerImageValue px,py;std::int32_t ix,iy;
         if(!free||!objects_||!objects_->findObject(220,definition)||definition.parentId!=-1||definition.spriteId!=-1||
            !nextId_||nextId_>0x7fffffffu||!px.assign(x)||!py.assign(y)||
-           !px.promoted().roundPixel(ix)||!py.promoted().roundPixel(iy))return fail();
+           !px.roundPixel(ix)||!py.roundPixel(iy))return fail();
         if(records_.create(nextId_,220,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
         *free={};free->id=nextId_++;free->key=records_.handleAt(records_.size()-1);
         auto* r=records_.resolve(free->key);if(!r)return fail();
@@ -97,7 +97,7 @@ public:
             bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
                 const auto x=vertical?e.state.x:value,y=vertical?value:e.state.y;
                 auto* r=owner.records_.resolve(e.key);std::int32_t ix,iy;
-                if(!r||!x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
+                if(!r||!x.roundPixel(ix)||!y.roundPixel(iy)||
                     !owner.lifecycle_.publishedPosition(e.key,*r,x,y))return false;
                 r=owner.records_.resolve(e.key);if(!r)return false;
                 r->x=ix;r->y=iy;r->preciseX=stored(x);r->preciseY=stored(y);accepted=value;return true;

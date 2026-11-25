@@ -333,7 +333,7 @@ bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue 
     auto* record=instances_.resolve(h);
     std::int32_t drawX,drawY;
     if(!record||!RunnerSpatialSplit::valid(x)||!RunnerSpatialSplit::valid(y)||
-       !x.promoted().roundPixel(drawX)||!y.promoted().roundPixel(drawY)||
+       !x.roundPixel(drawX)||!y.roundPixel(drawY)||
        !lifecycle_.publishedPosition(h,*record,x,y)){
         run_.effectsSucceeded=false;return false;
     }
@@ -1087,7 +1087,7 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
     RunnerImageValue x,y;std::int32_t ix,iy;
     if(!ProjectilePublication::coordinate(bullet.trajectory.x,0,x)||
         !ProjectilePublication::coordinate(bullet.trajectory.y,0,y)||
-        !x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
+        !x.roundPixel(ix)||!y.roundPixel(iy)||
         (lifecycle_.hasOwner()&&!publishBulletCollisionPosition(bullet.instance,x,y)))return false;
     record->x=ix;record->y=iy;
     std::memcpy(&record->preciseX,&x.bits,4);std::memcpy(&record->preciseY,&y.bits,4);

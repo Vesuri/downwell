@@ -9,7 +9,7 @@ struct RunnerMoveSnap {
         if((coordinate.bits&0x7fffffffu)&&exponent<=4)return false;
         if(coordinate.bits&0x7fffffffu)coordinate.bits-=4u<<23;
         std::int32_t grid;
-        if(!coordinate.promoted().roundPixel(grid)||grid>134217727||grid< -134217728)return false;
+        if(!coordinate.roundPixel(grid)||grid>134217727||grid< -134217728)return false;
         return out.assign(MotionBinary64::fromInteger(grid*16));
     }
 };

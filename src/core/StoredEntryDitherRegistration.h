@@ -36,7 +36,7 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredEntryDitherRegist
         if(write==EntryDither::Write::alarm){r->alarms.set(0,e.alarm0);return true;}
         std::int32_t pixel;
         const auto value=write==EntryDither::Write::x?e.x:e.y;
-        if(!value.promoted().roundPixel(pixel))return fail();
+        if(!value.roundPixel(pixel))return fail();
         // Publish one setter at a time; the other coordinate is unchanged.
         RunnerImageValue x,y;
         std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);

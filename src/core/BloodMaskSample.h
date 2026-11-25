@@ -16,7 +16,7 @@ struct BloodMaskSample {
         RunnerImageValue radians,cosine,negativeSine;MotionBinary64 c,s;BloodMaskSample next;
         next.path=selected;
         if(selected==RunnerMaskDispatch::Path::roundedPosition){
-            if(!effect.x.promoted().roundPixel(next.roundedX)||!effect.y.promoted().roundPixel(next.roundedY))return false;
+            if(!effect.x.roundPixel(next.roundedX)||!effect.y.roundPixel(next.roundedY))return false;
             *this=next;return true;
         }
         if(selected==RunnerMaskDispatch::Path::scaled){

@@ -58,7 +58,7 @@ public:
         for(auto& e:entries_){if(e.local==local&&local)return fail();if(!e.local&&!free)free=&e;}
         PackedObject definition;std::int32_t px,py;
         if(!local||!free||!objects_||!objects_->findObject(238,definition)||
-           !x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+           !x.roundPixel(px)||!y.roundPixel(py)||
            !nextId_||nextId_>0x7fffffffu)return fail();
         id=nextId_;
         if(records_.create(id,238,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)
@@ -172,7 +172,7 @@ public:
         if(!succeeded_)return false;
         auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;
         std::int32_t x,y;
-        if(!r||!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
+        if(!r||!effect.x.roundPixel(x)||!effect.y.roundPixel(y))return fail();
         // Destroy excludes queries immediately but does not abort the source
         // event's final x/y setters. Storage survives until event cleanup.
         if(!lifecycle_.integerPosition(e->key,*r,x,y))return fail();

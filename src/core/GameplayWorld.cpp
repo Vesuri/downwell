@@ -679,7 +679,7 @@ bool GameplayWorld::publishBulletCollisionPosition(downwell::InstanceHandle h,
     current->sourceMotion.x=x;current->sourceMotion.y=y;
     if(current->sourceOwned){
         std::int32_t px,py;
-        if(!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+        if(!x.roundPixel(px)||!y.roundPixel(py))return run_.effectsSucceeded=false;
         current->x=px-240;current->y=py-176;
     }
     return true;
@@ -2694,7 +2694,7 @@ bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,dow
     const bool born=object==115?steering_[slot].jelly.create(cx,cy,enemyRandom_,ops):
         steering_[slot].ball.create(cx,cy,enemyRandom_,ops);
     std::int32_t bx,by;
-    if(!born||!run_.effectsSucceeded||!actor->x.promoted().roundPixel(bx)||!actor->y.promoted().roundPixel(by))
+    if(!born||!run_.effectsSucceeded||!actor->x.roundPixel(bx)||!actor->y.roundPixel(by))
         return run_.effectsSucceeded=false;
     // instance_deactivate_object follows Create: born inactive and pending.
     if(!configureEnemy(enemyCount_,object,object==115?176:object==118?702:352,bx-240,by-176,0,0,actor->health,actor->money,
@@ -2760,7 +2760,7 @@ bool GameplayWorld::stepSteeringEnemy(EnemyState& enemy){
     enemy.health=actor->health;
     if(!enemy.active){releaseSteering(enemy);enemy.auxiliaryState=-1;return true;}
     std::int32_t px,py;
-    if(!actor->x.promoted().roundPixel(px)||!actor->y.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+    if(!actor->x.roundPixel(px)||!actor->y.roundPixel(py))return run_.effectsSucceeded=false;
     if(!enemyLifecycle_.recordOwnsAppearance()&&
        !enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,px,py))
         return run_.effectsSucceeded=false;
@@ -3243,7 +3243,7 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
     downwell::RunnerImageValue bx,by;std::int32_t px,py;
     if(!downwell::ProjectilePublication::coordinate(path.x,240,bx)||
        !downwell::ProjectilePublication::coordinate(path.y,176,by)||
-       !bx.promoted().roundPixel(px)||!by.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+       !bx.roundPixel(px)||!by.roundPixel(py))return run_.effectsSucceeded=false;
     const auto shot=rotatedShotBounds(bullet.sprite,bulletDirection(bullet),px,py);
     const int damage=bullet.damage;
     if(guns_.moduleEnd){
@@ -3278,7 +3278,7 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
     if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
         if(met)return true;
         std::int32_t cx,cy;
-        if(!corpse.x.promoted().roundPixel(cx)||!corpse.y.promoted().roundPixel(cy))return false;
+        if(!corpse.x.roundPixel(cx)||!corpse.y.roundPixel(cy))return false;
         if(!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(cx,cy,1,1,599)))return true;
         met=true;
         int order;
@@ -4256,7 +4256,7 @@ bool GameplayWorld::collideTimeShards(){
     bool valid=true;
     timeStop_.shards.visitNewest([&](std::uint32_t handle,const downwell::TimeShardAnimation& shard){
         std::int32_t sx,sy;
-        if(!shard.x.promoted().roundPixel(sx)||!shard.y.promoted().roundPixel(sy)){valid=false;return;}
+        if(!shard.x.roundPixel(sx)||!shard.y.roundPixel(sy)){valid=false;return;}
         if(!shard.noTouch&&downwell::contactBoundsOverlap(player,{sx+l.left,sx+l.right,sy+l.top,sy+l.bottom}))
             touched[count++]=handle;
     });
@@ -4493,7 +4493,7 @@ bool GameplayWorld::stepCompactCorpses(decltype(compactCorpses_.beginPhase()) ph
         bool frozen=false;
         if(compactTimeStop()&&stopped()){
             std::int32_t px,py;
-            if(!corpse.x.promoted().roundPixel(px)||!corpse.y.promoted().roundPixel(py))return false;
+            if(!corpse.x.roundPixel(px)||!corpse.y.roundPixel(py))return false;
             frozen=!timeStopBound(599,px,py);
         }
         return corpse.step(frozen,events);

@@ -266,7 +266,7 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
             if(!b.live)continue;
             if(!b.effect.drawFrame(frame))return false;
             std::int32_t x,y;
-            if(!b.effect.x.promoted().roundPixel(x)||!b.effect.y.promoted().roundPixel(y)){failedSprite=92;failedFrame=UWORD(frame);return false;}
+            if(!b.effect.x.roundPixel(x)||!b.effect.y.roundPixel(y)){failedSprite=92;failedFrame=UWORD(frame);return false;}
             if(!place(x,y,92,frame))return false;
         }
     }
@@ -297,7 +297,7 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
     port.compactTimeShards().visitNewest([&](auto,const auto& e){
         if(!shardsOk||e.dflash>0)return;
         std::int32_t x,y;unsigned frame;
-        if(!e.x.promoted().roundPixel(x)||!e.y.promoted().roundPixel(y)||
+        if(!e.x.roundPixel(x)||!e.y.roundPixel(y)||
            !downwell::DebrisDraw::frame(91,e.imageIndex,frame)){failedSprite=91;shardsOk=false;return;}
         if(!append(UWORD(91),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0))shardsOk=false;
     });
@@ -477,14 +477,14 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         foregroundDrawn=true;
         return port.visitForegroundEffects([&](const downwell::CorpseExpiryEffect& effect){
             std::int32_t x,y;
-            if(!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)){
+            if(!effect.x.roundPixel(x)||!effect.y.roundPixel(y)){
                 failedSprite=effect.spriteId;return false;
             }
             return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
         },[&](const downwell::PlayerDamageNumber& effect){
             downwell::DamageNumberText label;std::int32_t x,y;
             auto fail=[&](){failedSprite=gameplayDamageTextMarker;return false;};
-            if(!label.format(effect.amount)||!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
+            if(!label.format(effect.amount)||!effect.x.roundPixel(x)||!effect.y.roundPixel(y))return fail();
             const std::int64_t sx=std::int64_t(downwellPlayfieldX)+x-worldViewX,sy=std::int64_t(y)-worldViewY;
             const int half=int(label.length)*4;
             if(sx+half+1<=downwellPlayfieldX||sx-half-1>=downwellPlayfieldX+downwellPlayfieldWidth||sy+11<=0||sy-1>=downwellDisplayHeight)return true;
@@ -730,7 +730,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             if(kind==GameplayWorld::DrawActor::entryDither){
                 const auto* record=port.entryDithers()?port.entryDithers()->find(key):nullptr;
                 std::int32_t sourceDepth;
-                if(!record||entryCoverVisible||!depth.promoted().roundPixel(sourceDepth)||sourceDepth!=-200000||
+                if(!record||entryCoverVisible||!depth.roundPixel(sourceDepth)||sourceDepth!=-200000||
                    !downwell::EntryDitherPlacement::resolve(record->x,record->y,
                        downwell::MotionBinary64::fromInteger(worldViewX),
                        downwell::MotionBinary64::fromInteger(worldViewY),entryCover))return false;
@@ -781,7 +781,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 // Source Step publishes integer room positions. Keep this
                 // admission explicit: do not silently quantize an unsupported
                 // fractional collision-setter result for the planar backend.
-                if(!px.promoted().roundPixel(x)||!py.promoted().roundPixel(y)||
+                if(!px.roundPixel(x)||!py.roundPixel(y)||
                    !ix.assignInteger(x)||!iy.assignInteger(y)||
                    ((ix.bits!=px.bits)&&((ix.bits|px.bits)&0x7fffffffu))||
                    ((iy.bits!=py.bits)&&((iy.bits|py.bits)&0x7fffffffu)))return false;
@@ -914,7 +914,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             const bool blastImpact=effect.spriteId==605;
             if(!effect.valid||(!wallImpact&&!boneImpact&&!blastImpact&&effect.spriteId!=602&&effect.spriteId!=603)||
                effect.drawFrame()>=(wallImpact?8u:boneImpact?6u:blastImpact?3u:1u)||
-               !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)||
+               !effect.x.roundPixel(x)||!effect.y.roundPixel(y)||
                !ix.assign(downwell::MotionBinary64::fromInteger(x))||
                !iy.assign(downwell::MotionBinary64::fromInteger(y))||
                ((ix.bits!=effect.x.bits)&&((ix.bits|effect.x.bits)&0x7fffffffu))||

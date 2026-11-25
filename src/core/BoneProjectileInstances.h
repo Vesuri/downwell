@@ -48,7 +48,7 @@ public:
         if(slot==Capacity)return fail();
         Record birth;std::int32_t px,py;
         if(!birth.x.assignInteger(x)||!birth.y.assignInteger(y)||
-            !birth.x.promoted().roundPixel(px)||!birth.y.promoted().roundPixel(py))return fail();
+            !birth.x.roundPixel(px)||!birth.y.roundPixel(py))return fail();
         birth.lifetimeId=next_++;birth.sourceId=sourceId;
         records_[slot]=birth;++count_;const InstanceHandle key{slot,birth.lifetimeId};result=key;
         executing_=key;

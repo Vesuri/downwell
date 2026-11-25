@@ -65,7 +65,7 @@ public:
         Entry* free=nullptr;for(auto& e:entries_)if(!e.local&&!free)free=&e;
         PackedObject definition;std::int32_t x,y;
         if(!local||local<=newest_||!free||!objects_||!objects_->findObject(370,definition)||
-           !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)||
+           !effect.x.roundPixel(x)||!effect.y.roundPixel(y)||
            !nextId_||nextId_>0x7fffffffu)return fail();
         const auto id=nextId_;
         if(records_.create(id,370,room_,definition.persistent(),DebrisDraw::sourceDepth)!=CreateInstanceResult::success)return fail();
@@ -98,7 +98,7 @@ public:
     }
     bool move(unsigned local,const DebrisAnimation& effect,RunnerImageValue x,RunnerImageValue y){
         auto* e=checked(local,effect);auto* r=e?record(*e):nullptr;std::int32_t px,py;
-        if(!r||!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+        if(!r||!x.roundPixel(px)||!y.roundPixel(py)||
            !lifecycle_.publishedPosition(e->key,*r,x,y))return fail();
         r->x=px;r->y=py;r->preciseX=stored(x);r->preciseY=stored(y);return true;
     }

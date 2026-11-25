@@ -39,7 +39,7 @@ struct FlashBallEffect {
         if(!jitterY.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2)) ||
            !next.y.assign(jitterY)) return false;
         std::int32_t published;
-        if(!next.x.promoted().roundPixel(published) || !next.y.promoted().roundPixel(published)) return false;
+        if(!next.x.roundPixel(published) || !next.y.roundPixel(published)) return false;
         *this=next;return true;
     }
     bool advanceImage() {
@@ -61,8 +61,8 @@ struct FlashBallEffect {
         const unsigned exponent=(imageIndex.bits>>23)&255u;
         return exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
     }
-    int pixelX() const {std::int32_t pixel=0;x.promoted().roundPixel(pixel);return pixel;}
-    int pixelY() const {std::int32_t pixel=0;y.promoted().roundPixel(pixel);return pixel;}
+    int pixelX() const {std::int32_t pixel=0;x.roundPixel(pixel);return pixel;}
+    int pixelY() const {std::int32_t pixel=0;y.roundPixel(pixel);return pixel;}
 };
 
 // Owned fixed storage; no target heap allocation or per-frame asset conversion.

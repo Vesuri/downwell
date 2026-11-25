@@ -128,7 +128,7 @@ public:
             auto* r=store_.resolve(key_);std::int32_t px,py;RunnerImageValue integerX,integerY;
             // These event setters receive round(xx), round(yy). Do not hide
             // fractional external writes behind SkeletonActor's integer fields.
-            if(!r||!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+            if(!r||!x.roundPixel(px)||!y.roundPixel(py)||
                !integerX.assignInteger(px)||!integerY.assignInteger(py)||integerX.bits!=x.bits||integerY.bits!=y.bits||
                !store_.publishPosition(key_,*r,x,y))return store_.fail();
             r->state.x=px;r->state.y=py;return true;

@@ -228,7 +228,7 @@ bool GameplayWorld::blastShootables(downwell::CompactBlastRecord& blast,const do
     struct Hooks{} hooks;
     if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](std::uint32_t handle,downwell::CorpseAnimation& corpse){
         std::int32_t cx,cy;
-        if(!corpse.x.promoted().roundPixel(cx)||!corpse.y.promoted().roundPixel(cy))return false;
+        if(!corpse.x.roundPixel(cx)||!corpse.y.roundPixel(cy))return false;
         if(!downwell::contactBoundsOverlap(bounds,downwell::contactPixelBounds(cx,cy,1,1,599))||
            !blast.remember(blastHitCorpse|(handle&0x0fffffffu)))return true;
         int order;
@@ -320,7 +320,7 @@ bool GameplayWorld::eatCompactCorpses(){
     const bool playerDead=dead();
     return compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
         std::int32_t cx,cy;
-        if(!corpse.x.promoted().roundPixel(cx)||!corpse.y.promoted().roundPixel(cy))return false;
+        if(!corpse.x.roundPixel(cx)||!corpse.y.roundPixel(cy))return false;
         if(!downwell::contactBoundsOverlap(player,downwell::contactPixelBounds(cx,cy,1,1,599)))return true;
         bool okay=true;
         return corpse.collidePlayerPublished(true,playerDead,publish,effects,okay)&&okay&&run_.effectsSucceeded;
@@ -351,7 +351,7 @@ bool GameplayWorld::collideCompactBlood(){
     for(unsigned i=0;i<bloodEnd_;++i){auto& b=bloods_[i];
         if(!b.live)continue;
         std::int32_t px,py;
-        if(!b.effect.x.promoted().roundPixel(px)||!b.effect.y.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+        if(!b.effect.x.roundPixel(px)||!b.effect.y.roundPixel(py))return run_.effectsSucceeded=false;
         if(solidResolver_&&solidResolver_(solidResolverContext_,px-240,py-176))b.live=false;
     }
     return true;

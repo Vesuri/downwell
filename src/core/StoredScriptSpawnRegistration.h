@@ -34,7 +34,7 @@ public:
         for(auto& e:entries_){if(local&&e.local==local)return fail();if(!e.local&&!free)free=&e;}
         PackedObject definition;std::int32_t x,y;
         if(!local||!free||!objects_||!objects_->findObject(219,definition)||
-           !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)||
+           !effect.x.roundPixel(x)||!effect.y.roundPixel(y)||
            !nextId_||nextId_>0x7fffffffu||effect.spriteId!=-1||effect.frames||
            effect.imageSpeed.bits!=0x3f800000u||effect.angle.bits||effect.depth.bits)return fail();
         const auto id=nextId_;

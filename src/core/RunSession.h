@@ -734,7 +734,7 @@ struct RunSession {
         // original transformed sampling path below.
         std::int32_t ix,iy;
         RunnerImageValue rx,ry;
-        const bool integral=px.promoted().roundPixel(ix) && py.promoted().roundPixel(iy) &&
+        const bool integral=px.roundPixel(ix) && py.roundPixel(iy) &&
            rx.assign(MotionBinary64::fromInteger(ix)) && ry.assign(MotionBinary64::fromInteger(iy)) &&
            rx.bits==px.bits && ry.bits==py.bits &&
            ix>=-1048576 && ix<=1048576 && iy>=-1048576 && iy<=1048576;

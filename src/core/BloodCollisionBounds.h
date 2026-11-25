@@ -17,7 +17,7 @@ struct BloodCollisionBounds {
         const RunnerSpriteBounds::Box margins{{0x41200000},{0x41300000},{0x41500000},{0x41500000}};
         const RunnerImageValue unit{0x3f800000};
         RunnerSpriteBounds::Box edges;
-        auto round=[](RunnerImageValue value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);};
+        auto round=[](RunnerImageValue value,std::int32_t& pixel){return value.roundPixel(pixel);};
         // Keep half-open integer output: rounding the fractional far edge
         // directly avoids an inclusive decrement followed by increment.
         if(!(effect.imageAngle.bits&0x7fffffffu)){
@@ -25,7 +25,7 @@ struct BloodCollisionBounds {
         }else if(!RunnerSpriteBounds::rotated(margins,12,12,effect.x,effect.y,unit,unit,c,s,false,round,edges))return false;
         auto pixel=[](RunnerImageValue value,int& out){
             std::int32_t rounded;
-            if(!value.promoted().roundPixel(rounded))return false;
+            if(!value.roundPixel(rounded))return false;
             out=rounded;return true;
         };
         ContactBounds next;

@@ -78,7 +78,7 @@ public:
         if(noLoopCount_==NoLoopCapacity){++dropped_;return true;}
         NoLoop record;record.handle=next_;
         auto& e=record.effect;RunnerImageValue px,py;
-        if(!px.assign(x)||!py.assign(y)||!px.promoted().roundPixel(e.x)||!py.promoted().roundPixel(e.y)||
+        if(!px.assign(x)||!py.assign(y)||!px.roundPixel(e.x)||!py.roundPixel(e.y)||
            !begin(e,sprite,count,speed,angle))return fail();
         noLoop_[noLoopCount_++]=record;++next_;return true;
     }
@@ -89,7 +89,7 @@ public:
         auto& e=record.effect;RunnerImageValue px,py;Fixed16 fx,fy,length,direction;
         if(!good_||!frames(sprite,count))return fail();
         if(movingCount_==MovingCapacity){++dropped_;return true;}
-        if(!px.assign(x)||!py.assign(y)||!px.promoted().roundPixel(e.x)||!py.promoted().roundPixel(e.y)||
+        if(!px.assign(x)||!py.assign(y)||!px.roundPixel(e.x)||!py.roundPixel(e.y)||
            !Fixed16::fromBinary64(px.promoted(),fx)||!Fixed16::fromBinary64(py.promoted(),fy)||
            !begin(e,sprite,count,imageSpeed,angle)||
            !Fixed16::fromBinary64(speed,length)||length.v<0||length.v>3*65536||
@@ -139,7 +139,7 @@ private:
         if(count>Binary32Timeline::maximumFrames)return false;
         e.spriteId=sprite;e.frames27=std::int32_t(count)*Binary32Timeline::one;
         if(!rate.assign(speed)||!Binary32Timeline::rate(rate.bits,e.rate27)||e.rate27>e.frames27||
-           !turn.assign(angle)||!turn.promoted().roundPixel(degrees))return false;
+           !turn.assign(angle)||!turn.roundPixel(degrees))return false;
         e.fullRate27=e.rate27;
         degrees%=360;if(degrees<0)degrees+=360;
         e.turn=unsigned(std::uint16_t(degrees+45)/90)&3u;

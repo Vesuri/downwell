@@ -169,7 +169,7 @@ struct SkeletonActor : SkeletonDecisions {
         // adjustment for these integer inputs; original fistp rounds to even.
         if(coordinate.bits&0x7fffffffu) coordinate.bits-=4u<<23;
         std::int32_t grid;
-        if(!coordinate.promoted().roundPixel(grid) || grid>134217727 || grid< -134217728) return false;
+        if(!coordinate.roundPixel(grid) || grid>134217727 || grid< -134217728) return false;
         snapped=grid*16;
         return true;
     }

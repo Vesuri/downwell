@@ -146,10 +146,10 @@ struct BoneProjectile : ShootableThing {
             RunnerImageValue px,py;std::int32_t rounded;
             if(!px.assignInteger(motion.x)||!py.assignInteger(motion.y)||
                !motion.xx.roundPixel(rounded)||!px.assignInteger(rounded)||
-               !px.promoted().roundPixel(rounded)||!ops.position(px,py))return good=false;
+               !px.roundPixel(rounded)||!ops.position(px,py))return good=false;
             motion.x=rounded;
             if(!motion.yy.roundPixel(rounded)||!py.assignInteger(rounded)||
-               !py.promoted().roundPixel(rounded)||!ops.position(px,py))return good=false;
+               !py.roundPixel(rounded)||!ops.position(px,py))return good=false;
             motion.y=rounded;
             int hpOrder;if(!compareRunnerReal(health,{},hpOrder))return good=false;
             if(hpOrder<=0&&active){
