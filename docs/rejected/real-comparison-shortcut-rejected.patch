@@ -1,0 +1,95 @@
+diff --git a/src/core/RunnerRealComparison.h b/src/core/RunnerRealComparison.h
+index 4bf0fd9b..9262e0e0 100644
+--- a/src/core/RunnerRealComparison.h
++++ b/src/core/RunnerRealComparison.h
+@@ -5,7 +5,8 @@ namespace downwell {
+ // Finite normal/zero subset of the original runner's real comparison path.
+ // Returns -1/0/+1 for delta below -epsilon, inside the band, or above epsilon.
+ // Unsupported arithmetic is explicit, not silently interpreted as equality.
+-inline bool compareRunnerReal(MotionBinary64 left,MotionBinary64 right,int& order) {
++// The subtracting form: compareRunnerReal's oracle and its general case.
++inline bool compareRunnerRealReference(MotionBinary64 left,MotionBinary64 right,int& order) {
+     right.high^=0x80000000u;
+     if(!left.add(right)) return false;
+     const auto magnitude=left.high&0x7fffffffu;
+@@ -14,5 +15,36 @@ inline bool compareRunnerReal(MotionBinary64 left,MotionBinary64 right,int& orde
+     order=outside?(left.high&0x80000000u?-1:1):0;
+     return true;
+ }
++// The same answers without the subtraction where it cannot be near the
++// band (valid inputs below 2^1022, so the difference cannot overflow):
++// identical values, a zero side, opposite signs or exponents two or more
++// apart at magnitudes from 2^-13 (the difference then exceeds 2^-14,
++// well outside epsilon 1e-5). Near-equal pairs subtract.
++inline bool compareRunnerReal(MotionBinary64 left,MotionBinary64 right,int& order) {
++    const unsigned el=(left.high>>20)&2047u,er=(right.high>>20)&2047u;
++    if(el<2046u&&er<2046u&&left.valid()&&right.valid()){
++        if(left.high==right.high&&left.low==right.low){order=0;return true;}
++        const bool lz=left.zero(),rz=right.zero();
++        if(lz&&rz){order=0;return true;}
++        if(lz||rz){
++            const auto& value=rz?left:right;
++            const auto magnitude=value.high&0x7fffffffu;
++            const bool outside=magnitude>0x3ee4f8b5u||(magnitude==0x3ee4f8b5u&&value.low>0x88e368f1u);
++            const bool negative=(value.high>>31)!=0;
++            order=!outside?0:(rz?(negative?-1:1):(negative?1:-1));
++            return true;
++        }
++        const bool ln=(left.high>>31)!=0,rn=(right.high>>31)!=0;
++        const unsigned larger=el>er?el:er;
++        if(larger>=1010u){
++            if(ln!=rn){order=ln?-1:1;return true;}
++            if(el>=er+2u||er>=el+2u){
++                const bool leftBigger=el>er;
++                order=(leftBigger!=ln)?1:-1;return true;
++            }
++        }
++    }
++    return compareRunnerRealReference(left,right,order);
++}
+ }
+ #endif
+diff --git a/tests/core/FixedPointTest.cpp b/tests/core/FixedPointTest.cpp
+index b4eba3c3..d99da245 100644
+--- a/tests/core/FixedPointTest.cpp
++++ b/tests/core/FixedPointTest.cpp
+@@ -8,6 +8,7 @@
+ #include <cmath>
+ #include <cstdio>
+ #include <cstring>
++#include <utility>
+ using namespace downwell;
+ static double toDouble(MotionBinary64 v){
+     const std::uint64_t bits=(std::uint64_t(v.high)<<32)|v.low;double d;std::memcpy(&d,&bits,8);return d;
+@@ -83,6 +84,31 @@ int main(){
+     for(float f:{0.5f,1.5f,2.5f,-0.5f,-1.5f,0.49999997f,-2.5f,1048575.5f,2097151.f})
+         {std::uint32_t b;std::memcpy(&b,&f,4);std::int32_t a,r;
+          assert(downwell::EffectSpriteDraw::roundedPixel({b},a)&&downwell::RunnerImageValue{b}.promoted().roundPixel(r)&&a==r);}
++    // compareRunnerReal's subtraction-free cases against its reference.
++    {
++        using Real=downwell::MotionBinary64;
++        std::uint32_t st=2463534242u;
++        auto nx=[&](){st^=st<<13;st^=st>>17;st^=st<<5;return st;};
++        auto num=[](double d){std::uint64_t n;std::memcpy(&n,&d,8);return Real{std::uint32_t(n>>32),std::uint32_t(n)};};
++        for(unsigned i=0;i<2000000;++i){
++            Real a,b;
++            switch(nx()%6){
++            case 0:a={nx(),nx()};b={nx(),nx()};break;
++            case 1:{const double x=double(int(nx()%2000)-1000)/double(1+nx()%64);a=num(x);
++                    b=num(x+double(int(nx()%200)-100)*1e-7);}break;
++            case 2:a=num(double(int(nx()%720)-360));b=num(double(nx()%4)*90-180);break;
++            case 3:a=num(double(nx()%100)/100.0);b=nx()%2?Real{}:Real{0x80000000u,0};break;
++            case 4:a={nx(),nx()};b=a;b.low^=nx()%2;break;
++            default:{const double x=std::ldexp(1.0+double(nx()%1000)/1000,int(nx()%60)-30),
++                                  y=std::ldexp(1.0+double(nx()%1000)/1000,int(nx()%60)-30);
++                     a=num(nx()%2?x:-x);b=num(nx()%2?y:-y);}
++            }
++            if(nx()%2)std::swap(a,b);
++            int fast=7,reference=7;
++            const bool r1=downwell::compareRunnerReal(a,b,fast),r2=downwell::compareRunnerRealReference(a,b,reference);
++            assert(r1==r2&&(!r1||fast==reference));
++        }
++    }
+     std::printf("Fixed point: sine %.2g, atan %.2g deg; lengthdir %.2g px, point_direction %.2g deg from the VM forms\n",
+         worstSine,worstAtan,worstLength,worstDirection);
+ }
