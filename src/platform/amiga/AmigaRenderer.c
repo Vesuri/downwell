@@ -1308,6 +1308,36 @@ void amigaRendererPublishHudStage(AmigaRenderer* renderer, const AmigaHudStage* 
     }
 }
 
+void amigaRendererPublishHudStageShown(AmigaRenderer* renderer, const AmigaHudStage* stage,
+                                       UWORD shown[amigaHudStageRows][amigaHudStageWords]) {
+    UBYTE* row = renderer->hud + stage->y * downwellBytesPerPlaneLine + (stage->x >> 3);
+    unsigned y, word;
+    for (y = 0; y < stage->rows; ++y, row += downwellBytesPerPlaneLine)
+        for (word = 0; word < stage->words; ++word) {
+            const UWORD mask = stage->mask[y][word], low = stage->low[y][word], high = stage->high[y][word];
+            UBYTE* target = row + word*2;
+            shown[y][word] = (UWORD)(mask & (low | high));
+            if (!mask) continue;
+            writeWord(target, (UWORD)((readWord(target) & ~mask) | (low & mask)));
+            writeWord(target + downwellPlaneBytes,
+                (UWORD)((readWord(target + downwellPlaneBytes) & ~mask) | (high & mask)));
+        }
+}
+
+void amigaRendererEraseHudMask(AmigaRenderer* renderer, int x, int y, unsigned words, unsigned rows,
+                               const UWORD mask[amigaHudStageRows][amigaHudStageWords]) {
+    UBYTE* row = renderer->hud + y * downwellBytesPerPlaneLine + (x >> 3);
+    unsigned r, word;
+    for (r = 0; r < rows; ++r, row += downwellBytesPerPlaneLine)
+        for (word = 0; word < words; ++word) {
+            const UWORD clear = mask[r][word];
+            UBYTE* target = row + word*2;
+            if (!clear) continue;
+            writeWord(target, (UWORD)(readWord(target) & ~clear));
+            writeWord(target + downwellPlaneBytes, (UWORD)(readWord(target + downwellPlaneBytes) & ~clear));
+        }
+}
+
 int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
                                   const UBYTE* end, UWORD sprite, UWORD frame) {
     const UBYTE* record = findAsset(pack, end, sprite, frame);

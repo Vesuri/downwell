@@ -29,10 +29,7 @@ struct AmigaHudMaskedOwner {
             if (stage_.x != x_ || stage_.y != y_ || stage_.words != words_ || stage_.rows != rows_) eraseSeparately(renderer);
             else mergeErase();
         }
-        amigaRendererPublishHudStage(renderer, &stage_, nullptr);
-        for (unsigned r = 0; r < stage_.rows; ++r)
-            for (unsigned w = 0; w < stage_.words; ++w)
-                shown_[r][w] = UWORD(stage_.mask[r][w] & (stage_.low[r][w] | stage_.high[r][w]));
+        amigaRendererPublishHudStageShown(renderer, &stage_, shown_);
         published_ = true; x_ = stage_.x; y_ = stage_.y; words_ = stage_.words; rows_ = stage_.rows;
     }
     void hide(AmigaRenderer* renderer) {
@@ -45,12 +42,7 @@ struct AmigaHudMaskedOwner {
 
 private:
     void eraseSeparately(AmigaRenderer* renderer) {
-        if (!amigaHudStageBegin(&erase_, x_, y_, words_, rows_)) return;
-        for (unsigned r = 0; r < rows_; ++r)
-            for (unsigned w = 0; w < words_; ++w) {
-                erase_.mask[r][w] = shown_[r][w]; erase_.low[r][w] = erase_.high[r][w] = 0;
-            }
-        amigaRendererPublishHudStage(renderer, &erase_, nullptr);
+        amigaRendererEraseHudMask(renderer, x_, y_, words_, rows_, shown_);
     }
     void mergeErase() {
         composed_ = false;
@@ -63,7 +55,7 @@ private:
                 stage_.mask[r][w] |= old;
             }
     }
-    AmigaHudStage stage_, erase_;
+    AmigaHudStage stage_;
     UWORD shown_[amigaHudStageRows][amigaHudStageWords] = {};
     bool published_ = false, composed_ = false;
     int x_ = 0, y_ = 0;

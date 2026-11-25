@@ -140,6 +140,14 @@ int amigaHudStageGemmyText(AmigaHudStage*, const AmigaHudArt* const* glyphs, uns
                            int anchorX, int anchorY, int advance);
 /* Publish stage, with overlay (same x, its own rows; may be null) on top. */
 void amigaRendererPublishHudStage(AmigaRenderer*, const AmigaHudStage*, const AmigaHudStage*);
+/* amigaRendererPublishHudStage without an overlay, also recording each
+   word's non-zero published pixels, mask & (low | high), in shown. */
+void amigaRendererPublishHudStageShown(AmigaRenderer*, const AmigaHudStage*,
+                                       UWORD shown[amigaHudStageRows][amigaHudStageWords]);
+/* Clear (pen 0) the pixels set in mask over a words x rows region at x, y
+   (x word aligned), as publishing a stage of that mask with no pixels. */
+void amigaRendererEraseHudMask(AmigaRenderer*, int x, int y, unsigned words, unsigned rows,
+                               const UWORD mask[amigaHudStageRows][amigaHudStageWords]);
 int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);
 int amigaRendererDrawWordStampRun(AmigaRenderer*, const AmigaWordStamp*, int, int, unsigned);
 unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int);
