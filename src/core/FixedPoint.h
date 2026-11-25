@@ -97,6 +97,12 @@ struct Fixed16 {
         r.high -= 16u << 20;
         return r;
     }
+    // GameMaker round (halves to even) of a Q16 value, as a whole number.
+    static std::int32_t roundPixel(std::int32_t q16) {
+        std::int32_t whole = (q16 + 0x8000) >> 16;
+        if ((q16 & 0xffff) == 0x8000 && (whole & 1)) --whole;
+        return whole;
+    }
     Fixed16 operator+(Fixed16 o) const { return Fixed16{v + o.v}; }
     Fixed16 operator-(Fixed16 o) const { return Fixed16{v - o.v}; }
     Fixed16 operator-() const { return Fixed16{-v}; }

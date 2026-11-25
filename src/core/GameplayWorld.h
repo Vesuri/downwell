@@ -36,6 +36,7 @@
 #include "core/GameplaySpawners.h"
 #include "core/GameplayWhiteJellies.h"
 #include "core/GameplayRedBalls.h"
+#include "core/WhiteJellyFixedStep.h"
 #include "core/GameplayShopInstances.h"
 #include "core/CompactShopSpeech.h"
 #include "core/MovingFxInstances.h"
@@ -3146,10 +3147,10 @@ private:
     // Compact spawner 78 and its source-exact steering children 115/118.
     // Each live steering record owns one pool slot through auxiliaryState,
     // keyed by its enemy lifetime; Step/alarm/contact events run the shared
-    // WhiteJellyStep/RedBallStep state machines. The registered stores above
+    // WhiteJellyFixedStep/RedBallStep state machines. The registered stores above
     // remain the reference owners and are not used by this compact world.
     union SteeringActor {
-        downwell::WhiteJellyStep jelly;
+        downwell::WhiteJellyFixedStep jelly;
         downwell::RedBallStep ball;
         SteeringActor():jelly(){}
     };
@@ -3178,6 +3179,7 @@ private:
     bool hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTurns,int damage);
     bool collideSteeringEnemies();
     bool steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+    bool steeringWallContact(const downwell::ContactBounds& bounds,bool& hit);
     bool steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
 
     // Compact world-one effect chains (W1.3): box destruction, scenery

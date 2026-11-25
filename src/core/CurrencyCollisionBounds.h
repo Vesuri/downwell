@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_CURRENCY_COLLISION_BOUNDS_H
 #include "EnemyContact.h"
 #include "RunnerSpriteBounds.h"
+#include "FixedPoint.h"
 namespace downwell {
 // Unit, unrotated currency masks. Narrow position to binary32 before edge
 // arithmetic; rounding the centre first is not the bounds algorithm.
@@ -21,6 +22,22 @@ struct CurrencyCollisionBounds {
                pixelAxis(local.top,local.bottom-1,py,next.top,next.bottom)){out=next;return true;}
         }
         return calculateMaskReference(sprite,x,y,out);
+    }
+    // The same unit rectangle at a Q16 position (W3 fixed point): each edge
+    // is the position plus its margin rounded to a pixel (halves to even),
+    // without the binary32 narrowing, whose pixel W3 accepts moving.
+    // |x|, |y| < 2^30; false elsewhere.
+    static bool calculateMaskQ16(int sprite,std::int32_t x,std::int32_t y,ContactBounds& out){
+        const auto local=contactSpriteBounds(sprite);
+        constexpr std::int32_t limit=std::int32_t(1)<<30;
+        if(local.left>=local.right||local.top>=local.bottom||local.left<-(1<<7)||local.right>(1<<7)||
+           local.top<-(1<<7)||local.bottom>(1<<7)||x<=-limit||x>=limit||y<=-limit||y>=limit)return false;
+        ContactBounds next;
+        next.left=int(Fixed16::roundPixel(x+local.left*65536));
+        next.right=int(Fixed16::roundPixel(x+local.right*65536));
+        next.top=int(Fixed16::roundPixel(y+local.top*65536));
+        next.bottom=int(Fixed16::roundPixel(y+local.bottom*65536));
+        out=next;return true;
     }
     // unitIntegerAxis's rounded edges for a non-negative position p =
     // s * 2^-k (k 2..23) whose sums with the margins stay in [0, 2^24) at

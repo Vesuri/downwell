@@ -895,6 +895,13 @@ test-terrain-wall-contacts: build/terrain-wall-contacts-test
 test: test-terrain-wall-contacts
 verify-smoke-owner: build/smoke-owner-test
 	./build/smoke-owner-test
+.PHONY: verify-white-jelly-fixed
+test: verify-white-jelly-fixed
+verify-white-jelly-fixed: build/white-jelly-fixed-test
+	./build/white-jelly-fixed-test
+build/white-jelly-fixed-test: tests/core/WhiteJellyFixedStepTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/WhiteJellyFixedStepTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-effect-birth-sequences
 verify-effect-birth-sequences: build/effect-birth-sequences-test

@@ -2416,6 +2416,17 @@ struct GameplayWorld::SteeringOps {
         if(world.balloonHeld()){value=Real::fromInteger(world.balloon_.y);return true;}
         return player(true,value);
     }
+    // eplx/eply in Q16: the frame-start Q8 position plus the room offset.
+    bool enemyPlayerQ16(bool vertical,std::int32_t& value){
+        if(world.balloonHeld()){
+            const int pixel=vertical?world.balloon_.y:world.balloon_.x;
+            if(pixel<-32000||pixel>32000)return false;
+            value=pixel*65536;return true;
+        }
+        const long q8=vertical?world.player_.frameStartYFixed():world.player_.frameStartXFixed();
+        if(q8<-30000L*256||q8>30000L*256)return false;
+        value=std::int32_t(q8)*256+(vertical?176:240)*65536;return true;
+    }
     // point_direction in Q16 fixed point (FixedPoint.h), not the VM's
     // binary32/binary64 wrapper.
     bool pointDirection(Real x,Real y,Real targetX,Real targetY,Real& value){
@@ -2460,6 +2471,13 @@ struct GameplayWorld::SteeringOps {
     bool meeting(Real x,Real y,int object,bool& hit){
         return enemy&&object==57&&world.steeringWallMeeting(
             downwell::enemyContactMask(enemy->objectId,enemy->spriteId),x,y,hit);
+    }
+    bool meetingQ16(std::int32_t x,std::int32_t y,int object,bool& hit){
+        downwell::ContactBounds bounds;
+        if(!enemy||object!=57||!downwell::CurrencyCollisionBounds::calculateMaskQ16(
+            downwell::enemyContactMask(enemy->objectId,enemy->spriteId),x,y,bounds))
+            return world.run_.effectsSucceeded=false;
+        return world.steeringWallContact(bounds,hit);
     }
     bool enemyDeath(){ // scrEnemyDeath, gunshotStop included
         world.run_.combo.state.enemyDefeated();world.run_.stopSound(world.run_.overlapSounds[1]);
@@ -2550,9 +2568,14 @@ bool GameplayWorld::createCompactSpawner(int y){
 }
 
 bool GameplayWorld::steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
-    // parentWall 57: walls and boxes (resolver) plus the compact shop walls.
-    downwell::ContactBounds bounds;unsigned count=0;
+    downwell::ContactBounds bounds;
     if(!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
+    return steeringWallContact(bounds,hit);
+}
+
+bool GameplayWorld::steeringWallContact(const downwell::ContactBounds& bounds,bool& hit){
+    // parentWall 57: walls and boxes (resolver) plus the compact shop walls.
+    unsigned count=0;
     if(wallContactResolver_){
         if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
     }else if(solidResolver_){
@@ -2662,7 +2685,7 @@ bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,dow
     while(slot<steeringCapacity&&steeringOwner_[slot])++slot;
     if(slot==steeringCapacity)return run_.effectsSucceeded=false;
     downwell::SteeringEnemyBirthState* actor;
-    if(object==115)actor=new(&steering_[slot].jelly) downwell::WhiteJellyStep{};
+    if(object==115)actor=new(&steering_[slot].jelly) downwell::WhiteJellyFixedStep{};
     else{actor=new(&steering_[slot].ball) downwell::RedBallStep{};steering_[slot].ball.neon=object==173;}
     SteeringOps ops{*this,nullptr,*actor};
     downwell::RunnerImageValue cx,cy;
@@ -2793,7 +2816,9 @@ bool GameplayWorld::collideSteeringEnemies(){
         if(!steeringObject(enemy.objectId)||!enemy.active||enemy.destroyRequested||enemy.health<=0)continue;
         auto* actor=steeringActor(enemy);
         long stompY;
-        if(!actor||!ceilQ8(actor->yy,stompY))return run_.effectsSucceeded=false;
+        if(!actor)return run_.effectsSucceeded=false;
+        if(enemy.objectId==115)stompY=steering_[enemy.auxiliaryState].jelly.stompCeilQ8();
+        else if(!ceilQ8(actor->yy,stompY))return run_.effectsSucceeded=false;
         stompY-=176L*256;
         const downwell::ContactActor contact{enemy.x*256L,enemy.y*256L,enemy.facing,1,
             downwell::enemyContactMask(enemy.objectId,enemy.spriteId)};
