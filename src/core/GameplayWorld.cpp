@@ -2160,14 +2160,15 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(blastEnd_&&!stepCompactBlasts(blastStepLastSerial))return {};
     if(!scenery_.empty()&&!stepCompactScenery())return {};
     if(compactDebris_.size()&&!compactDebris_.step(compactDebrisStepPhase,enemyRandom_,
-        [this](auto,const downwell::DebrisAnimation& d,bool& frozen){ // !TimeStopBound, mask 598
+        [this](auto,const downwell::DebrisParticle& d,bool& frozen){ // !TimeStopBound, mask 598
             if(!stopped()){frozen=false;return true;}
-            std::int32_t x,y;
-            if(!d.x.promoted().roundPixel(x)||!d.y.promoted().roundPixel(y))return false;
-            frozen=!timeStopBound(598,x,y);return true;
+            frozen=!timeStopBound(598,d.pixelX(),d.pixelY());return true;
         },
-        [this](auto,const downwell::DebrisAnimation&,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
-            return solidMeeting(598,x,y,true,hit);
+        [this](auto,const downwell::DebrisParticle&,std::int32_t x,std::int32_t y,bool& hit){
+            downwell::ContactBounds bounds;
+            if(!run_.effectsSucceeded||!downwell::CurrencyCollisionBounds::calculateMaskQ16(598,x,y,bounds))
+                return run_.effectsSucceeded=false;
+            return solidContact(bounds,true,hit);
         })){run_.effectsSucceeded=false;return {};}
     if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
         const auto key=debrisStepOrder_.handle(i);
@@ -2993,6 +2994,10 @@ bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::M
     downwell::ContactBounds bounds;
     if(!run_.effectsSucceeded||!maskBounds_.calculate(mask,x,y,bounds))
         return run_.effectsSucceeded=false;
+    return solidContact(bounds,platforms,hit);
+}
+
+bool GameplayWorld::solidContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit){
     bool found=false;
     if(wallContactResolver_&&(!platforms||platformContactResolver_)){
         unsigned count=0;
@@ -3052,8 +3057,8 @@ struct GameplayWorld::SceneryOps {
     bool createDebris(){return world.spawnCompactDebris(Real::fromInteger(x),Real::fromInteger(y),debris);}
     bool debrisYSpeed(Real value){
         auto* effect=world.compactDebris_.get(debris);
-        if(!effect)return fail();
-        effect->ysp=value;return true;
+        if(!effect||!effect->setYSpeed(value))return fail();
+        return true;
     }
     bool sprite(int){changed=true;return true;}
     // Collision with objPlayer_n: objPlayer_n.ysp > 0, then scrFjump/scrSShake.

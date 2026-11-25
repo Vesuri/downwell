@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_DEBRIS_DRAW_H
 #define DOWNWELL_CORE_DEBRIS_DRAW_H
 #include "DebrisAnimation.h"
+#include "DebrisParticle.h"
 #include "EffectSpriteDraw.h"
 #include "EffectMaskAssets.h"
 namespace downwell {
@@ -37,6 +38,26 @@ struct DebrisDraw {
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
         return frame(command.sprite,command.imageIndex,subimage)&&assets.debris(command.sprite,subimage,asset)&&
             emit(asset,effect.x.promoted(),effect.y.promoted());
+    }
+    // The compact world's Q16 debris: drawFx at its rounded pixel.
+    template<class Emit>
+    static bool surface(const DebrisParticle& effect,const EffectMaskAssets& assets,
+                        const EffectSurfacePlacement::View& view,Emit emit){
+        if(effect.destroyRequested||effect.flash>0)return true;
+        const std::int32_t px=effect.pixelX(),py=effect.pixelY();
+        EffectSurfacePlacement::PixelView pixels;unsigned subimage;EffectMaskAssets::Asset asset;
+        if(EffectSurfacePlacement::pixelView(view,pixels)){
+            if(!EffectSurfacePlacement::pixelInView(px,py,pixels))return true;
+            return frame(effect.spriteId,effect.imageIndex,subimage)&&
+                assets.debris(effect.spriteId,subimage,asset)&&emit(asset,px,py);
+        }
+        Command command;
+        const auto x=MotionBinary64::fromInteger(px),y=MotionBinary64::fromInteger(py);
+        if(!EffectSpriteDraw::prepare(true,effect.spriteId,effect.imageIndex,x,y,{0x3f800000u},
+            view,false,false,true,command))return false;
+        if(command.placement.target==EffectSurfacePlacement::hidden)return true;
+        return frame(command.sprite,command.imageIndex,subimage)&&assets.debris(command.sprite,subimage,asset)&&
+            emit(asset,x,y);
     }
     static bool prepare(const DebrisAnimation& effect,
                         const EffectSurfacePlacement::View& view,

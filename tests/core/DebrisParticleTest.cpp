@@ -1,0 +1,61 @@
+#include "core/DebrisParticle.h"
+#include "core/DebrisAnimation.h"
+#include "core/CurrencyCollisionBounds.h"
+#include "core/GameMakerRandom.h"
+#include <cstdio>
+#include <cstdlib>
+// The compact world's Q16 debris against DebrisAnimation, its VM form,
+// stepped side by side in a walled pit while their RNG streams agree:
+// published pixels stay within one, and hits (which draw RNG) rarely move.
+static void checkAt(bool ok,int line){if(!ok){std::fprintf(stderr,"Debris particle check failed at line %d\n",line);std::abort();}}
+#define check(ok) checkAt((ok),__LINE__)
+using N=downwell::MotionBinary64;
+namespace {
+constexpr int mask=598;
+bool solid(int x,int y){
+    if(x<40||x>=280||y>=200)return true;
+    return (y>>4)==11&&((x>>4)%4==1);
+}
+bool overlaps(const downwell::ContactBounds& b){
+    for(int y=b.top;y<b.bottom;++y)for(int x=b.left;x<b.right;++x)if(solid(x,y))return true;
+    return false;
+}
+int pixel(downwell::RunnerImageValue v){std::int32_t n;checkAt(v.promoted().roundPixel(n),__LINE__);return int(n);}
+}
+int main(){
+    unsigned births=0,steps=0,pixelDifferences=0,streamsParted=0,meetings=0,hits=0;
+    for(unsigned seed=0;seed<512;++seed){
+        downwell::GameMakerRandom referenceRandom(seed),fixedRandom(seed),place(seed+7000);
+        const N x=N::fromInteger(60+int(place.irandomSmall(200))),y=N::fromInteger(160+int(place.irandomSmall(30)));
+        downwell::DebrisAnimation reference;downwell::DebrisParticle fixed;
+        const int area=1+int(seed%5);
+        check(reference.create(x,y,area,referenceRandom)&&fixed.create(x,y,area,fixedRandom));
+        check(referenceRandom.drawCount()==fixedRandom.drawCount()&&reference.spriteId==fixed.spriteId);
+        ++births;
+        for(unsigned tick=0;tick<60&&!reference.destroyRequested;++tick){
+            check(reference.advanceImage()&&fixed.advanceImage());
+            for(unsigned a=0;a<3;++a){reference.advanceAlarm(a);fixed.advanceAlarm(a);}
+            if(reference.destroyRequested)break;
+            check(reference.step(false,referenceRandom,[&](N px,N py,bool& hit){
+                downwell::ContactBounds b;
+                if(!downwell::CurrencyCollisionBounds::calculateMask(mask,px,py,b))return false;
+                hit=overlaps(b);return true;
+            }));
+            check(fixed.step(false,fixedRandom,[&](std::int32_t px,std::int32_t py,bool& hit){
+                downwell::ContactBounds b;
+                if(!downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,px,py,b))return false;
+                hit=overlaps(b);++meetings;hits+=hit;return true;
+            },0));
+            if(referenceRandom.drawCount()!=fixedRandom.drawCount()){++streamsParted;break;}
+            ++steps;
+            const int rx=pixel(reference.x),ry=pixel(reference.y);
+            check(std::abs(rx-fixed.pixelX())<=1&&std::abs(ry-fixed.pixelY())<=1);
+            pixelDifferences+=(rx!=fixed.pixelX())+(ry!=fixed.pixelY());
+            check(reference.imageSpeed.bits==fixed.imageSpeed.bits&&reference.flash==fixed.flash&&
+                  reference.destroyRequested==fixed.destroyRequested);
+        }
+    }
+    std::printf("Debris Q16: %u births, %u steps, %u meetings (%u solid), %u of %u published pixels differ by one, "
+                "%u RNG streams parted by a moved hit\n",births,steps,meetings,hits,pixelDifferences,2*steps,streamsParted);
+    check(hits*10>meetings&&pixelDifferences*100<2*steps&&streamsParted*50<births);
+}

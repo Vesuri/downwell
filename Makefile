@@ -895,6 +895,13 @@ test-terrain-wall-contacts: build/terrain-wall-contacts-test
 test: test-terrain-wall-contacts
 verify-smoke-owner: build/smoke-owner-test
 	./build/smoke-owner-test
+.PHONY: verify-debris-particle
+test: verify-debris-particle
+verify-debris-particle: build/debris-particle-test
+	./build/debris-particle-test
+build/debris-particle-test: tests/core/DebrisParticleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/DebrisParticleTest.cpp src/core/GameMakerRandom.cpp
 .PHONY: verify-white-jelly-fixed
 test: verify-white-jelly-fixed
 verify-white-jelly-fixed: build/white-jelly-fixed-test

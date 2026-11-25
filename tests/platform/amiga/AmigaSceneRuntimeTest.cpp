@@ -3065,6 +3065,8 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         if(level==3&&!upgradeRoute)require(routeSideStops&&routeShards,"the route stops time in a side room with shards");
         if(level==3&&!upgradeRoute)require(routeFrozen,"the route freezes or field-kills an enemy");
         if(level==3&&!upgradeRoute)require(routeFireViews&&routeDoused,"the route shows and douses a TorchFire");
+        // The spray workload may die: keep its complete tape and states.
+        tape.flush();states.flush();
         require(!game.dead()&&game.levelResultRequested(),"input-only slice reaches exit alive");
         playedUpgrades=game.upgrades();
         bool heart=false;require(game.enterLevelClear(0,heart),"slice Result Create");

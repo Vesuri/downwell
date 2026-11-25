@@ -1584,7 +1584,7 @@ public:
         if(ok&&compactCorpses_.size()&&!compactCorpses_.visitNewest([&](auto,const downwell::CorpseAnimation& corpse){
             if(ok&&!downwell::CorpseDraw::surface(corpse,assets,view,emit))ok=false;
         }))return false;
-        if(ok&&compactDebris_.size()&&!compactDebris_.visitNewest([&](auto,const downwell::DebrisAnimation& effect){
+        if(ok&&compactDebris_.size()&&!compactDebris_.visitNewest([&](auto,const downwell::DebrisParticle& effect){
             if(ok&&!downwell::DebrisDraw::surface(effect,assets,view,emit))ok=false;
         }))return false;
         // decoyBalloon (depth -10000) sits between explosionSmall and
@@ -3190,7 +3190,7 @@ private:
     CompactEffects compactEffects_;
     // Object 370 born by compact boxes and scenery, apart from the registered
     // debris owner's storage.
-    downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity> compactDebris_;
+    downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity,downwell::DebrisParticle> compactDebris_;
     // Compact objDeadBody 263 (W1.6): the world-one families' scrDeadBody
     // corpses, apart from the registered skeleton corpse owner.
     downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity> compactCorpses_;
@@ -3372,12 +3372,13 @@ private:
     bool attractCompactGem(int slot);
     bool spawnCompactDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& handle);
     bool solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool solidContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit);
     downwell::MaskBoundsMemo maskBounds_;
     bool segmentSolid(const downwell::ProjectileSegment& path)const;
     bool compactInView(int x,int y,bool& visible)const;
 public:
     const CompactEffects& compactEffects()const{return compactEffects_;}
-    const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity>& compactDebris()const{return compactDebris_;}
+    const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity,downwell::DebrisParticle>& compactDebris()const{return compactDebris_;}
     const downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity>& compactCorpses()const{return compactCorpses_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}

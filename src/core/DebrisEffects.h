@@ -1,13 +1,15 @@
 #ifndef DOWNWELL_CORE_DEBRIS_EFFECTS_H
 #define DOWNWELL_CORE_DEBRIS_EFFECTS_H
 #include "DebrisAnimation.h"
+#include "DebrisParticle.h"
 namespace downwell {
 // Same bounded production storage on both platforms; exhaustion is terminal.
 constexpr unsigned debrisEffectCapacity=64;
-// Fixed object-370 storage. Handles are owner-local, not Windows instance IDs.
+// Fixed object-370 storage of DebrisAnimation (registered paths, the VM
+// form) or DebrisParticle (the compact world's Q16 motion). Handles are owner-local, not Windows instance IDs.
 // Capture cutoffs at global phase entry. Callbacks must not mutate this owner;
 // pass adapters anew after copying a world, never retain borrowed references.
-template<unsigned Capacity> class DebrisEffects {
+template<unsigned Capacity,class Effect=DebrisAnimation> class DebrisEffects {
     static_assert(Capacity>0,"Debris capacity must be nonzero");
 public:
     using Handle=std::uint32_t;
@@ -23,8 +25,8 @@ public:
     }
     struct Phase{Handle newest;};
     struct NoLifecycle{
-        bool birth(Handle,const DebrisAnimation&)const{return true;}
-        bool retire(Handle,const DebrisAnimation&)const{return true;}
+        bool birth(Handle,const Effect&)const{return true;}
+        bool retire(Handle,const Effect&)const{return true;}
     };
     bool valid()const{return good_;}
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
@@ -35,7 +37,7 @@ public:
         }
         return result;
     }
-    DebrisAnimation* get(Handle h){
+    Effect* get(Handle h){
         if(good_&&h)for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.handle==h&&!s.effect.destroyRequested)return &s.effect;
         }
@@ -43,7 +45,7 @@ public:
     }
     // Registered instances remain addressable after a destruction request.
     // Only the room's explicit cleanup may release/reuse their slots.
-    const DebrisAnimation* retained(Handle h)const{
+    const Effect* retained(Handle h)const{
         if(good_&&h)for(unsigned i=0;i<count_;++i){const auto& s=slots_[order_[i]];
             if(s.handle==h)return &s.effect;
         }
@@ -121,11 +123,11 @@ public:
         auto& effect=slot->effect;
         if(h>phase.newest||effect.destroyRequested)return true;
         bool frozen=false;
-        if(!stopped(h,static_cast<const DebrisAnimation&>(effect),frozen)||
+        if(!stopped(h,static_cast<const Effect&>(effect),frozen)||
            !effect.step(frozen,random,[&](auto x,auto y,bool& hit){
-               return meeting(h,static_cast<const DebrisAnimation&>(effect),x,y,hit);
+               return meeting(h,static_cast<const Effect&>(effect),x,y,hit);
            },[&](auto x,auto y){
-               return publish(h,static_cast<const DebrisAnimation&>(effect),x,y);
+               return publish(h,static_cast<const Effect&>(effect),x,y);
            }))return good_=false;
         return publishMark(*slot,lifecycle);
     }
@@ -169,11 +171,11 @@ public:
         for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.handle>phase.newest||s.effect.destroyRequested)continue;
             bool frozen=false;
-            if(!stopped(s.handle,static_cast<const DebrisAnimation&>(s.effect),frozen)||
+            if(!stopped(s.handle,static_cast<const Effect&>(s.effect),frozen)||
                !s.effect.step(frozen,random,[&](auto x,auto y,bool& hit){
-                   return meeting(s.handle,static_cast<const DebrisAnimation&>(s.effect),x,y,hit);
+                   return meeting(s.handle,static_cast<const Effect&>(s.effect),x,y,hit);
                },[&](auto x,auto y){
-                   return publish(s.handle,static_cast<const DebrisAnimation&>(s.effect),x,y);
+                   return publish(s.handle,static_cast<const Effect&>(s.effect),x,y);
                })){good_=false;return false;}
         }
         return retireRequested(lifecycle);
@@ -181,7 +183,7 @@ public:
     template<class Random,class Stopped,class Meeting,class Lifecycle=NoLifecycle>
     bool step(Phase phase,Random& random,Stopped stopped,Meeting meeting,Lifecycle&& lifecycle={}){
         return stepPublished(phase,random,stopped,meeting,
-            [](Handle,const DebrisAnimation&,RunnerImageValue,RunnerImageValue){return true;},lifecycle);
+            [](Handle,const Effect&,auto,auto){return true;},lifecycle);
     }
     template<class Lifecycle=NoLifecycle> bool retireRequested(Lifecycle&& lifecycle={}){
         if(!good_)return false;
@@ -205,7 +207,7 @@ public:
         return true;
     }
 private:
-    struct Slot{Handle handle=0;DebrisAnimation effect;bool markPublished=false;};
+    struct Slot{Handle handle=0;Effect effect;bool markPublished=false;};
     Slot* find(Handle h){
         if(good_&&h)for(unsigned i=0;i<count_;++i)if(slots_[order_[i]].handle==h)return &slots_[order_[i]];
         return nullptr;
