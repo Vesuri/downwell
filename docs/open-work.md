@@ -160,22 +160,14 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     released (`GardenMotion`). Confirm on the Windows build, then bring the
     garden bullets, the gunshot sounds, the recharge on landing and the
     grass reaction into the front end.
-17. **Ammo label on a digit change.** On the update the ammo number widens
-    (0 → 10 and 4 → 10 on landing, seen twice in a 2026-11-25 playthrough),
-    the label area shows a solid red box with the old and new numbers
-    overlapping, and the gauge still shows the old fill. The next update is
-    correct. The original draws nothing like this. Suspect the wide label
-    clear in `AmigaAmmoHud.h` (it fills colour 0 where the one-digit clear
-    fills 3). Reproduce with a fixture that reloads from a one-digit to a
-    two-digit count and compare the frame with the SDL reference.
-18. **Disappearing gems leave white outlines.** A gem about to vanish skips
+17. **Disappearing gems leave white outlines.** A gem about to vanish skips
     its Draw every other update (`dflash`, `objCurrency` Step and Draw). On
     those updates the Amiga shows the gems as white outlines with black
     interiors; `sprGemM`'s four frames are all red-filled and gem high draws
     no outlines. Also seen: partly drawn gems beside `EMPTY!`. Seen with a
     `gemChunk`'s ten gems on the floor of a side room during gem high.
     Check first whether it predates the uncommitted 5 C row-restore queue.
-19. **Gameplay display checks do not run.** The six emulator pixel checks
+18. **Gameplay display checks do not run.** The six emulator pixel checks
     (`verify-amiga-gameplay-frame`, `-active-frame`, `-laser-frame`,
     `-gemhigh-frame`, `-ammo-frame`, `-recharge-frame`) fail at HEAD
     0728994a. On `a1200-4m` the verification build does not fit (it exits

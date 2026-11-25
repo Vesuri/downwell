@@ -1432,7 +1432,7 @@ int main(int argc, char** argv) {
             previousDigits = digits;
             if (clearDigits == 1) amigaRendererFillRect(renderer, 282, 232, 24, 24, 3);
             else amigaRendererFillRect(renderer, 282-(int(clearDigits)-1)*4, 231,
-                34+(clearDigits-1)*8, 26+clearDigits-1, 0);
+                34+(clearDigits-1)*8, 26+clearDigits-1, 3);
             asset(416, 0, 284, 43+meter);
             downwell::drawAmmoFill(ammo, cap, 289, [&](int x, unsigned y, unsigned w, unsigned h) {
                 amigaRendererFillRect(renderer, x, y, w, h, 1);
@@ -1512,6 +1512,38 @@ int main(int argc, char** argv) {
                         ammo, cap, 0, &rows, meter);
                     fullRedraw(ammo, cap, 0, meter);
                     require(actualHud == expectedHud, "composed divider cache preserves all charge and jiggle states");
+                }
+        // A landing reload widens the label in one update (0 -> 10, 4 -> 10),
+        // with the refill's jiggle, after one-digit updates the prepared path took.
+        for (unsigned cap : {10u, 12u, 15u})
+            for (unsigned before : {0u, 4u, 9u})
+                for (unsigned meter = 0; meter < 4; ++meter) {
+                    for (unsigned tick = 0; tick < 3; ++tick) {
+                        rows.step(before, cap);
+                        retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(),
+                            before, cap, 0, &rows, 0);
+                        fullRedraw(before, cap, 0, 0);
+                    }
+                    rows.step(10, cap);
+                    retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(),
+                        10, cap, 0, &rows, meter);
+                    fullRedraw(10, cap, 0, meter);
+                    if (actualHud != expectedHud) {
+                        unsigned first = 0;
+                        while (actualHud[first] == expectedHud[first]) ++first;
+                        std::cerr << "widening reload cap=" << cap << " before=" << before << " meter=" << meter
+                                  << " first byte=" << first << " row=" << first % downwellPlaneBytes / 48
+                                  << " x=" << first % 48 * 8 << '\n';
+                    }
+                    require(actualHud == expectedHud, "a reload that widens the label matches the source draw");
+                    // The label stays opaque: no transparent pixel over the sprites, and
+                    // no pen change that crosses both planes of the single-buffered HUD.
+                    for (int y = 231; y < 258; ++y)
+                        for (int x = 278; x < 320; ++x) {
+                            const unsigned at = unsigned(y)*48 + unsigned(x)/8, bit = 0x80u >> (x%8);
+                            require((actualHud[at] & bit) || (actualHud[at+downwellPlaneBytes] & bit),
+                                "a widened ammo label leaves no transparent pixel");
+                        }
                 }
         // Isolate every artwork transition, including the special bottom row
         // and both sides of the fill boundary. Adjacent overlays can conceal

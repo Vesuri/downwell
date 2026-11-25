@@ -192,9 +192,13 @@ public:
                 renderer->clipX = left; renderer->clipWidth = right-left;
             } else {
                 amigaRendererFillRect(renderer, 282, 40, 24, 216, 3);
+                // Opaque black (3), as the side panel: pen 0 would open a
+                // hole over the sprites, and PF2 is single-buffered, so the
+                // 11 -> 00 change could show for a frame as red (10) between
+                // the two planes' writes.
                 if (clearDigits == 1) amigaRendererFillRect(renderer, 282, 232, 24, 24, 3);
                 else amigaRendererFillRect(renderer, 282 - (static_cast<int>(clearDigits)-1)*4,
-                    231, 34 + (clearDigits-1)*8, 26 + clearDigits-1, 0);
+                    231, 34 + (clearDigits-1)*8, 26 + clearDigits-1, 3);
                 asset(416, 0, 284, 43 + meter);
             }
             if (!interior && fillHeight_) amigaRendererFillRect(renderer, 289, fillTop_, 10, fillHeight_, 1);
