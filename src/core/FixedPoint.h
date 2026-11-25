@@ -103,6 +103,14 @@ struct Fixed16 {
         if ((q16 & 0xffff) == 0x8000 && (whole & 1)) --whole;
         return whole;
     }
+    // v * factor / 65536 for a factor below 1 (0..65535), rounded to
+    // nearest with 32-bit products: the whole pixels' product is exact,
+    // only the fraction's is rounded. Symmetric about zero.
+    static std::int32_t scale(std::int32_t v, std::uint32_t factor) {
+        const std::uint32_t m = std::uint32_t(v < 0 ? -v : v);
+        const std::int32_t r = std::int32_t((m >> 16) * factor + (((m & 0xffffu) * factor + 0x8000u) >> 16));
+        return v < 0 ? -r : r;
+    }
     Fixed16 operator+(Fixed16 o) const { return Fixed16{v + o.v}; }
     Fixed16 operator-(Fixed16 o) const { return Fixed16{v - o.v}; }
     Fixed16 operator-() const { return Fixed16{-v}; }

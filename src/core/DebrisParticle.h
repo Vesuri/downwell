@@ -107,13 +107,7 @@ struct DebrisParticle {
         return true;
     }
 private:
-    // 0.7 in Q16, rounded, with 32-bit products: whole pixels times the
-    // factor are exact, only the fraction's product is rounded.
-    static std::int32_t scale(std::int32_t v){
-        const std::uint32_t m=std::uint32_t(v<0?-v:v);
-        const std::int32_t r=std::int32_t((m>>16)*std::uint32_t(bounce)+(((m&0xffffu)*std::uint32_t(bounce)+0x8000u)>>16));
-        return v<0?-r:r;
-    }
+    static std::int32_t scale(std::int32_t v){return Fixed16::scale(v,std::uint32_t(bounce));}
 };
 }
 #endif

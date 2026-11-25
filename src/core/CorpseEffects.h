@@ -2,12 +2,15 @@
 #define DOWNWELL_CORE_CORPSE_EFFECTS_H
 #include "CorpseAnimation.h"
 #include "DeadBodyCreation.h"
+#include "CorpseParticle.h"
 namespace downwell {
 // Owner-local monotonic handles, not Windows instance IDs. Global schedulers
 // merge event order across families; a phase cutoff excludes subsequent births.
 // Callbacks may create other families, but must not mutate this store. Pass
 // fresh adapters after world copies; no borrowed callback is retained here.
-template<unsigned Capacity> class CorpseEffects {
+// Effect is CorpseAnimation (registered paths, the VM form) or
+// CorpseParticle (the compact world's Q16 motion).
+template<unsigned Capacity,class Effect=CorpseAnimation> class CorpseEffects {
     static_assert(Capacity>0,"nonempty corpse capacity required");
 public:
     using Handle=std::uint32_t;
@@ -17,13 +20,13 @@ public:
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
     // Lifetime lookup is separate from event eligibility: marked corpses and
     // partial failures remain owned until explicit room cleanup succeeds.
-    const CorpseAnimation* find(Handle handle)const{
+    const Effect* find(Handle handle)const{
         if(handle)for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];
             if(slot.handle==handle)return &slot.effect;
         }
         return nullptr;
     }
-    CorpseAnimation* get(Handle handle){
+    Effect* get(Handle handle){
         if(good_&&handle)for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle==handle&&slot.effect.valid&&!slot.effect.destroyRequested)return &slot.effect;
         }
@@ -126,7 +129,7 @@ public:
         return true;
     }
 private:
-    struct Slot{Handle handle=0;CorpseAnimation effect;};
+    struct Slot{Handle handle=0;Effect effect;};
     Slot slots_[Capacity];unsigned order_[Capacity]{},count_=0;
     Handle next_=1;bool good_=true;
 };

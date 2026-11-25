@@ -382,15 +382,19 @@ resets it; that is the first owner to find.
     `scrCheckCollisionWith` and mask bounds; `WhiteJellyStep` remains the
     registered path and oracle); the compact debris (`DebrisParticle`, Q16
     position and velocity, `sParentSolid` bounds from Q16; `DebrisAnimation`
-    remains the registered form and oracle).
+    remains the registered form and oracle); the compact corpses
+    (`CorpseParticle`, Q16 position, speeds in exact 1/65520 px so the
+    decimal gravity and bounce thresholds keep their outcomes;
+    `CorpseAnimation` remains the registered form and oracle).
     Converting at an owner's boundary pays only where trig dominates: for
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
     together: smoke's animation (1.0-1.3 ms per worst spray update, binary32
-    timeline) and wall contacts (1.8), corpses 3.2, then the red ball's
-    stored state. Debris and jelly steps are now mostly their terrain
-    queries (1.2 and 1.3 ms per spray update). drawFx rounds every
+    timeline) and wall contacts (1.8), then the red ball's stored state.
+    Debris, jelly and corpse steps are now mostly their terrain queries
+    (1.2, 1.3 and 1.1 ms per spray update); corpse drawing (2.0 ms) is
+    stamping, not arithmetic. drawFx rounds every
     binary32 position to its pixel and skips binary64 placement.
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,

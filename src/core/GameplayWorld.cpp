@@ -4451,11 +4451,16 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
 // is symmetric about the origin, so image_xscale does not move its edges.
 bool GameplayWorld::compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
     if(wallContactResolver_&&(!platforms||platformContactResolver_))return solidMeeting(599,x,y,platforms,hit);
-    // Worlds with only a point resolver (host fixtures) scan the mask's
-    // pixel box; without any resolver nothing is solid.
-    hit=false;
     downwell::ContactBounds bounds;
     if(!downwell::CurrencyCollisionBounds::calculateMask(599,x,y,bounds))return run_.effectsSucceeded=false;
+    return compactCorpseContact(bounds,platforms,hit);
+}
+
+// Worlds with only a point resolver (host fixtures) scan the mask's pixel
+// box; without any resolver nothing is solid.
+bool GameplayWorld::compactCorpseContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit){
+    if(wallContactResolver_&&(!platforms||platformContactResolver_))return solidContact(bounds,platforms,hit);
+    hit=false;
     if(!solidResolver_)return true;
     for(int py=bounds.top;py<bounds.bottom&&!hit;++py)
         for(int px=bounds.left;px<bounds.right&&!hit;++px)
@@ -4469,21 +4474,22 @@ bool GameplayWorld::compactCorpseMeeting(downwell::MotionBinary64 x,downwell::Mo
 // explosionSmall 274 at (x, yy); the compact blast records keep whole
 // pixels, so yy is rounded.
 bool GameplayWorld::stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase){
-    using Real=downwell::MotionBinary64;
     struct Events {
         GameplayWorld& world;
-        bool meeting(Real x,Real y,bool& hit){return world.compactCorpseMeeting(x,y,true,hit);}
-        bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+        bool meeting(std::int32_t x,std::int32_t y,bool& hit){
+            downwell::ContactBounds bounds;
+            if(!downwell::CurrencyCollisionBounds::calculateMaskQ16(599,x,y,bounds))return world.run_.effectsSucceeded=false;
+            return world.compactCorpseContact(bounds,true,hit);
+        }
         int area(){return world.run_.stage.area;}
         int restInPieces(){return world.run_.upgrades.levels[3];}
-        bool create(int object,Real x,Real y){
-            std::int32_t px,py;
-            return (object==272||object==274)&&x.roundPixel(px)&&y.roundPixel(py)&&world.createCompactBlast(object,px,py);
+        bool create(int object,std::int32_t px,std::int32_t py){
+            return (object==272||object==274)&&world.createCompactBlast(object,px,py);
         }
         void destroy(){}
     } events{*this};
     struct Hooks{} hooks;
-    return compactCorpses_.dispatch(phase,[&](auto,downwell::CorpseAnimation& corpse){
+    return compactCorpses_.dispatch(phase,[&](auto,downwell::CorpseParticle& corpse){
         bool frozen=false;
         if(compactTimeStop()&&stopped()){
             std::int32_t px,py;
@@ -4507,8 +4513,8 @@ bool GameplayWorld::advanceCompactCorpseAlarm(unsigned alarm){
 bool GameplayWorld::endStepCompactCorpses(long viewTop){
     struct Events{void destroy(){}} events;
     struct Hooks{bool retire(std::uint32_t,const downwell::CorpseAnimation&){return true;}} hooks;
-    const auto top=exactQ8(viewTop/16);
-    return (compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
+    const long top=viewTop/16;
+    return (compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseParticle& corpse){
         return corpse.endStep(true,top,events);
     },hooks)&&compactCorpses_.retireRequested(hooks))||(run_.effectsSucceeded=false);
 }

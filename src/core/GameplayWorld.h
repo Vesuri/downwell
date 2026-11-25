@@ -3193,7 +3193,7 @@ private:
     downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity,downwell::DebrisParticle> compactDebris_;
     // Compact objDeadBody 263 (W1.6): the world-one families' scrDeadBody
     // corpses, apart from the registered skeleton corpse owner.
-    downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity> compactCorpses_;
+    downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity,downwell::CorpseParticle> compactCorpses_;
     bool compactEnemyDeath(EnemyState& enemy,bool stomped);
     bool compactBulletImpact(EnemyState& enemy,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
         std::uint32_t direction,int damage,bool laser);
@@ -3244,6 +3244,7 @@ private:
     unsigned compactAreaTitleCount_=0;
     const char* compactLanguage_="english";
     bool compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool compactCorpseContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit);
     bool stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase);
     bool advanceCompactCorpseAlarm(unsigned alarm);
     bool endStepCompactCorpses(long viewTop);
@@ -3379,7 +3380,7 @@ private:
 public:
     const CompactEffects& compactEffects()const{return compactEffects_;}
     const downwell::DebrisEffects<downwell::gameplayCompactDebrisCapacity,downwell::DebrisParticle>& compactDebris()const{return compactDebris_;}
-    const downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity>& compactCorpses()const{return compactCorpses_;}
+    const downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity,downwell::CorpseParticle>& compactCorpses()const{return compactCorpses_;}
     const downwell::CompactScenery& compactScenery()const{return scenery_;}
     const downwell::CompactGuns& compactGuns()const{return guns_;}
     const downwell::CompactBlastRecord* compactBlasts(unsigned& end)const{end=blastEnd_;return blasts_;}
