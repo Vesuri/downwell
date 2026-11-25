@@ -995,6 +995,11 @@ static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maxi
 static AmigaHudText hudText;
 #else
 static AmigaPreparedHudText hudText;
+// The prepared tables bind only packs of the sizes they were derived from;
+// any other size falls back to the reference on every redraw.
+static_assert(DOWNWELL_GAME_BANK_BYTES==downwellHudPrepared::gameBytes&&
+    DOWNWELL_CAVERN_BANK_BYTES==downwellHudPrepared::cavernBytes,
+    "Prepared HUD text derived from other game art banks");
 #endif
 static void invalidateHudText(bool all = false) {
 #if !defined(DOWNWELL_REFERENCE_HUD_WORDS) && !defined(DOWNWELL_REFERENCE_HUD_TEXT)

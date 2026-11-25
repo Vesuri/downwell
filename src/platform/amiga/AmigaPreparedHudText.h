@@ -75,7 +75,9 @@ public:
         return valid_=header(hud,hudEnd)&&header(game,gameEnd)&&
             unsigned(hudEnd-hud)==downwellHudPrepared::hudBytes&&
             (unsigned(gameEnd-game)==downwellHudPrepared::gameBytes||
-             unsigned(gameEnd-game)==downwellHudPrepared::gameChipBytes);
+             unsigned(gameEnd-game)==downwellHudPrepared::gameChipBytes||
+             unsigned(gameEnd-game)==downwellHudPrepared::cavernBytes||
+             unsigned(gameEnd-game)==downwellHudPrepared::cavernChipBytes);
     }
     bool currency(AmigaRenderer* renderer,unsigned value){
         if(!valid_||!renderer||!renderer->hud)return false;

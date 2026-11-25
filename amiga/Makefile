@@ -1027,7 +1027,7 @@ obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
-$(REPO)/generated/amiga-hud-text.h: $(REPO)/tools/generate-amiga-hud-text.cpp $(REPO)/tools/generate-amiga-hud-text.py $(AMIGA_SRC)/AmigaHudText.h $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_HUD) $(AMIGA_GAME)
+$(REPO)/generated/amiga-hud-text.h: $(REPO)/tools/generate-amiga-hud-text.cpp $(REPO)/tools/generate-amiga-hud-text.py $(AMIGA_SRC)/AmigaHudText.h $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_HUD) $(AMIGA_GAME) $(REPO)/generated/amiga-cavern.dwap
 	$(MAKE) -C $(REPO) generated/amiga-hud-text.h
 
 $(REPO)/generated/amiga-health-art.h: $(REPO)/tools/generate-amiga-health-art.cpp $(REPO)/tools/generate-amiga-health-art.py $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_SRC)/AmigaRenderer.c $(REPO)/src/core/HudNumbers.h $(AMIGA_HUD)

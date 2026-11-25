@@ -3,12 +3,14 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "generated/amiga-hud-text.h"
 INPUTS = ["data/data.win", "generated/amiga-hud.dwap", "generated/amiga-game.dwap",
+          "generated/amiga-cavern.dwap",
           "generated/amiga-hud.manifest.json", "generated/amiga-game.packing.json",
           "tools/generate-amiga-hud-text.cpp", "tools/generate-amiga-hud-text.py",
           "src/platform/amiga/AmigaHudText.h", "src/core/HudNumbers.h",
@@ -19,8 +21,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    payload = subprocess.check_output([str(ROOT / "build/generate-amiga-hud-text"),
-                                      "generated/amiga-hud.dwap", "generated/amiga-game.dwap"], cwd=ROOT)
+    def run(game):
+        output = subprocess.check_output([str(ROOT / "build/generate-amiga-hud-text"),
+                                          "generated/amiga-hud.dwap", game], cwd=ROOT)
+        body, sizes = output.rstrip(b"\n").rsplit(b"\n", 1)
+        match = re.fullmatch(rb"namespace downwellHudPrepared \{ inline constexpr unsigned "
+                             rb"hudBytes=(\d+), gameBytes=(\d+), gameChipBytes=(\d+); \}", sizes)
+        assert match, sizes
+        return body, match.groups()
+    # Production gameplay binds the cavern bank (a subset of the full game
+    # pack); its HUD glyphs must derive exactly the same tables.
+    body, (hud, game, game_chip) = run("generated/amiga-game.dwap")
+    cavern_body, (cavern_hud, cavern, cavern_chip) = run("generated/amiga-cavern.dwap")
+    if cavern_body != body or cavern_hud != hud:
+        raise SystemExit("the cavern pack's HUD glyphs differ from the game pack's")
+    payload = body + (b"\nnamespace downwellHudPrepared { inline constexpr unsigned hudBytes=%s, "
+                      b"gameBytes=%s, gameChipBytes=%s, cavernBytes=%s, cavernChipBytes=%s; }\n"
+                      % (hud, game, game_chip, cavern, cavern_chip))
     manifest = {"format": "amiga-hud-prepared-words-v2", "generator_version": 2,
                 "pair_column_bytes": 49368,
                 "extractor": json.loads((ROOT / "generated/amiga-hud.manifest.json").read_text())["extractor"],

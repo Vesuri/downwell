@@ -20,7 +20,7 @@ int main(int argc,char** argv){
     assert(overlap.hudTop==6&&overlap.hudBottom==44);
     overlap.reset();overlap.invalidateStreak(-38,-38);
     assert(overlap.hudTop==6&&overlap.hudBottom==30);
-    assert(argc==3);auto hud=load(argv[1]),game=load(argv[2]);
+    assert(argc==4);auto hud=load(argv[1]),game=load(argv[2]);
     AmigaPreparedHudText text;
     assert(text.bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
     std::vector<UBYTE> actual(downwellLayerBytes),expected(actual.size());
@@ -86,5 +86,19 @@ int main(int argc,char** argv){
     text.release();
     assert(!text.currency(&r,1)&&!text.streak(&r,1));
     assert(text.bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
+    // Production gameplay binds the cavern bank, and its Chip-compacted form.
+    game=load(argv[3]);
+    for(int pass=0;pass<2;++pass){
+        if(pass){
+            std::vector<UBYTE> chip(amigaRendererChipPackBytes(game.data(),game.data()+game.size()));
+            assert(amigaRendererCopyChipPack(game.data(),game.data()+game.size(),chip.data(),chip.size()));
+            game=chip;
+        }
+        assert(text.bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
+        for(bool currency:{true,false}){
+            for(unsigned value=0;value<1200;++value)assert(draw(currency,value,true));
+            for(unsigned value=0;value<1200;++value)assert(draw(currency,value,false));
+        }
+    }
     std::printf("Prepared HUD: %u full-layer comparisons, resets and continuous digit transitions\n",cases);
 }
