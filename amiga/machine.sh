@@ -11,10 +11,27 @@
 #               CPU the game accepts).
 # The A1200 machines use the shared AMIGA_SETUP presets, which also select
 # the A1200 Kickstart and override the launch script's chipset argument.
+# With MACHINE and VERIFY_MACHINE unset, a nonempty AMIGA_SETUP selects any
+# shared preset directly, as in the other AmigaXDev projects
+# (AMIGA_SETUP=a1200-030 amiga/run.sh); its names keep their shared meaning,
+# so AMIGA_SETUP=a500 is the 68000 A500, which the game refuses. MACHINE wins
+# over AMIGA_SETUP, so a check that names its machine keeps it.
 DOWNWELL_DEFAULT_MACHINE=a1200-4m
 
 downwell_machine() {
+  DOWNWELL_MACHINE_PRESET=0
+  if [ -z "${MACHINE:-}" ] && [ -z "${VERIFY_MACHINE:-}" ] && [ -n "${AMIGA_SETUP:-}" ]; then
+    MACHINE="$AMIGA_SETUP" DOWNWELL_MACHINE_PRESET=1
+    case "$AMIGA_SETUP" in
+      a1200*) MACHINE_CHIPSET=aga ;;
+      a500+*|a3000*) MACHINE_CHIPSET=ecs ;;
+      *) MACHINE_CHIPSET=ocs ;;
+    esac
+    export MACHINE AMIGA_SETUP
+    return 0
+  fi
   MACHINE="${MACHINE:-${VERIFY_MACHINE:-$DOWNWELL_DEFAULT_MACHINE}}"
+  unset AMIGA_SETUP
   case "$MACHINE" in
     a1200|a1200-4m|a1200-fast)
       AMIGA_SETUP="$MACHINE" MACHINE_CHIPSET=aga ;;
@@ -34,6 +51,10 @@ downwell_machine() {
 }
 
 downwell_machine_description() {
+  if [ "${DOWNWELL_MACHINE_PRESET:-0}" = 1 ]; then
+    echo "shared preset AMIGA_SETUP=$AMIGA_SETUP"
+    return
+  fi
   case "$MACHINE" in
     a1200) echo "unexpanded A1200 (2 MB Chip, no Fast)" ;;
     a1200-4m) echo "A1200 (2 MB Chip, 4 MB Fast)" ;;

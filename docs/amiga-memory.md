@@ -5,7 +5,9 @@ default). Only DMA data asks for `MEMF_CHIP`; everything else, including
 the executable's hunks and BSS, goes to Fast. The game also starts on any
 other Amiga with enough Chip for its DMA data and enough public memory for
 the rest (`downwellMemoryFits`). `MACHINE=a500` (1 MiB Chip, 8 MiB Fast)
-and `MACHINE=a1200` (unexpanded) remain available. Exec labels any slow RAM
+and `MACHINE=a1200` (unexpanded) remain available. With `MACHINE` unset, a
+shared `AMIGA_SETUP` preset selects the machine instead
+(`AMIGA_SETUP=a1200-030 amiga/run.sh`). Exec labels any slow RAM
 at `$C00000` `MEMF_FAST` as well, although its bus timing differs.
 
 ## Target budget
