@@ -2613,12 +2613,15 @@ struct GameplayWorld::SpawnerOps {
     bool area(int& value){value=world.run_.stage.area;return true;}
     bool fallDepth(Real& value){
         if(world.playerChildrenStarted_)return world.sourceFallDepth(value);
-        // global.falldepth = yy - objDepthMeter.y; the meter keeps the birth y.
-        Real x,y;
-        if(!downwell::ContactCoordinates::playerGlobals(world.player_.offsetXFixed(),
-            world.player_.offsetYFixed(),240,176,x,y)||
-           !y.add(Real::fromInteger(-world.depthMeterY_)))return false;
-        value=y;return true;
+        // global.falldepth = yy - objDepthMeter.y; the meter keeps the birth
+        // y. yy is the Q8 player offset plus 176, so the difference is a Q8
+        // integer and its binary64 is exact: fromInteger, then /256.
+        const std::int32_t offset=world.player_.offsetYFixed(),meter=176-world.depthMeterY_;
+        if(offset< -0x20000000||offset>0x20000000||meter< -0x100000||meter>0x100000)return false;
+        const std::int32_t q8=offset+meter*256;
+        value=Real::fromInteger(q8);
+        if(q8)value.high-=8u<<20;
+        return true;
     }
     bool death(bool& value){value=world.dead();return true;}
     bool endReached(bool& value){value=world.generationEndReached_;return true;}

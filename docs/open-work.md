@@ -397,8 +397,7 @@ resets it; that is the first owner to find.
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
-    together: the spawner's fall depth through
-    `ContactCoordinates::playerGlobals` (0.36 ms), the gem streak rise draw
+    together: the gem streak rise draw
     (0.27 ms), then the red ball's stored state. Smoke's wall contacts
     (1.5 ms) are mostly the terrain query.
     Debris, jelly and corpse steps are now mostly their terrain queries
