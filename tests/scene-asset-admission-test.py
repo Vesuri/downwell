@@ -54,7 +54,9 @@ int main() {
     def test_hud_is_packaged_as_scene_data(self):
         for script in ('run.sh', 'verify_startup.sh', 'verify_replay.sh'):
             text = (ROOT / 'amiga' / script).read_text()
-            loop = re.search(r'^for bank in ([a-z ]+); do$', text, re.MULTILINE)
+            # run.sh names its parts once (it snapshots and copies them).
+            loop = (re.search(r'^for bank in ([a-z ]+); do$', text, re.MULTILINE) or
+                    re.search(r'^PARTS="([a-z ]+)"$', text, re.MULTILINE))
             self.assertIsNotNone(loop, script)
             banks = loop.group(1).split()
             for bank in ('patterns', 'exitmask', 'selectionmask', 'hud',
