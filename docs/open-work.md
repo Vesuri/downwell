@@ -375,11 +375,13 @@ resets it; that is the first owner to find.
     `make test-fixed-point`, and re-searches any sound route whose
     autopilot no longer survives (`DOWNWELL_SLICE_VARIANT`) without losing
     route sound coverage. Done: steering `lengthdir`/`point_direction`.
-    Next, by the spray trace (ms per worst update): debris steps 3.9,
-    smoke motion 3.2, corpses 3.2, effect placement (`EffectSurfacePlacement::fx`)
-    3.7, the wall probe and comparisons in `CheckCollisionWithScript` and
-    `compareRunnerReal`, then the stored state itself (positions and speeds
-    held as Q16, no boundary conversions).
+    Converting at an owner's boundary pays only where trig dominates: for
+    drawFx placement it cost as much as it saved (rejected, see the frame
+    cost audit). So the remaining owners convert their stored state (positions
+    and speeds held as Q16), each family with its producers and readers
+    together: smoke (motion 3.2 ms per worst spray update, plus its drawFx
+    placement), debris 3.9, corpses 3.2, then the steering enemies' stored
+    state and `CheckCollisionWithScript`.
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,
     level transitions and shop re-entry, the clear and upgrade screens,

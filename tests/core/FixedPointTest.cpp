@@ -16,12 +16,13 @@ static MotionBinary64 fromDouble(double d){
 }
 int main(){
     // Conversions: exact round trip of Q16 values, nearest for others.
-    std::uint32_t rng=12345;auto next=[&]{rng=rng*1664525u+1013904223u;return rng;};
+    // High bits only: an LCG's low bits have short periods.
+    std::uint32_t rng=12345;auto next=[&]{rng=rng*1664525u+1013904223u;return rng>>8;};
     for(int i=0;i<200000;++i){
-        const std::int32_t raw=std::int32_t(next())>>(next()%16);
+        const std::int32_t raw=std::int32_t(next()<<8^next())>>(next()%16);
         Fixed16 back;assert(Fixed16::fromBinary64(Fixed16::raw(raw).binary64(),back)&&back.v==raw);
         assert(toDouble(Fixed16::raw(raw).binary64())==raw/65536.0);
-        const double d=(std::int32_t(next())/65536.0)*(next()%3?1:1e-3);
+        const double d=(std::int32_t(next()<<8^next())/65536.0)*(next()%3?1:1e-3);
         Fixed16 f;assert(Fixed16::fromBinary64(fromDouble(d),f));
         assert(std::fabs(f.v/65536.0-d)<=0.5/65536+1e-12);
     }

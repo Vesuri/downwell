@@ -1,0 +1,138 @@
+diff --git a/Makefile b/Makefile
+index c19e8324..6b057cd3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -289,7 +289,7 @@ test: test-fixed-point
+ .PHONY: test-fixed-point
+ test-fixed-point: build/fixed-point-test
+ 	./build/fixed-point-test
+-build/fixed-point-test: tests/core/FixedPointTest.cpp src/core/FixedPoint.h src/core/WhiteJellyStep.h src/core/RunnerPointDirection.h src/core/NarrowAtan.h generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
++build/fixed-point-test: tests/core/FixedPointTest.cpp src/core/FixedPoint.h src/core/EffectSurfacePlacement.h src/core/WhiteJellyStep.h src/core/RunnerPointDirection.h src/core/NarrowAtan.h generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
+ 	@mkdir -p build
+ 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/FixedPointTest.cpp src/core/GameMakerRandom.cpp
+ 
+diff --git a/src/core/EffectSurfacePlacement.h b/src/core/EffectSurfacePlacement.h
+index 30381d29..b6772ca6 100644
+--- a/src/core/EffectSurfacePlacement.h
++++ b/src/core/EffectSurfacePlacement.h
+@@ -2,6 +2,7 @@
+ #define DOWNWELL_CORE_EFFECT_SURFACE_PLACEMENT_H
+ #include "RunnerRealComparison.h"
+ #include "MultiplyBinary64.h"
++#include "FixedPoint.h"
+ namespace downwell {
+ // drawFx/drawShade placement only. Surface lifetime, draw ordering and GPU
+ // subtract/alpha composition remain the renderer's responsibility.
+@@ -55,8 +56,26 @@ struct EffectSurfacePlacement {
+            rounded < -1073741824 || rounded > 1073741823)return false;
+         out=MotionBinary64::fromInteger(rounded*2);return true;
+     }
++    // drawFx placement in Q16 fixed point (FixedPoint.h): the view test and
++    // the surface-relative position without binary64 arithmetic. Inputs
++    // outside the Q16 range take fxReference.
+     static bool fx(MotionBinary64 x,MotionBinary64 y,const View& view,
+                    bool death,bool lowSpec,bool surfaceExists,Draw& out) {
++        if(death || lowSpec){out={direct,x,y};return true;}
++        Fixed16 fx16,fy16,vx,vy,vw,vh;
++        if(!Fixed16::fromBinary64(x,fx16)||!Fixed16::fromBinary64(y,fy16)||!Fixed16::fromBinary64(view.x,vx)||
++           !Fixed16::fromBinary64(view.y,vy)||!Fixed16::fromBinary64(view.width,vw)||!Fixed16::fromBinary64(view.height,vh))
++            return fxReference(x,y,view,death,lowSpec,surfaceExists,out);
++        Draw next;
++        if(surfaceExists && fx16.v>vx.v && fx16.v<vx.v+vw.v && fy16.v>vy.v && fy16.v<vy.v+vh.v){
++            next.target=effects;
++            next.x=Fixed16::raw(fx16.v-vx.v).binary64();next.y=Fixed16::raw(fy16.v-vy.v).binary64();
++        }
++        out=next;return true;
++    }
++    // fx's VM-exact binary64 form, the oracle make test-fixed-point compares.
++    static bool fxReference(MotionBinary64 x,MotionBinary64 y,const View& view,
++                   bool death,bool lowSpec,bool surfaceExists,Draw& out) {
+         Draw next;
+         if(death || lowSpec)next={direct,x,y};
+         else {
+diff --git a/tests/core/EffectSurfacePlacementTest.cpp b/tests/core/EffectSurfacePlacementTest.cpp
+index 3e4119f4..dd77ee48 100644
+--- a/tests/core/EffectSurfacePlacementTest.cpp
++++ b/tests/core/EffectSurfacePlacementTest.cpp
+@@ -9,6 +9,7 @@ using N=downwell::MotionBinary64;
+ static void check(bool b){if(!b)std::abort();}
+ static N number(double d){std::uint64_t u;std::memcpy(&u,&d,8);return {std::uint32_t(u>>32),std::uint32_t(u)};}
+ static bool same(N n,double d){auto r=number(d);return n.high==r.high && n.low==r.low;}
++static double real(N n){const std::uint64_t u=(std::uint64_t(n.high)<<32)|n.low;double d;std::memcpy(&d,&u,8);return d;}
+ int main(){
+     unsigned cases=0;
+     // Independent scalar oracle across the integer fast-path range and its
+@@ -44,10 +45,16 @@ int main(){
+         const bool death=flags&1,low=flags&2,exists=flags&4,noControl=flags&8;
+         const bool visible=x+12.25>1e-5 && x-147.75 < -1e-5 && y-40.5>1e-5 && y-324.5 < -1e-5;
+         P::Draw fx,shade;
+-        check(P::fx(number(x),number(y),view,death,low,exists,fx));
++        // The VM-exact form, then the Q16 form: the same target, the
++        // position within one Q16 step.
++        check(P::fxReference(number(x),number(y),view,death,low,exists,fx));
+         check(fx.target==((death||low)?P::direct:(visible&&exists)?P::effects:P::hidden));
+         if(fx.target==P::direct)check(same(fx.x,x)&&same(fx.y,y));
+         if(fx.target==P::effects)check(same(fx.x,x+12.25)&&same(fx.y,y-40.5));
++        P::Draw fixed;
++        check(P::fx(number(x),number(y),view,death,low,exists,fixed)&&fixed.target==fx.target);
++        if(fixed.target!=P::hidden)check(std::fabs(real(fixed.x)-real(fx.x))<=1.0/65536&&
++                                         std::fabs(real(fixed.y)-real(fx.y))<=1.0/65536);
+         check(P::enemyShade(number(x),number(y),view,low,noControl,exists,shade));
+         check(shade.target==((!low&&!noControl&&exists&&visible)?P::shade:P::hidden));
+         if(shade.target==P::shade)check(same(shade.x,std::nearbyint(x/2)*2+12.25)&&same(shade.y,std::nearbyint(y/2)*2-40.5));
+diff --git a/tests/core/FixedPointTest.cpp b/tests/core/FixedPointTest.cpp
+index 35da569c..29b6fd0d 100644
+--- a/tests/core/FixedPointTest.cpp
++++ b/tests/core/FixedPointTest.cpp
+@@ -3,6 +3,7 @@
+ #include "core/WhiteJellyStep.h"
+ #include "core/RunnerPointDirection.h"
+ #include "core/NarrowAtan.h"
++#include "core/EffectSurfacePlacement.h"
+ #include <cassert>
+ #include <cmath>
+ #include <cstdio>
+@@ -16,12 +17,13 @@ static MotionBinary64 fromDouble(double d){
+ }
+ int main(){
+     // Conversions: exact round trip of Q16 values, nearest for others.
+-    std::uint32_t rng=12345;auto next=[&]{rng=rng*1664525u+1013904223u;return rng;};
++    // High bits only: an LCG's low bits have short periods.
++    std::uint32_t rng=12345;auto next=[&]{rng=rng*1664525u+1013904223u;return rng>>8;};
+     for(int i=0;i<200000;++i){
+-        const std::int32_t raw=std::int32_t(next())>>(next()%16);
++        const std::int32_t raw=std::int32_t(next()<<8^next())>>(next()%16);
+         Fixed16 back;assert(Fixed16::fromBinary64(Fixed16::raw(raw).binary64(),back)&&back.v==raw);
+         assert(toDouble(Fixed16::raw(raw).binary64())==raw/65536.0);
+-        const double d=(std::int32_t(next())/65536.0)*(next()%3?1:1e-3);
++        const double d=(std::int32_t(next()<<8^next())/65536.0)*(next()%3?1:1e-3);
+         Fixed16 f;assert(Fixed16::fromBinary64(fromDouble(d),f));
+         assert(std::fabs(f.v/65536.0-d)<=0.5/65536+1e-12);
+     }
+@@ -63,8 +65,24 @@ int main(){
+         double diff=std::fabs(FixedTrig::pointDirection(bx.v-ax.v,by.v-ay.v)/65536.0-toDouble(reference));
+         if(diff>180)diff=360-diff;worstDirection=std::fmax(worstDirection,diff);
+     }
++    // drawFx placement against its binary64 form.
++    unsigned placements=0,disagreements=0;double worstPlace=0;
++    for(int i=0;i<100000;++i){
++        using P=EffectSurfacePlacement;
++        const P::View view{fromDouble(-24),fromDouble(int(next()%3000)),fromDouble(288),fromDouble(256)};
++        const double px=int(next()%340)-50+(next()%2?(next()%1000)/1000.0:0),
++            py=toDouble(view.y)+int(next()%300)-20+(next()%2?(next()%1000)/1000.0:0);
++        P::Draw a,b;const bool surface=next()%8!=0;
++        assert(P::fx(fromDouble(px),fromDouble(py),view,false,false,surface,a));
++        assert(P::fxReference(fromDouble(px),fromDouble(py),view,false,false,surface,b));
++        ++placements;
++        if(a.target!=b.target){++disagreements;continue;}
++        if(a.target==P::effects)worstPlace=std::fmax(worstPlace,std::fmax(std::fabs(toDouble(a.x)-toDouble(b.x)),
++            std::fabs(toDouble(a.y)-toDouble(b.y))));
++    }
++    assert(!disagreements&&worstPlace<1e-4);
+     assert(worstLength<1e-3);
+     assert(worstDirection<0.01);
+-    std::printf("Fixed point: sine %.2g, atan %.2g deg; lengthdir %.2g px, point_direction %.2g deg from the VM forms\n",
+-        worstSine,worstAtan,worstLength,worstDirection);
++    std::printf("Fixed point: sine %.2g, atan %.2g deg; lengthdir %.2g px, point_direction %.2g deg, "
++        "%u drawFx placements within %.2g px of the VM forms\n",worstSine,worstAtan,worstLength,worstDirection,placements,worstPlace);
+ }
