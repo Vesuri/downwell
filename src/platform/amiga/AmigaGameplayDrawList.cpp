@@ -242,32 +242,19 @@ bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& worl
     eligible=true;return true;
 }
 
-namespace {
-// Nearest offline quarter turn (frame page turn*256) for an image_angle.
-bool quarterTurn(downwell::RunnerImageValue angle,unsigned& turn){
-    std::int32_t degrees;
-    if(!angle.promoted().roundPixel(degrees))return false;
-    degrees%=360;if(degrees<0)degrees+=360;
-    turn=unsigned(std::uint16_t(degrees+45)/90)&3u;return true;
-}
-}
-
 // Compact scrEffectSpawn and emitMovingFx records in birth order, then each TorchFire's red and white particle
 // layers. The offline bank holds the reviewed sprites and quarter turns.
 template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const GameplayWorld& port,
     Append& append,int viewX,int viewY){
     const auto& fx=port.compactEffects();
-    const auto place=[&](const downwell::RunnerImageValue& rx,const downwell::RunnerImageValue& ry,int sprite,unsigned frame){
-        std::int32_t x,y;
-        if(!rx.promoted().roundPixel(x)||!ry.promoted().roundPixel(y)){failedSprite=UWORD(sprite);failedFrame=UWORD(frame);return false;}
+    const auto place=[&](std::int32_t x,std::int32_t y,int sprite,unsigned frame){
         // A 62000+id record (the landing dust's mirrored half) is the
         // prepared frame's flipped side, not a separate prepared sprite.
         const bool mirrored=sprite>=62000&&sprite<63000;
         return append(UWORD(mirrored?sprite-62000:sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,mirrored?1:0);
     };
     for(unsigned i=0;i<fx.noLoopCount();++i){
-        const auto& e=fx.noLoop(i).effect;unsigned turn;
-        if(!e.valid||!quarterTurn(e.angle,turn))return false;
+        const auto& e=fx.noLoop(i).effect;const unsigned turn=e.turn;
         // 603 and 605 carry offline 0 and 270 degree pages; 605 also 90
         // (W1.9: Gunpowder Blocks' upward shot splashes at its angle).
         if(turn!=0&&turn!=3&&!(turn==1&&e.spriteId==605)){failedSprite=UWORD(e.spriteId);return false;}
@@ -278,15 +265,16 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
         for(unsigned i=0;i<end;++i){const auto& b=blood[i];unsigned frame;
             if(!b.live)continue;
             if(!b.effect.drawFrame(frame))return false;
-            if(!place(b.effect.x,b.effect.y,92,frame))return false;
+            std::int32_t x,y;
+            if(!b.effect.x.promoted().roundPixel(x)||!b.effect.y.promoted().roundPixel(y)){failedSprite=92;failedFrame=UWORD(frame);return false;}
+            if(!place(x,y,92,frame))return false;
         }
     }
     for(unsigned i=0;i<fx.movingCount();++i){
-        const auto& e=fx.moving(i).effect;unsigned turn=0;
-        if(!e.valid)return false;
+        const auto& e=fx.moving(i).effect;
         // Only the red splash rotates in the bank; smoke puffs, sparkles and
         // the opening flash are drawn upright.
-        if(e.spriteId==704&&!quarterTurn(e.angle,turn))return false;
+        const unsigned turn=e.spriteId==704?e.turn:0;
         if(!place(e.x,e.y,e.spriteId,turn*256+e.drawFrame()))return false;
     }
     const auto& sc=port.compactScenery();

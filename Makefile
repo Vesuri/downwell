@@ -3937,3 +3937,11 @@ verify-amiga-paula-mixer: build/paula-mixer-test generated/amiga-sfx.bin
 	{ rm -f tmp/paula-probe.raw ; } && \
 	( cd amiga && VERIFY_PROGRAM=out/PaulaMixerProbe VERIFY_TIMEOUT_SECONDS=500 GDB_SOURCE=verify_paula_mixer.gdb READY_MARKER=DOWNWELL_PAULA_MIXER_READY READY_DESCRIPTION='Paula mixer schedule' VERIFY_AUDIO_FILE="$(CURDIR)/tmp/paula-probe.raw" bash verify_startup.sh ) && \
 	{ python3 tools/compare-paula-recording.py tmp/paula-probe.raw tmp/paula-probe-expected.wav --events tmp/paula-probe-expected.wav.events --wav captures/paula-probe.wav ; }
+
+.PHONY: verify-compact-room-effects
+test: verify-compact-room-effects
+verify-compact-room-effects: build/compact-room-effects-test
+	./build/compact-room-effects-test
+build/compact-room-effects-test: tests/core/CompactRoomEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/CompactRoomEffectsTest.cpp src/core/GameMakerRandom.cpp

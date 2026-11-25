@@ -2929,7 +2929,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                     peakBullets=std::max(peakBullets,live);peakCasings=std::max(peakCasings,liveCasings);peakTrails=std::max(peakTrails,liveTrails);
                 }
                 for(unsigned i=0;i<fx.movingCount();++i)
-                    if(fx.moving(i).effect.spriteId==704&&fx.moving(i).effect.imageIndex.bits==0)++splashes;
+                    if(fx.moving(i).effect.spriteId==704&&fx.moving(i).effect.frame27==0)++splashes;
                 // W1.4: 603 is also the usual gun's muzzle, which faces 270
                 // (+/- aim); box bursts are unrotated.
                 // W1.4: the box burst's 603 (0.5, 270, -60000) is also the usual
@@ -2943,9 +2943,9 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                         std::cerr<<"EVENT chunkOpened tick="<<game.tick()<<'\n';}
                 if(traceEvents)for(unsigned i=0;i<sc.fireEnd;++i)if(sc.fires[i].live&&sc.fires[i].y>y-100&&sc.fires[i].y<y+100)
                     std::cerr<<"EVENT fireNear tick="<<game.tick()<<" fire="<<sc.fires[i].x<<','<<sc.fires[i].y<<" player="<<x<<','<<y<<'\n';
-                if(traceEvents&&fx.noLoopCount()&&fx.noLoop(fx.noLoopCount()-1).effect.imageIndex.bits==0)
+                if(traceEvents&&fx.noLoopCount()&&fx.noLoop(fx.noLoopCount()-1).effect.frame27==0)
                     std::cerr<<"EVENT noLoop tick="<<game.tick()<<" sprite="<<fx.noLoop(fx.noLoopCount()-1).effect.spriteId<<'\n';
-                if(traceEvents)for(unsigned i=0;i<fx.movingCount();++i)if(fx.moving(i).effect.spriteId==118&&fx.moving(i).effect.imageIndex.bits==0)
+                if(traceEvents)for(unsigned i=0;i<fx.movingCount();++i)if(fx.moving(i).effect.spriteId==118&&fx.moving(i).effect.frame27==0)
                     std::cerr<<"EVENT superFlash tick="<<game.tick()<<'\n';
                 for(unsigned i=0;i<sc.torchEnd;++i)if(sc.torches[i].live&&sc.torches[i].allSet&&sc.torches[i].placement>=0)
                     litTorches.insert({sc.torches[i].x,sc.torches[i].y});
@@ -2969,7 +2969,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                         <<" gems="<<game.gemSlotEnd()<<" player="<<x<<','<<y<<" fire="<<input.fire
                         <<" noLoop="<<game.compactEffects().noLoopCount()<<" stopped="<<game.timeStopped()<<" shards="<<game.compactTimeShards().size()<<" speed="<<game.roomSpeed();
                     for(unsigned i=0;i<game.compactEffects().noLoopCount();++i){const auto& e=game.compactEffects().noLoop(i).effect;
-                        std::cerr<<" fx"<<e.spriteId<<'#'<<std::hex<<e.imageIndex.bits<<std::dec;}
+                        std::cerr<<" fx"<<e.spriteId<<'#'<<std::hex<<e.frame27<<std::dec;}
                     for(unsigned i=0;i<game.bulletSlotEnd();++i){const auto& b=game.bulletAt(i);
                         if(b.active)std::cerr<<" shot"<<int(b.kind)<<'@'<<b.x+240<<','<<b.y+176;}
                     for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);

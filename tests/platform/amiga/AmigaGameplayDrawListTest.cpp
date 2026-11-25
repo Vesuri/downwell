@@ -847,8 +847,7 @@ int main() {
         // this walk), upright, at their rounded anchors.
         {
             const auto& fx=world.compactEffects();
-            const auto at=[&](const auto& e){std::int32_t x,y;
-                assert(e.x.promoted().roundPixel(x)&&e.y.promoted().roundPixel(y));
+            const auto at=[&](const auto& e){const std::int32_t x=e.x,y=e.y;
                 const bool mirrored=e.spriteId>=62000&&e.spriteId<63000;
                 emit(mirrored?e.spriteId-62000:e.spriteId,e.drawFrame(),110+x-vx,y-vy,mirrored?1:0);};
             for(unsigned i=0;i<fx.noLoopCount();++i)at(fx.noLoop(i).effect);

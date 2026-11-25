@@ -29,15 +29,15 @@ int main(){
         downwell::CompactRoomEffects<4,4> fx;
         assert(fx.spawnMoving(MotionBinary64::fromInteger(100),MotionBinary64::fromInteger(50),84,
             {0x3fe00000u,0},MotionBinary64::fromInteger(0),MotionBinary64::fromInteger(1)));
-        const auto x0=fx.moving(0).effect.x.bits;
+        const auto x0=fx.moving(0).effect.x16;
         bool asked=false;
-        assert(fx.stepMoving(fx.beginPhase(),[&](const downwell::MovingFx& e,bool& moving){
+        assert(fx.stepMoving(fx.beginPhase(),[&](const downwell::CompactRoomEffects<4,4>::Effect& e,bool& moving){
             asked=e.spriteId==84;moving=false;return true;}));
-        assert(asked&&fx.moving(0).effect.x.bits==x0);
+        assert(asked&&fx.moving(0).effect.x16==x0);
         assert(fx.stepMoving(fx.beginPhase()));
-        assert(fx.moving(0).effect.x.bits!=x0);
+        assert(fx.moving(0).effect.x16!=x0);
         // A failed bound query is terminal for the store.
-        assert(!fx.stepMoving(fx.beginPhase(),[](const downwell::MovingFx&,bool&){return false;})&&!fx.valid());
+        assert(!fx.stepMoving(fx.beginPhase(),[](const downwell::CompactRoomEffects<4,4>::Effect&,bool&){return false;})&&!fx.valid());
     }
     std::puts("Compact time-stop tests passed");
 }

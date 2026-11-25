@@ -2061,11 +2061,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     bumpCompactFrogs();
     // parentMovingFx (220) follows the enemies, before damage numbers (221).
     if(compactEffects_.movingCount()&&!compactEffects_.stepMoving(compactEffectStepPhase,
-        [this](const downwell::MovingFx& fx,bool& moving){
-            if(!stopped()){moving=true;return true;}
-            std::int32_t x,y;
-            if(!fx.x.promoted().roundPixel(x)||!fx.y.promoted().roundPixel(y))return false;
-            moving=timeStopBound(fx.spriteId,x,y);return true;
+        [this](const CompactEffects::Effect& fx,bool& moving){
+            moving=!stopped()||timeStopBound(fx.spriteId,fx.x,fx.y);return true;
         })){
         run_.effectsSucceeded=false;return {};
     }
