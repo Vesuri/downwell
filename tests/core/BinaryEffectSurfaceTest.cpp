@@ -50,13 +50,16 @@ int main(int argc,char**argv){
             };
             auto emit=[&](const auto& actual,auto px,auto py){
                 const Real x=real(px),y=real(py);
-                // Whole-pixel positions arrive as pixels, fractional ones as reals.
+                // Positions arrive as their nearest pixels (W3: 248.25, 128.5
+                // round to 248, 128).
                 constexpr bool pixel=std::is_same_v<decltype(px),std::int32_t>;
-                check(pixel==(corpse.x.bits==0x43780000u&&corpse.y.bits==0x43000000u));
+                check(pixel);
                 const auto expectedAsset=asset(sprite+(mirrored?62000:0),0);
                 check(actual.mask.data==expectedAsset.mask.data&&actual.originX==expectedAsset.ox&&actual.originY==expectedAsset.oy);
-                check(x.high==corpse.x.promoted().high&&x.low==corpse.x.promoted().low&&
-                    y.high==corpse.y.promoted().high&&y.low==corpse.y.promoted().low);
+                std::int32_t rx,ry;
+                check(corpse.x.promoted().roundPixel(rx)&&corpse.y.promoted().roundPixel(ry));
+                const Real ex=Real::fromInteger(rx),ey=Real::fromInteger(ry);
+                check(x.high==ex.high&&x.low==ex.low&&y.high==ey.high&&y.low==ey.low);
                 ++emitted;return true;
             };
             check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);

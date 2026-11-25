@@ -383,10 +383,11 @@ resets it; that is the first owner to find.
     cost audit). So the remaining owners convert their stored state (positions
     and speeds held as Q16), each family with its producers and readers
     together: smoke's animation (1.0-1.3 ms per worst spray update, binary32
-    timeline) and wall contacts (1.8), debris 3.9 (its fractional positions still take binary64 drawFx
-    placement twice, 1.1 ms), corpses 3.2, then the steering enemies'
-    stored state and `CheckCollisionWithScript`. Whole-pixel drawFx
-    positions (smoke, corpses, rounded debris) already skip placement.
+    timeline) and wall contacts (1.8), debris 3.8 (mostly `sParentSolid` meeting bounds from binary32
+    positions, about 2.5 ms; its hits draw RNG, so moved debris can shift
+    the routes), corpses 3.2, then the steering enemies'
+    stored state and `CheckCollisionWithScript`. drawFx rounds every
+    binary32 position to its pixel and skips binary64 placement.
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,
     level transitions and shop re-entry, the clear and upgrade screens,

@@ -13,6 +13,10 @@
 #include <cstdio>
 #include <vector>
 static bool boundsOK=true;
+// drawFx emits each effect's nearest pixel (W3 fixed point).
+static downwell::MotionBinary64 nearestPixel(downwell::MotionBinary64 v){
+    std::int32_t r;assert(v.roundPixel(r));return downwell::MotionBinary64::fromInteger(r);
+}
 static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell::EffectMaskAssets& assets,
     const downwell::EffectSurfacePlacement::View& view){
     struct Draw {downwell::EffectMaskAssets::Asset art;downwell::MotionBinary64 x,y;};
@@ -299,7 +303,8 @@ int main() {
                 downwell::MotionBinary64::fromInteger(284)};
             assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto ex,auto ey){
                 const auto px=downwell::EffectSpriteDraw::real(ex),py=downwell::EffectSpriteDraw::real(ey);
-                assert(asset.mask.data==expected.mask.data&&px.high==x.high&&px.low==x.low&&py.high==y.high&&py.low==y.low);
+                const auto rx=nearestPixel(x),ry=nearestPixel(y);
+                assert(asset.mask.data==expected.mask.data&&px.high==rx.high&&px.low==rx.low&&py.high==ry.high&&py.low==ry.low);
                 ++surfaces;return true;
             })&&surfaces==1);
             assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
@@ -400,8 +405,9 @@ int main() {
                 unsigned surfaces=0;
                 assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto ex,auto ey){
                     const auto px=downwell::EffectSpriteDraw::real(ex),py=downwell::EffectSpriteDraw::real(ey);
-                    assert(asset.mask.data==art.smoke(frame)->mask.data&&px.high==x.high&&px.low==x.low&&
-                        py.high==y.high&&py.low==y.low);++surfaces;return true;
+                    const auto rx=nearestPixel(x),ry=nearestPixel(y);
+                    assert(asset.mask.data==art.smoke(frame)->mask.data&&px.high==rx.high&&px.low==rx.low&&
+                        py.high==ry.high&&py.low==ry.low);++surfaces;return true;
                 })&&surfaces==1);
                 assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
                 assert(compareEffectSurfaces(*world,art,effectView)==1);

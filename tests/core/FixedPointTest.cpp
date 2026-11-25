@@ -3,6 +3,7 @@
 #include "core/WhiteJellyStep.h"
 #include "core/RunnerPointDirection.h"
 #include "core/NarrowAtan.h"
+#include "core/EffectSpriteDraw.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -66,6 +67,22 @@ int main(){
     }
     assert(worstLength<1e-3);
     assert(worstDirection<0.01);
+    // drawFx rounds binary32 positions to pixels as MotionBinary64::roundPixel
+    // (halves to even) inside smallPixel, refusing the rest.
+    unsigned rounded=0;
+    for(std::uint64_t bits=0;bits<0x100000000ull;bits+=4099){
+        for(std::uint32_t near:{0u,1u,0x7fffffu}){
+            const std::uint32_t b=std::uint32_t(bits)^near;float f;std::memcpy(&f,&b,4);
+            std::int32_t a,r;
+            const bool ok=downwell::EffectSpriteDraw::roundedPixel({b},a);
+            const bool expected=std::isfinite(f)&&std::fabs(f)<float(1<<21)&&
+                downwell::RunnerImageValue{b}.promoted().roundPixel(r);
+            assert(ok==expected&&(!ok||a==r));++rounded;
+        }
+    }
+    for(float f:{0.5f,1.5f,2.5f,-0.5f,-1.5f,0.49999997f,-2.5f,1048575.5f,2097151.f})
+        {std::uint32_t b;std::memcpy(&b,&f,4);std::int32_t a,r;
+         assert(downwell::EffectSpriteDraw::roundedPixel({b},a)&&downwell::RunnerImageValue{b}.promoted().roundPixel(r)&&a==r);}
     std::printf("Fixed point: sine %.2g, atan %.2g deg; lengthdir %.2g px, point_direction %.2g deg from the VM forms\n",
         worstSine,worstAtan,worstLength,worstDirection);
 }

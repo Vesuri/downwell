@@ -24,15 +24,33 @@ struct EffectSpriteDraw {
         if(value.bits>>31)out=-out;
         return true;
     }
-    // fx for whole-pixel coordinates and an integer view, without binary64
-    // values: false when either is not whole (use prepare). Otherwise
-    // `shown` is fx's effects target, and the composition takes the pixels
-    // through its whole-pixel path (the same rounding as fx's smallInteger
-    // branch).
+    // The nearest pixel (halves to even, as roundPixel) of a binary32
+    // coordinate inside smallPixel; false outside it or for NaN/infinity.
+    static bool roundedPixel(RunnerImageValue value,std::int32_t& out){
+        const auto magnitude=value.bits&0x7fffffffu;
+        const unsigned exponent=magnitude>>23;
+        if(exponent>147)return false;
+        if(exponent<126){out=0;return true;} // below one half, or zero
+        const unsigned shift=150-exponent,significand=(magnitude&0x7fffffu)|0x800000u;
+        std::uint32_t whole=significand>>shift;
+        if(shift<=23){
+            const std::uint32_t rest=significand&((1u<<shift)-1u),half=1u<<(shift-1);
+            if(rest>half||(rest==half&&(whole&1u)))++whole;
+        }else if(significand>0x800000u)++whole; // exponent 126: (0.5, 1) rounds up, 0.5 to 0
+        out=std::int32_t(whole);
+        if(value.bits>>31)out=-out;
+        return true;
+    }
+    // fx without binary64 values, for an integer view: false when the view
+    // or a coordinate is outside smallPixel (use prepare). Otherwise
+    // `shown` is the effects target. Whole pixels match fx exactly
+    // (its smallInteger branch); fractional coordinates are rounded first
+    // (W3 fixed point accepts the pixel this moves: visibility at a view
+    // edge, and halves when the view coordinate is odd).
     static bool pixelFx(RunnerImageValue x,RunnerImageValue y,const EffectSurfacePlacement::View& view,
                         std::int32_t& px,std::int32_t& py,bool& shown){
         EffectSurfacePlacement::PixelView pixels;
-        if(!pixel(x,px)||!pixel(y,py)||!EffectSurfacePlacement::pixelView(view,pixels))return false;
+        if(!roundedPixel(x,px)||!roundedPixel(y,py)||!EffectSurfacePlacement::pixelView(view,pixels))return false;
         shown=EffectSurfacePlacement::pixelInView(px,py,pixels);
         return true;
     }
