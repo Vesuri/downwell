@@ -87,6 +87,15 @@ public:
     static void blitterSolidRect(uint16_t* destination, uint16_t widthWords,
         uint16_t height, int16_t modulo, uint16_t firstMask, uint16_t lastMask,
         bool set);
+    // A cookie-cut copy whose register values the caller has already
+    // computed: A is the mask (with the edge masks), B the pixels, C and D
+    // the destination. One argument instead of two 14-argument forwards.
+    struct MaskedBlit {
+        uint16_t* mask; uint16_t* pixels; uint16_t* destination;
+        int16_t maskModulo, pixelModulo, destinationModulo;
+        uint16_t con0, con1, firstWordMask, lastWordMask, size;
+    };
+    static void blitterMasked(const MaskedBlit& blit);
 };
 
 #define bltddat 0x000

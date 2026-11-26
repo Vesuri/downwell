@@ -6,6 +6,7 @@
 #endif
 #include "AmigaEffectStampBank.h"
 #include <exec/types.h>
+#include <hardware/blit.h>
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
 #include "AmigaGameplayRows.h"
@@ -221,9 +222,15 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     }
     auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(combined?combined->mask:maskData)+source);
     if(combined){
-        AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<unsigned char*>(combined->pixels)+source),
-            reinterpret_cast<uint16_t*>(data+target),mask,words,blitHeight,
-            sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
+        // blitterCopyWithMask's registers for this copy: A the repeated
+        // mask, B the pixels, both shifted alike; minterm 0xca.
+        const uint16_t magnitude=uint16_t((shift<0?-shift:shift)<<12);
+        const AmigaHardware::MaskedBlit blit{mask,
+            reinterpret_cast<uint16_t*>(const_cast<unsigned char*>(combined->pixels)+source),
+            reinterpret_cast<uint16_t*>(data+target),sourceModulo,sourceModulo,surfaceModulo,
+            uint16_t(BC0F_SRCA|BC0F_SRCB|BC0F_SRCC|BC0F_DEST|0xca|magnitude),
+            uint16_t((shift<0?BLITREVERSE:0)|magnitude),first,last,uint16_t((blitHeight<<6)|words)};
+        AmigaHardware::blitterMasked(blit);
     }else{
     if(low){
         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(low)+source),

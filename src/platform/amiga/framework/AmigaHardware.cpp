@@ -396,6 +396,53 @@ void AmigaHardware::blitterCopyWithMaskOperation(uint16_t* source, uint16_t* des
     BLIT_INTERRUPT_ON();
 }
 
+void AmigaHardware::blitterMasked(const MaskedBlit& b)
+{
+    BLIT_INTERRUPT_OFF();
+    if (!isBlitterBusy() && !hasQueuedBlits) {
+        *bltafwmPointer = b.firstWordMask;
+        *bltalwmPointer = b.lastWordMask;
+        *bltcon1Pointer = b.con1;
+        *bltcon0Pointer = b.con0;
+        *bltamodPointer = b.maskModulo;
+        *bltbmodPointer = b.pixelModulo;
+        *bltcmodPointer = b.destinationModulo;
+        *bltdmodPointer = b.destinationModulo;
+        *bltaptPointer = b.mask;
+        *bltbptPointer = b.pixels;
+        *bltcptPointer = b.destination;
+        *bltdptPointer = b.destination;
+        BLIT_CENSUS(2, b.destination, b.size, false);
+        *bltsizePointer = b.size;
+    } else {
+        uint16_t* q = blitterQueueAddPosition;
+        *q++ = 17;
+        if (q + 34 >= blitterQueueBufferEnd) q = blitterQueueBuffer;
+        *q++ = bltafwm; *q++ = b.firstWordMask;
+        *q++ = bltalwm; *q++ = b.lastWordMask;
+        *q++ = bltcon1; *q++ = b.con1;
+        *q++ = bltcon0; *q++ = b.con0;
+        *q++ = bltamod; *q++ = b.maskModulo;
+        *q++ = bltbmod; *q++ = b.pixelModulo;
+        *q++ = bltcmod; *q++ = b.destinationModulo;
+        *q++ = bltdmod; *q++ = b.destinationModulo;
+        *q++ = bltapth; *q++ = (uint16_t)((uint32_t)b.mask >> 16);
+        *q++ = bltaptl; *q++ = (uint16_t)(uint32_t)b.mask;
+        *q++ = bltbpth; *q++ = (uint16_t)((uint32_t)b.pixels >> 16);
+        *q++ = bltbptl; *q++ = (uint16_t)(uint32_t)b.pixels;
+        *q++ = bltcpth; *q++ = (uint16_t)((uint32_t)b.destination >> 16);
+        *q++ = bltcptl; *q++ = (uint16_t)(uint32_t)b.destination;
+        *q++ = bltdpth; *q++ = (uint16_t)((uint32_t)b.destination >> 16);
+        *q++ = bltdptl; *q++ = (uint16_t)(uint32_t)b.destination;
+        BLIT_CENSUS(2, b.destination, b.size, true);
+        *q++ = bltsize; *q++ = b.size;
+        blitterQueueAddPosition = q;
+        hasQueuedBlits = true;
+        processBlitterQueue();
+    }
+    BLIT_INTERRUPT_ON();
+}
+
 void AmigaHardware::blitterCopyWithMaskBackgroundOperation(uint16_t* source, uint16_t* destination, uint16_t* mask, uint16_t* background, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked, bool invertSource)
 {
     const uint16_t operation=(invertSource?0x30:0xc0)|(clearMasked?0:0x0a);

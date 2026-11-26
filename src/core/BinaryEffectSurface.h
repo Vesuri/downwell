@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_BINARY_EFFECT_SURFACE_H
 #define DOWNWELL_CORE_BINARY_EFFECT_SURFACE_H
 #include <cstdint>
+#include "EffectMask.h"
 namespace downwell {
 // Opaque/binary-alpha drawFx subset: union smoke coverage, then subtract shade.
 // Mask data is offline MSB-first planar bytes, not converted texture pixels.
@@ -11,10 +12,7 @@ template<unsigned Width=160,unsigned Height=284> class BinaryEffectSurface {
                   "bounded word-aligned effect viewport required");
     static constexpr unsigned words=Width/16;
 public:
-    struct Mask {
-        const std::uint8_t* data;
-        unsigned bytes,width,height,stride;
-    };
+    using Mask=EffectMask;
     BinaryEffectSurface(){for(unsigned y=0;y<Height;++y)first_[y]=words;}
     void clear(){
         if(!dirty_)return;

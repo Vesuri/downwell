@@ -168,9 +168,7 @@ private:
            (asset.originY<0 && py>2147483647+asset.originY))return false;
         px-=asset.originX;py-=asset.originY;
         DW_PROFILE_SCOPE(profileEffectStamp);
-        const auto& m=asset.mask;
-        const PaletteEffectSurface<>::Mask mask{m.data,m.bytes,m.width,m.height,m.stride};
-        return subtract?surface_.subtract(mask,px,py):surface_.add({mask,asset.low,asset.high},px,py);
+        return subtract?surface_.subtract(asset.mask,px,py):surface_.add(asset.mask,asset.low,asset.high,px,py);
     }
     PaletteEffectSurface<> surface_;
     bool visible_=false,direct_=false;

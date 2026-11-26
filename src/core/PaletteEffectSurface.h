@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_PALETTE_EFFECT_SURFACE_H
 #include <cstdint>
 #include "NarrowArithmetic.h"
+#include "EffectMask.h"
 namespace downwell {
 // Binary alpha with the native two-bit palette. Painter-order masked replace,
 // not OR of colors: opaque black (pen 0 or 3) also occludes previous effects.
@@ -11,12 +12,14 @@ template<unsigned Width=160,unsigned Height=284> class PaletteEffectSurface {
     static_assert(Width && Width%16==0 && Width<=4096 && Height && Height<=4096,"bounded viewport required");
     static constexpr unsigned words=Width/16;
 public:
-    struct Mask {const std::uint8_t* data;unsigned bytes,width,height,stride;};
+    using Mask=EffectMask;
     struct Asset {Mask alpha;const std::uint8_t* low;const std::uint8_t* high;};
     // Optional platform-owned planar storage and operations. A declined stamp
     // must not modify storage. All CPU reads/writes synchronize queued work.
     // Half-open clip in surface words and rows; a stamp writes only inside it.
     struct Clip {unsigned left,top,right,bottom;};
+    // The whole surface, shared: a per-stamp temporary costs a memcpy.
+    static constexpr Clip whole{0,0,words,Height};
     struct Backend {
         void* context=nullptr;
         bool (*stamp)(void*,const Mask&,const std::uint8_t*,const std::uint8_t*,int,int,const Clip&)=nullptr;
@@ -48,14 +51,15 @@ public:
         }
         firstRow_=Height;lastRow_=0;rectanglesValid_=false;
     }
-    bool add(const Asset& asset,int x,int y){
-        if(!asset.low || !asset.high)return false;
-        return stamp(asset.alpha,asset.low,asset.high,x,y,{0,0,words,Height});
+    bool add(const Asset& asset,int x,int y){return add(asset.alpha,asset.low,asset.high,x,y);}
+    bool add(const Mask& alpha,const std::uint8_t* low,const std::uint8_t* high,int x,int y){
+        if(!low || !high)return false;
+        return stamp(alpha,low,high,x,y,whole);
     }
     // All alpha lies in the tracked rectangles, and subtraction elsewhere
     // changes nothing: a queued backend subtracts only their overlap.
     bool subtract(const Mask& mask,int x,int y){
-        if(!backend_.stamp)return stamp(mask,nullptr,nullptr,x,y,{0,0,words,Height});
+        if(!backend_.stamp)return stamp(mask,nullptr,nullptr,x,y,whole);
         bool okay=true;
         visitRectangles([&](unsigned left,unsigned top,unsigned width,unsigned height){
             if(okay)okay=stamp(mask,nullptr,nullptr,x,y,{left/16,top,(left+width)/16,top+height});
