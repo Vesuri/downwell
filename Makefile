@@ -1581,10 +1581,14 @@ build/terrain-birth-records-test: tests/core/TerrainBirthRecordsTest.cpp $(wildc
 build/native-terrain-source-records-test: tests/core/NativeTerrainSourceRecordsTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
-verify-terrain-source-records: build/terrain-publication-clock-test build/terrain-birth-records-test build/native-terrain-source-records-test
+build/native-terrain-unbound-span-test: tests/core/NativeTerrainUnboundSpanTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+verify-terrain-source-records: build/terrain-publication-clock-test build/terrain-birth-records-test build/native-terrain-source-records-test build/native-terrain-unbound-span-test
 	./build/terrain-publication-clock-test
 	./build/terrain-birth-records-test
 	./build/native-terrain-source-records-test
+	./build/native-terrain-unbound-span-test
 .PHONY: verify-terrain-read-census
 build/terrain-read-census-off: tests/core/TerrainReadCensusTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build

@@ -688,6 +688,12 @@ candidate before choosing the next removal.
   - enemy adoption 11.4 ms, of which runner birth and binding is 8.5;
   - breakable random evaluation 5.1 ms;
   - enemy choice 3.8 ms.
+- **Shipping build:** the world-1 build binds no terrain consumer, so its
+  native records now publish unbound spans (per run, not per cell). On the
+  spray route's pattern at update 644 that took the records from 22.7 to
+  10.1 ms and the update from 82.1 to 57.2 ms. The rest of that update's
+  generation is event cells (7.4 ms) and run appends (about 1,500 cycles
+  per run).
 - **Target:** 122, 136 and 163 each at or under 20 ms.
 - **Approach:**
   1. **Cheaper event cells:** breakables publish as records with the

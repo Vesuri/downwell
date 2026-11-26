@@ -591,8 +591,35 @@ private:
             if(cells.retained&&!runs_.commitRetainedCells(0))return good_=false;
         }
         if(direct)return true;
+        if(!binding_.context&&tile>=0&&tile<=32767&&canAppend(count))return appendUnboundCells(cells,tile);
         for(unsigned i=0;i<count;++i){
             if(!appendConstructed(cells.object(i),cells.x(i),cells.y,true,0,-1,&effectsSucceeded,tile))return false;
+        }
+        return true;
+    }
+    // With no consumer bound there is no birth, Create or layer callback:
+    // each scalar cell would take the first free slot, flags 36 (active,
+    // spatial 8, created) and the tile. Publish each horizontal run that
+    // lands on consecutive free slots as one span, the same descriptors
+    // scalar append merges. appendConstructed remains the oracle.
+    bool appendUnboundCells(PreparedCells cells,int tile){
+        DW_TERRAIN_CONSTRUCTION_SCOPE;
+        const unsigned count=cells.count;
+        for(unsigned i=0;i<count;){
+            unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
+            if(slot==Capacity||pendingPublication_)return good_=false;
+            const unsigned kind=cells.kind(i);const int x=cells.x(i);
+            int step=16;if(i+1<count&&cells.x(i+1)==x-16)step=-16;
+            unsigned n=1;
+            while(i+n<count&&slot+n<Capacity&&!runs_.occupied(slot+n)&&cells.kind(i+n)==kind&&
+                  cells.x(i+n)==x+int(n)*step)++n;
+            if(!runs_.appendSpan({slot,next_},cells.object(i),x,cells.y,step,n,Order{}))return good_=false;
+            for(unsigned j=0;j<n;++j){
+                flags_[slot+j]=36u;createSprite_[slot+j]=static_cast<std::int16_t>(tile);
+                walls_[slot+j]=PackedWallState{};
+            }
+            if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+            next_+=n;freeHint_=slot+n;i+=n;
         }
         return true;
     }
