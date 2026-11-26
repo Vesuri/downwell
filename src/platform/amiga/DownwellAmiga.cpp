@@ -3457,6 +3457,15 @@ __attribute__((noinline)) static int runDownwell(void) {
                             enemySprites[back], palette,
                             port.ringOrigin()))
                         break;
+                    // The transition frame draws the just-created entry wipe
+                    // at its Create position, before its first Step.
+                    if(const auto* entry=presentedScene==AmigaScene::gameplay?port.compactEntryDither():nullptr){
+                        std::int32_t y;unsigned offset;
+                        if(!entry->y.roundPixel(y)||!AmigaEntryMask::offset(y-worldViewY,offset)||!selectEntryMaskBank()||
+                           !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,y-worldViewY)){
+                            exitCode=downwellGameplayFailed(__LINE__);break;
+                        }
+                    }
                     if(!encounterFrame.publishable())break;
                     platform.publish(gameplayScene.copper(back));
                     front = back;
