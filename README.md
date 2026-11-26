@@ -24,10 +24,11 @@ It is for people who want to try the port early and report what they find.
   the saved game and records.
 - **Not yet:** music; world 2 onwards. After level 1-3 the run ends at an
   end-of-slice screen.
-- **Speed:** optimizing for the A1200 is under way. Quiet moments run at full
-  speed, but the game slows down as enemies, gems and effects fill the screen,
-  and in side rooms. A faster processor helps. On a PAL Amiga it runs at 50
-  frames per second, against the original's 60.
+- **Speed:** partly optimized. On the target machine gameplay averages about 30
+  of its 50 updates a second: quiet stretches run at full speed, and the game
+  slows down when the screen gets busy and in the side rooms. A faster processor
+  helps. Full speed on a PAL Amiga is 50 updates a second, against the
+  original's 60.
 - **Known problems:**
   - the first level appears with a hard cut instead of the original's dithered
     reveal;
@@ -42,7 +43,8 @@ were doing when they happened.
 ## Requirements and installation
 
 - Any Amiga with a 68020 or better, and Kickstart and Workbench 2.04 or newer.
-  The game is written for an **A1200 with 4 MB Fast RAM**.
+  Its target machine, the one it is optimized and tested on, is an **A1200 with
+  4 MB Fast RAM**.
 - About 1 MB of free Chip memory and about 2.5 MB of further free memory (Fast or
   Chip). The game says so and does not start when it is not there.
 - Installer 43 or newer and about 4 MB free on the hard disk.
