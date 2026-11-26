@@ -52,7 +52,7 @@ public:
     void addTileGroup(const UBYTE* source,unsigned column){
         for(unsigned w=0;w<5&&column+w<unsigned(words);++w){
             const unsigned dest=column+w;
-            const UWORD clip=dest==0?0x0003:dest==10?0xfffc:0xffff;
+            const UWORD clip=dest==0?0x001f:0xffff;
             const auto* input=source+firstY_*20+w*2;
             auto* out=pixels_+dest;
             for(int y=0;y<height_;++y,input+=20,out+=words*2){
@@ -92,7 +92,7 @@ public:
         const int first=tileY>firstY_?tileY:firstY_;
         const int end=tileY+16<firstY_+height_?tileY+16:firstY_+height_;
         if(first>=end)return;
-        if(!prepared_||tileX-x-column0*16!=6||left_!=110||right_!=270){
+        if(!prepared_||tileX-x-column0*16!=6||left_!=downwellTerrainX||right_!=downwellTerrainX+downwellTerrainWidth){
             for(unsigned cell=0;cell<columns;++cell){
                 const ULONG bit=2UL<<cell;
                 if(middle&bit)tile(((above&bit)?1:0)|((middle&(bit<<1))?2:0)|
@@ -112,12 +112,12 @@ public:
             UWORD* target=destination+column;
             if(column==10){
                 for(int row=first;row<end;++row,source+=12,target+=words*2){
-                    const UWORD mask=word(source)&0xfffcu;
+                    const UWORD mask=word(source);
                     target[0]=(target[0]&UWORD(~mask))|(word(source+4)&mask);
                     target[words]=(target[words]&UWORD(~mask))|(word(source+8)&mask);
                 }
             }else{
-                const ULONG clip=column==0?0x0003ffffUL:column==9?0xfffffffcUL:0xffffffffUL;
+                const ULONG clip=column==0?0x001fffffUL:0xffffffffUL;
                 for(int row=first;row<end;++row,source+=12,target+=words*2){
                     const ULONG mask=longWord(source)&clip;
                     mergePair(target,mask,longWord(source+4));

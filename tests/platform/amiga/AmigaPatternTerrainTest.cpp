@@ -53,7 +53,7 @@ int main(int argc,char** argv){
         std::fill(game.begin(),game.end(),0);
         (void)AmigaTerrainPainter::bindBatch(nullptr,nullptr,nullptr,0);
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
-            pack.data(),pack.data()+pack.size(),160,24,110,0,160,16),"scalar paint failed");
+            pack.data(),pack.data()+pack.size(),160,24,107,0,165,16),"scalar paint failed");
         UWORD actual[16*22+2];std::fill(std::begin(actual),std::end(actual),0xbeef);
         require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"batch bind");
         require(AmigaTerrainPainter::paintCached(actual+1,&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
@@ -111,7 +111,7 @@ int main(int argc,char** argv){
         std::fill(game.begin(),game.end(),0);
         (void)AmigaTerrainPainter::bindBatch(nullptr,nullptr,nullptr,0);
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
-            pack.data(),pack.data()+pack.size(),160,24,110,0,160,16),"scalar tile fixture");
+            pack.data(),pack.data()+pack.size(),160,24,107,0,165,16),"scalar tile fixture");
         require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"batch bind");
         for(unsigned first=0;first<16;first+=4){
             UWORD actual[4*22];
@@ -149,7 +149,7 @@ int main(int argc,char** argv){
         std::fill(game.begin(),game.end(),0);
         (void)AmigaTerrainPainter::bindBatch(nullptr,nullptr,nullptr,0);
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
-            pack.data(),pack.data()+pack.size(),160,24,110,0,160,16),"scalar overlap fixture");
+            pack.data(),pack.data()+pack.size(),160,24,107,0,165,16),"scalar overlap fixture");
         require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"batch bind");
         raster->invalidate(24,40);
         unsigned pieces=0;
@@ -179,7 +179,7 @@ int main(int argc,char** argv){
             std::fill(game.begin(),game.end(),0);
             (void)AmigaTerrainPainter::bindBatch(nullptr,nullptr,nullptr,0);
             require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,&deco,1,nullptr,
-                pack.data(),pack.data()+pack.size(),160,24,110,0,160,16),"scalar decoration boundary");
+                pack.data(),pack.data()+pack.size(),160,24,107,0,165,16),"scalar decoration boundary");
             require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"batch bind");
             raster->invalidate(24,40);
             unsigned pieces=0;
@@ -222,7 +222,7 @@ int main(int argc,char** argv){
         if(!group)continue;
         for(unsigned column:{0u,4u,8u}){
             std::fill(game.begin(),game.end(),0);
-            amigaRendererSetClipRect(&renderer,110,0,160,16);
+            amigaRendererSetClipRect(&renderer,107,0,165,16);
             unsigned digits=code;
             for(unsigned cell=0;cell<4;++cell,digits/=5){
                 const unsigned digit=digits%5;
@@ -233,7 +233,7 @@ int main(int argc,char** argv){
             }
             for(unsigned first:{0u,8u}){
                 UWORD actual[8*22]{};
-                AmigaTerrainRunSurface surface(actual,first,8,110,160,nullptr);
+                AmigaTerrainRunSurface surface(actual,first,8,107,165,nullptr);
                 surface.addTileGroup(group,column);
                 for(unsigned y=0;y<8;++y)for(unsigned p=0;p<2;++p)for(unsigned w=0;w<11;++w)
                     require(actual[y*22+p*11+w]==word(game.data()+p*downwellGameRingPlaneBytes+(first+y)*48+12+w*2),
@@ -248,10 +248,10 @@ int main(int argc,char** argv){
         if(!bank.overlay(sprite,frame,flip,art))continue;
         for(int anchorX=94;anchorX<=302;anchorX+=16)for(int anchorY:{-8,0,7,16,31,40}){
             std::fill(game.begin(),game.end(),0x5a);
-            amigaRendererSetClipRect(&renderer,110,0,160,32);
+            amigaRendererSetClipRect(&renderer,107,0,165,32);
             amigaRendererDrawAsset(&renderer,pack.data(),pack.data()+pack.size(),sprite,frame,anchorX,anchorY,flip);
             UWORD actual[32*22];std::fill(std::begin(actual),std::end(actual),0x5a5a);
-            AmigaTerrainRunSurface surface(actual,0,32,110,160,nullptr);
+            AmigaTerrainRunSurface surface(actual,0,32,107,165,nullptr);
             require(surface.overlay(art,anchorX,anchorY),"prepared overlay alignment");
             for(unsigned y=0;y<32;++y)for(unsigned p=0;p<2;++p)for(unsigned w=0;w<11;++w)
                 require(actual[y*22+p*11+w]==word(game.data()+p*downwellGameRingPlaneBytes+y*48+12+w*2),

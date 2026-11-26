@@ -1448,7 +1448,7 @@ static void drawMainWorldSpan(
     unsigned decorationCount,
     const AmigaPortRuntime* runtime,
     int viewX, int viewY, int clipY, int clipHeight,
-    int clipX = downwellPlayfieldX, int clipWidth = downwellPlayfieldWidth,
+    int clipX = downwellTerrainX, int clipWidth = downwellTerrainWidth,
     bool refresh = false, unsigned refreshCause = 0) {
     if(!terrainPaintSucceeded)return;
     const int firstWorldY = viewY + clipY;
@@ -1462,7 +1462,7 @@ static void drawMainWorldSpan(
     if (terrainRaster.ready && cacheable && !refresh) {
         const int column = std::uint16_t(viewX - mainViewX + 160) / 160; // cacheable: 0..320
 #ifdef DOWNWELL_PREPARED_PATTERN_ROWS
-        if(column==1&&clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+        if(column==1&&clipX==downwellTerrainX&&clipWidth==downwellTerrainWidth&&
            (terrainRaster.dirty(column,firstWorldY)||
             terrainRaster.runEnd(column,firstWorldY,finalWorldY)<unsigned(finalWorldY)))
             (void)preparePatternCache(renderer,rooms,room,decorations,decorationCount,
@@ -1484,7 +1484,7 @@ static void drawMainWorldSpan(
             return;
         }
         refresh = firstWorldY < finalWorldY && terrainRaster.dirty(column, firstWorldY);
-        if(refresh&&column==1&&clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+        if(refresh&&column==1&&clipX==downwellTerrainX&&clipWidth==downwellTerrainWidth&&
            !decorationCount&&runtime&&!runtime->terrainInstances()&&
            (!runtime->nativeTerrainInstances()||!runtime->nativeTerrainInstances()->hasWallPresentationState())&&
            !runtime->shops().allocatedCount&&terrainCollision.index&&
@@ -1501,7 +1501,7 @@ static void drawMainWorldSpan(
             return;
         }
 #ifdef DOWNWELL_TERRAIN_DIRECT
-        if(clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+        if(clipX==downwellTerrainX&&clipWidth==downwellTerrainWidth&&
             AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,firstWorldY,clipHeight),renderer,
                 rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
                 runtime,activeGamePack,activeGamePackEnd,viewX,viewY,clipY,clipHeight)){
@@ -4255,7 +4255,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                         fragments, liveBuilder.fragmentCount(), generatedDecorations,
                         liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
-                        top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true, 1);
+                        top, bottom - top, downwellTerrainX, downwellTerrainWidth, true, 1);
                 }
             }
             if(!wallDamage.repair([&](int first,int end){
@@ -4269,7 +4269,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 amigaRendererClearGameRows(&renderer,top,bottom-top,0);
                 drawMainWorldSpan(&renderer,rooms,mainRoom,builders,fragments,liveBuilder.fragmentCount(),
                     generatedDecorations,liveBuilder.decorationCount(),&port,worldViewX,worldViewY,
-                    top,bottom-top,downwellPlayfieldX,downwellPlayfieldWidth,true,1);
+                    top,bottom-top,downwellTerrainX,downwellTerrainWidth,true,1);
                 return terrainPaintSucceeded;
             }))terrainPaintSucceeded=false;
 #ifdef DOWNWELL_FRAME_WORK_CANDIDATE
@@ -4291,7 +4291,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                     fragments, liveBuilder.fragmentCount(), generatedDecorations,
                     liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
-                    top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true, 2);
+                    top, bottom - top, downwellTerrainX, downwellTerrainWidth, true, 2);
             }
             if (destroyedBlockCount != 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
@@ -4314,9 +4314,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     int right = left + 16;
                     if (top < 0) top = 0;
                     if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
-                    if (left < downwellPlayfieldX) left = downwellPlayfieldX;
-                    if (right > downwellPlayfieldX + downwellPlayfieldWidth)
-                        right = downwellPlayfieldX + downwellPlayfieldWidth;
+                    if (left < downwellTerrainX) left = downwellTerrainX;
+                    if (right > downwellTerrainX + downwellTerrainWidth)
+                        right = downwellTerrainX + downwellTerrainWidth;
                     if (top >= bottom || left >= right) continue;
 #ifdef DOWNWELL_REFERENCE_CELL_REPAIR
                     cells[0] = {top, bottom, left, right}; cellCount = 1;
@@ -4470,7 +4470,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                                 if(!AmigaTerrainPainter::paint(&stage, rooms, mainRoom, terrainCollision.index,
                                     terrainTiles, generatedDecorations, liveBuilder.decorationCount(), &port,
                                     activeGamePack, activeGamePackEnd, targetX, first,
-                                    downwellPlayfieldX, top, downwellPlayfieldWidth, height)){
+                                    downwellTerrainX, top, downwellTerrainWidth, height)){
                                     terrainPaintSucceeded=false;
                                     return AmigaTerrainRaster::stageFailed;
                                 }

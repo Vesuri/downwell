@@ -80,10 +80,10 @@ int main(int argc,char** argv){
             amigaRendererInit(&reference,a.data(),ha.data());amigaRendererInit(&candidate,b.data(),hb.data());
             require(!AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),nullptr,0),"unbind owned reference");
             require(AmigaTerrainPainter::paint(&reference,rooms,room,nullptr,empty,nullptr,0,referenceWorld.get(),
-                pack.data(),pack.data()+pack.size(),160,176,110,0,160,48),"owned reference paint");
+                pack.data(),pack.data()+pack.size(),160,176,107,0,165,48),"owned reference paint");
             require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"bind owned batch");
             require(AmigaTerrainPainter::paint(&candidate,rooms,room,nullptr,empty,nullptr,0,nativeWorld.get(),
-                pack.data(),pack.data()+pack.size(),160,176,110,0,160,48),"native retained paint");
+                pack.data(),pack.data()+pack.size(),160,176,107,0,165,48),"native retained paint");
             require(a==b&&ha==hb,"native retained wall pixels differ");
             require(std::any_of(a.begin(),a.end(),[](UBYTE b){return b!=0;}),"empty retained wall fixture");
             std::vector<UWORD> rows(48*22);
@@ -100,9 +100,9 @@ int main(int argc,char** argv){
         command.integerImageIndex=next()%26;
         require(tiles.append(command),"tile fixture");
     }
-    const int clips[][4]={{110,0,160,284},{0,0,380,284},{112,9,1,263},
+    const int clips[][4]={{107,0,165,284},{110,0,160,284},{0,0,380,284},{112,9,1,263},
         {0,12,380,1},{-3,-7,390,300},{100,267,171,13},{0,0,0,284},
-        {110,13,160,1},{110,13,160,3},{110,267,160,16}};
+        {107,13,165,1},{107,13,165,3},{107,267,165,16}};
     for(int vx:{-520,-512,-16,0,1,159,160,161,319,320,1530})
     for(int vy:{-16,-1,0,1,175,176,177,4000,8177,8192})
     for(const auto& clip:clips){
@@ -122,7 +122,7 @@ int main(int argc,char** argv){
         require(AmigaTerrainPainter::paint(&candidate,rooms,room,&index,tiles,nullptr,0,nullptr,
             pack.data(),pack.data()+pack.size(),vx,vy,clip[0],clip[1],clip[2],clip[3]),"batch paint");
         if(a!=b||ha!=hb){std::cerr<<"viewport mismatch "<<vx<<','<<vy<<" clip "<<clip[0]<<','<<clip[1]<<','<<clip[2]<<','<<clip[3]<<'\n';return 1;}
-        if(clip[0]==110&&clip[2]==160){
+        if(clip[0]==downwellTerrainX&&clip[2]==downwellTerrainWidth){
             std::fill(a.begin(),a.end(),0);
             require(!AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),nullptr,0),"unbind direct oracle");
             require(AmigaTerrainPainter::paint(&reference,rooms,room,&index,tiles,nullptr,0,nullptr,
@@ -165,7 +165,7 @@ int main(int argc,char** argv){
         amigaRendererInit(&renderer,game.data(),hud.data());
         require(!AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),nullptr,0),"unbind frame oracle");
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,nullptr,single,nullptr,0,nullptr,
-            pack.data(),pack.data()+pack.size(),160,160,110,0,160,40),"frame oracle");
+            pack.data(),pack.data()+pack.size(),160,160,107,0,165,40),"frame oracle");
         require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"bind frame");
         std::vector<UWORD> rows(40*22);
         require(AmigaTerrainPainter::paintCached(rows.data(),&renderer,rooms,room,nullptr,single,

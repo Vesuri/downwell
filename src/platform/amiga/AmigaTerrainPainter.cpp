@@ -169,7 +169,8 @@ bool AmigaTerrainPainter::preparePatternPiece(AmigaTerrainRaster& raster,const A
         plan.grouped=true;
         for(unsigned id=tiles.first(row*16);id;){
             const auto& tile=tiles.at(id);id=tile.next;
-            if(tile.x+8<=160||tile.x-8>=320)continue;
+            if(tile.x+8<=157||tile.x-8>=322)continue; // ring x 107..271
+            if(tile.x<160||tile.x>320)return false;
             if(tile.objectId==92&&runtime&&!runtime->breakableActiveAt(tile.x-240,row*16-176))continue;
             if(tile.frame>=26||plan.count==32)return false;
             plan.commands[plan.count++]={tile.frame,110+tile.x-160,8,false,{}};
@@ -220,7 +221,8 @@ bool AmigaTerrainPainter::preparePatternPiece(AmigaTerrainRaster& raster,const A
     const unsigned count=offset+8>16?16-offset:8;
     auto* pixels=raster.writeRows(1,first,count);
     patternTerrain.copy(plan.walls,offset,count,pixels);
-    AmigaTerrainRunSurface surface(pixels,int(offset),int(count),110,160,terrainBatch.tiles,preparedTerrain);
+    AmigaTerrainRunSurface surface(pixels,int(offset),int(count),downwellTerrainX,downwellTerrainWidth,
+        terrainBatch.tiles,preparedTerrain);
     if(plan.grouped)for(unsigned i=0;i<3;++i)if(plan.groups[i])surface.addTileGroup(plan.groups[i],i*4);
     for(unsigned i=0;i<plan.count;++i){
         const auto& command=plan.commands[i];
@@ -303,8 +305,8 @@ bool AmigaTerrainPainter::paintCached(UWORD* rows,AmigaRenderer* renderer,
 #else
     if(!rows||!terrainBatch.scratch||clipY<0||clipHeight<=0||
         clipY+clipHeight>downwellDisplayHeight||directSurface)return false;
-    AmigaTerrainRunSurface surface(rows,clipY,clipHeight,downwellPlayfieldX,
-        downwellPlayfieldWidth,terrainBatch.tiles,preparedTerrain);
+    AmigaTerrainRunSurface surface(rows,clipY,clipHeight,downwellTerrainX,
+        downwellTerrainWidth,terrainBatch.tiles,preparedTerrain);
     AmigaRenderer local=*renderer;
     directSurface=&surface;directFailed=false;
     directWallsPrepared=index&&(!runtime||(!runtime->terrainInstances()&&
@@ -312,7 +314,7 @@ bool AmigaTerrainPainter::paintCached(UWORD* rows,AmigaRenderer* renderer,
         paintPatternRows(rows,*index,viewX,viewY+clipY,clipHeight);
     if(!directWallsPrepared)surface.clear();
     const bool ok=paint(&local,rooms,room,index,tiles,decorations,decorationCount,
-        runtime,pack,end,viewX,viewY,downwellPlayfieldX,clipY,downwellPlayfieldWidth,clipHeight);
+        runtime,pack,end,viewX,viewY,downwellTerrainX,clipY,downwellTerrainWidth,clipHeight);
     directSurface=nullptr;directWallsPrepared=false;
 #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
     if(ok&&!directFailed){
@@ -322,7 +324,7 @@ bool AmigaTerrainPainter::paintCached(UWORD* rows,AmigaRenderer* renderer,
         oracle.game=oracle.target=expected;oracle.blitterEnabled=0;
         useTerrainBatch=false;
         const bool referenceOK=paint(&oracle,rooms,room,index,tiles,decorations,decorationCount,
-            runtime,pack,end,viewX,viewY,downwellPlayfieldX,clipY,downwellPlayfieldWidth,clipHeight);
+            runtime,pack,end,viewX,viewY,downwellTerrainX,clipY,downwellTerrainWidth,clipHeight);
         useTerrainBatch=true;
         bool equal=referenceOK;
         for(int y=0;y<clipHeight;++y)for(unsigned p=0;p<2;++p)for(unsigned w=0;w<11;++w){

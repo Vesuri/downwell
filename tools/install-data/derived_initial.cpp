@@ -48,7 +48,7 @@ void mergeWord(u16* p, u16 mask, u16 color) { *p = (u16)((*p & ~mask) | (color &
 void paintWalls(u16* rows, const WallIndex& index, const u8* phase, int viewX, int viewY, int height)
 {
     for (int i = 0; i < height * Words * 2; ++i) rows[i] = 0;
-    const int left = 110, right = 270; /* downwellPlayfieldX, + downwellPlayfieldWidth */
+    const int left = 107, right = 272; /* downwellTerrainX, + downwellTerrainWidth */
     const int firstX = (viewX + left - 110 + 8) & ~15, lastX = (viewX + right - 110 + 7) & ~15;
     const int firstY = (viewY + 8) & ~15, lastY = (viewY + height + 7) & ~15;
     const unsigned columns = (unsigned)(lastX - firstX) / 16 + 1;
@@ -73,11 +73,11 @@ void paintWalls(u16* rows, const WallIndex& index, const u8* phase, int viewX, i
                 for (int r = top; r < end; ++r, source += 12, target += Words * 2) {
                     const u32 coverage = rd_be32(source), low = rd_be32(source + 4), high = rd_be32(source + 8);
                     if (col == 10) {
-                        const u16 mask = (u16)((coverage >> 16) & 0xfffcu);
+                        const u16 mask = (u16)(coverage >> 16);
                         mergeWord(target, mask, (u16)(low >> 16));
                         mergeWord(target + Words, mask, (u16)(high >> 16));
                     } else {
-                        const u32 mask = coverage & (col == 0 ? 0x0003fffful : col == 9 ? 0xfffffffcul : 0xfffffffful);
+                        const u32 mask = coverage & (col == 0 ? 0x001ffffful : 0xfffffffful);
                         mergeWord(target, (u16)(mask >> 16), (u16)(low >> 16));
                         mergeWord(target + 1, (u16)mask, (u16)low);
                         mergeWord(target + Words, (u16)(mask >> 16), (u16)(high >> 16));

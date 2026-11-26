@@ -140,7 +140,7 @@ def render(key, frames):
                 value = frames[frame][y+plane*16]
                 for pixel in range(16):
                     x = 102+cell*16+pixel
-                    if 110 <= x < 270 and value & (0x8000 >> pixel):
+                    if 107 <= x < 272 and value & (0x8000 >> pixel):
                         result[y][plane*11+(x-96)//16] |= 0x8000 >> ((x-96) & 15)
     return [tuple(row) for row in result]
 

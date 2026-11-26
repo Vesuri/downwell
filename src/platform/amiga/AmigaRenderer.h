@@ -27,7 +27,13 @@ enum {
     /* HRM table 3-13: PAL lines $1D-$137 are displayable. */
     downwellDisplayVStart = 0x1d,
     downwellPlayfieldX = 110,
-    downwellPlayfieldWidth = 160
+    downwellPlayfieldWidth = 160,
+    /* Terrain is clipped three pixels left and two right of the window: the
+       BPLCON1 screen shake scrolls PF1 by -2..+3 pixels and must expose wall,
+       not black. HUD pen 3 hides these columns while the view is steady.
+       They stay inside the eleven retained words from x 96. */
+    downwellTerrainX = 107,
+    downwellTerrainWidth = 165
 };
 
 typedef struct AmigaRenderer {

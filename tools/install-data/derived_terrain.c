@@ -204,7 +204,7 @@ static void render(Writer* out, const Key* key, u16 frames[26][32])
                 u32 value = frames[frame][y + plane * 16];
                 for (pixel = 0; pixel < 16; ++pixel) {
                     u32 x = 102 + cell * 16 + pixel;
-                    if (x >= 110 && x < 270 && (value & (0x8000u >> pixel)))
+                    if (x >= 107 && x < 272 && (value & (0x8000u >> pixel)))
                         row[plane * 11 + (x - 96) / 16] |= (u16)(0x8000u >> ((x - 96) & 15));
                 }
             }

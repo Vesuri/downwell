@@ -47,7 +47,7 @@ int main(int argc,char** argv){
         std::fill(game.begin(),game.end(),0);
         require(!AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),nullptr,0),"unbind scalar oracle");
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
-            pack.data(),pack.data()+pack.size(),column*160,y,110,0,160,height),"scalar initial oracle");
+            pack.data(),pack.data()+pack.size(),column*160,y,downwellTerrainX,0,downwellTerrainWidth,height),"scalar initial oracle");
         for(int line=0;line<height;++line)for(unsigned p=0;p<2;++p)for(unsigned w=0;w<11;++w){
             const unsigned offset=p*downwellGameRingPlaneBytes+line*48+12+w*2;
             require(target[line*22+p*11+w]==UWORD(unsigned(game[offset])*256+game[offset+1]),"initial scalar pixel mismatch");
@@ -73,7 +73,7 @@ int main(int argc,char** argv){
     auto checkCorridorPixels=[&](unsigned phaseY){
         std::fill(game.begin(),game.end(),0);
         require(AmigaTerrainPainter::paint(&renderer,rooms,room,&index,tiles,nullptr,0,nullptr,
-            pack.data(),pack.data()+pack.size(),160,32+phaseY,110,0,160,16),"scalar corridor oracle");
+            pack.data(),pack.data()+pack.size(),160,32+phaseY,downwellTerrainX,0,downwellTerrainWidth,16),"scalar corridor oracle");
         for(unsigned y=0;y<16;++y)for(unsigned plane=0;plane<2;++plane)for(unsigned w=0;w<11;++w){
             const unsigned offset=plane*downwellGameRingPlaneBytes+y*48+12+w*2;
             require(corridor[((y+phaseY)&15)*22+plane*11+w]==UWORD(unsigned(game[offset])*256+game[offset+1]),

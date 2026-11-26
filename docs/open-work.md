@@ -413,18 +413,7 @@ resets it; that is the first owner to find.
     BPLCON1 (with a one-word pointer lead for a left shift) and the sprite x
     apply the shake, so shaken updates no longer repaint the whole view. The
     census's camera-jump class still counts those updates (the profile
-    compares the shaken view x). Remaining gap: a shift exposes up to three
-    ring columns left and two right of the 160-pixel window, ring x 107-109
-    and 270-271, which every terrain producer clips away, so the window's
-    edge column shows black while the screen shakes. Painting them per
-    update (general painter, 9-12 ms per shaken update), caching them in the
-    backing (27 ms on a burst's first update) or painting ahead (3 ms on
-    every update) all cost more than they were worth. Widen the retained
-    terrain's clip to those columns instead, in the same words the rows
-    already store: the pattern generator and install derivation
-    (`tools/generate-pattern-terrain.py`, `tools/install-data/derived_terrain.c`),
-    the run surface, corridor rows, the initial dictionary and their
-    oracles. BOBs and effects keep the 160-pixel clip.
+    compares the shaken view x).
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,
     level transitions and shop re-entry, the clear and upgrade screens,

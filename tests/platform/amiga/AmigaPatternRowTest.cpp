@@ -19,7 +19,7 @@ int main(){
             for(unsigned w=0;w<11;++w)expected[p][w]=unsigned(walls[p*22+w*2])*256+walls[p*22+w*2+1];
             for(unsigned group=0;group<3;++group)for(unsigned w=0;w<5&&group*4+w<11;++w){
                 const unsigned column=group*4+w;
-                const unsigned clip=column==0?3:column==10?0xfffc:0xffff;
+                const unsigned clip=column==0?0x1f:0xffff;
                 expected[p][column]|=(unsigned(tiles[group][p*10+w*2])*256+tiles[group][p*10+w*2+1])&clip;
             }
         }

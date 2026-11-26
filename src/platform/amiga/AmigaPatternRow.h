@@ -34,7 +34,7 @@ struct AmigaPatternRow {
                 else if(w<8)tile=word(b+(w-4)*2);
                 else if(w==8)tile=word(b+8)|word(c);
                 else tile=word(c+(w-8)*2);
-                const unsigned clip=w==0?3:w==10?0xfffc:0xffff;
+                const unsigned clip=w==0?0x1f:0xffff;
                 output[w]=std::uint16_t(word(wall+w*2)|(tile&clip));
             }
         }
