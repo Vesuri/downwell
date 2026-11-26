@@ -1104,6 +1104,21 @@ void GameplayWorld::bumpCompactFrogs()
 }
 
 bool GameplayWorld::captureEnemyStepOrder(){
+#ifndef DOWNWELL_REFERENCE_ENEMY_ORDER_CAPTURE
+    // The unbound order is a function of the active records' slot, lifetime,
+    // activation tick and object, in array order: if none changed, the
+    // captured and sorted order stands.
+    if(!enemyOrderCapture_&&unboundOrderKnown_){
+        unsigned n=0;bool same=true;
+        for(unsigned i=0;i<enemyCount_&&same;++i){
+            const auto& e=enemies_[i];
+            if(!e.active)continue;
+            same=n<unboundOrderKeys_&&unboundOrderKey_[n].matches(e);++n;
+        }
+        if(same&&n==unboundOrderKeys_)return true;
+    }
+    unboundOrderKnown_=false;
+#endif
     const auto revision=enemyOrderRevision_?enemyOrderRevision_(enemyOrderContext_):0xffffffffu;
     if(enemyOrderCapture_&&enemyOrderValid_&&revision!=0xffffffffu&&
        revision==enemyOrderCapturedRevision_)return true;
@@ -1127,6 +1142,11 @@ bool GameplayWorld::captureEnemyStepOrder(){
         for(unsigned n=0;n<count;++n){const auto& e=enemies_[order[n]];
             if(!enemyStepOrder_.append(e.identitySlot,e.lifetimeId,e.objectId))return run_.effectsSucceeded=false;
         }
+#ifndef DOWNWELL_REFERENCE_ENEMY_ORDER_CAPTURE
+        unboundOrderKeys_=0;
+        for(unsigned i=0;i<enemyCount_;++i)if(enemies_[i].active)unboundOrderKey_[unboundOrderKeys_++].take(enemies_[i]);
+        unboundOrderKnown_=true;
+#endif
     }
     enemyStepOrder_.sort();
     enemyOrderCapturedRevision_=revision;enemyOrderValid_=true;return true;
@@ -2890,17 +2910,36 @@ bool GameplayWorld::collideSteeringEnemies(){
     // Collision events with other enemies: jelly and neon red ball vs
     // subparentEnemy, red ball vs red ball. All read the other's published
     // builtin x/y.
+    const auto otherBounds=[](const EnemyState& other){
+        return downwell::contactWorldBounds({other.x*256L,other.y*256L,
+            other.objectId==117?other.motionState:other.facing,other.imageScaleY(),
+            downwell::enemyContactMask(other.objectId,other.spriteId,other.maskId)});
+    };
+#ifndef DOWNWELL_REFERENCE_STEERING_BOUNDS
+    // Each enemy's published bounds, computed once per update. A contact
+    // event changes only its own steering enemy (sprite, facing, activity;
+    // never the published x/y), whose entry is recomputed after its events.
+    downwell::ContactBounds others[enemyCapacity];
+    bool known[enemyCapacity]{};
+    const auto bounds=[&](unsigned j)->const downwell::ContactBounds&{
+        if(!known[j]){others[j]=otherBounds(enemies_[j]);known[j]=true;}
+        return others[j];
+    };
+#else
+    const auto bounds=[&](unsigned j){return otherBounds(enemies_[j]);};
+#endif
     for(unsigned i=0;i<enemyCount_;++i){
         auto& self=enemies_[i];
         if(!steeringObject(self.objectId)||!self.active||self.destroyRequested)continue;
         const auto selfBounds=downwell::contactWorldBounds({self.x*256L,self.y*256L,self.facing,1,
             downwell::enemyContactMask(self.objectId,self.spriteId)});
-        for(unsigned j=0;j<enemyCount_;++j){
+#ifndef DOWNWELL_REFERENCE_STEERING_BOUNDS
+        known[i]=false;
+#endif
+        for(unsigned j=0;j<enemyCount_&&j<enemyCapacity;++j){
             const auto& other=enemies_[j];
             if(j==i||!other.active||other.destroyRequested||(self.objectId==118&&other.objectId!=118))continue;
-            if(!downwell::contactBoundsOverlap(selfBounds,downwell::contactWorldBounds({other.x*256L,other.y*256L,
-                other.objectId==117?other.motionState:other.facing,other.imageScaleY(),
-                downwell::enemyContactMask(other.objectId,other.spriteId,other.maskId)})))continue;
+            if(!downwell::contactBoundsOverlap(selfBounds,bounds(j)))continue;
             auto* actor=steeringActor(self);
             if(!actor)return run_.effectsSucceeded=false;
             struct CollisionOps : SteeringOps {
@@ -2912,6 +2951,9 @@ bool GameplayWorld::collideSteeringEnemies(){
                 steering_[self.auxiliaryState].ball.enemyContact(enemyRandom_,ops);
             if(!collided||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
         }
+#ifndef DOWNWELL_REFERENCE_STEERING_BOUNDS
+        known[i]=false;
+#endif
     }
     return true;
 }

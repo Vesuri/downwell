@@ -3061,6 +3061,17 @@ private:
     std::uint32_t (*enemyOrderRevision_)(void*)=nullptr;
     std::uint32_t enemyOrderCapturedRevision_=0;
     bool enemyOrderValid_=false;
+    // The unbound capture's inputs: active records in array order.
+    struct UnboundOrderKey {
+        std::uint32_t lifetime,tick;int object;unsigned short slot;
+        bool matches(const EnemyState& e)const{
+            return slot==e.identitySlot&&lifetime==e.lifetimeId&&tick==e.activatedTick&&object==e.objectId;
+        }
+        void take(const EnemyState& e){slot=e.identitySlot;lifetime=e.lifetimeId;tick=e.activatedTick;object=e.objectId;}
+    };
+    UnboundOrderKey unboundOrderKey_[enemyCapacity]{};
+    unsigned unboundOrderKeys_=0;
+    bool unboundOrderKnown_=false;
     bool (*enemyOrderCapture_)(void*,EnemyStepOrder&)=nullptr;
     void* enemyOrderContext_=nullptr;
     bool captureEnemyStepOrder();

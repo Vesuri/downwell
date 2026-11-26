@@ -96,6 +96,11 @@ REFERENCE_ENEMY_UPDATES ?= 0
 # W3.12: 1 captures and sorts the enemy step order for every alarm index,
 # even when at most one enemy event is due there.
 REFERENCE_ENEMY_ALARM_ORDER ?= 0
+# W3.12: 1 recaptures and sorts the unbound enemy step order even when its
+# active records are unchanged.
+REFERENCE_ENEMY_ORDER_CAPTURE ?= 0
+# W3.12: 1 recomputes every other enemy's bounds for each steering enemy.
+REFERENCE_STEERING_BOUNDS ?= 0
 # W3.12: 1 scans the wall-contact query's cell superset with a bounds test
 # per cell.
 REFERENCE_WALL_CONTACT_SCAN ?= 0
@@ -490,6 +495,12 @@ CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
 endif
 ifeq ($(REFERENCE_ENEMY_ALARM_ORDER),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ORDER
+endif
+ifeq ($(REFERENCE_ENEMY_ORDER_CAPTURE),1)
+CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ORDER_CAPTURE
+endif
+ifeq ($(REFERENCE_STEERING_BOUNDS),1)
+CFLAGS += -DDOWNWELL_REFERENCE_STEERING_BOUNDS
 endif
 ifeq ($(REFERENCE_WALL_CONTACT_SCAN),1)
 CFLAGS += -DDOWNWELL_REFERENCE_WALL_CONTACT_SCAN
@@ -924,6 +935,8 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_ENEMY_ALARM_ROSTER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENEMY_UPDATES)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENEMY_ALARM_ORDER)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_ENEMY_ORDER_CAPTURE)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_STEERING_BOUNDS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_WALL_CONTACT_SCAN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CELL_REPAIR)' >> $@.tmp
 	@printf '%s\n' '$(CELL_REPAIR_VERIFY)' >> $@.tmp
