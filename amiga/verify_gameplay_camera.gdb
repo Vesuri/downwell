@@ -1,5 +1,6 @@
 set pagination off
 set confirm off
+set remotetimeout 90
 target remote 127.0.0.1:2345
 break downwellGameplayLongRunReady
 continue

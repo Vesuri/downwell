@@ -459,7 +459,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         const auto& gem = port.gemAt(index);
         if (gem.active && gem.motion.lifetime.visible() && !append(
                 (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),
-                downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
+                downwellPlayfieldX + 80 + gem.x - port.cameraSteadyOffsetX(),
                 playerStartY + gem.y - port.cameraOffsetY(), 0))
             ready = false;
     }
@@ -557,14 +557,14 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             const unsigned page = 2048u + (pose.facing < 0 ? 256u : 0u) + pose.frame;
             for (unsigned i = 0; i < 2; ++i)
                 if (!append((UWORD)pose.sprite, UWORD(page),
-                        downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraOffsetX() + port.lowHealthDx(i),
+                        downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraSteadyOffsetX() + port.lowHealthDx(i),
                         playerStartY + downwell::roundGameMakerQ8(pose.yFixed) - port.cameraOffsetY() + port.lowHealthDy(i),
                         0)) return false;
         } else
 #endif
         if (port.playerVisible() && !append(
                 (UWORD)pose.sprite, (UWORD)pose.frame,
-                downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraOffsetX(),
+                downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(pose.xFixed) - port.cameraSteadyOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
                 replayGroundY + port.player().offsetY(),
 #else
@@ -586,7 +586,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         // playerDraw ends with drawComboNumber(x, y - 11, comboCount).
         if(port.comboCount()>=5&&!port.goalStopped()&&
            !downwell::drawComboNumber(
-                downwellPlayfieldX+80+downwell::roundGameMakerQ8(port.player().offsetXFixed())-port.cameraOffsetX(),
+                downwellPlayfieldX+80+downwell::roundGameMakerQ8(port.player().offsetXFixed())-port.cameraSteadyOffsetX(),
                 playerStartY+downwell::roundGameMakerQ8(port.player().offsetYFixed())-port.cameraOffsetY()-11,
                 port.comboCount(),[&](unsigned sprite,unsigned frame,int x,int y){
                     return append(UWORD(sprite),UWORD(frame),x,y,0);
@@ -741,7 +741,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 const auto* enemy=port.resolveEnemyLifetime(key);
                 if(!enemy)return false;
                 if(!enemy->active||!enemy->awake)return true;
-                const int x=downwellPlayfieldX+80+enemy->x-port.cameraOffsetX();
+                const int x=downwellPlayfieldX+80+enemy->x-port.cameraSteadyOffsetX();
                 const int y=playerStartY+enemy->y-port.cameraOffsetY();
                 if(!append(enemy->spriteId,enemy->drawFrame(),x,y,enemy->objectId!=119&&enemy->facing<0))return false;
                 // enmRedBall (and neonRedBall) Draw: the eye follows
@@ -757,7 +757,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             if(kind==GameplayWorld::DrawActor::bullet){
                 const auto* bullet=port.resolveBulletLifetime(key);
                 return bullet&&(!bullet->active||append(bullet->sprite,
-                    bullet->drawFrame(),downwellPlayfieldX+80+bullet->x-port.cameraOffsetX(),
+                    bullet->drawFrame(),downwellPlayfieldX+80+bullet->x-port.cameraSteadyOffsetX(),
                     playerStartY+bullet->y-port.cameraOffsetY(),0));
             }
             if(kind==GameplayWorld::DrawActor::bone||kind==GameplayWorld::DrawActor::skeleton){
@@ -948,7 +948,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             // the spread-adjusted artwork equals this offline quarter
             // turn. Other angles/guns need separately verified variants.
             if (bullet.active && !append(bullet.sprite, bullet.drawFrame(),
-                    downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
+                    downwellPlayfieldX + 80 + bullet.x - port.cameraSteadyOffsetX(),
                     playerStartY + bullet.y - port.cameraOffsetY(), 0))
                 ready = false;
         }
@@ -972,7 +972,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         // front of the player (-50000) and the blasts.
         unsigned front=drawn;
         const auto drawEnemy=[&](const GameplayWorld::EnemyState& enemy){
-            const int x=downwellPlayfieldX+80+enemy.x-port.cameraOffsetX();
+            const int x=downwellPlayfieldX+80+enemy.x-port.cameraSteadyOffsetX();
             const int y=playerStartY+enemy.y-port.cameraOffsetY();
             if(!append(enemy.spriteId,enemy.drawFrame(),x,y,enemy.objectId!=119&&enemy.facing<0))ready=false;
             int eye,mirror;

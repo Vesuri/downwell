@@ -57,12 +57,13 @@ public:
     AmigaGameplayScene& operator=(const AmigaGameplayScene&) = delete;
     void invalidate() { ready_[0] = ready_[1] = false; }
     void invalidate(unsigned slot) { if (slot < 2) ready_[slot] = false; }
+    // shiftX: the screen shake DownwellGameplayCopperList::update applies.
     bool build(unsigned slot, const Bitmap& game, const Bitmap& hud,
         const Sprite& player, const Sprite* actors, unsigned count,
-        const Sprite& overflow, const Palette& palette, unsigned origin);
+        const Sprite& overflow, const Palette& palette, unsigned origin, int shiftX = 0);
     bool update(unsigned slot, const Bitmap& game, const Bitmap& hud,
         const Sprite& player, const Sprite* actors, unsigned count,
-        const Sprite& overflow, const Palette& palette, unsigned origin);
+        const Sprite& overflow, const Palette& palette, unsigned origin, int shiftX = 0);
     bool mask(unsigned slot, const UBYTE* mask);
     // Borrow immutable Chip RAM until both displayed Copper slots retire it.
     // Validation failure leaves the slot unchanged. No conversion or repaint.

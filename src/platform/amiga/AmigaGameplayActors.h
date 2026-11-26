@@ -47,11 +47,13 @@ public:
     // Channels are player, six regular slots, overflow, in front-to-back
     // priority. Disjoint planar occluders may be passed; overlapping ones
     // remain boundaries. Compact unassigned actors in stable painter order.
+    // Actor x is in the steady view; spriteShiftX moves hardware sprites
+    // with the display's screen shake (the BOBs move with the playfield).
     static Assignment assign(GameplayBob* actors, unsigned count,
         const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
         Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8,
         const downwell::PaletteEffectSurface<>* controller = nullptr,
-        unsigned controllerSuffix = 0);
+        unsigned controllerSuffix = 0, int spriteShiftX = 0);
     // Draw only into the retired display ring, not the terrain backing.
     static void draw(AmigaRenderer renderer, Bitmap& display,
         unsigned buffer, unsigned origin, const GameplayBob* bobs, unsigned count,

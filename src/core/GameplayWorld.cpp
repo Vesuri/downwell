@@ -254,7 +254,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     // Restore pre-Step camera state before publishing the real room birth.
     cameraMotion_.reset(240,176);
     cameraShakeAlarm_=-1;
-    cameraY_=cameraPixelY_=cameraPixelX_=0;
+    cameraY_=cameraPixelY_=cameraPixelX_=cameraSteadyX_=0;
     ringOrigin_=initialRingOrigin%ringHeight;
     // ResetPlayer: audio_resume_all, audio_stop_all, then the confirm sound.
     // The rebuilt run starts an empty ring and voice model; the backend must
@@ -431,7 +431,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     followCamera_ = true;
     cameraMotion_.reset(240, 176);
     cameraShakeAlarm_=-1;
-    cameraY_ = cameraPixelY_ = cameraPixelX_ = activationY_ = 0;
+    cameraY_ = cameraPixelY_ = cameraPixelX_ = cameraSteadyX_ = activationY_ = 0;
     ringOrigin_ = initialRingOrigin % ringHeight;
     playerBirthPending_=playerBirthTiming_==PlayerBirthTiming::authoredRoom;
     return playerBirthPending_||birthPlayerOwnership();
@@ -448,7 +448,7 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
     : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), terrainInstances_(terrainInstances), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
-      cameraPixelX_(0), activationY_(0),
+      cameraPixelX_(0), cameraSteadyX_(0), activationY_(0),
       enemyCount_(0), enemyRandom_(2),
       health_(4), invulnerability_(0),
       solidResolver_(0),
@@ -1956,7 +1956,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     int scrollDelta = 0;
     int cameraXDelta = 0;
     if (followCamera_) {
-        const int oldCameraPixelX = cameraPixelX_;
+        const int oldCameraSteadyX = cameraSteadyX_;
         DW_PROFILE_SCOPE(profileCamera);
         const int oldCameraPixelY = cameraPixelY_;
         cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
@@ -1964,7 +1964,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                            run_.sideCameraLockers.overlaps(cameraMotion_));
         cameraMotion_.sampleShake(enemyRandom_);
         cameraPixelX_ = cameraMotion_.pixelX() - 240;
-        cameraXDelta = cameraPixelX_ - oldCameraPixelX;
+        // The frame reports the steady view: a shake moves only the display.
+        cameraSteadyX_ = cameraMotion_.steadyPixelX() - 240;
+        cameraXDelta = cameraSteadyX_ - oldCameraSteadyX;
         cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
         cameraPixelY_ = cameraMotion_.pixelY() - 176;
         scrollDelta = cameraPixelY_ - oldCameraPixelY;

@@ -182,7 +182,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     gDownwellCaptureTick = port.tick();
     gDownwellCapturePlayerXQ8 = 240L * 256 + port.player().offsetXFixed();
     gDownwellCapturePlayerYQ8 = 176L * 256 + port.player().offsetYFixed();
-    gDownwellCaptureViewX = 160 + port.cameraOffsetX();
+    gDownwellCaptureViewX = 160 + port.cameraSteadyOffsetX();
     gDownwellCaptureViewY = 34 + port.cameraOffsetY();
     gDownwellGameplayGame = (const UBYTE*)display.data;
     AmigaVerificationScratch scratch;
@@ -190,7 +190,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte) expected[byte] = memory.game()[byte];
     static downwell::TimeFieldOutlines fieldOracle;
     fieldOracle.set(port.timeFields(), port.goalField(), port.levelExitPresent(),
-                    port.goalFieldBirthBoundary(), 160 + port.cameraOffsetX(),
+                    port.goalFieldBirthBoundary(), 160 + port.cameraSteadyOffsetX(),
                     34 + port.cameraOffsetY(), downwellPlayfieldX,port.startTimeField());
     if (fieldOracle.visible) {
         AmigaRenderer oracle;
@@ -762,7 +762,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
                 unsigned visible = 0;
                 for (unsigned i = 0; i < AmigaPortRuntime::bulletCapacity; ++i) {
                     const auto& bullet = port.bulletAt(i);
-                    const int x = 80 + bullet.x - port.cameraOffsetX();
+                    const int x = 80 + bullet.x - port.cameraSteadyOffsetX();
                     const int y = gameplayPlayerStartY + bullet.y - port.cameraOffsetY();
                     if (bullet.active && bullet.gemHigh && bullet.animation.frame() != 0 &&
                             x >= 8 && x < 152 && y >= 8 && y < 276)

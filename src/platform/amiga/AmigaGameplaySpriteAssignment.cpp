@@ -7,7 +7,7 @@
 AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
     unsigned count, const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
     Sprite* regular, Sprite& overflow, unsigned height, unsigned limit,
-    const downwell::PaletteEffectSurface<>* controller,unsigned controllerSuffix) {
+    const downwell::PaletteEffectSurface<>* controller,unsigned controllerSuffix,int spriteShiftX) {
     Assignment result{count, true, 0, 0};
     if(controllerSuffix>count){result.ready=false;return result;}
     AmigaActorChannels channels(limit);
@@ -104,7 +104,7 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
             DW_PROFILE_SCOPE(profileHardwareSpriteUpdate);
             Sprite& sprite = slot(first + part);
             if ((part && !resolve(part)) ||
-                !amigaRendererDrawResolvedSpritePart(&prepared, actor.x, actor.y,
+                !amigaRendererDrawResolvedSpritePart(&prepared, actor.x + spriteShiftX, actor.y,
                     sprite.data(), height)) {
                 result.ready = false;
                 result.failedSprite = actor.sprite; result.failedFrame = actor.frame;

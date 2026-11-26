@@ -47,13 +47,18 @@ public:
                const Sprite& playerSprite,
                const Sprite* actorSprites, unsigned actorCount,
                const Sprite& overflowSprite,
-               const Palette& palette, unsigned ringOrigin);
-    bool update(const Bitmap& game, unsigned ringOrigin);
+               const Palette& palette, unsigned ringOrigin, int shiftX = 0);
+    // shiftX moves the world playfield (PF1) right on screen by -15..15
+    // pixels: the screen shake, applied by the display so the retained
+    // world raster keeps the steady view (BPLCON1 PF1 delay, plus one fetch
+    // word ahead for a leftward shift).
+    bool update(const Bitmap& game, unsigned ringOrigin, int shiftX = 0);
     // Patch only the inactive list's PF2 pointers for a retained overlay swap.
     bool updateOverlay(const Bitmap& hud);
     bool updateExitMask(const UBYTE* mask);
 private:
-    unsigned planeOffset_ = 0, wrapWaitOffset_ = 0, overlayOffset_ = 0;
+    unsigned planeOffset_ = 0, wrapWaitOffset_ = 0, overlayOffset_ = 0, scrollOffset_ = 0;
+    unsigned lead_ = 0;
     unsigned exitModeOffset_, exitMaskOffset_;
     const UBYTE* exitMaskData_ = nullptr;
     const void* gameData_ = nullptr;

@@ -15,7 +15,7 @@
                 fresh.reset();
                 if (!fresh.draw(&oracle, gDownwellShopPack,
                         gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
-                        mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
+                        mainViewX + port.cameraSteadyOffsetX(), mainInitialViewY + port.cameraOffsetY(),
                         port.currency())) ++gDownwellShopLiveFailures;
                 composeStreak(&oracle, streakView);
                 for (unsigned i = 0; i < downwellLayerBytes; ++i)

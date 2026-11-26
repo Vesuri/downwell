@@ -30,6 +30,9 @@ struct MainCameraMotion {
     // rmMain's serialized view follows camMain's rounded instance x/y.
     int pixelX() const { return static_cast<int>(roundGameMakerQ12(x+shakeX*4096L)); }
     int pixelY() const { return static_cast<int>(roundGameMakerQ12(y+shakeY*4096L)); }
+    // The view x without the screen shake: what a renderer keeps its
+    // retained world raster at while the display applies the shake.
+    int steadyPixelX() const { return static_cast<int>(roundGameMakerQ12(x)); }
     long viewLeftQ12() const { return (pixelX() - 80L) * 4096; }
     long viewRightQ12() const { return (pixelX() + 80L) * 4096; }
     long viewTopQ12() const { return (pixelY() - 142L) * 4096; }

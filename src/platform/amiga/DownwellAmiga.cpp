@@ -1121,7 +1121,7 @@ static void composeResultsBackdrop(AmigaRenderer* renderer,
 }
 
 static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force = false) {
-    const int viewX = mainViewX + port.cameraOffsetX();
+    const int viewX = mainViewX + port.cameraSteadyOffsetX();
     const int viewY = mainInitialViewY + port.cameraOffsetY();
     const int offset = port.deathResults().menu.titleOffset;
     static int lastX = -1, lastY = -1, lastOffset = -1;
@@ -1316,7 +1316,7 @@ static void redrawResultsChoices(AmigaRenderer* renderer, const AmigaPortRuntime
     static unsigned previous = ~0u;
     if (!force && phase == previous) return;
     previous = phase;
-    composeResultsChoices(renderer, menu, mainViewX + port.cameraOffsetX(),
+    composeResultsChoices(renderer, menu, mainViewX + port.cameraSteadyOffsetX(),
         mainInitialViewY + port.cameraOffsetY());
 }
 
@@ -2337,7 +2337,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             return false;
         }
         }
-        worldViewX = mainViewX + port.cameraOffsetX();
+        worldViewX = mainViewX + port.cameraSteadyOffsetX();
         worldViewY = mainInitialViewY + port.cameraOffsetY();
         terrainCollision.index = &terrainIndex;
 #if defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_RESULTS_RESTART_VERIFY) && !defined(DOWNWELL_SCENE_COLLISION_BACKEND)
@@ -3048,7 +3048,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 port.levelResultRequested()||port.levelClearActive()));
             gDownwellProfileSection=port.runStage().level==1?
                 (port.levelResultRequested()||port.levelClearActive()?1:0):
-                port.shops().noControl?4:port.cameraOffsetX()?3:2;
+                port.shops().noControl?4:port.cameraSteadyOffsetX()?3:2;
 #endif
 #endif
 #endif
@@ -3300,7 +3300,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                             gameplayScene.invalidate(buffer);
                         }
                         gameplayRows.reset();
-                        worldViewX = mainViewX + port.cameraOffsetX();
+                        worldViewX = mainViewX + port.cameraSteadyOffsetX();
                         worldViewY = mainInitialViewY + port.cameraOffsetY();
                         gameplayScene.resetStage();
                         newRunWorldPending = false;
@@ -3891,7 +3891,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             if(!shopProfileInput.advance(port.runStage().level))++gDownwellShopProfileFailures;
             gDownwellShopProfileFrames[0]=shopProfileInput.frames(1);
             gDownwellShopProfileFrames[1]=shopProfileInput.frames(2);
-            if(port.cameraOffsetX())++gDownwellShopProfileSideFrames;
+            if(port.cameraSteadyOffsetX())++gDownwellShopProfileSideFrames;
             if(port.shops().noControl)++gDownwellShopProfileMenuFrames;
             if(shopProfileInput.done()){
                 const long actual[]={port.health(),static_cast<long>(port.currency()),
@@ -3900,7 +3900,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if(port.randomDrawCount()!=downwell::shopProfileRandom[0]||
                     port.randomState().stateIndex()!=downwell::shopProfileRandom[1])++gDownwellShopProfileFailures;
                 for(unsigned i=0;i<16;++i)if(port.randomState().stateWord(i)!=downwell::shopProfileRandom[i+2])++gDownwellShopProfileFailures;
-                if(port.dead()||port.cameraOffsetX()||port.shops().noControl)++gDownwellShopProfileFailures;
+                if(port.dead()||port.cameraSteadyOffsetX()||port.shops().noControl)++gDownwellShopProfileFailures;
                 gDownwellShopProfileDone=1;
                 gDownwellShopHud=activeHudPack;
                 gDownwellShopHudBytes=activeHudPackEnd-activeHudPack;
@@ -3968,7 +3968,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
 #ifdef DOWNWELL_CAMERA_VERIFY
-            gDownwellCameraColumns |= 1u << ((port.cameraOffsetX() + 160) / 160);
+            gDownwellCameraColumns |= 1u << ((port.cameraSteadyOffsetX() + 160) / 160);
             if (cameraXChanged) ++gDownwellCameraTransitions;
 #endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -4076,7 +4076,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     shopMenuOverlay.invalidateStreak(previousStreakOffset,streakYOffset);
                 if (!shopMenuOverlay.draw(&renderer, gDownwellShopPack,
                         gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
-                        mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
+                        mainViewX + port.cameraSteadyOffsetX(), mainInitialViewY + port.cameraOffsetY(),
                         port.currency(), [](AmigaRenderer* target, void* context) {
                             composeStreak(target, *static_cast<const AmigaGemStreakHud::View*>(context));
                         }, &streakView)) { exitCode=downwellGameplayFailed(__LINE__); break; }
@@ -4170,7 +4170,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     liveGeneration.dirtyEnd, worldViewY, downwellDisplayHeight);
             }
             if (cameraXChanged) {
-                worldViewX = mainViewX + port.cameraOffsetX();
+                worldViewX = mainViewX + port.cameraSteadyOffsetX();
 #ifdef DOWNWELL_CAMERA_VERIFY
                 // Force exactly one absent-prefetch case as well as real hits.
                 if (gDownwellCameraTransitions == 1) gameplayScene.invalidateStage();
@@ -4435,7 +4435,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             // Chip-to-Chip DMA, not an entire Fast-to-Chip raster transfer.
             if (!cameraXChanged && missingHeight == 0 && destroyedBlockCount == 0 && terrainRaster.ready) {
                 const int playerX = port.player().offsetX();
-                const int cameraX = port.cameraOffsetX();
+                const int cameraX = port.cameraSteadyOffsetX();
                 const int wanted = AmigaGameplayScene::stageColumn(playerX,
                     port.player().speedXFixed(), cameraX, port.dead());
                 const int targetY = wanted != AmigaGameplayScene::noStageColumn
@@ -4594,7 +4594,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 8
 #endif
                 , compositeEffects && controllerEffects.visible() ? &controllerEffects.surface() : nullptr,
-                hardwareCurrency?actorList.currencySpriteCount:0
+                hardwareCurrency?actorList.currencySpriteCount:0, -port.cameraShakeX()
             );
             const unsigned bobCount = assignment.bobCount;
             if (!assignment.ready) {
@@ -4682,7 +4682,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     bulletSprites + back *
                         gameplayRegularSpriteCount,
                     gameplayRegularSpriteCount,
-                    enemySprites[back], palette, port.ringOrigin()))
+                    enemySprites[back], palette, port.ringOrigin(), -port.cameraShakeX()))
                 frameReady = false;
             if(!terrainPaintSucceeded){exitCode=downwellGameplayFailed(__LINE__);break;}
             if (!frameReady) {

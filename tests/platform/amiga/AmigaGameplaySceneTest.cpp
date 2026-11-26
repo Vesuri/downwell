@@ -17,10 +17,10 @@ CopperList::CopperList(UWORD* words,unsigned capacity)
 DownwellGameplayCopperList::DownwellGameplayCopperList(UWORD* words,unsigned capacity)
     : CopperList(words,capacity) {}
 bool DownwellGameplayCopperList::build(const Bitmap& game,const Bitmap&,const Sprite&,
-    const Sprite*,unsigned,const Sprite&,const Palette&,unsigned) {
+    const Sprite*,unsigned,const Sprite&,const Palette&,unsigned,int) {
     ++builds; bound=&game; return buildOK;
 }
-bool DownwellGameplayCopperList::update(const Bitmap& game,unsigned) {
+bool DownwellGameplayCopperList::update(const Bitmap& game,unsigned,int) {
     ++updates; bound=&game; return updateOK;
 }
 bool DownwellGameplayCopperList::updateExitMask(const UBYTE* mask) {

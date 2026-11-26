@@ -78,7 +78,7 @@ struct AmigaNaturalRouteVerification {
         if (menuFrame == 5 && (money >= price || game.currency() != money ||
                 shop.stock.items[0].remaining != stock)) ++failures;
         if (menuFrame == 7 && game.shops().noControl) ++failures;
-        if (returnFrames && 240 + game.player().offsetX() < 280 && game.cameraOffsetX() == 0) done = true;
+        if (returnFrames && 240 + game.player().offsetX() < 280 && game.cameraSteadyOffsetX() == 0) done = true;
     }
 };
 #endif

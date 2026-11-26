@@ -2858,6 +2858,10 @@ public:
     int bulletY() const;
     int cameraOffsetY() const { return cameraPixelY_; }
     int cameraOffsetX() const { return cameraPixelX_; }
+    // The view x without screen shake, and the shake the display adds to it
+    // (cameraOffsetX() == cameraSteadyOffsetX() + cameraShakeX()).
+    int cameraSteadyOffsetX() const { return cameraSteadyX_; }
+    int cameraShakeX() const { return cameraPixelX_ - cameraSteadyX_; }
     bool breakableActiveAt(int x, int y) const;
     unsigned blocksDestroyed() const { return blocksDestroyed_; }
     std::uint64_t checkpoint() const { return checkpoint_; }
@@ -3038,6 +3042,7 @@ private:
     int cameraShakeAlarm_=-1; // camMain's only alarm; global identity remains separate.
     int cameraPixelY_;
     int cameraPixelX_;
+    int cameraSteadyX_;
     // Event-phase snapshot in absolute room coordinates, not the camera
     // target being updated later in this tick. Normal following is pixelized.
     int boneViewLeft_=160;

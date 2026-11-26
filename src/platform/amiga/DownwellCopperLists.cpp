@@ -176,7 +176,7 @@ bool DownwellGameplayCopperList::build(
     const Bitmap& game, const Bitmap& hud,
     const Sprite& playerSprite, const Sprite* actorSprites,
     unsigned actorCount, const Sprite& overflowSprite,
-    const Palette& palette, unsigned ringOrigin)
+    const Palette& palette, unsigned ringOrigin, int shiftX)
 {
     if (!beginCroppedDisplay(*this) ||
         !move(bplcon0, 0x4401) ||
@@ -206,12 +206,14 @@ bool DownwellGameplayCopperList::build(
 
     planeOffset_ = moveOffset(bpl1pth);
     overlayOffset_ = moveOffset(bpl2pth);
+    scrollOffset_ = moveOffset(bplcon1);
     wrapWaitOffset_ = size();
     // Fixed shape, including the PAL line-255 bridge, permits word patches.
     if (!wait(255, 0xdf) || !wait(downwellDisplayVStartCropped + downwellDisplayHeight - 1, 0xdf) ||
         !showBitmap(game, 1, 2, downwellFetchCropBytes * 8, 0, 2) || !finish())
         return false;
-    return update(game, ringOrigin);
+    gameData_ = nullptr;
+    return update(game, ringOrigin, shiftX);
 }
 
 bool DownwellGameplayCopperList::updateExitMask(const UBYTE* mask)
@@ -225,19 +227,24 @@ bool DownwellGameplayCopperList::updateExitMask(const UBYTE* mask)
     return ok;
 }
 
-bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin)
+bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin, int shiftX)
 {
-    if (ringOrigin >= downwellGameRingHeight) return false;
-    if (gameData_ != game.data) {
-        const UBYTE* base = (const UBYTE*)game.data + downwellFetchCropBytes;
+    if (ringOrigin >= downwellGameRingHeight || shiftX < -15 || shiftX > 15) return false;
+    // A right shift delays PF1; a left one fetches a word further on and
+    // delays by the rest. The playfield is far from both fetch edges.
+    const unsigned lead = shiftX < 0 ? 2 : 0;
+    if (gameData_ != game.data || lead_ != lead) {
+        const UBYTE* base = (const UBYTE*)game.data + downwellFetchCropBytes + lead;
         if (!patchPointer(wrapWaitOffset_ + 4, base) ||
             !patchPointer(wrapWaitOffset_ + 8, base + downwellGameRingPlaneBytes)) return false;
         gameData_ = game.data;
+        lead_ = lead;
     }
+    if (!patchMove(scrollOffset_, (UWORD)(shiftX < 0 ? 16 + shiftX : shiftX))) return false;
     unsigned span = downwellGameRingHeight - ringOrigin;
     if (span > downwellDisplayHeight) span = downwellDisplayHeight;
     const unsigned line = downwellDisplayVStartCropped + span - 1;
-    const UBYTE* data = (const UBYTE*)game.data + downwellFetchCropBytes +
+    const UBYTE* data = (const UBYTE*)game.data + downwellFetchCropBytes + lead +
                         ringOrigin * downwellBytesPerPlaneLine;
     // After $ffdf the copper can fetch the second wait on line 256, whose
     // eight-bit position is 0. Repeating $ffdf there waits for the next field

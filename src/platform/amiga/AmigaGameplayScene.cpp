@@ -86,19 +86,19 @@ AmigaGameplayScene::AmigaGameplayScene(UWORD* first, UWORD* second, unsigned cap
 
 bool AmigaGameplayScene::build(unsigned slot, const Bitmap& game, const Bitmap& hud,
     const Sprite& player, const Sprite* actors, unsigned count,
-    const Sprite& overflow, const Palette& palette, unsigned origin) {
+    const Sprite& overflow, const Palette& palette, unsigned origin, int shiftX) {
     if (slot >= 2) return false;
-    ready_[slot] = lists_[slot].build(game, hud, player, actors, count, overflow, palette, origin);
+    ready_[slot] = lists_[slot].build(game, hud, player, actors, count, overflow, palette, origin, shiftX);
     if(ready_[slot])coverReferenced_[slot]=false;
     return ready_[slot];
 }
 
 bool AmigaGameplayScene::update(unsigned slot, const Bitmap& game, const Bitmap& hud,
     const Sprite& player, const Sprite* actors, unsigned count,
-    const Sprite& overflow, const Palette& palette, unsigned origin) {
+    const Sprite& overflow, const Palette& palette, unsigned origin, int shiftX) {
     if (slot >= 2) return false;
-    if (!ready_[slot]) return build(slot, game, hud, player, actors, count, overflow, palette, origin);
-    ready_[slot] = lists_[slot].update(game, origin);
+    if (!ready_[slot]) return build(slot, game, hud, player, actors, count, overflow, palette, origin, shiftX);
+    ready_[slot] = lists_[slot].update(game, origin, shiftX);
     return ready_[slot];
 }
 
