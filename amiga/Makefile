@@ -93,6 +93,9 @@ REFERENCE_ENEMY_ALARM_ROSTER ?= 0
 # 1 selects the generic enemy alarm walk, room animation walk, per-setter
 # publication and fifths-of-Q8 motion: the oracle for native enemy updates.
 REFERENCE_ENEMY_UPDATES ?= 0
+# W3.12: 1 captures and sorts the enemy step order for every alarm index,
+# even when at most one enemy event is due there.
+REFERENCE_ENEMY_ALARM_ORDER ?= 0
 # W3.9: repaint each destroyed block's cell on its own instead of one
 # repaint per span of touching rows.
 REFERENCE_CELL_REPAIR ?= 0
@@ -481,6 +484,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
 endif
 ifeq ($(REFERENCE_ENEMY_UPDATES),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
+endif
+ifeq ($(REFERENCE_ENEMY_ALARM_ORDER),1)
+CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ORDER
 endif
 ifeq ($(REFERENCE_CELL_REPAIR),1)
 CFLAGS += -DDOWNWELL_REFERENCE_CELL_REPAIR
@@ -911,6 +917,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENEMY_ALARM_ROSTER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENEMY_UPDATES)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_ENEMY_ALARM_ORDER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CELL_REPAIR)' >> $@.tmp
 	@printf '%s\n' '$(CELL_REPAIR_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(EFFECT_BLIT_CENSUS)' >> $@.tmp

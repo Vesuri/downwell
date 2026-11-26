@@ -72,6 +72,9 @@ endif
 ifeq ($(REFERENCE_ENEMY_UPDATES),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_UPDATES
 endif
+ifeq ($(REFERENCE_ENEMY_ALARM_ORDER),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ORDER
+endif
 # The host runs the parked frame-work candidate (section 0 D); the Amiga
 # build keeps the measured production path unless FRAME_WORK_CANDIDATE=1.
 CXXFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE

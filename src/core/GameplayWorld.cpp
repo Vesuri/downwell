@@ -1164,7 +1164,6 @@ void GameplayWorld::advanceEnemyAlarms()
             for(unsigned alarm=0;alarm<3;++alarm)if(!advanceCompactSceneryAlarm(alarm))return;
         return;
     }
-    if(!captureEnemyStepOrder())return;
     // Match the runner's global alarm-index order. Dispatch each event before
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
     // Object order within each index: boxes 92, enemies 111-119, then the
@@ -1175,12 +1174,54 @@ void GameplayWorld::advanceEnemyAlarms()
     const auto changePhase=timeStop_.changes.beginPhase();
     const auto shardPhase=timeStop_.shards.beginPhase();
     const unsigned alarms=compactCorpses_.size()?4:scenery_.gemChunkEnd||compactDebris_.size()||timeStop_.shards.size()?3:2;
+    // Every enemy alarm event acts on its own enemy (its state, alarms, RNG
+    // draws, sounds and spawned effects). The unbound step order (activation
+    // tick, then object) therefore decides only the order of events due at
+    // the same index: with at most one due, the others merely count down and
+    // the order is neither captured nor sorted. Births during the index wait.
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ORDER
+    const bool unorderedAlarms=!enemyOrderCapture_;
+#else
+    const bool unorderedAlarms=false;
+#endif
+    bool ordered=false;
+    const unsigned enemyEnd=enemyCount_;
     for (unsigned alarm = 0; alarm < alarms; ++alarm) {
-      if(alarm==0)for(unsigned i=0;i<breakableCount_;++i)
-        if(breakables_[i].lifetimeId&&!advanceBoxRoomAlarm({i,breakables_[i].lifetimeId},alarm))return;
-      if(alarm<2)for (unsigned i=0;i<enemyStepOrder_.size();++i) {
-        if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
-        if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
+      if(alarm==0){
+        if(!run_.effectsSucceeded)return;
+        // A slot's own handle always resolves: no lookup per box.
+        for(unsigned i=0;i<breakableCount_;++i){
+            auto& box=breakables_[i];
+            if(box.alarm0<0||!box.lifetimeId||!box.active||box.destroyRequested)continue;
+            if(downwell::AlarmBank::advanceValue(box.alarm0)){
+                box.state.alarmZero();observeBoxHealth(box);
+                if(!run_.effectsSucceeded)return;
+            }
+        }
+      }
+      if(alarm<2){
+        unsigned due=0;
+        if(unorderedAlarms&&!ordered)
+            for(unsigned i=0;i<enemyEnd&&due<2;++i){
+                const auto& enemy=enemies_[i];
+                if(!enemy.active||enemy.destroyRequested||
+                   !((downwell::enemyAlarmEvents(enemy.objectId)>>alarm)&1u))continue;
+                due+=(alarm?enemy.alarm1:enemy.alarm0)==1;
+            }
+        if(unorderedAlarms&&!ordered&&due<2){
+            if(!run_.effectsSucceeded)return;
+            for(unsigned i=0;i<enemyEnd;++i){
+                auto& enemy=enemies_[i];
+                if(!enemy.active||enemy.destroyRequested)continue;
+                if(!advanceEnemyAlarm(enemy,alarm))return;
+            }
+        }else{
+            if(!ordered){if(!captureEnemyStepOrder())return;ordered=true;}
+            for (unsigned i=0;i<enemyStepOrder_.size();++i) {
+                if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
+                if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
+            }
+        }
       }
       if(timeEffects&&alarm<3&&!advanceTimeEffectAlarm(changePhase,shardPhase,alarm))return;
       if(compactCorpses_.size()&&!advanceCompactCorpseAlarm(alarm))return;
