@@ -44,6 +44,21 @@ int main(){
         for(std::uint64_t w=0;w<=0xffffffffu;w+=65521)one(std::uint32_t(w));
         std::printf("Time shard random(7): %u words narrow as the VM does\n",checked);
     }
+    // Q16 mask bounds: one rounding per axis plus the whole-pixel margins,
+    // against rounding every edge, including exact halves on both parities.
+    {
+        unsigned checked=0;
+        for(int mask:{91,585,598,599,49})for(std::int32_t whole=-40;whole<40;++whole)
+            for(std::int32_t fraction:{0,1,0x4000,0x7fff,0x8000,0x8001,0xffff}){
+                const std::int32_t v=whole*65536+fraction;
+                downwell::ContactBounds b;if(!downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,v,v-3*65536,b))continue;
+                const auto l=downwell::contactSpriteBounds(mask);
+                const auto r=[](std::int32_t q){return int(downwell::Fixed16::roundPixel(q));};
+                check(b.left==r(v+l.left*65536)&&b.right==r(v+l.right*65536)&&
+                      b.top==r(v-3*65536+l.top*65536)&&b.bottom==r(v-3*65536+l.bottom*65536));++checked;
+            }
+        std::printf("Q16 mask bounds: %u positions round as their edges do\n",checked);check(checked>=3*80*7);
+    }
     unsigned bursts=0,shards=0,steps=0,pixelDifferences=0,streamsParted=0,meetings=0,hits=0,timed=0;
     std::int32_t worstVelocity=0;
     for(unsigned seed=0;seed<512;++seed){

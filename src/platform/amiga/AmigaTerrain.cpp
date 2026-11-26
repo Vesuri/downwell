@@ -535,6 +535,23 @@ bool amigaResolveTerrainPlatformContact(void* opaque,const downwell::ContactBoun
     bool found=false;
     if(query.left<query.right&&query.top<query.bottom&&query.right>-521&&
         query.left<1546&&query.bottom>-8&&query.top<8201){
+#ifndef DOWNWELL_REFERENCE_WALL_CONTACT_SCAN
+        // Exactly the cells whose thin platform box (sprThinPlatform mask 49:
+        // origin 12,12; margins 4,4..19,5, so x-8..x+8, y-8..y-6 about the
+        // cell origin) overlaps. Columns as for walls; a row at y = 16r
+        // overlaps when top+6 < 16r < bottom+8.
+        int firstRow=((query.top+6)>>4)+1,lastRow=(query.bottom+7)>>4;
+        int firstColumn=((query.left+504)>>4)+1,lastColumn=(query.right+519)>>4;
+        if(firstRow<0)firstRow=0;
+        if(lastRow>=AmigaTerrainIndex::rows)lastRow=AmigaTerrainIndex::rows-1;
+        if(firstColumn<0)firstColumn=0;
+        if(lastColumn>=AmigaTerrainIndex::columns)lastColumn=AmigaTerrainIndex::columns-1;
+        for(int row=firstRow;row<=lastRow&&!found;++row){
+            const unsigned char* cell=index.cells+row*AmigaTerrainIndex::columns+firstColumn;
+            for(int column=firstColumn;column<=lastColumn;++column,++cell)
+                if(*cell&platformCell){found=true;break;}
+        }
+#else
         const int firstRow=query.top<=9?0:(query.top-9)/16;
         const int lastRow=query.bottom>=8184?AmigaTerrainIndex::rows-1:(query.bottom+8)/16;
         const int firstColumn=query.left<=-520?0:(query.left+504)/16;
@@ -544,9 +561,9 @@ bool amigaResolveTerrainPlatformContact(void* opaque,const downwell::ContactBoun
             for(int column=firstColumn;column<=lastColumn;++column){
                 if(!(index.cells[row*AmigaTerrainIndex::columns+column]&platformCell))continue;
                 const int x=AmigaTerrainIndex::minX+column*16,y=row*16;
-                // sprThinPlatform mask 49: origin 12,12; margins 4,4..19,5.
                 if(downwell::contactBoundsOverlap(query,{x-8,x+8,y-8,y-6})){found=true;break;}
             }
+#endif
     }
     hit=found;return true;
 }

@@ -33,10 +33,23 @@ struct CurrencyCollisionBounds {
         if(local.left>=local.right||local.top>=local.bottom||local.left<-(1<<7)||local.right>(1<<7)||
            local.top<-(1<<7)||local.bottom>(1<<7)||x<=-limit||x>=limit||y<=-limit||y>=limit)return false;
         ContactBounds next;
-        next.left=int(Fixed16::roundPixel(x+local.left*65536));
-        next.right=int(Fixed16::roundPixel(x+local.right*65536));
-        next.top=int(Fixed16::roundPixel(y+local.top*65536));
-        next.bottom=int(Fixed16::roundPixel(y+local.bottom*65536));
+        // The margins are whole pixels, so each edge rounds as the position
+        // does plus its margin; only an exact half (to even) depends on the
+        // edge's own parity.
+        if((x&0xffff)!=0x8000){
+            const int whole=int((x+0x8000)>>16);
+            next.left=whole+local.left;next.right=whole+local.right;
+        }else{
+            next.left=int(Fixed16::roundPixel(x+local.left*65536));
+            next.right=int(Fixed16::roundPixel(x+local.right*65536));
+        }
+        if((y&0xffff)!=0x8000){
+            const int whole=int((y+0x8000)>>16);
+            next.top=whole+local.top;next.bottom=whole+local.bottom;
+        }else{
+            next.top=int(Fixed16::roundPixel(y+local.top*65536));
+            next.bottom=int(Fixed16::roundPixel(y+local.bottom*65536));
+        }
         out=next;return true;
     }
     // unitIntegerAxis's rounded edges for a non-negative position p =

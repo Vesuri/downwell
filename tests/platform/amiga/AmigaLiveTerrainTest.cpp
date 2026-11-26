@@ -239,6 +239,10 @@ void verifyContactMultiplicity() {
             },[&]{++expected;return true;}),"reference query");
             require(amigaResolveTerrainWallContacts(&context,query,~0u,actual)&&actual==expected,
                 "cell counts report every overlapping instance");
+            {bool expectedPlatform=false,actualPlatform=false;
+                for(auto p:platforms)expectedPlatform|=downwell::contactBoundsOverlap(query,{p.first-8,p.first+8,p.second-8,p.second-6});
+                require(amigaResolveTerrainPlatformContact(&context,query,actualPlatform)&&actualPlatform==expectedPlatform,
+                    "integral queries meet exactly the overlapping thin platforms");}
             for(unsigned limit:{1u,2u}){unsigned limited=0;
                 require(amigaResolveTerrainWallContacts(&context,query,limit,limited)&&limited<=expected&&
                     (limited>=limit||limited==expected),"a limited query stops once it reaches its limit");}
