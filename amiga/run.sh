@@ -68,6 +68,9 @@ DH1="$RUN/dh1"
 fsuae_prepare
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
+# The program reads PROGDIR:data/ before PROGDIR:; a stale data/ drawer would
+# shadow the banks copied beside it.
+if [ -d "$DH1/data" ]; then find "$DH1/data" -delete; fi
 printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 for part in $PARTS; do
   if [ "$part" = exe ]; then cp -f "$EXE" "$DH1/Downwell"; else cp -f "${EXE%.exe}.$part" "$DH1/Downwell.$part"; fi

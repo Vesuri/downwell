@@ -89,6 +89,9 @@ if [ -n "${VERIFY_INSTALLED:-}" ]; then
   rsync -a --exclude '*.uaem' --exclude 'ReadMe*' "$VERIFY_INSTALLED/" "$GAME/"
   [ "${VERIFY_WORKBENCH:-0}" != 1 ] || [ -f "$GAME/Downwell.info" ] || { echo "the installed drawer has no Downwell.info"; exit 1; }
 else
+# The program reads PROGDIR:data/ before PROGDIR:, so a data/ drawer left by
+# an installed-layout run would shadow the banks copied beside it.
+if [ "$DATA" = "$GAME" ] && [ -d "$GAME/data" ]; then find "$GAME/data" -delete; fi
 cp -f "$VERIFY_PROGRAM.exe" "$GAME/Downwell"
 for bank in boot front planes game cavern cavernplanes results shop pause clear fields columns patterns exitmask selectionmask hud entrymask terrain encountermasks sndrun sndfront sndresults sndclear tables; do
   cp -f "out/Downwell.$bank" "$DATA/Downwell.$bank"
