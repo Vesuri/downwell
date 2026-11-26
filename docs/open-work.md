@@ -196,11 +196,18 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     from it, or retire the oldest bullet as an explicit, documented
     approximation.
 20. **Gameplay starts with a hard cut.** STYLE SELECT fades out through the
-    dithered overlay, but the first level appears at once. The original
-    reveals it with the same dither (the entry-dither lifetime,
-    `EntryDither` / `GameplayEntryDithers`). This worked earlier, so find
-    the regression first: check that the first room creates and draws its
-    entry dither in StartupRuntime and on the Amiga.
+    dithered overlay, but the first level appears at once; the original
+    reveals it with objEntryDither (73), born among objPlayer's Create
+    children. On the Amiga (route capture at update 6 of 1-1: no cover)
+    the compact world never creates one: `GameplayEntryDithers` is bound
+    and drawn (hardware cover or effect surface), but its only creator,
+    `createPlayerChildren` via `withPlayerChildCreation`, has no production
+    caller (e007a5b7 left the loader unwired pending the global source-ID
+    stream), and the entry-wipe verifier uses a fixture lifetime. Wire the
+    player-birth children (camera, meter, companions, entry dither) into
+    the compact room load with their source IDs, or birth the entry dither
+    alone there with an ID from the room creation stream. Check
+    `make run` (StartupRuntime, `createOwnedEntryDither`) too.
 
 ### WM. Music (deferred)
 
