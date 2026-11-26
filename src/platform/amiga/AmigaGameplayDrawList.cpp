@@ -991,6 +991,15 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             const auto* record=above->find(above->handle());
             if(record&&record->active&&!record->destroyRequested&&!drawDitherAbove(record))ready=false;
         }
+        // objEnterDither 73 (depth -200000): the immutable cover, never a
+        // BOB. The mask spans the playfield, so only y places it; from
+        // screen y 684 on its displayed rows are all transparent, so the
+        // remaining updates of its 120 present nothing.
+        if(const auto* entry=port.compactEntryDither()){
+            std::int32_t y;unsigned offset;
+            if(!entry->y.roundPixel(y)||!downwell::EntryDitherMask::offset(y-worldViewY,offset))ready=false;
+            else if(y-worldViewY<684){entryCover={y-worldViewY,offset};entryCoverVisible=true;}
+        }
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     if(port.compactGuns().textEnd&&!drawCompactGunTexts(port,append,false,worldViewX,worldViewY))ready=false;

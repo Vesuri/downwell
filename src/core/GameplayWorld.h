@@ -1893,6 +1893,10 @@ private:
                 playerBirthPending_=false;
                 if(playerChildCreate_&&!playerChildCreate_(playerChildCreateContext_,*this))
                     return run_.effectsSucceeded=false;
+                // Without the registered children the world keeps the entry
+                // wipe itself; its numeric ID is observable by nothing here.
+                if(!playerChildCreate_&&!entryDithers_&&room.roomId==11&&!createCompactEntryDither())
+                    return run_.effectsSucceeded=false;
                 // Preserve the initial/Retry presentation snapshot. Later
                 // rooms retain their unadvanced camera until ordinary Step.
                 if(!tick_)initializeMainCameraFrame();
@@ -3252,6 +3256,11 @@ private:
     void advanceCompactHudAlarms();
     void advanceCompactHudDraw();
     downwell::CompactLevelTitle compactTitle_;
+    // objEnterDither 73 without a registered store (W1.20): born last among
+    // the player's Create children in rmMain, alarm 0 after 120 updates.
+    bool createCompactEntryDither();
+    downwell::EntryDither compactEntry_;
+    bool compactEntryLive_=false;
     void createCompactShopSpeech();
     downwell::CompactShopSpeech shopSpeech_[downwell::ShopWorld::capacity];
     unsigned shopSpeechLive_=0;
@@ -3418,6 +3427,7 @@ public:
         compactAreaTitles_=titles;compactAreaTitleCount_=count;compactLanguage_=language;
     }
     const downwell::CompactLevelTitle& compactLevelTitle()const{return compactTitle_;}
+    const downwell::EntryDither* compactEntryDither()const{return compactEntryLive_?&compactEntry_:nullptr;}
     // The merchant's speech strings in the configured language; without
     // them the speech records live and move but draw nothing.
     bool configureCompactShopSpeech(const downwell::ShopLanguageEntry* entries,unsigned count,const char* language){

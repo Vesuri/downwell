@@ -112,7 +112,7 @@ do the pause menu (Escape or P) with its confirm, PALETTE, STATS and OPTIONS
 screens, all five styles with their rules, unlocks and the results' unlock
 notice, hard mode's toggle, builder, prices and titles, the Timer option and
 `save.ini` (style, hard mode, palette, timer, records and lifetime gems).
-After the 1-3 clear the run reaches a deliberate end-of-slice screen at
+Each level opens with the objEnterDither (73) entry wipe. After the 1-3 clear the run reaches a deliberate end-of-slice screen at
 CATACOMB-1 without loading area 2. Items keep their numbers as they close.
 Known approximations: overlapping `moduleText` records never push each other
 down (Collision with `moduleText`), and `moduleText`, `itemNotif`, "EMPTY!" and
@@ -195,19 +195,6 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     and upgrade (pellets per shot, lifetime, fire rate) and size the pool
     from it, or retire the oldest bullet as an explicit, documented
     approximation.
-20. **Gameplay starts with a hard cut.** STYLE SELECT fades out through the
-    dithered overlay, but the first level appears at once; the original
-    reveals it with objEntryDither (73), born among objPlayer's Create
-    children. On the Amiga (route capture at update 6 of 1-1: no cover)
-    the compact world never creates one: `GameplayEntryDithers` is bound
-    and drawn (hardware cover or effect surface), but its only creator,
-    `createPlayerChildren` via `withPlayerChildCreation`, has no production
-    caller (e007a5b7 left the loader unwired pending the global source-ID
-    stream), and the entry-wipe verifier uses a fixture lifetime. Wire the
-    player-birth children (camera, meter, companions, entry dither) into
-    the compact room load with their source IDs, or birth the entry dither
-    alone there with an ID from the room creation stream. Check
-    `make run` (StartupRuntime, `createOwnedEntryDither`) too.
 21. **The world-one route driver fails without an end tick.** `CENSUS=1
     ROUTE=world-one bash amiga/profile.sh route` stops at its first
     sound-voice sample (`verify-world-one-native.py` `sampleVoices`: the

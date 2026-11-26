@@ -56,6 +56,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(resultInstance_&&!resultInstance_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    compactEntryLive_=false;
     if(ditherAbove_&&!ditherAbove_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(builderController_&&!builderController_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(playerControllers_&&!playerControllers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -347,6 +348,7 @@ bool GameplayWorld::retireGameplayRoom() {
     if(resultInstance_&&!resultInstance_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
+    compactEntryLive_=false;
     if(ditherAbove_&&!ditherAbove_->clear())return run_.effectsSucceeded=false;
     if(builderController_&&!builderController_->clear())return run_.effectsSucceeded=false;
     if(playerControllers_&&!playerControllers_->clear())return run_.effectsSucceeded=false;
@@ -2093,6 +2095,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;
         })){run_.effectsSucceeded=false;return {};}
     }
+    if(compactEntryLive_&&!compactEntry_.step([&](downwell::MotionBinary64& x){
+        x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;
+    })){run_.effectsSucceeded=false;return {};}
 
     // Spawner 78 follows builder/entry work and precedes breakable Step.
     if(compactSpawnerLive_&&!stepCompactSpawner(generationCameraY))return {};
@@ -4759,12 +4764,28 @@ void GameplayWorld::advanceCompactHudAlarms(){
         afterImages_[afterImageHead_]=presentedPose_;
     }
     compactTitle_.advanceAlarms();
+    // objEnterDither 73 Alarm 0: instance_destroy, before its Step.
+    if(compactEntryLive_){
+        if(!compactEntry_.advanceAlarm())run_.effectsSucceeded=false;
+        else if(compactEntry_.destroyRequested)compactEntryLive_=false;
+    }
     if(!liveRewards_)return;
     const long camera=long(34+142+cameraPixelY_)<<16;
     for(auto& r:compactRewards_)if(r.live){
         r.advanceAlarms();
         if(r.live)r.step(camera);else --liveRewards_;
     }
+}
+
+// objPlayer_n Create: x = the new camMain's x (its Create x, the player's),
+// y = view_yview[0] of the room's serialized view.
+bool GameplayWorld::createCompactEntryDither(){
+    const auto* view=roomEntryViews_.get(0);
+    compactEntry_={};compactEntryLive_=false;
+    if(!view||!compactEntry_.create([&](downwell::MotionBinary64& x){
+            x=downwell::MotionBinary64::fromInteger(playerInstance_.x);return true;
+        },[&](downwell::MotionBinary64& y){y=view->y.promoted();return true;}))return false;
+    compactEntryLive_=true;return true;
 }
 
 // The previous update's Draw mutations (letter offsets, slide-ins, flash).

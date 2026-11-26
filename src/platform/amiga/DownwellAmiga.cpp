@@ -3311,6 +3311,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                         ++gDownwellResultsBankFailures;
                     ++gDownwellResultsBankChecks;
 #endif
+                    // The room's entry wipe (W1.20) covers the first updates:
+                    // copy its 31 KB mask into the bank here, not in update 1.
+                    if(port.compactEntryDither()&&!selectEntryMaskBank()){exitCode=downwellGameplayFailed(__LINE__);break;}
                     DW_PROFILE_PHASE(profileEntryRaster);
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);

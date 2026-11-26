@@ -164,11 +164,30 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
         logDraw();
         require(frame.finish(),"replay frame completes");
     };
+    // W1.20: without the owner the world births objEnterDither 73 with the
+    // player. Its y falls 16 per Step from view_yview and alarm 0 destroys
+    // it at the 120th update; the owned world keeps it in its own store.
+    unsigned entrySteps=0;std::int32_t entryY=0;
+    auto entryBorn=[&]{
+        const auto* e=game.compactEntryDither();
+        if(owned){require(!e,"the owned world keeps no compact entry wipe");return;}
+        require(e&&e->alarm0==120&&e->y.roundPixel(entryY),"room load births the entry wipe");
+        entrySteps=0;
+    };
+    auto entryStep=[&]{
+        if(owned||entrySteps>=120)return;
+        const auto* e=game.compactEntryDither();++entrySteps;std::int32_t y;
+        if(entrySteps==120){require(!e,"alarm 0 destroys the entry wipe");return;}
+        require(e&&e->alarm0==int(120-entrySteps)&&e->y.roundPixel(y)&&y==entryY+16*int(entrySteps),
+            "the entry wipe falls 16 per Step");
+    };
+    entryBorn();
     for(unsigned level=1;level<=3&&t<tape.size();++level){
         while(t<tape.size()&&!game.levelResultRequested()&&!game.dead()){
             check(level);
             const auto packed=std::uint8_t(tape[t++]);
             frameStep([&]{game.step(packed);});
+            entryStep();
         }
         if(game.dead()){
             while(t<tape.size()){const auto packed=std::uint8_t(tape[t++]);frameStep([&]{game.step(packed);});}
@@ -189,6 +208,7 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
             downwell::Input input;input.fire=true;
             require(game.prepareNextAreaOneLevel(input,300),"replay next cavern");
             live.bind(game,rooms,room,true);
+            entryBorn();
         }
     }
     if(sounds)sounds->flush();
