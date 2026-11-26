@@ -23,6 +23,21 @@ enum DownwellCensusFlag : unsigned char {
 void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool overlay, int cameraX);
 void downwellCensusMark(unsigned flags);
 #endif
+#ifdef DOWNWELL_CENSUS_PARTS
+// W3.7: the census update's work split at the gameplay loop's stages, in a
+// parallel ring (gDownwellCensusParts, same indices; units of four beam
+// ticks, saturated). A mark ends the running part and starts part; display
+// waits inside a part are not its work. Read by amiga-census-report.py --parts.
+enum DownwellCensusPart : unsigned char {
+    censusPartOther, censusPartStep, censusPartHud, censusPartScroll, censusPartCollect,
+    censusPartRows, censusPartComposition, censusPartAssign, censusPartOverlays,
+    censusPartActors, censusPartEffects, censusPartScene, censusPartCount
+};
+void downwellCensusPart(unsigned part);
+#define DW_CENSUS_PART(part) downwellCensusPart(part)
+#else
+#define DW_CENSUS_PART(part) ((void)0)
+#endif
 #ifdef DOWNWELL_EFFECT_BLIT_CENSUS
 // Effect-surface blits in the current census update (W3.12, effect composition): every
 // queued blit's words and kind, and the CPU's waits for the queue.

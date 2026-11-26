@@ -3804,7 +3804,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     activeEntryMask!=nullptr, terrainRaster.hasStorage())){
                 gDownwellSceneAdmissionFailure=2;exitCode=downwellGameplayFailed(__LINE__);break;
             }
+            DW_CENSUS_PART(censusPartStep);
             const AmigaPortFrame result = port.step(packedInput);
+            DW_CENSUS_PART(censusPartHud);
 #ifdef DOWNWELL_OVERFLOW_VERIFY
 #define DOWNWELL_VERIFY_PART 27
 #include "DownwellAmigaOverflowVerify.inc"
@@ -4062,6 +4064,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             terrainCopyBacking = &gameBitmap;
             terrainCopyBuffer = back;
             DW_PROFILE_PHASE(profileScroll);
+            DW_CENSUS_PART(censusPartScroll);
             worldViewY += scrollDelta;
             // Retained wall patches use sparse debts, not the min/max span of
             // unrelated generation work. Preserve clean rows between bands.
@@ -4376,6 +4379,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 fieldChanged=gameplayFields[back].touchesDirtyRows(
                     [&](unsigned row){return gameplayRows.dirty(row,back);});
             DW_PROFILE_PHASE(profileActorCollect);
+            DW_CENSUS_PART(censusPartCollect);
             bool compositeCurrency = !port.dead();
 #ifdef DOWNWELL_REPLAY_VERIFY
             compositeCurrency = false;
@@ -4401,9 +4405,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             // The back buffer is off screen (fenced) and its terrain is final:
             // let the row restore run on the blitter during the composition's
             // CPU work. A laser or goal field retires its pixels before sync.
+            DW_CENSUS_PART(censusPartRows);
             if(!actorList.rayVisible&&!gameplayRays[back].present()&&
                     !fieldShape.visible&&!gameplayFields[back].present())
                 gameplayRows.queue(gameDisplay[back], gameBitmap, back);
+            DW_CENSUS_PART(censusPartComposition);
             using Real = downwell::MotionBinary64;
             bool hardwareEntryCover=false;
             // Immutable cover DMA cannot reproduce shade-subtracted alpha.
@@ -4473,6 +4479,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             static_assert(gameplayRegularSpriteCount == AmigaGameplayActors::regularChannels,
                           "Gameplay Copper and sprite slots must agree");
             DW_PROFILE_PHASE(profileActorChannels);
+            DW_CENSUS_PART(censusPartAssign);
             const auto assignment = AmigaGameplayActors::assign(actors, actorCount,
                 activeGamePack, activeGamePackEnd, playerSprites[back],
                 bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back],
@@ -4492,6 +4499,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 frameReady = false;
             }
             DW_PROFILE_PHASE(profileCopper);
+            DW_CENSUS_PART(censusPartOverlays);
             if (rayVisible || gameplayRays[back].present()) {
                 DW_PROFILE_SCOPE(profileLaserPrepare);
                 bool changed = fieldChanged && (fieldShape.visible || gameplayFields[back].present());
@@ -4558,13 +4566,16 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if (gDownwellClearFieldFrames % 60 == 0) downwellClearProbe();
 #endif
             }
+            DW_CENSUS_PART(censusPartActors);
             if (bobCount)
                 AmigaGameplayActors::draw(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
                     activeGamePack, activeGamePackEnd, gameplayRows, gameplayRays[back],
                     rayVisible ? &rayLine : nullptr);
+            DW_CENSUS_PART(censusPartEffects);
             if (compositeEffects)
                 AmigaGameplayEffects::draw(renderer,gameDisplay[back],back,port.ringOrigin(),
                     controllerEffects.surface(),gameplayRows);
+            DW_CENSUS_PART(censusPartScene);
             if (frameReady &&
                 !gameplayScene.update(back,
                     gameDisplay[back], hudBitmap, playerSprites[back],
@@ -4607,6 +4618,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             platform.publish(gameplayScene.copper(back));
             overlapNextStep = true;
+            DW_CENSUS_PART(censusPartOther);
 #ifdef DOWNWELL_FRAME_DUMP
             // The last BOB/effect blit may still be finishing when the CPU
             // publishes. Debugger snapshots must include its completed planes.

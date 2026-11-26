@@ -114,6 +114,9 @@ def main():
             if os.environ.get('EFFECT_BLIT_CENSUS') in ('1','2'):
                 # Section 5 C: the parallel effect-blit ring, same indices.
                 checked('dump binary memory .run/effect-census.bin &gDownwellEffectCensus[0] &gDownwellEffectCensus[gDownwellCensusCapacity]')
+            if os.environ.get('CENSUS_PARTS')=='1':
+                # W3.7: the work of each update by gameplay loop stage.
+                checked('dump binary memory .run/census-parts.bin &gDownwellCensusParts[0] &gDownwellCensusParts[gDownwellCensusCapacity]')
             if os.environ.get('BLIT_CENSUS')=='1':
                 # W3.15: every blit started, same indices.
                 checked('dump binary memory .run/blit-census.bin &gDownwellBlitCensus[0] &gDownwellBlitCensus[gDownwellCensusCapacity]')

@@ -13,7 +13,11 @@ first gameplay update), the clear/results/upgrade overlays, side-room camera
 jumps and the front end. Handoffs are judged by total latency, not per update.
 
   python3 tools/amiga-census-report.py census.bin capture.log
-      [--frames=N-M] [--list=over|all] [--json=FILE]
+      [--frames=N-M] [--list=over|all] [--json=FILE] [--parts=census-parts.bin]
+
+--parts (a CENSUS_PARTS=1 build) splits each class's work by gameplay loop
+stage: the mean per update, and each stage's share of the excess over 20 ms
+(an over-budget update's excess divided in proportion to its stages).
 """
 import argparse
 import json
@@ -28,6 +32,8 @@ FLAG_NAMES = [(SLOWED, 'slowed'), (DELIBERATE, 'deliberate'), (HANDOFF, 'handoff
               (OVERLAY, 'overlay'), (SIDE_CAMERA, 'side-camera'), (WARMUP, 'warm-up')]
 CLASSES = ['gameplay', 'slowdown', 'handoff', 'overlay', 'camera jump', 'front end']
 BUDGET_MS = 20.0
+PARTS = ['other', 'step', 'hud', 'scroll', 'collect', 'rows', 'composition', 'assign',
+         'overlays', 'actors', 'effects', 'scene']
 HEADER = re.compile(r'^CENSUS count=(\d+) capacity=(\d+) ticks_per_field=(\d+)$', re.M)
 
 
@@ -69,6 +75,34 @@ def load(ring_path, log_text):
         records.append(record)
     return dict(count=count, capacity=capacity, ticks_per_field=ticks,
                 overwritten=first, records=records)
+
+
+def load_parts(path, census):
+    """Attach each record's stage work (ms) from the parallel ring."""
+    with open(path, 'rb') as source:
+        data = source.read()
+    width = 2 * len(PARTS)
+    if len(data) != census['capacity'] * width:
+        raise ValueError(f'parts ring is {len(data)} bytes, not {census["capacity"]} records')
+    scale = 4 * BUDGET_MS / census['ticks_per_field']
+    for record in census['records']:
+        units = struct.unpack_from(f'>{len(PARTS)}H', data, (record['index'] % census['capacity']) * width)
+        record['parts_ms'] = [u * scale for u in units]
+
+
+def part_table(name, group):
+    count = len(group)
+    mean = [sum(r['parts_ms'][i] for r in group) / count for i in range(len(PARTS))]
+    excess = [0.0] * len(PARTS)
+    for r in group:
+        total = sum(r['parts_ms'])
+        if r['work_ms'] > BUDGET_MS and total > 0:
+            for i, ms in enumerate(r['parts_ms']):
+                excess[i] += (r['work_ms'] - BUDGET_MS) * ms / total
+    print(f'\n| {name} stage | mean ms | excess s |')
+    print('| --- | ---: | ---: |')
+    for i in sorted(range(len(PARTS)), key=lambda i: -excess[i]):
+        print(f'| {PARTS[i]} | {mean[i]:.2f} | {excess[i] / 1000:.2f} |')
 
 
 def summarise(records):
@@ -118,10 +152,13 @@ def main():
     parser.add_argument('--frames', help='only gameplay frames N or N-M (FPS/trace numbering)')
     parser.add_argument('--list', choices=('over', 'all'), help='also list updates')
     parser.add_argument('--json', help='write the summary and every record')
+    parser.add_argument('--parts', help='the CENSUS_PARTS=1 stage ring (census-parts.bin)')
     args = parser.parse_args()
     try:
         with open(args.log) as source:
             census = load(args.ring, source.read())
+        if args.parts:
+            load_parts(args.parts, census)
     except (ValueError, OSError) as error:
         sys.exit(f'census rejected: {error}')
     records = census['records']
@@ -150,6 +187,11 @@ def main():
         s = summary[name] = summarise(group)
         print(f'| {name} | {s["updates"]} | {s["work_mean_ms"]:.1f} | {s["worst_ms"]:.1f} '
               f'({s["worst_frame"]}) | {s["over_budget"]} | {s["excess_ms"]:.0f} |')
+    if args.parts:
+        for name in ('gameplay', 'camera jump', 'slowdown'):
+            group = [r for r in records if r['class'] == name]
+            if group:
+                part_table(name, group)
     transitions = handoffs(records)
     if transitions:
         print('\n| handoff | updates | latency ms | work ms | worst update ms |')

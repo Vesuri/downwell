@@ -285,7 +285,7 @@ restore() {
   unset REFERENCE_HUD_BORDER_EXTENT
   unset REFERENCE_CONTACT_MOTION
   unset REFERENCE_CONTACT_COORDINATES
-  unset REFERENCE_CELL_REPAIR CELL_REPAIR_VERIFY EFFECT_BLIT_CENSUS BLIT_CENSUS EFFECT_CLEAR_VERIFY EFFECT_PIXEL_VERIFY
+  unset REFERENCE_CELL_REPAIR CELL_REPAIR_VERIFY EFFECT_BLIT_CENSUS BLIT_CENSUS CENSUS_PARTS EFFECT_CLEAR_VERIFY EFFECT_PIXEL_VERIFY
   unset REFERENCE_ENEMY_ALARM_ROSTER
   unset DRAW_CACHE_AUDIT
   unset DRAW_ORDER_AUDIT
@@ -346,8 +346,13 @@ if [[ $census == 1 ]]; then
   cp ".run/profile-${mode}.log" "$census_out/capture.log"
   cp out/Downwell.elf "$census_out/Downwell.elf"
   [[ ${BLIT_CENSUS:-0} != 1 ]] || cp .run/blit-census.bin "$census_out/blit-census.bin"
+  CENSUS_PARTS_FILE=
+  if [[ ${CENSUS_PARTS:-0} == 1 ]]; then
+    cp .run/census-parts.bin "$census_out/census-parts.bin"; CENSUS_PARTS_FILE="$census_out/census-parts.bin"
+  fi
   python3 ../tools/amiga-census-report.py "$census_out/census.bin" "$census_out/capture.log" \
-    --list=over --json="$census_out/census.json" | tee "$census_out/census.txt"
+    --list=over --json="$census_out/census.json" \
+    ${CENSUS_PARTS_FILE:+--parts="$CENSUS_PARTS_FILE"} | tee "$census_out/census.txt"
   echo "Census: $census_out"
 fi
 if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^PHASE coarse:' ".run/profile-${mode}.log"; then

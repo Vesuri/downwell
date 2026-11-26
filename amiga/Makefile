@@ -226,6 +226,9 @@ EFFECT_BLIT_CENSUS ?= 0
 # with the per-plane twins one interleaved blit would merge, dumped to
 # .run/blit-census.bin. Needs CENSUS=1.
 BLIT_CENSUS ?= 0
+# W3.7: a parallel ring of each census update's work by gameplay loop stage
+# (DownwellCensusPart), dumped to .run/census-parts.bin. Needs CENSUS=1.
+CENSUS_PARTS ?= 0
 ifeq ($(CENSUS),1)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(FPSCOUNT)$(PROBES)$(GENERATION_TIMING)$(PHASE_SAMPLING),1000)
@@ -622,6 +625,9 @@ endif
 ifeq ($(BLIT_CENSUS),1)
 CFLAGS += -DDOWNWELL_BLIT_CENSUS
 endif
+ifeq ($(CENSUS_PARTS),1)
+CFLAGS += -DDOWNWELL_CENSUS_PARTS
+endif
 endif
 ifeq ($(TERRAIN_READ_CENSUS),1)
 ifneq ($(FPSCOUNT),1)
@@ -934,6 +940,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(CELL_REPAIR_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(EFFECT_BLIT_CENSUS)' >> $@.tmp
 	@printf '%s\n' '$(BLIT_CENSUS)' >> $@.tmp
+	@printf '%s\n' '$(CENSUS_PARTS)' >> $@.tmp
 	@printf '%s\n' '$(EFFECT_CLEAR_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(EFFECT_PIXEL_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp

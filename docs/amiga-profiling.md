@@ -286,6 +286,16 @@ game takes it only while blits wait): the blitter's busy time, the time it
 sat finished while blits waited, and the CPU's drain waits. The interrupt
 and hooks add about 1 ms per gameplay update. Read it with
 `tools/amiga-blit-census-report.py CENSUS_DIR`.
+`CENSUS_PARTS=1` (with the census, `CENSUS_UPDATES=8192`: 24 bytes per
+update) splits each update's work at the gameplay loop's stages
+(`DownwellCensusPart` in `AmigaProfile.h`: the step, the HUD after it, the
+scroll, actor collection, the row queue, the effect composition, sprite
+assignment, the ray and field overlays, BOB drawing, the effect publish and
+the scene update), with display waits excluded as in the record's work,
+into `census-parts.bin`; the report then adds, per class, each stage's mean
+and its share of the excess over 20 ms (each over-budget update's excess
+divided in proportion to its stages). The marks cost a few beam reads per
+update.
 Without the census,
 `ROUTE_TRACE=N` records `ROUTE_TRACE_FIELDS` (default 20) whole fields of
 every instruction from the input sample of gameplay update N-1 into

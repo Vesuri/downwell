@@ -445,6 +445,23 @@ static void censusWait(bool begin)
         censusWaited += beamTick() - censusWaitStart;
     }
 }
+#ifdef DOWNWELL_CENSUS_PARTS
+static_assert(censusPartCount == 12, "census part layout");
+extern "C" { UWORD gDownwellCensusParts[DOWNWELL_CENSUS_UPDATES][censusPartCount]; }
+static ULONG partTicks[censusPartCount], partStart, partWaited;
+static unsigned partCurrent;
+static void closePart(ULONG now)
+{
+    partTicks[partCurrent] += (now - partStart) - (censusWaited - partWaited);
+    partStart = now; partWaited = censusWaited;
+}
+void downwellCensusPart(unsigned part)
+{
+    if (!censusOpen || part >= censusPartCount) return;
+    closePart(beamTick());
+    partCurrent = part;
+}
+#endif
 void downwellCensusMark(unsigned flags)
 {
     censusCurrent.flags |= static_cast<UBYTE>(flags);
@@ -466,6 +483,15 @@ void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool ov
         censusCurrent.span = now - censusStart;
         censusCurrent.work = censusCurrent.span - censusWaited;
         gDownwellCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = censusCurrent;
+#ifdef DOWNWELL_CENSUS_PARTS
+        closePart(now);
+        for (unsigned i = 0; i < censusPartCount; ++i) {
+            const ULONG units = partTicks[i] >> 2;
+            gDownwellCensusParts[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)][i] =
+                UWORD(units > 0xffffu ? 0xffffu : units);
+        }
+        __asm__ volatile("" :: "g"(gDownwellCensusParts) : "memory");
+#endif
 #ifdef DOWNWELL_EFFECT_BLIT_CENSUS
         gDownwellEffectCensus[gDownwellCensusCount & (DOWNWELL_CENSUS_UPDATES - 1)] = effectCurrent;
         __asm__ volatile("" :: "g"(gDownwellEffectCensus) : "memory");
@@ -487,6 +513,10 @@ void downwellCensusUpdate(unsigned scene, int roomSpeed, unsigned stage, bool ov
     censusOpen = true;
     censusStart = now;
     censusWaited = 0;
+#ifdef DOWNWELL_CENSUS_PARTS
+    for (unsigned i = 0; i < censusPartCount; ++i) partTicks[i] = 0;
+    partStart = now; partWaited = 0; partCurrent = censusPartOther;
+#endif
 #ifdef DOWNWELL_EFFECT_BLIT_CENSUS
     effectCurrent = DownwellEffectCensusRecord();
     effectStamped = false;
