@@ -287,6 +287,51 @@ static void drawAssetNormal(AmigaRenderer* renderer,
             targetY = (UWORD)(renderer->gameOrigin + targetY) % downwellGameRingHeight;
         UBYTE* targetRow = renderer->target + targetY * downwellBytesPerPlaneLine;
         const UBYTE* source = data + (ULONG)(UWORD)(firstY-top)*(UWORD)planeBytes;
+        if (planeBytes == 2) {
+            /* One source word per plane row (the shards, gems and most
+               small actors): it lands at shift s in the destination pair
+               (base, base+1), and one 32-bit mask clips both words. The
+               clip zeroes any word outside columns 0..23. */
+            const int shift = left & 15;
+            const int baseWord = (left - shift) / 16;
+            const int from = clipLeft - baseWord * 16, to = clipRight - baseWord * 16;
+            const ULONG clip = (from > 0 ? 0xffffffffUL >> from : 0xffffffffUL) &
+                               (to < 32 ? ~(0xffffffffUL >> to) : 0xffffffffUL);
+            const int pen = outputPen;
+            for (y = firstY; y < lastY; ++y) {
+                const UWORD a = readWord(source), b = readWord(source + sourcePlaneBytes);
+                if (a | b) {
+                    const ULONG mask = ((((ULONG)(UWORD)(a | b)) << 16) >> shift) & clip;
+                    ULONG low, high;
+                    if (pen >= 0) {
+                        low = pen & 1 ? mask : 0; high = pen & 2 ? mask : 0;
+                    } else {
+                        low = (((ULONG)a << 16) >> shift) & mask;
+                        high = (((ULONG)b << 16) >> shift) & mask;
+                    }
+                    if (mask >> 16) {
+                        UBYTE* target = targetRow + baseWord * 2;
+                        const UWORD m = (UWORD)(mask >> 16);
+                        writeWord(target, (UWORD)((readWord(target) & (UWORD)~m) | (UWORD)(low >> 16)));
+                        writeWord(target + destinationPlaneBytes,
+                            (UWORD)((readWord(target + destinationPlaneBytes) & (UWORD)~m) | (UWORD)(high >> 16)));
+                    }
+                    if (mask & 0xffffu) {
+                        UBYTE* target = targetRow + baseWord * 2 + 2;
+                        const UWORD m = (UWORD)mask;
+                        writeWord(target, (UWORD)((readWord(target) & (UWORD)~m) | (UWORD)low));
+                        writeWord(target + destinationPlaneBytes,
+                            (UWORD)((readWord(target + destinationPlaneBytes) & (UWORD)~m) | (UWORD)high));
+                    }
+                }
+                source += 2; targetRow += downwellBytesPerPlaneLine;
+                if (++targetY == targetHeight) {
+                    targetY = 0;
+                    targetRow = renderer->target;
+                }
+            }
+            return;
+        }
         if (planeBytes <= 4) {
             /* A source row is at most 32 bits: load each plane once and
                derive the (up to three) destination-aligned words with one
