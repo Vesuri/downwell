@@ -35,7 +35,8 @@ It is for people who want to try the port early and report what they find.
   - gems about to vanish can show as white outlines;
   - with many shotgun pellets in the air at once, the game can stop: it has
     room for 32 bullets.
-- **Testing:** on an emulated A1200 with 4 MB Fast RAM; not yet on real hardware.
+- **Testing:** on an emulated A1200 with 4 MB Fast RAM, and on a real A1200 with a
+  68040 at 40 MHz ([video](https://www.youtube.com/watch?v=4q3sZ8uSJLg)).
 
 Please [report problems](https://github.com/Vesuri/downwell/issues) with what you
 were doing when they happened.
