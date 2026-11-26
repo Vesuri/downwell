@@ -1,6 +1,6 @@
 # Amiga profiling procedure
 
-Remaining performance work belongs only in [the work queue](open-work.md#5-meet-the-amiga-frame-budget).
+Remaining performance work belongs only in [the work queue](open-work.md#w3-performance).
 Measurements, completed optimizations and rejected experiments belong in the
 commit that records them, not a rolling status document.
 

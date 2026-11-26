@@ -29,7 +29,7 @@ and feature complete in the normal Amiga executable. Work it in this order:
 1. gameplay and visuals (W1);
 2. sound effects (W2, done; see [Amiga sound effects](amiga-audio.md); music
    is deferred to WM);
-3. performance (W3, which absorbs section 0 and the world-1 part of section 5).
+3. performance (W3).
 
 The shipping Amiga executable holds only what world 1 uses (the
 world-one profile and its link gate, `make -C amiga audit`) and fits the
@@ -40,8 +40,8 @@ Only after W is complete, continue with what world 2 needs: the skeleton
 encounter tasks (section 1), the catacombs (section 2) and the remaining
 content (section 4).
 
-Sections 1, 2 and 4 are parked. Sections 0 and 5 are W3's performance work.
-Sections 3 and 6–8 still apply, but only where they touch world 1.
+Sections 1, 2, 4 and 5 are parked. Sections 3 and 6–8 still apply, but only
+where they touch world 1.
 
 ## W. World 1 vertical slice on the Amiga
 
@@ -208,6 +208,13 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     the compact room load with their source IDs, or birth the entry dither
     alone there with an ID from the room creation stream. Check
     `make run` (StartupRuntime, `createOwnedEntryDither`) too.
+21. **The world-one route driver fails without an end tick.** `CENSUS=1
+    ROUTE=world-one bash amiga/profile.sh route` stops at its first
+    sound-voice sample (`verify-world-one-native.py` `sampleVoices`: the
+    `VOICES` line is missing), before gameplay, at `6095f6cf` and with
+    either ring size; with `ROUTE_END_TICK` it skips the sampling and
+    passes. Find why the voice format no longer prints, so the route runs to
+    the hand-off with its witnesses and sounds checked.
 
 ### WM. Music (deferred)
 
@@ -226,47 +233,66 @@ A1200 with 4 MB Fast RAM (`MACHINE=a1200-4m`). Code, BSS and CPU-side data
 run from Fast. Only DMA data shares the Chip bus with display, blitter and
 audio DMA, so CPU writes into Chip (row painting, HUD and plane publication)
 gain far less from the faster CPU than computation does. Scene handoffs are
-judged by overall transition latency and visible stalls (section 5's
-handoff rule). The updates the original slows on purpose are transitions,
-not frame cost: `fxTimeChange` (two fields per update at room speed 30, plus
-a 30 ms sleep), `momentDelay` (30 for one update) and player damage (40 for
-40 updates).
+judged by overall transition latency and visible stalls, not a per-update
+limit. The updates the original slows on purpose are transitions, not frame
+cost: `fxTimeChange` (two fields per update at room speed 30, plus a 30 ms
+sleep), `momentDelay` (30 for one update) and player damage (40 for 40
+updates).
 
-The target's numbers for the initial fall and the normal run are below.
-Every number in sections 0 and 5 and in the [frame-cost
-audit](amiga-frame-cost.md) is from the A500 and predates most of W1 and W2,
-so it is relative evidence only.
-Work the steps in order; sections 0 and 5 hold the detail for the items they
-name. Every change follows their working rules:
+The [frame-cost audit](amiga-frame-cost.md) was measured on the A500 and
+predates most of W1 and W2: relative evidence only. Use the target's numbers
+below.
 
-- state the removed work and the expected saving from the profile before
-  writing code;
-- compare the same deterministic workload on the target, including its
-  worst update;
-- an accepted change is the default in its commit, with the replaced path
-  kept only as a `REFERENCE_*` oracle;
-- two rejected attempts end an item, and closed approaches stay closed;
-- no tuning of code under the work threshold;
-- delete traces once their numbers are in a commit.
+**Working rules**
+
+- Before writing code, state the removed work and the expected saving from
+  the profile, in the commit message.
+- Compare the same deterministic workload on the target, including its worst
+  update. Trace only the affected updates, starting a capture one update
+  early, and re-check a surprising number with a short capture before
+  quoting it. Use the shortest workload that shows the owner.
+- No tuning of code under 1 ms in the updates it runs in (loop rewrites,
+  types, unrolling, inline assembly, compiler flags, helper substitutions).
+  Take an owner only with at least 3 ms in a budget update.
+- Accept when the targeted cost falls, no worst update gets slower by more
+  than 0.5 ms and no mean the change runs in gets worse; another update may
+  rise by about 1 ms when the change saves several times that elsewhere
+  (report it). Untouched updates move by up to 0.5 ms between builds.
+- An accepted change is the default in its commit, with the replaced path
+  kept only as a `REFERENCE_*` oracle. No experiment flags, mode numbers or
+  parallel candidates in the tree.
+- Two rejected attempts end an item: one row each in the audit's
+  [rejected approaches](amiga-frame-cost.md#rejected-approaches) table, the
+  removed code as a patch in `docs/rejected/`. Closed approaches stay closed
+  (below).
+- Verify with the full RNG state, instance IDs, creation and event order,
+  positions and draw order on deterministic replays (`make
+  verify-cross-replay`, `make verify-terrain-ownership`, `make
+  test-world-one-ownership`), plus the native pixel oracles when
+  presentation changes.
+- Delete your own traces once their numbers are in a commit (a 100-field
+  capture is about 500 MB).
 
 **Baseline on the target**
 
-On the target the quiet fall already presents every update in one field
-(164 updates, 164 fields; `profile.sh quiet-fall` now fails on any more), so
-its field count cannot show a smaller regression: judge the quiet fall on
-the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
+The initial fall (updates 1–164, no input) presents in 164 fields; display
+buffering absorbs its two overruns, 136 (21.2 ms, 18.9 of it in
+`GameplayWorld::step`) and 163 (28.7 ms, 23.5 in the step). Quiet updates
+cost 5–6 ms, the row-painting updates about 11 ms. `profile.sh quiet-fall`
+fails on any more than 164 fields; judge smaller changes by work cycles from
+`profile.sh quiet-window` (`--work-summary`, baseline
+`docs/amiga-quiet-work-baseline-a1200-4m.json`), with `quiet-state`
+(`docs/amiga-quiet-states.txt`) guarding behaviour.
 
 The normal run: `CENSUS=1 CENSUS_UPDATES=8192 ROUTE=world-one
 ROUTE_END_TICK=8100 bash amiga/profile.sh route` (the
 [census](amiga-profiling.md#per-update-work-census) of the host route
 `world-one`: boot, the garden, normal mode 1-1 to 1-3 with shops, side
 rooms, time-stop and the clear and upgrade screens, stopped at tick 8100
-just before the hand-off to area 2). Measured at `6095f6cf` on 26.11.2026:
-8,963 updates, the ring holding the last 8,192 (the first 771, all front
-end, overwritten). Frames count gameplay updates from the start of the run.
-Without `ROUTE_END_TICK` the route driver fails at its first sound-voice
-sample (`verify-world-one-native.py` `sampleVoices`: no `VOICES` line),
-before gameplay.
+just before the hand-off to area 2; W1.21 covers running it to the end).
+Measured at `6095f6cf` on 26.11.2026: 8,963 updates, the ring holding the
+last 8,192 (the first 771, all front end, overwritten). Frames count
+gameplay updates from the start of the run.
 
 | Updates | Count | Work mean ms | Worst ms (frame) | Over 20 ms | Excess s |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -283,243 +309,137 @@ All gameplay: 6,454 updates, mean 31.4 ms, median 30.6 ms, 23% within
 second. Handoffs: style select to 1-1 1,406 ms, 1-1 to 1-2 1,116 ms, 1-2
 to 1-3 1,091 ms (splash and menu fell outside the ring).
 
-The gameplay floor still rises within each level, much less than before.
-The cheapest update of each 200-update stretch goes from 4 ms to 12–29 ms
-through 1-1, from 16 ms to 20–34 ms through 1-2, and from 17 ms to
-24–42 ms through 1-3; the medians go from 7 to 22–37, 20 to 31–47 and 23
-to 33–58 ms. Each level change resets it.
+The gameplay floor still rises within each level. The cheapest update of
+each 200-update stretch goes from 4 ms to 12–29 ms through 1-1, from 16 ms
+to 20–34 ms through 1-2, and from 17 ms to 24–42 ms through 1-3; the medians
+go from 7 to 22–37, 20 to 31–47 and 23 to 33–58 ms. Each level change
+resets it.
 
-7. **W3.7 Owners and ranking.** Start with the normal run's rising floor,
-   on the shortest workload that shows it: the route from boot to about
-   frame 700 of 1-1 (`DOWNWELL_CAPTURE_TICK` ends the route driver early).
-   Trace the worst updates with short captures that start one update early
-   (the route driver can run `monitor profile` at a tick, as its screenshots
-   do). Rank owners by their total excess across
-   all workloads. Replace the A500 numbers in this section, sections 0 and
-   5 and the audit with the target's, and drop any item the target already
-   meets. Then review the order of W3.8–W3.13 with the user: CPU-side work
-   should shrink more than Chip-bus work, so C may rank ahead of D.
+**Items**
 
-**The initial fall (section 0)**
-
-8. **W3.8 D, the fixed per-update cost.** Start from the
-   `REFERENCE_FRAME_WORK=0` candidate: re-measure it on the target, finish
-   its behaviour acceptance and cadence run, and make it the default. Then
-   remove what remains on a quiet update:
-   - a retained draw list instead of the room-actor walk;
-   - dirty tracking instead of per-update clears;
-   - no work in phases without participants (alarms, Step-order capture,
-     End Step interior, shop End Step);
-   - the weapon level recomputed when the streak changes, and the camera
-     when the player moves;
-   - the builder's position acquired once for its lifetime.
-
-   Gate: the quiet-update target re-derived on the target (room for a
-   row's work and one enemy), with unchanged state samples.
-9. **W3.9 C, terrain painting.** Measured on the 68020 target (census
-   to tick 700):
-   - **The fall.** The default already presents every update in one field.
-     Its row updates in 122–135 and 137–162 peak at 10.4 ms;
-     `PREPARED_PATTERN_ROWS=1` lowers that peak to 7.3 ms.
-   - **The candidate on the routes.** It saves only about 1% of fields:
-     normal 1,384 → 1,371, constant fire 1,643 → 1,629. 27–48 updates get
-     1–3 ms worse. Its paint-ahead spends only budget left inside 20 ms,
-     and deep in 1-1 almost no update has any, so these routes barely
-     exercise it.
-   - **The candidate stays.** Re-measure it once W3.10 and W3.12 have given
-     those updates spare time again. It is not accepted while those per-update
-     regressions remain.
-
-   Destroyed blocks are now repaired one span of touching rows at a time
-   (`REFERENCE_CELL_REPAIR=1` keeps the per-cell repair). A single
-   destroyed cell still costs about 1.9 ms: 1.18 ms of live painting and a
-   0.55 ms full-width store of its 16 rows. That is not an owner on
-   constant fire: a trace of 560–587 on that route shows one repair, 1.1 ms
-   at 587, in 28 updates (31–51 ms each).
-
-   What constant fire does cost (mean of 560–569, 49.1 ms per update):
-   - **The simulation step, 21.6 ms.** White jelly 5.0 ms, the smoke step
-     3.5 ms, smoke against walls 1.9 ms, the enemy room effect 1.7 ms,
-     enemy alarms 1.5 ms.
-   - **Smoke composition, 15.4 ms.** `visitNewest`, queueing the smoke
-     stamps, takes 6.9 ms. The visibility test then spends 5.1 ms in
-     `blitterDrain`: `intersects` synchronizes the surface before it reads
-     alpha. Actor assignment tests actors against the same surface right
-     after, so moving the test alone only moves the wait.
-
-   That wait is section 5 C (combat composition), which now holds its
-   blitter measurements.
-
-   The candidate's own gate stays: generation and painting in different
-   updates of each row period, and the scalar pixel comparison over all
-   pattern rows and seams.
-10. **W3.10 E, the bursts at 122, 136 and 163.** First make event cells
-    cheaper: breakables become source records under a lent-counter lease,
-    and enemy adoption goes through the native roster. Then stage the
-    builder's next pattern in slack time, verify its key at the trigger
-    update and commit it there. Gate: each burst at or under 20 ms, a
-    fixture that forces a key mismatch, and unchanged state samples and
+7. **W3.7 Owners and ranking.** Find what makes the floor rise within a
+   level, on the shortest workload that shows it (the route to about frame
+   700 of 1-2 or 1-3; `ROUTE_END_TICK` ends the route driver early, and it
+   can run `monitor profile` at a tick, as its screenshots do). Trace the
+   worst updates (6847, 5796, 6692, 3662). Rank owners by their total
+   excess across the workloads, then review the order of W3.10–W3.14 with
+   the user.
+10. **W3.10 The fall's two overruns, 136 and 163.** Both are generation
+    bursts inside `GameplayWorld::step` (the builder's next pattern and its
+    event cells). First make event cells cheaper: breakables as source
+    records under a lent-counter lease, enemy adoption through the native
+    roster. Then stage the builder's next pattern in slack time, verify its
+    key at the trigger update and commit it there. Gate: both at or under
+    20 ms, a fixture that forces a key mismatch, unchanged state samples and
     replay.
-11. **W3.11 Close section 0:** the fall in 164 fields with every update
-    within 20 ms. Remove section 0.
+12. **W3.12 Gameplay owners in census order.** Where an update's time goes
+    now (spray route, the first side room and 690–699):
+    - `GameplayWorld::step`, 16.1 ms at spray 690–699, spread thin: the
+      per-enemy step 2.0 ms (bat, snail and crawler behaviour), jelly
+      steering 2.0, debris 1.2, the ranged bullet 1.1, casings 0.9, alarms
+      0.9, corpses 0.8, smoke against walls 0.7, the player 0.7, steering
+      contacts 0.6. Debris, jelly and corpse steps are mostly their terrain
+      queries.
+    - Effect composition, 8–9 ms where smoke exists: about 19 masked
+      interleaved stamps at about 5,000 cycles each, then the clear, shade
+      subtraction and the publish copy (on constant fire 560–569: smoke
+      stamps 4.1 ms of blitter, gem stamps 1.2, shade 0.5, the clear 1.6,
+      the publish copy 3.9). The CPU still waits on the blitter
+      (`isBlitterBusy`, `processBlitterQueue`); find the drains and the work
+      queued ahead of them, then choose between fewer smoke stamps, a cheaper
+      publish and CPU work moved between queueing and the first read. Needs
+      a design pass. Keep `REFERENCE_EFFECT_COMPOSITION=1` and the final
+      pixels as oracles, and the retained alpha raster's exact queries.
+    - Actor drawing, about 9 ms in the side room (CPU-drawn assets 5.1 ms,
+      bordered glyphs 1.6 ms), the time-field overlay about 3 ms, terrain
+      rows 2.4 ms, collection 1.7 ms.
+    - Time shards (5.25 ms in the side room): one swept-region check for
+      empty cells could answer all three `sParentSolid` meetings at once.
+    - The work W1 added, to measure when its workload is profiled: Hot
+      Casing against every active enemy; Heart Balloon's string climb (up to
+      21 point tests, five binary64 divisions) and enemy test; the blast and
+      drone steps and the unowned enemy step order's insertion pass; the
+      laser's ray and up to 96 trail BOBs; every shot's RNG draws; the
+      eyefish's wall tests and the neon ball's enemy test; gem high's
+      afterimages, streak block, `currencyText` and the Timer's HUD rows;
+      up to 16 corpses with their `TimeStopBound` and wall queries; the 1-HP
+      flicker; shop speech glyphs.
 
-**The rest of world 1**
-
-12. **W3.12 Gameplay owners in census order.** Take only owners with at
-    least 3 ms in a budget update (section 5's threshold). The A500
-    candidates are section 5's A (later generation bursts), B (the contact
-    damage number), C (combat composition) and E (quiet frames), plus the
-    work W1 added:
-    - Hot Casing: each live hot casing against every active enemy, every
-      update;
-    - Heart Balloon: a string climb of up to 21 point tests and five
-      binary64 divisions, and a test against every active enemy, every
-      update;
-    - the blast and drone steps (empty loops without the upgrades) and the
-      unowned enemy step order's insertion pass;
-    - the laser's ray (8-pixel steps against enemies, walls and
-      shootables) and up to 96 trail BOBs;
-    - every shot's RNG draws (spread, speed, image speed, three casing
-      draws);
-    - the eyefish's wall tests; the neon ball's test against every enemy;
-    - gem high: up to nine afterimage BOBs with two RNG draws each, and the
-      streak block recomposed and published every update; `currencyText`
-      while it counts; the Timer's 16 HUD rows while shown;
-    - time-stop: up to 20 time shards (Q16) with three or more
-      `sParentSolid` queries each, the y-sorted field index for the player and every enemy, and
-      `TimeStopBound` for casings, debris, moving effects and TorchFires;
-    - deaths: up to 16 corpses, each a `TimeStopBound` and two mask-599
-      wall queries per update; a bullet or casing at a wall steps up to 101
-      tenths of its velocity to place its puff;
-    - the 1-HP flicker: four RNG words and two BOBs on 7 Draws in 51;
-    - shop speech: up to ten glyph BOBs per rising text.
-    **Fixed point instead of binary64 (decided 2026-11-25).** Core's
-    software binary64 (`MotionBinary64`, `RunnerImageValue` arithmetic,
-    binary64 trig) costs about 14 ms of a worst spray update. Replace it
-    owner by owner with `FixedPoint.h` (Q16.16, table trig), hottest first.
-    Bit-exact VM agreement is given up (about 1e-4 px per lengthdir,
-    0.002 degrees per point_direction); host and Amiga still share core.
-    Each owner keeps its VM form as a `...Reference` oracle compared in
-    `make test-fixed-point`, and re-searches any sound route whose
-    autopilot no longer survives (`DOWNWELL_SLICE_VARIANT`) without losing
-    route sound coverage. Done: steering `lengthdir`/`point_direction`;
-    the compact smoke owner's motion (`SmokeParticle`, Q16 position,
-    velocity and animation position, whole published pixels; the registered
-    room path still runs `SmokeEffect`); the compact white jelly (`WhiteJellyFixedStep`, Q16
-    position, velocity and heading, speed in exact thousandths, Q16
-    `scrCheckCollisionWith` and mask bounds; `WhiteJellyStep` remains the
-    registered path and oracle); the compact debris (`DebrisParticle`, Q16
-    position and velocity, `sParentSolid` bounds from Q16; `DebrisAnimation`
-    remains the registered form and oracle); the compact corpses
-    (`CorpseParticle`, Q16 position, speeds in exact 1/65520 px so the
-    decimal gravity and bounce thresholds keep their outcomes;
-    `CorpseAnimation` remains the registered form and oracle); the compact
-    no-loop and moving effects (`CompactRoomEffects::Effect`, Q16 position
-    and velocity, whole published pixels, quarter turn at spawn, and the
-    binary32 animation timeline in exact Q27 `Binary32Timeline`;
-    `ScriptSpawnEffect` and `MovingFx` remain the registered forms and
-    oracle); the compact debris, gem and corpse animations (debris and gems
-    on `Binary32Timeline`, bit-exact; compact corpses skip their one-frame
-    timeline); the compact time shards (`TimeShardParticle`, Q16 position
-    and velocity, whole published pixels, the burst's direction and speed
-    from `FixedTrig`; `TimeShardAnimation` remains the registered form and
-    oracle, compared in `verify-time-shard-particle`). On the spray route's
-    first side room this took update 987 (the exit burst) from 82.4 to
-    45.2 ms, 875 from 57.8 to 31.9 ms and 988-1009 from 46-57 to 35-45 ms
-    on the A1200; those updates are now the shard queries (about 4 ms), the
-    actors' draw (11 ms, 3 ms of it bordered glyphs drawn by the CPU), the
-    time-field overlay (4.5 ms) and the rows.
-    Converting at an owner's boundary pays only where trig dominates: for
-    drawFx placement it cost as much as it saved (rejected, see the frame
-    cost audit). So the remaining owners convert their stored state (positions
-    and speeds held as Q16), each family with its producers and readers
-    together. About 0.8 ms of software binary64 is left per spray update
-    (updates 693-698), no caller over 0.1 ms: casings' fromInteger, smoke
+    **Fixed point instead of binary64 (decided 2026-11-25).** Replace
+    core's software binary64 owner by owner with `FixedPoint.h` (Q16.16,
+    table trig); bit-exact VM agreement is given up (about 1e-4 px per
+    lengthdir, 0.002 degrees per point_direction). Each owner keeps its VM
+    form as a `...Reference` oracle compared in `make test-fixed-point`,
+    converts its stored state (positions and speeds as Q16) with its
+    producers and readers together (converting only at a boundary does not
+    pay), and re-searches any sound route whose autopilot no longer survives
+    (`DOWNWELL_SLICE_VARIANT`). About 0.8 ms of binary64 is left per spray
+    update, no caller over 0.1 ms: casings' `fromInteger`, smoke
     wall-contact scaling, the spawner countdown, mask bounds' binary32
-    narrowing, steering and corpse pixel publication, flash-ball
-    animation. Convert those with their owners' next change, and the
-    upgrade, hard-mode and red-ball owners when those workloads are
-    profiled; the spray route's frame cost is now composition, terrain
-    rows and camera jumps, not arithmetic.
-    Debris, jelly and corpse steps are now mostly their terrain queries
-    (1.2, 1.3 and 1.1 ms per spray update); corpse drawing (2.0 ms) is
-    stamping, not arithmetic. drawFx rounds every
-    binary32 position to its pixel and skips binary64 placement.
-    Screen shake is a display scroll: the ring keeps the steady camera x and
-    BPLCON1 (with a one-word pointer lead for a left shift) and the sprite x
-    apply the shake, so shaken updates no longer repaint the whole view. The
-    census's camera-jump class still counts those updates (the profile
-    compares the shaken view x).
-    `GameplayWorld::step` at spray 690-699 is now 16.1 ms (was 20.2):
-    alarms count down without the step order unless two enemy events are
-    due, wall contacts resolve their exact cells and stop at a limit, the
-    unbound step order and the steering contact bounds are reused, and
-    contact sprite bounds come from a table. What remains is spread thin:
-    the per-enemy step 2.0 ms (bat, snail and crawler behaviour; its
-    dispatch and publication are about 0.3 ms, too little for a
-    per-family split), jelly steering 2.0, debris 1.2, the ranged bullet
-    1.1, casings 0.9, alarms 0.9 (real frog and steering events, corpse
-    and debris countdowns), corpses 0.8, smoke against walls 0.7, the
-    player 0.7, steering contacts 0.6.
-13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
-    the first interactive frame and by visible stalls: gameplay entry,
-    level transitions and shop re-entry, the clear and upgrade screens,
-    results and Retry, and the pause menus.
-
+    narrowing, steering and corpse pixel publication, flash-ball animation.
+    Convert those with their owners' next change, and the upgrade,
+    hard-mode and red-ball owners when those workloads are profiled.
+13. **W3.13 Scene handoffs,** judged by total latency through the first
+    interactive frame and by visible stalls: gameplay entry (1,406 ms),
+    level transitions (1,091–1,116 ms) and shop re-entry, the clear and
+    upgrade screens, results and Retry, and the pause menus. Measure the
+    last style frame and the first gameplay frame together
+    (`profile.sh entry`); the remaining synchronous work includes the
+    initial terrain raster and backing and HUD setup. Move immutable
+    preparation out of confirmation without moving RNG draws or
+    source-visible Create effects ahead of it. Level re-entry: reduce the
+    mutable room-layer reset and publication (`PROBES=1 bash
+    amiga/profile.sh shop`), keeping `REFERENCE_ROOM_PREPARE=1` as the
+    oracle. Relocated copy work is not eliminated work.
 14. **W3.14 The other workloads,** each a separate census once the normal
     run meets its target:
     - hard mode (`ROUTE=hard-mode-death`, to its death in 1-3 and the
-      results). Measured with the normal run: gameplay 5,729 updates, work
-      mean 133.8 ms, worst 556.1 ms (frame 864), 5,522 over 20 ms (654 s of
-      excess); side-room camera 611 updates, mean 222.5 ms; room speed
-      below 60 462 updates, mean 177.4 ms. Its 7,230 gameplay updates took
-      50,022 VBlank fields, and the census spans sum to 50,117;
+      results), last measured before the fixed-point work; re-measure;
     - the upgrade routes that add per-update work (`UPGRADE_ROUTES`: Hot
       Casing `upgrade-8-v17`, Heart Balloon `upgrade-15-v2`, Gunpowder and
       Drone `upgrade-5-9-v53`, Rocket Jump `upgrade-0-18-v58`, the laser
       `upgrade-12-v155`);
-    - side rooms, which no census tape reaches: a torch room, a `pTimeStop`
-      field and gem high with a `gemChunk`'s gems on screen. Room speed 30
-      makes 25 updates per second correct there. A 2026-11-25 playthrough
-      ran the time-stop field at 18–21 and gem high in a torch room at
-      14–26 (frame-change counts from a screen recording, lower bounds).
-      The effect surface keeps one word span per row, so torches on both
-      walls at one height publish and clear the full width between them;
-      measure that before proposing two spans per row;
-    - the contact tape (`profile.sh fps`), the shop tape (`profile.sh
-      shop`) and a dense-encounter tape (section 5 H). These wait for the
-      host reference's W1.4 shot (section 3): `verify-contact-profile`
-      fails at frame 13, `generate-shop-profile` at parity frame 3 (camera
-      X 159 against 160) and the overflow witness at frame 7, group 1.
-
-**AGA display experiments** (both need AGA, while the target note above
-says the game must start on any 68020 Amiga. Decide between an ECS fallback
-display and changing that rule before either becomes the default.)
-
-16. **W3.16 FMODE 3 bitplane fetch.** Measured experiment, gameplay display
-    only. The effect composition keeps the blitter busy end to end (5 C);
-    64-bit bitplane fetches use a quarter of the bus slots and leave the
-    rest to the blitter and CPU Chip access. Keep 16-pixel sprites (FMODE
-    bits 2–3 zero) so the offline sprite streams stay valid. Constraints:
-    bitplane pointers and modulos 64-bit aligned, so the 352-pixel fetch
-    with its two-byte inset becomes a 384-pixel fetch (six 64-pixel blocks)
-    cropped by DIW; the 48-byte rows keep the PF1 ring aligned. First
-    question: can a fetch window that meets FMODE 3's DDF rounding keep all
-    eight sprite channels (today DDFSTRT `$38` keeps channel 7)? Work it out
-    from the AGA documentation, then show every channel at both display
-    edges in the emulator. If a channel is lost, stop: more BOBs cost more
-    than the fetch saves. Then check that the profiling emulator times AGA
-    DMA cycle-exactly, and compare constant fire and the normal run to tick
-    700 (mean, fields, worst update, the blitter waits).
+    - side rooms: the spray route reaches the first side room's time-stop
+      field (875–1009); still to cover are a torch room and gem high with a
+      `gemChunk`'s gems on screen. Room speed 30 makes 25 updates per second
+      correct there. The effect surface keeps one word span per row, so
+      torches on both walls at one height publish and clear the full width
+      between them; measure that before proposing two spans per row;
+    - a dense-encounter tape, the contact tape (`profile.sh fps`) and the
+      shop tape (`profile.sh shop`). The last two wait for the host
+      reference's W1.4 shot (section 3): `verify-contact-profile` fails at
+      frame 13, `generate-shop-profile` at parity frame 3 (camera X 159
+      against 160) and the overflow witness at frame 7, group 1.
+16. **W3.16 AGA fetch mode, as an optional fast path.** The game must keep
+    working on ECS, so this is a second display setup chosen at start when
+    the chipset is AGA (`GfxBase` `ChipRevBits0`), with today's FMODE 0
+    display the default and the fallback. The framework's `setPlayfield`
+    has an FMODE 3 branch, but `AmigaHardware::hasAGAChipSet` is never set
+    and the game drives its own copper lists, so nothing uses it. The
+    effect composition keeps the blitter busy (W3.12); 64-bit bitplane
+    fetches use a quarter of the bus slots and leave the rest to the blitter
+    and CPU Chip access. Keep 16-pixel sprites (FMODE bits 2–3 zero) so the
+    offline sprite streams stay valid. Bitplane pointers and modulos must be
+    64-bit aligned, so the 352-pixel fetch with its two-byte inset becomes a
+    384-pixel fetch cropped by DIW; the 48-byte rows keep the PF1 ring
+    aligned. First question: can a fetch window that meets FMODE 3's DDF
+    rounding keep all eight sprite channels (today DDFSTRT `$38` keeps
+    channel 7)? Work it out from the AGA documentation, then show every
+    channel at both display edges in the emulator; if a channel is lost,
+    stop. Then check that the profiling emulator times AGA DMA
+    cycle-exactly, and compare constant fire and the normal run (mean,
+    fields, worst update, blitter waits). Keep it only if it is faster and
+    the ECS path still passes the display checks on an ECS machine preset.
 17. **W3.17 Moving objects on their own playfield (design first).** Today
     PF1 holds terrain, actors and effects together, so every update copies
     dirtied terrain rows back from the backing (2,182 words and a 1.5 ms
     wait per update on constant fire) and BOBs sit in the terrain planes.
     Proposal: terrain alone in PF1, and the BOBs and the effect raster in
-    PF2 inside the well (PF2 already holds the HUD outside it). That removes
-    the row restore and possibly the second terrain buffer; the object layer
-    erases its previous rectangles with D-only blits. Write the design
-    before code:
+    PF2 inside the well (PF2 already holds the HUD outside it). Dual
+    playfield is OCS, so this keeps ECS working. That removes the row
+    restore and possibly the second terrain buffer; the object layer erases
+    its previous rectangles with D-only blits. Write the design before
+    code:
     - every source Draw that paints behind terrain or walls, since dual
       playfield priority cannot change per pixel;
     - opaque black on PF2 (a non-zero pen set to black, as the HUD does);
@@ -533,339 +453,49 @@ display and changing that rule before either becomes the default.)
     - the removed work and expected saving from the census.
     8 planes (4+4) are not needed: three colours per layer cover white, red
     and black.
-
-**Close**
-
 18. **W3.18 Re-audit and lock in.** Repeat the census on the target, with
     every active-gameplay update within 20 ms. Commit the results to the
     audit, and turn the cadences into regression ceilings: the quiet fall
     at 164 fields, and a ceiling for the world-one route. Check that the
     shipping footprint still fits the target.
-19. **W3.19 Close W3:** remove this section and the world-1 parts of
-    section 5. Its other items stay parked for world 2.
+19. **W3.19 Close W3:** remove this section, moving its working rules and
+    closed approaches to section 5.
 
-## 0. Restore the A500 initial fall: every update within 20 ms
+**Closed approaches (do not retry)**
 
-**Part of W3 (W3.8–W3.11).** The target is the **no-input initial fall from the top of the well to
-the first platform**, updates 1–164. The goal is that every update fits one
-PAL field, 20 ms of work, so the fall takes 164 fields. This replaces the
-earlier target of matching the historical 181 fields; reaching that is a
-milestone on the way, not completion.
+Measured and rejected; the evidence is in the audit, `docs/rejected/` and
+the git log.
 
-**On the target** (`a1200-4m`, measured at 666437a9) the fall already
-presents in 164 fields: display buffering absorbs the two updates that still
-overrun. Three overlapping 100-field captures (from marks 1, 60 and 120;
-work excludes `AmigaPlatform::waitPublished` and its children):
-
-| Window | Work mean ms | Worst ms (update) | Updates over 20 ms | Excess ms |
-| --- | ---: | ---: | ---: | ---: |
-| Authored entrance, 2–55 | 5.1 | 6.0 (49) | 0 | 0 |
-| Quiet generation, 56–121 | 5.8 | 6.9 (117) | 0 | 0 |
-| First burst, 122–135 | 6.4 | 15.3 (122) | 0 | 0 |
-| Enemies, 136–162 | 7.9 | 21.2 (136) | 1 | 1 |
-| Landing, 163–164 | 22.8 | 28.7 (163) | 1 | 9 |
-
-Update 163 spends 23.5 ms and update 136 18.9 ms in `GameplayWorld::step`;
-the row-painting updates (141 and 143, 11.3 ms and 11.1 ms of work) are the next
-largest. `profile.sh quiet-fall` (164 fields), `quiet-window` (the work
-baseline `docs/amiga-quiet-work-baseline-a1200-4m.json`) and `quiet-state`
-(`docs/amiga-quiet-states.txt`, identical on the A500) guard it.
-
-The rest of this section was measured on the A500, relative evidence only
-until W3.7 replaces it.
-
-The current state is the complete trace of the
-[native enemy updates](amiga-frame-cost.md#native-enemy-updates-section-0-b)
-(formerly item B), on top of the
-[source-record terrain owner](amiga-frame-cost.md#source-record-terrain-owner-section-0-a)
-(formerly item A). It runs 176 fields for 164 updates, with a worst update of
-100 ms. "Work" excludes the publication wait. The per-owner costs quoted in
-C–E come from the earlier
-[`45e96a9c` trace](amiga-frame-cost.md#complete-initial-fall-against-the-20-ms-budget--45e96a9c-2026-10-12)
-(192 fields, worst 136 ms); re-measure before relying on a number.
-
-| Window | Work mean ms | Worst ms (update) | Updates over 20 ms | Excess ms |
-| --- | ---: | ---: | ---: | ---: |
-| Authored entrance, 2–55 | 16.5 | 20.6 (19) | 1 | 1 |
-| Quiet generation, 56–121 | 18.8 | 24.5 (71) | 22 | 31 |
-| First burst, 122–135 | 20.2 | 35.0 (122) | 8 | 27 |
-| Enemies, 136–162 | 24.3 | 64.1 (136) | 14 | 135 |
-| Landing, 163–164 | 65.7 | 100.2 (163) | 2 | 91 |
-
-This is the shipping default. Unaccepted C and D candidates exist behind
-`REFERENCE_ROW_PAINTING=0` and `REFERENCE_FRAME_WORK=0` (both default `1`);
-their measurements are under C and D below. Three owners account for the
-remaining excess. Every update over 20 ms in 137–162 paints a row (C). The
-items below remove them in order of how much over-budget work each one
-removes. Each item names:
-
-- the measured work it removes;
-- its target;
-- the structural change;
-- its gate.
-
-The estimates are from the trace and are not additive guarantees; re-measure
-after each item.
-
-### How to work this section
-
-- **Measure the whole fall with the three-capture method** in the audit.
-  `tools/amiga-fall-budget.py` prints the window table above.
-- **Gate on all of these together:**
-  - the window table: work mean, worst update, number over 20 ms and excess;
-  - the specific updates each item names;
-  - the `quiet-fall` pace and its landing witness.
-- **Do not reject a change on pace alone** when it removes the measured work.
-  Display buffering absorbs and redistributes alternating overruns. A
-  better mean likewise does not excuse a worse window worst update.
-- **Before writing code,** state which measured work the change removes,
-  using this profile. Then compare the same windows after the change.
-- **Behaviour gates:**
-  - all 165 native state samples;
-  - the landing witness (tick 164, y 262,144, health 4, ammo 8, 3 enemies,
-    1,371 RNG draws);
-  - the 18,000-frame terrain replay;
-  - mutation and failure fixtures for whatever the item touches;
-  - normal startup at 1 MiB Chip;
-  - unchanged replay behaviour.
-
-  Preserve source event order, RNG order, instance identities, DitherAbove
-  behaviour and hardware scrolling. Keep the portable implementation as the
-  oracle (`REFERENCE_*` selector) until the native path is accepted, then make
-  the native path the default.
-- **Re-check any surprising per-update number** with a short capture of that
-  update before committing it.
-- **Clean up after each item:** delete your own traces once their numbers are
-  in a commit. Stop every owned emulator before handoff.
-
-### C. Row painting and the two-update row period
-
-**Deferred; not accepted as the default.** The preserved C/D candidate is
-selected with `REFERENCE_ROW_PAINTING=0 REFERENCE_FRAME_WORK=0`; both remain
-`1` by default. It uses prepared pattern rows, ordinary-memory preparation,
-paint-ahead and reduced fixed-frame work, without the rejected larger asset
-bank. Behavior/pixel checks have passed, but the timing gate below has not.
-The existing late-fall capture still has four updates over 20 ms; exact
-fence-excluded accounting gives 18.9 ms mean and 20.6 ms worst (139).
-The full-fall, cadence and default-acceptance gates must be rerun on the final
-candidate before closing C. Measurements and test evidence are in
-[the audit](amiga-frame-cost.md#row-preparation-and-empty-family-dispatch--provisional).
-
-- **Removes:**
-  - corridor row painting, 2.85 ms per row in the quiet window;
-  - cave row painting, 8.9 ms per row on average in 137–162 (`paintCached`
-    5.17), with 16.6 and 17.9 ms at 141 and 143;
-  - breakables drawn through the generic masked asset path (2.5 ms at 141);
-  - raster invalidation of each new row's band, per-pixel-row dirty bytes
-    for the painter (0.39 ms per row).
-
-  In the quiet window, generation and painting land in the same update of
-  each two-update row period (15.6 versus 24.6 ms).
-- **Target:**
-  - at most 4 ms to paint a row, and at most 6 ms in the worst update;
-  - row work split so neither update of a period carries both generation
-    and painting.
-- **Approach:**
-  - **Paint ahead:** paint the next row into the hidden scroll margin in the
-    update without a new row. Its terrain is generated before it is visible.
-  - **Prepared pattern rows:** extend the borrowed-corridor method to the
-    builder's patterns. Use offline per-pattern row images, with live fix-ups
-    only at segment seams, autotile neighbours and breakables. The live
-    painter remains the oracle and the fallback.
-- **Gate:**
-  - no row update over 20 ms in 122–135 or 137–162;
-  - scalar pixel comparison across all pattern rows and seams.
-
-### D. Fixed per-update cost
-
-**Next when section 0 resumes; not accepted as the default.** The candidate
-`REFERENCE_FRAME_WORK=0` (counted destruction results, empty-alarm admission,
-streak-dependent weapon selection, grouped display-row debts) takes the whole
-fall from 19.6/100.2 to 18.2/98.7 ms mean/worst and 47 to 33 updates over
-20 ms, but update 98 is still 14.3 ms and the entrance mean above 12 ms. All
-165 state samples match; full behaviour acceptance and the cadence run are
-still to do. See [the audit](amiga-frame-cost.md#fixed-frame-work-candidate--section-0-d-2026-10-18).
-The quiet-update breakdown below is from `45e96a9c`; re-measure it on the
-candidate before choosing the next removal.
-
-- **Removes part of the 15.6 ms a quiet update costs with nothing to do:**
-  - Step 8.8 ms;
-  - draw-list collection 1.73 ms (a room-actor walk of 1.20);
-  - display row sync 1.23 ms;
-  - frame loop body 1.39 ms;
-  - the rest.
-
-  Step's parts include:
-  - six per-update clears, 0.50 ms;
-  - phase reconciliation 0.53 ms;
-  - End Step interior 0.35 ms;
-  - an empty alarm phase 0.28 ms;
-  - enemy Step-order capture 0.24 ms;
-  - weapon level recomputed every update 0.20 ms;
-  - camera 0.50 ms;
-  - DitherAbove 0.66–1.09 ms;
-  - RNG refill 0.44 ms;
-  - the builder's position publication, re-acquired every generation update
-    although it is unchanged for the builder's lifetime, 0.18 ms.
-- **Target:** a quiet update at or under 11 ms. This leaves room for a row's
-  work and for one enemy.
-- **Approach:** do work only when its inputs change. Not instruction tuning:
-  - keep a retained draw list, updated at birth, death and movement, instead
-    of a walk every update;
-  - recompute derived values when their inputs change: the weapon level when
-    the streak changes, the camera when the player moves;
-  - replace per-update clears with dirty tracking;
-  - skip phases with no participants entirely: alarms, Step-order capture,
-    End Step interior, shop End Step.
-
-  List every item that runs on a quiet update. Keep each one only where a
-  source event requires it.
-- **Gate:**
-  - update 98 type at or under 11.5 ms;
-  - the entrance window mean at or under 12 ms;
-  - unchanged state samples.
-
-### E. Stage generation bursts ahead of their trigger
-
-- **What remains:** with items A and B the bursts at 122, 136 and 163 still
-  cost 35.0, 64.1 and 100.2 ms of work, mostly builder and
-  event-cell work (event cells about 6 and 22 ms at 122 and 136). At
-  `45e96a9c` event cells at 163 were 43.3 ms:
-  - breakables 16.1 ms for 21, 5,458 cycles each;
-  - enemy adoption 11.4 ms, of which runner birth and binding is 8.5;
-  - breakable random evaluation 5.1 ms;
-  - enemy choice 3.8 ms.
-- **Shipping build:** the world-1 build binds no terrain consumer, so its
-  native records now publish unbound spans (per run, not per cell). On the
-  spray route's pattern at update 644 that took the records from 22.7 to
-  10.1 ms and the update from 82.1 to 57.2 ms. The rest of that update's
-  generation is event cells (7.4 ms) and run appends (about 1,500 cycles
-  per run).
-- **Target:** 122, 136 and 163 each at or under 20 ms.
-- **Approach:**
-  1. **Cheaper event cells:** breakables publish as records with the
-     source-record segment method (`TerrainBirthRecords` and a lent-counter
-     lease, as terrain does), and enemy adoption joins the roster and
-     record-owned appearance of the
-     [native enemy updates](amiga-frame-cost.md#native-enemy-updates-section-0-b)
-     instead of the generic runner birth and binding.
-  2. **Stage the builder's next pattern** in slack time on earlier updates,
-     once its trigger row is known: pattern choice, consumed RNG values, cell
-     bytes and breakable outputs. Key the staged result on:
-     - RNG draw count and state index;
-     - builder state;
-     - the next instance identity;
-     - the occupied rows.
-  3. **At the trigger update,** verify the key and commit the staged records
-     in source order. Advance the RNG by the staged draw count, and run live
-     only the Create events that observe the world, such as enemy Create.
-  4. **On a key mismatch** (another RNG consumer or birth intervened),
-     discard the staged result and run the normal path, which stays the
-     oracle.
-- **Depends on C and D,** which provide the slack. Do E last.
-- **Gate:**
-  - the three bursts at or under 20 ms;
-  - a fixture that forces a key mismatch;
-  - unchanged state samples and replay.
-
-### Closed approaches (do not retry)
-
-Measured and rejected during the earlier restoration attempts. The evidence
-is in the audit and the git log.
-
-- Shared intrusive room and lifetime descriptors, accessor tuning and
-  another room-animation skip projection.
-- The sparse-change room owner, room-state packing and sparse-list variants.
-- Initial-state, recipe-cache, cross-row grouping and observed-room
-  reconstruction variants.
-- The persistent multi-row identity replacement (group formats, cursors,
-  admission loops).
-- Hoisted metadata or layer admission caches.
-- Standalone registration-owner replacements and registry encodings.
-- Fresh-cell default preinitialisation and copy-loop variants.
-- Immutable-row and copy-on-write spatial encodings.
-- Deferring the effect surface's per-stamp row extents into merged bands:
-  the stamps saved 0.44 ms per update, but the wider rows made each
-  `intersects` about four times dearer and the flushes cost 0.5 ms (spray
-  route, +0.13 ms mean).
-
-The source-record owner that completed the former item A replaced all the
-per-span structures together, behind one record per segment; do not
-reintroduce per-span terrain structures on the generated path.
-
-### Other regression work (after the fall)
-
-- Enforce scene/level-local residency and execution before adding content:
-  1. Replace remaining resident
-     gameplay tables/room catalogues and SDL collision masks with explicit
-     scene/level dependencies. New native mask consumers
-     must use those dependencies, not link the full reference mask catalogue.
-     Include reachable spawns, persistent
-     objects, nested Create/Draw dependencies and transition overlap; fail on
-     undeclared resources rather than falling back to all assets. Apply the
-     same dependency declarations to SDL texture/audio residency. Prove peak
-     ordinary/Chip memory and unload/re-entry with growing unrelated content.
-  2. Make phase dispatch depend on live, eligible family membership and scene
-     ownership, not the catalogue of implemented families. Preserve event/RNG
-     order, synchronous births, activation and captured-phase cutoffs. Assert
-     inactive systems do no work; a later family must not add empty per-frame
-     scans to world 1. Identify each replaced measured runner walk before
-     changing it; do not simply add another full validation pass.
-     Replace work at the owning phase/lifecycle boundary, not individual
-     publications. Do not sweep enemy-appearance setter or validation-helper
-     variants (see the rejected-approaches table).
-     Use the current actor-event audit; do not start another capture/traversal
-     or individual setter optimization without a structural removal.
-  3. Add regression fixtures that add unrelated resources/families and verify
-     unchanged current-scene residency and work counts, alongside replay and
-     bounded native timing gates. Transition-only preparation must not run in
-     gameplay frames. Check failure, Retry and all scene handoffs.
-- After the initial fall, use the matched early contact prefix to investigate
-  firing: updates 51–70 measure 23.98/34.42 ms historical mean/worst versus
-  28.00/42.03 ms current. Do not use later historical frame numbers as equal
-  workloads: reward Step eligibility changes RNG timing from sample 464 and
-  player motion diverges at 652 (see `amiga-frame-cost.md`). Establish equivalent
-  workloads before comparing later combat, generation or field windows.
-  Old section 5 numbers are not a current baseline.
-- Remove the measured regression at its architectural cause. Compare the same
-  workload and behavior checks before/after, preserving hardware scrolling,
-  offline assets and native terrain ownership. Do not resume micro-optimization
-  sweeps, duplicate simulation passes or reference-only performance modes.
-  For generation, profile the remaining work inside and around admitted
-  whole-segment construction; it must not reintroduce generic cell constructors
-  or per-cell retained-layer publication. Standalone
-  registration-owner replacements are closed after two measured rejections;
-  do not retry registry encodings or tune their lookup helpers. Preserve inactive
-  end-of-layer cutoffs, activation, depth order and retirement; an always-active
-  scenery lease alone cannot represent these semantics. Gate on current frames
-  676, 1512 and 1689, plus no-input generation frame 163, as well as
-  ordinary gameplay; use the current measurements in `amiga-frame-cost.md`.
-  Separate the measured RNG refill cost from publication; do not count nested
-  timings twice or replace these owners with arithmetic-helper tuning.
-  Fresh-cell default preinitialization is closed after its measured attempt;
-  do not retry initialization or copy-loop variants (see rejected approaches).
-  This is not a revival of rejected
-  immutable-row/copy-on-write spatial encodings. Preserve bounded run membership
-  rather than replacing it with another per-cell logical lookup/publication
-  path (see the rejected-approaches table). Judge the next structural change
-  against the remaining generation cost and memory footprint, not an isolated
-  copy-helper improvement.
-- Reduce executable and static-memory growth at its owning structures: audit
-  linked collision/query machinery, embedded resource/mask banks and full-height
-  terrain caches. Account separately for Hunk code/data/relocations, zero-filled
-  BSS and dynamic Chip allocations. Loading assets from files reduces executable
-  size only; prove residency savings separately. Preserve the portable/reference
-  oracle without requiring all of its machinery in the shipping native binary.
-  Do not restart rejected per-cell registration encodings. Future query-heavy
-  scenes must budget the full on-demand tree allocation from the memory
-  contract; its absence in the current contact workload does not prove those
-  scenes fit. Continue removing unrelated resident resources and code without
-  moving the same always-resident bytes into startup allocations.
-- Close this section only with every initial-fall update within 20 ms (items
-  C–E), a normally runnable build, explained/resolved recent regressions and
-  meaningful startup failure codes. Retain any 20 ms shortfall outside the
-  initial fall explicitly in section 5; do not claim 50 FPS or stock total-memory fit without evidence. Restore a normal
-  non-profile build and stop every owned emulator run before handoff.
+- Terrain: shared intrusive room and lifetime descriptors, accessor tuning,
+  another room-animation skip projection; the sparse-change room owner,
+  room-state packing and sparse lists; initial-state, recipe-cache,
+  cross-row grouping and observed-room reconstruction; the persistent
+  multi-row identity replacement; hoisted metadata or layer admission
+  caches; standalone registration-owner replacements and registry
+  encodings; fresh-cell default preinitialisation and copy loops;
+  immutable-row and copy-on-write spatial encodings. The source-record
+  owner replaced the per-span structures behind one record per segment; do
+  not reintroduce per-span terrain structures on the generated path.
+- Row painting: the prepared pattern rows and paint-ahead (former section 0
+  C) and the fixed-frame-work candidate (former D) were retired on
+  26.11.2026: the target already met their goals, and on the routes the
+  rows candidate saved about 1% of fields while making 27–48 updates
+  1–3 ms worse.
+- Effect composition: deferring per-stamp row extents into merged bands;
+  the two rejected effect layouts (a new proposal must remove their
+  exact-query or CPU source/mask-extraction cost); the delta-register stamp
+  batch; offline shifted CPU stamps into the retained raster; both
+  row-debt representations (disjoint ranges, shared word coverage with
+  cached footprints); small sprite assignment and gem-position helpers.
+- Quiet frames: enemy alarm-order variants, roster insertion, pinning,
+  snapshot caching, merge loops, negative counter dispatch, the borrowed
+  Step snapshot and generic temporary alarm-array layouts.
+- Drawing: converting to fixed point only at the drawFx placement
+  boundary (cost as much as it saved); the two-word asset path (0.07 ms).
+- The ammo gauge's runtime classifiers; bounded clean-style raster
+  preparation and row-budget, scheduling, gather-loop or encoding sweeps
+  for the gameplay entry; mutation-owned occupancy row extents for level
+  re-entry.
 
 ## 1. Finish live skeleton and bone integration
 
@@ -1253,7 +883,7 @@ References: [collision bounds](runner-collision-bounds.md),
 [FP startup evidence](runner-fp-startup.md). This external-evidence gap does not
 block implementing or testing the other tasks locally.
 
-#### 1.18 Validate the integrated A500 workload and memory
+#### 1.18 Validate the integrated workload and memory on the target
 **Depends on:** 1.15–1.16.
 **Work:** Run bounded native natural-encounter captures, including dense smoke,
 debris, gems, fields, shops and Retry. Measure actual per-owner costs, worst
@@ -1262,7 +892,7 @@ output outside AmigaStart.c and meaningful allocation failures. Use offline asse
 hardware scrolling; no runtime sprite conversion or silent RAM expansion.
 **Done when:** Reproducible measurements and coverage are recorded in the commit;
 newly exposed costs and fit failures have concrete entries in §5/§7. Do not claim
-20 ms or stock-A500 fit unless the measurements prove them. Finishing §1's
+20 ms or fit on the target unless the measurements prove them. Finishing §1's
 integration does not erase those separate performance/memory requirements.
 
 ## 2. Make catacombs playable
@@ -1354,274 +984,27 @@ ports does not count as parity with the original.
 
 Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
-## 5. Meet the Amiga frame budget
+## 5. Meet the Amiga frame budget beyond world 1
 
-W3.12 and W3.13 take its world-1 part, re-measured on the target.
+**Parked: world 2.** World 1's performance work is W3, with its working
+rules, target and closed approaches; apply them to each later area. The
+earlier A500 items (generation bursts at 701 and 844, the contact damage
+number, combat composition, quiet frames, the ammo gauge and the other
+scenes) were folded into W3 or retired with their measurements in the
+[frame-cost audit](amiga-frame-cost.md).
 
-Target <=20 ms frames during active gameplay and smooth style/upgrade navigation.
-Scene handoffs are not gameplay frames: judge them by total transition latency
-and visible stalls, not a 20 ms per-frame limit. Average gameplay FPS alone is
-not the criterion. Use the current regression baseline and exact comparison
-windows in the [frame-cost audit](amiga-frame-cost.md), not its historical
-`13e08ca2` section. Source Step-order changes altered the contact tape's
-trajectory; frame 701 is no longer its largest terrain burst. Finish section 0
-before resuming the historical ranked items below, re-estimating their costs
-against the live workload. Extend coverage to quiet gameplay and scene handoffs
-rather than treating the captured generation and contact
-windows as a complete game audit. Measure the cold gameplay handoff separately
-with `profile.sh entry`.
-
-### How to work this section
-
-An earlier round spent most of its commits on one parked item (the ammo
-gauge) and left ten opt-in flags behind. Do not repeat that.
-
-- Work the items below in order. Each names the structure to remove, its
-  measured cost and a target. Implement the whole structural change in one
-  attempt; do not sweep variants, modes or parameters.
-- Do not touch code that costs under 1 ms in the windows it runs in. That
-  includes loop rewrites, type/register changes, unrolling, inline assembly,
-  compiler flags and helper substitutions. If a profile shows nothing of 3 ms
-  or more in the target, the item is done: move on.
-- Before starting, write in the commit message the work removed and the
-  expected saving from the numbers here. Afterwards trace only the affected
-  windows (start a capture one frame early: 644, 659, 699, 843) and run the
-  FPS tape. Repeat the full audit only after each lettered group lands.
-- Gate on the frames the budget is about, not on every frame. Use the current
-  audit's frame numbers and coverage. Accept when
-  the targeted cost falls, no measured budget frame or window
-  worst frame gets slower by more than 0.5 ms, and no window mean the change
-  runs in gets worse. Another single frame may rise by up to about 1 ms when
-  the change saves several times that elsewhere; report it in the commit.
-  Untouched frames move by up to about 0.5 ms between builds; that is noise.
-  The tape's worst gap is quantized to whole fields: report it, never gate on
-  it. Do not reject an 11 ms saving for a 0.6 ms move in a 70 ms frame.
-- For scene handoffs, measure the complete transition through the first
-  interactive frame, including preparation charged to earlier frames. Small
-  differences such as 8 ms or one or two PAL fields are not rejection grounds
-  by themselves. Accept a substantial overall improvement even when VBlank
-  waiting shifts into the following frame. Preserve smooth ongoing animation
-  and gameplay; distinguish added computation from redistributed waiting.
-  Saving estimates and attempt limits guide prioritization, not automatic
-  rejection of useful changes. Reassess candidates blocked solely by an
-  obsolete timing gate without starting another parameter/variant sweep.
-- Quote frame numbers from the report's per-frame table for the frame you
-  name, and re-check a surprising number with a short capture of that frame
-  before committing it. The `36d8a0f2` message gives 660 as 84.5 ms; the
-  frame measures 90.2 ms (a saving of about 16 ms, not 22).
-- An accepted change is the default in the same commit. Keep the replaced path
-  only as a reference selector for oracles. Do not add experiment flags, mode
-  numbers or parallel candidate implementations to the tree.
-- Two rejected attempts at an item end it: record one row each in the audit's
-  [rejected approaches](amiga-frame-cost.md#rejected-approaches) table (commit,
-  and the removed code as a patch in `docs/rejected/`), then take the next
-  item. Measurements belong in commit messages. Do not add narrative or
-  per-experiment results to this file or the audit.
-- Verify each change with the full RNG state, numeric instance IDs, creation
-  and event order, positions and draw order on deterministic replays
-  (`make verify-cross-replay`, `make verify-terrain-ownership`, the per-frame
-  ownership digests, and `profile.sh overflow-state` for that encounter), plus
-  the native pixel oracles (`profile.sh terrain`,
-  `profile.sh fields`, `profile.sh ammo`, native frame dumps against the
-  reference selector) when presentation changes.
-- Delete your own traces under `tmp/trace/` once their numbers are in a commit;
-  each 100-field capture is about 500 MB. For several queries on one capture,
-  export `--collapsed` stacks once instead of re-running `--focus`.
-
-### A. Generation bursts (frames 701 and 844)
-
-`generateLiveTerrain` costs 40.84 ms at 701 and 35.86 ms at 844. A whole
-builder pattern is emitted synchronously, as in the original; the draws and
-creations must stay in that order. Further changes must remove remaining
-publication or Create machinery, not reorder those effects.
-
-**Remaining budget shortfall, not another encoding sweep.** Generation at
-701 still exceeds the 30 ms target. Event cells take 16.92 ms and prepared
-terrain publication 13.92 ms (nested within generation). At 844 these are
-19.81 and 6.87 ms. The next generation attempt must eliminate a named
-remaining structure, not retune the prepared row program or its helpers.
-
-   - Further actor/time-field publication work must replace shared ownership
-     as a whole; individual lifetime helpers are below the work threshold.
-     Do not retune the generated-box command path. One enemy configuration
-     at 844 costs 3.76 ms, including 3.23 ms in lifecycle publication.
-     Establish the removable structure and saving
-     before changing it; charge mutation costs in the affected-frame gate.
-     Do not tune `nextU32`, constructors or small choice helpers individually.
-   - Fixed-terrain publication remains a shortfall, but both immutable-row
-     owner attempts are closed (see the rejection table). Do not retry
-     copy-on-write rows, sparse overrides, prepared row encodings, copy loops
-     or individual publication helpers. This owner item has exhausted its
-     two attempts; proceed to the other shared ownership/composition work.
-     No deferred source-visible Create or later terrain exposure is permitted.
-   - Preserve source-ordered terrain segments separated by event cells: never
-     expose later terrain to an earlier Create. Retain the scalar reference
-     for registered terrain, instance IDs, and capacity/failure prefixes.
-   - Keep coincident-wall counts, landing candidates, platform record order,
-     dirty rows, RNG interleaving and the optional pillar tail exact.
-   - Recheck full-state/ownership replay and native terrain pixel oracles.
-     `REFERENCE_PATTERNS=1` selects the retained cell interpreter.
-   - Native breakables cost about 2,058 cycles per creation at 844 (thirteen, 3.77
-     ms), still above 1,500. Do not tune individual writes or copy loops for
-     this threshold. Keep `REFERENCE_BREAKABLES=1` as the oracle, including
-     room re-entry and failure prefixes. See the
-     [allocation contract](terrain-update-contract.md#native-breakable-allocation).
-
-### B. Contact damage number (frames 645 and 646)
-
-The remaining contact-pair damage-number work is 10.85 ms, above its
-10 ms target. At 645, creation costs 5.29 ms. The retained post-difference
-direction calculation is below 3 ms. At 646, first Step costs 5.56 ms, including
-3.31 ms in the certified motion decoder and wrappers. Subsequent motion and
-damping cost about 2.1 ms per frame; leave their individual helpers alone.
-Preserve bit-identical direction, speed and positions and keep frame 646
-under 80 ms while removing remaining threshold-sized computations.
-
-- Keep the [finite-domain certificate](runner-point-direction.md#lossless-contact-motion-representation)
-  and portable cosine oracle. `REFERENCE_CONTACT_MOTION=1` selects the retained
-  first-Step program. Mutated, arbitrary and fallback directions must not be
-  silently admitted to the certified domain.
-- A further change must remove a named remaining computation across the
-  contact adapter/first Step, not tune sub-millisecond decoder or arithmetic
-  helpers. Do not substitute trigonometric identities or reduced precision.
-- A faster generic binary64 multiply is a helper substitution, not this item.
-- Keep exact Q8 coordinate admission and the full-wrapper fallback
-  (`REFERENCE_CONTACT_COORDINATES=1`). Do not tune the sub-millisecond
-  coordinate adapter or the now-under-3-ms direction calculation.
-
-### C. Combat composition shortfall
-
-Blitter time per update on constant fire, 560–569 (`EFFECT_BLIT_CENSUS=2`,
-each effect blit timed alone), now that the clear covers only the touched
-rectangles (6.9 → 1.5 ms) and each shade subtraction only their overlap
-(3.5 → 0.5 ms):
-- 14.4 smoke stamps, 84 words each: 4.1 ms (0.28 ms per stamp);
-- 2 gem stamps: 1.2 ms;
-- shade subtraction, 2.7 clipped blits of 56 words: 0.5 ms;
-- the clear, 1,575 words in 2.7 rectangles: 1.6 ms;
-- the publish copy to the display, 1,265 words: 3.9 ms.
-
-The visibility test's wait fell 5.5 → 1.3 ms. The tracked rectangles are
-built once per change of coverage and replayed to the subtraction clips,
-the publish copy and the clear (six row scans were 3.4 ms of CPU). Against
-the full-band clear, census to tick 700: constant fire 1,643 → 1,606
-fields, 560–569 54.7 → 51.6 ms, worst 140.8 → 139.2 ms; normal
-1,376 → 1,353 fields, worst 134.6 → 131.5 ms.
-
-Next: the CPU still spins on the blitter (`isBlitterBusy` 2.2 ms and
-`processBlitterQueue` 1.9 ms per update in a 561–567 trace before the
-cache). Trace again, find the drains and the work queued ahead of them,
-then choose between fewer smoke stamps (4.1 ms of blitter, the largest
-effect cost left), a cheaper publish (3.9 ms) and CPU work moved between
-queueing and the first read.
-
-Remaining effect work is the raster fallback for mixed producers, actual
-shade subtraction and entry cover. Measure those
-cases separately from eligible gem-only frames before another compositor
-attempt. Use the effect-coverage census described in the profiling procedure
-to establish that the chosen window actually exercises each proposed path;
-producer-phase timings alone do not prove smoke/debris or raster coverage.
-Use the seed-87 route-34 tape for shade subtraction and channel overflow. Preserve
-the unshaded actor/BOB pass, topmost unshaded hardware suffix, shaded raster prefix, and
-controller/ordinary-actor boundary when changing
-the retained raster. Do not tune sub-millisecond stamp helpers. Mixed producers and entry cover still
-need their own native workload and pixel evidence.
-Current combat draw collection costs 4.48 ms and row synchronization 1.50 ms.
-The supplied baseline's raster preparation/publication costs no longer describe
-this hardware-gem-only workload; do not use them to justify fallback changes.
-Review the complete producer/compositor/consumer path, preserving source
-painter order, opaque-black replacement and shade subtraction. The two
-rejected effect approaches remain closed: a new proposal must remove their
-exact-query or CPU source/mask-extraction cost, not repeat either layout.
-The delta-register stamp batch is also closed: it shifts work into queued
-dispatch and regresses the first affected frame. Do not sweep its scheduling.
-Offline shifted CPU stamps into the retained raster are closed too; do not
-retune their word interpreter, layout or CPU/DMA selection.
-Row-debt representation has exhausted its two attempts: disjoint ranges and
-shared word coverage with cached field/laser footprints are closed. Do not
-retune their range layout, bit scans or footprint maintenance. Proceed to the
-remaining producer/compositor/consumer structures, not another debt encoding.
-Keep per-producer/presentation state and final pixels as oracles. Do not
-reopen small sprite assignment or gem-position helpers.
-Keep `REFERENCE_EFFECT_COMPOSITION=1` as the separate-plane oracle. Further
-composition work must remove a threshold-sized structure, not tune stamp
-lookup, row geometry or the sub-millisecond bitmap setup. Preserve the
-retained alpha raster's exact queries and uncommon-mask fallback.
-
-### E. Quiet-frame shortfall
-
-Pursue shared quiet-frame work, not another enemy alarm-order variant. Do not
-retune roster insertion, pinning, snapshot caching, merge loops or negative
-counter dispatch. The rejected borrowed Step snapshot and generic temporary
-alarm-array layouts remain closed. Any remaining effect-alarm proposal must
-first meet the work threshold in a workload that actually exercises it.
-
-Target: quiet frames under 22 ms; current mean is 26.7 ms. Player and walking
-enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
-Leave their individual helpers alone. A quiet-frame proposal needs a shared
-work structure to remove, measured across its callers, not a collection of
-unrelated sub-millisecond edits.
-
-### F. Parked until A–E are done
-
-- Ammo gauge: 11.29 ms at 645 and 10.71 ms at 646, 1.5–4 ms in typical frames. Every
-  runtime classifier is ruled out (rejected-approaches table). If reopened,
-  start from the staged-transfer patch listed there, measured against the
-  factored default.
-- Health HUD at 645 (4.51 ms); terrain painting at 844 (6.41 ms against 5 ms).
-
-### G. Keep native ownership sufficient
-
-- Native ownership rejects every collision query and wall End Step. When an
-  original query or wall event enters native gameplay, answer it from native
-  state (the grid for terrain selectors, family records for actors) with the
-  same first-hit identity and order, verified against the registered
-  reference. Do not re-enable per-instance spatial publication for it.
-- Actors at the wall depth (100) are rejected, because an inactive wall ends
-  that layer's Draw. Supporting one needs the layer's wall-order cutoff.
-
-### H. Coverage
-
-Add a dense-encounter tape before claiming the budget. Include the natural
-two-level horizontal shop tape (`profile.sh shop`), not only the contact
-tape, in subsequent audits. Repeat the audit after each lettered group lands.
-Particle-heavy natural coverage depends on the destruction/effect integration
-in §1: manually emitted smoke/debris fixtures or a bullet-only census do not
-prove that coverage. Keep the input-only seeded search's source/runtime parity
-checks enabled when selecting a tape.
-
-### I. Other scenes
-
-The earlier style-reveal-only tape peaks at two fields (splash 34.7 ms,
-garden 40.5 ms, style
-34.5 ms, instrumented). Reduce upgrade-selection layout/content and transition
-preparation costs, keeping static layers and pointer-driven movement. Reduce
-animated overlay and offer-bank preparation stalls.
-Measure asset staging and Chip/Fast residency separately from steady-state navigation.
-Preserve the original heading, icon and carousel animation.
-
-Reduce the overall cold gameplay handoff exposed by `profile.sh entry`.
-Measure the last style frame and first gameplay frame together under the
-transition gate above; do not discard either. Remaining synchronous work includes
-initial terrain raster and backing/HUD
-setup. Move immutable preparation out of confirmation without overwriting
-the garden/style display owners or introducing another long frame earlier.
-Do not move RNG draws or source-visible Create effects ahead of confirmation.
-Do not retry bounded clean-style raster preparation or sweep row budgets,
-scheduling, dictionary gather loops or encodings. Proceed to remaining
-backing/HUD setup and room publication structures; do not count relocated
-copy work as eliminated work.
-
-Reduce remaining mutable room-layer reset/publication at level reentry,
-measured with the natural shop tape (`PROBES=1 bash amiga/profile.sh shop`).
-Keep immutable metadata admission and the no-survivor proof outside repeated
-placeholder searches. A further attempt must remove a measured structure,
-not tune reset loops. Preserve serialized placeholders, source IDs, background
-initialization order, failure prefixes and later actor attachment; retain
-the generic layer lifecycle as the oracle (`REFERENCE_ROOM_PREPARE=1`).
-Mutation-owned occupancy row extents are rejected: tracking during room
-publication consumes most of the removed reset work. Do not tune their range
-updates or partial-clear loops; pursue a different ownership structure.
+- **Keep native ownership sufficient.** Native ownership rejects every
+  collision query and wall End Step. When an original query or wall event
+  enters native gameplay, answer it from native state (the grid for terrain
+  selectors, family records for actors) with the same first-hit identity
+  and order, verified against the registered reference. Do not re-enable
+  per-instance spatial publication for it. Actors at the wall depth (100)
+  are rejected, because an inactive wall ends that layer's Draw; supporting
+  one needs the layer's wall-order cutoff.
+- **Coverage.** Each later area needs a dense-encounter tape and its own
+  census before claiming the budget. Particle-heavy coverage depends on the
+  destruction and effect integration in section 1; manually emitted
+  fixtures or a bullet-only census do not prove it.
 
 Reference: [profiling procedure](amiga-profiling.md).
 
@@ -1645,15 +1028,26 @@ Reference: [scene architecture](scene-architecture.md).
   and the startup requirement are in `docs/amiga-memory.md`);
   expanded-emulator runs do not prove stock-machine fit. Size the shop speech overlap reserve against repeated
   messages within the nested parent Step, not just one replacement per parent.
-- Budget further Chip residency against the measured 20,272-byte cavern
-  minimum free space (126,840 bytes before gameplay); remeasure after pack
-  growth and through scene transitions. The cavern DMA bank is 109,410 bytes;
-  the verification-only full union remains 115,806 bytes. Reconcile gameplay-family
-  residency before admitting additional encounter artwork on a stock-memory machine.
-  Keep the gate unchanged until residency is reduced or a new whole-program
-  allocation measurement justifies a different budget.
-  Keep the 68020 CPU target; do not silently increase emulator Chip RAM
-  to make memory checks pass.
+- Chip residency: the route driver checks peak Chip and public use against
+  the declared startup requirements (`downwellChipRequirement`, about 1 MB
+  of Chip and 2.5 MB of further memory). The A500-era free-Chip budgets in
+  `docs/amiga-memory.md` no longer apply. Reconcile gameplay-family
+  residency before admitting more encounter artwork, and keep the 68020
+  target; do not raise emulator memory to make a check pass.
+- Enforce scene- and level-local residency before adding content: replace
+  the remaining resident gameplay tables, room catalogues and SDL collision
+  masks with explicit scene and level dependencies (reachable spawns,
+  persistent objects, nested Create and Draw dependencies, transition
+  overlap), and fail on an undeclared resource rather than falling back to
+  all assets. Prove peak memory and unload and re-entry.
+- Dispatch phases from live, eligible family membership, not the catalogue
+  of implemented families, keeping event and RNG order: a later family must
+  add no empty per-update scans to world 1. Add fixtures with unrelated
+  resources and families that show unchanged residency and work counts.
+- Reduce executable and static memory at their owning structures (linked
+  query machinery, embedded banks, full-height terrain caches), accounting
+  Hunk code, data and relocations, BSS and Chip allocations separately.
+  Moving resident bytes into startup allocations is not a saving.
 - The effect stamps are still linked into the
   executable, so ordinary memory holds them beside any Chip copy. Give them
   scene/level dependency contracts and bounded file residency; merely moving
@@ -1697,8 +1091,9 @@ Reference: [scene architecture](scene-architecture.md).
   selection, gameplay, death, upgrades and later-area progression.
 - Run all relevant regression gates before claiming parity. Component tests,
   CPU replays and screenshots each prove only their respective scope.
-- Prepare release packaging, compatibility tests and installation documentation
-  for the measured CPU/memory requirements, without bundling copyrighted inputs.
+- Release compatibility: 0.1 was tested on an emulated A1200 with 4 MB Fast
+  and a real A1200 with a 68040. Test an ECS machine with a 68020 and Fast
+  RAM, and the minimum memory, before claiming them in the ReadMe.
 
 ## Closing work
 

@@ -3331,7 +3331,7 @@ current is `3aa1e229376680c1ada7d5c084133fc0a5950f4062e4ab87aeafae534280eaac`.
 
 Default A500 build at `13e08ca2` (2026-10-08), compared with the supplied
 `36d8a0f2` audit. Remaining work is ranked in
-[open-work §5](open-work.md#5-meet-the-amiga-frame-budget). This is a snapshot
+[open-work W3](open-work.md#w3-performance). This is a snapshot
 cost audit, not a claim that the 20 ms gameplay budget has been met. Subsequent
 matched measurements and post-group audits are recorded in their commits.
 

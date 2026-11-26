@@ -2,7 +2,7 @@
 """Summarise the no-input initial fall against the 20 ms update budget.
 
 Input is one or more reports written by tools/amiga-trace-report.py for
-overlapping captures of the same build (see docs/open-work.md section 0).
+overlapping captures of the same build (see docs/open-work.md, W3 baseline).
 Prefer JSON from --work-summary with an explicitly verified --work-wait:
 it retains unrounded cycles and waits below the displayed top-six cutoff.
 The named wait scope includes all its children, including idle RNG service.
