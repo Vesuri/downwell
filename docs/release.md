@@ -59,3 +59,12 @@ The world 1 slice, levels 1-1 to 1-3 with sound effects and no music, partly
 optimized for the A1200 with 4 MB Fast. Its purpose is to announce the
 project. Gate: `make release` (package and audit) and `make test-installer`
 (every mode, both starts) on this build.
+
+Built by `make release` from `2d285dff` on 26.11.2026; `make test-installer`
+passed every mode and both starts on that archive:
+
+| Artifact | SHA-256 |
+|---|---|
+| `Downwell-0.1.lha`, 709,639 bytes | `c08cc30dd4d6b964256b0caa1ef895e6fb32cfdf4adf6fa4553f4d5d5a07cdb2` |
+| `Downwell` (exe) | `f3743aa5ed5ba6d8e3b598e03273d1ec6e73ebdf2b5d7cef415328336284685a` |
+| `DownwellInstallData` | `a5b48787f8b781a5cb59ad7f20f6b939579574974d01144bcd1221776d79d9dd` |
