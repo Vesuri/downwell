@@ -1101,16 +1101,62 @@ int amigaRendererPrepareGlyphRows(UBYTE rows[10], const UBYTE* pack, const UBYTE
    spans x-5 .. x+10; rows y-1 .. y+10. */
 void amigaRendererDrawBorderGlyph(AmigaRenderer* renderer, const UBYTE rows[10],
                                   int x, int y, unsigned pen) {
-    UWORD mask[12], ink[12];
-    unsigned row;
-    for (row = 0; row < 12; ++row) {
+    /* amigaRendererDrawTextWordsPen for this one-word, 12-row shape, with
+       the outline built per row in registers: the word at x-5 lands at
+       shift s in the destination pair (base, base+1); one 32-bit clip mask
+       covers the clip rectangle's columns. */
+    const int originX = x - 5, originY = y - 1;
+    int left = renderer->clipX > 0 ? renderer->clipX : 0, right = renderer->clipX + renderer->clipWidth;
+    int top = renderer->clipY > 0 ? renderer->clipY : 0, bottom = renderer->clipY + renderer->clipHeight;
+    int base, shift, row, endRow;
+    unsigned physical, ringHeight;
+    ULONG planeBytes, clip;
+    UBYTE* dest;
+    const UWORD low = (UWORD)(pen & 1u ? 0xffffu : 0), high = (UWORD)(pen & 2u ? 0xffffu : 0);
+    if (right > downwellVisibleWidth) right = downwellVisibleWidth;
+    if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+    if (originX > left) left = originX;
+    if (originX + 16 < right) right = originX + 16;
+    if (originY > top) top = originY;
+    if (originY + 12 < bottom) bottom = originY + 12;
+    if (left >= right || top >= bottom) return;
+    base = originX >= 0 ? originX / 16 : -((-originX + 15) / 16);
+    shift = originX - base * 16;
+    /* Pixels [left, right) of the pair starting at base*16 (0..31). */
+    {
+        const int from = left - base * 16, to = right - base * 16;
+        clip = (from > 0 ? 0xffffffffUL >> from : 0xffffffffUL) &
+               (to < 32 ? ~(0xffffffffUL >> to) : 0xffffffffUL);
+    }
+    ringHeight = renderer->target == renderer->game ? downwellGameRingHeight : downwellDisplayHeight;
+    planeBytes = ringHeight * downwellBytesPerPlaneLine;
+    physical = (unsigned)top;
+    if (renderer->target == renderer->game) physical = (UWORD)(renderer->gameOrigin + physical) % downwellGameRingHeight;
+    dest = renderer->target + physical * downwellBytesPerPlaneLine;
+    endRow = bottom - originY;
+    for (row = top - originY; row < endRow; ++row) {
         const UWORD above = row >= 2 ? (UWORD)((UWORD)rows[row-2] << 7) : 0;
         const UWORD shape = row >= 1 && row <= 10 ? (UWORD)((UWORD)rows[row-1] << 7) : 0;
         const UWORD below = row <= 9 ? (UWORD)((UWORD)rows[row] << 7) : 0;
-        ink[row] = shape;
-        mask[row] = (UWORD)(shape | (UWORD)(shape << 1) | (UWORD)(shape >> 1) | above | below);
+        const UWORD outline = (UWORD)(shape | (UWORD)(shape << 1) | (UWORD)(shape >> 1) | above | below);
+        const ULONG bits = (((ULONG)outline << 16) >> shift) & clip;
+        const ULONG ink = (((ULONG)shape << 16) >> shift) & bits;
+        /* The clip leaves a word's mask zero unless 0 <= its column < 24. */
+        if (bits >> 16) {
+            UBYTE* word = dest + base * 2;
+            const UWORD m = (UWORD)(bits >> 16), i = (UWORD)(ink >> 16);
+            writeWord(word, (UWORD)((readWord(word) & (UWORD)~m) | (i & low)));
+            writeWord(word + planeBytes, (UWORD)((readWord(word + planeBytes) & (UWORD)~m) | (i & high)));
+        }
+        if (bits & 0xffffu) {
+            UBYTE* word = dest + base * 2 + 2;
+            const UWORD m = (UWORD)bits, i = (UWORD)ink;
+            writeWord(word, (UWORD)((readWord(word) & (UWORD)~m) | (i & low)));
+            writeWord(word + planeBytes, (UWORD)((readWord(word + planeBytes) & (UWORD)~m) | (i & high)));
+        }
+        dest += downwellBytesPerPlaneLine;
+        if (++physical == ringHeight) { physical = 0; dest -= planeBytes; }
     }
-    amigaRendererDrawTextWordsPen(renderer, x - 5, y - 1, mask, ink, 1, 12, 1, pen & 3u);
 }
 
 int amigaRendererPrepareHudGlyph(AmigaHudGlyph* glyph, const UBYTE* pack,
