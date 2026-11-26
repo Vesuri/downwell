@@ -414,6 +414,17 @@ resets it; that is the first owner to find.
     apply the shake, so shaken updates no longer repaint the whole view. The
     census's camera-jump class still counts those updates (the profile
     compares the shaken view x).
+    `GameplayWorld::step` at spray 690-699 is now 16.1 ms (was 20.2):
+    alarms count down without the step order unless two enemy events are
+    due, wall contacts resolve their exact cells and stop at a limit, the
+    unbound step order and the steering contact bounds are reused, and
+    contact sprite bounds come from a table. What remains is spread thin:
+    the per-enemy step 2.0 ms (bat, snail and crawler behaviour; its
+    dispatch and publication are about 0.3 ms, too little for a
+    per-family split), jelly steering 2.0, debris 1.2, the ranged bullet
+    1.1, casings 0.9, alarms 0.9 (real frog and steering events, corpse
+    and debris countdowns), corpses 0.8, smoke against walls 0.7, the
+    player 0.7, steering contacts 0.6.
 13. **W3.13 Scene handoffs** (section 5 I), judged by total latency through
     the first interactive frame and by visible stalls: gameplay entry,
     level transitions and shop re-entry, the clear and upgrade screens,
