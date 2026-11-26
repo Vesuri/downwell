@@ -8,7 +8,9 @@ namespace downwell {
 // Integer pixel-cell edges: right/bottom are exclusive. Margin/origin values
 // are verified against the pinned data.win export by verify-enemy-contact.py.
 struct ContactBounds { int left, right, top, bottom; };
-inline ContactBounds contactSpriteBounds(int sprite) {
+// The verified records; contactSpriteBounds reads the same values from a
+// table built from them at compile time.
+constexpr ContactBounds contactSpriteBoundsReference(int sprite) {
     switch (sprite) {
         case 31: return {-4, 4, -4, 8};
         case 84: return {-2, 2, -1, 2};
@@ -54,6 +56,40 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 710: return {-2, 2, -2, 2};
         default: return {0, 0, 0, 0};
     }
+}
+namespace detail {
+// A sprite's byte entry index, then each record's edges (all within a
+// signed byte): one indexed load instead of a search of the cases per call.
+struct ContactSpriteTable {
+    static constexpr int sprites = 712;
+    unsigned char entry[sprites];
+    signed char edges[48][4];
+};
+constexpr ContactSpriteTable makeContactSpriteTable() {
+    ContactSpriteTable table{};
+    unsigned entries = 1; // entry 0: no record
+    for (int sprite = 0; sprite < ContactSpriteTable::sprites; ++sprite) {
+        const ContactBounds b = contactSpriteBoundsReference(sprite);
+        if (!b.left && !b.right && !b.top && !b.bottom) continue;
+        table.edges[entries][0] = static_cast<signed char>(b.left);
+        table.edges[entries][1] = static_cast<signed char>(b.right);
+        table.edges[entries][2] = static_cast<signed char>(b.top);
+        table.edges[entries][3] = static_cast<signed char>(b.bottom);
+        table.entry[sprite] = static_cast<unsigned char>(entries++);
+    }
+    return table;
+}
+inline constexpr ContactSpriteTable contactSpriteTable = makeContactSpriteTable();
+}
+inline ContactBounds contactSpriteBounds(int sprite) {
+#ifndef DOWNWELL_REFERENCE_CONTACT_SPRITE_BOUNDS
+    using Table = detail::ContactSpriteTable;
+    if (static_cast<unsigned>(sprite) >= static_cast<unsigned>(Table::sprites)) return {0, 0, 0, 0};
+    const signed char* e = detail::contactSpriteTable.edges[detail::contactSpriteTable.entry[sprite]];
+    return {e[0], e[1], e[2], e[3]};
+#else
+    return contactSpriteBoundsReference(sprite);
+#endif
 }
 
 inline int enemyContactMask(int object, int sprite,int explicitMask=-1) {

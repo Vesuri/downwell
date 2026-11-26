@@ -81,6 +81,9 @@ endif
 ifeq ($(REFERENCE_STEERING_BOUNDS),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_STEERING_BOUNDS
 endif
+ifeq ($(REFERENCE_CONTACT_SPRITE_BOUNDS),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_SPRITE_BOUNDS
+endif
 # The host runs the parked frame-work candidate (section 0 D); the Amiga
 # build keeps the measured production path unless FRAME_WORK_CANDIDATE=1.
 CXXFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE

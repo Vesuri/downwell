@@ -15,6 +15,12 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    for (int sprite = -16; sprite < 4096; ++sprite) {
+        const auto table = contactSpriteBounds(sprite), reference = contactSpriteBoundsReference(sprite);
+        require(table.left == reference.left && table.right == reference.right &&
+                table.top == reference.top && table.bottom == reference.bottom,
+                "the contact sprite table matches every verified record and the empty default");
+    }
     {
         constexpr auto normal = machineGunProfileForStreak(99);
         constexpr auto high = machineGunProfileForStreak(100);
