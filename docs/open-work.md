@@ -256,31 +256,38 @@ On the target the quiet fall already presents every update in one field
 its field count cannot show a smaller regression: judge the quiet fall on
 the target by work cycles from `profile.sh quiet-window` (`--work-summary`).
 
-The normal run: `CENSUS=1 ROUTE=world-one bash amiga/profile.sh route` (the
+The normal run: `CENSUS=1 CENSUS_UPDATES=8192 ROUTE=world-one
+ROUTE_END_TICK=8100 bash amiga/profile.sh route` (the
 [census](amiga-profiling.md#per-update-work-census) of the host route
 `world-one`: boot, the garden, normal mode 1-1 to 1-3 with shops, side
-rooms, time-stop and the clear and upgrade screens, to the hand-off to area
-2; 9,001 updates, END 2 1 8138, witnesses and sounds passed). Frames count
-gameplay updates from the start of the run.
+rooms, time-stop and the clear and upgrade screens, stopped at tick 8100
+just before the hand-off to area 2). Measured at `6095f6cf` on 26.11.2026:
+8,963 updates, the ring holding the last 8,192 (the first 771, all front
+end, overwritten). Frames count gameplay updates from the start of the run.
+Without `ROUTE_END_TICK` the route driver fails at its first sound-voice
+sample (`verify-world-one-native.py` `sampleVoices`: no `VOICES` line),
+before gameplay.
 
 | Updates | Count | Work mean ms | Worst ms (frame) | Over 20 ms | Excess s |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Gameplay 1-1 | 1,994 | 90.8 | 494.4 (1574) | 1,822 | 143.0 |
-| Gameplay 1-2 | 1,571 | 109.2 | 578.4 (3468) | 1,571 | 140.2 |
-| Gameplay 1-3 | 2,678 | 112.3 | 569.9 (5780) | 2,678 | 247.2 |
-| Side-room camera | 896 | 198.0 | 736.2 (7407) | 896 | 159.5 |
-| Room speed below 60 | 362 | 184.6 | 722.2 (7615) | 362 | 59.6 |
-| Clear and upgrade overlays | 636 | 6.4 | 127.0 (7931) | 40 | 0.5 |
-| Front end | 854 | 1.2 | 17.7 | 0 | 0 |
+| Gameplay 1-1 | 2,226 | 21.6 | 57.7 (1569) | 1,069 | 9.7 |
+| Gameplay 1-2 | 2,692 | 33.4 | 83.9 (3662) | 2,428 | 36.5 |
+| Gameplay 1-3 | 1,536 | 42.1 | 338.5 (6847) | 1,501 | 34.0 |
+| Side-room camera | 816 | 47.6 | 437.4 (5796) | 776 | 22.7 |
+| Room speed below 60 | 405 | 44.5 | 313.5 (6692) | 405 | 9.9 |
+| Clear and upgrade overlays | 424 | 5.1 | 107.8 (5974) | 9 | 0.2 |
+| Front end (last 87) | 87 | 1.3 | 14.7 | 0 | 0 |
 
-Handoffs: splash to menu 222 ms, menu to style select 56 ms, style select to
-1-1 1,426 ms, 1-1 to 1-2 1,157 ms, 1-2 to 1-3 1,155 ms.
+All gameplay: 6,454 updates, mean 31.4 ms, median 30.6 ms, 23% within
+20 ms, 55% at 20–40 ms; its mean span is 33.5 ms, about 30 updates a
+second. Handoffs: style select to 1-1 1,406 ms, 1-1 to 1-2 1,116 ms, 1-2
+to 1-3 1,091 ms (splash and menu fell outside the ring).
 
-The gameplay floor rises within each level. 1-1 starts at the quiet fall's
-4–8 ms, but by frame 400 the cheapest update of each stretch costs 50–100 ms,
-and from frame 272 ten updates in a row exceed 40 ms. 1-2 starts at 22 ms.
-So a per-update cost grows through a level and the level change only partly
-resets it; that is the first owner to find.
+The gameplay floor still rises within each level, much less than before.
+The cheapest update of each 200-update stretch goes from 4 ms to 12–29 ms
+through 1-1, from 16 ms to 20–34 ms through 1-2, and from 17 ms to
+24–42 ms through 1-3; the medians go from 7 to 22–37, 20 to 31–47 and 23
+to 33–58 ms. Each level change resets it.
 
 7. **W3.7 Owners and ranking.** Start with the normal run's rising floor,
    on the shortest workload that shows it: the route from boot to about
