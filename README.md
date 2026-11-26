@@ -7,8 +7,8 @@ the shops on the way down.
 
 The port is written from the Windows Steam release's own program and data: its
 GameMaker bytecode and resources were studied and reimplemented in C and C++ for
-the Amiga, and the port is tested against them. It runs on AGA with the
-original's well, art and palettes, and plays the sound effects on Paula.
+the Amiga, and the port is tested against them. It keeps the original's well,
+art and palettes, and plays the sound effects on Paula.
 
 Current Amiga release: **0.1 (26.11.2026), an early alpha**.
 
@@ -41,7 +41,7 @@ were doing when they happened.
 
 ## Requirements and installation
 
-- An Amiga with AGA and a 68020 or better, Kickstart and Workbench 2.04 or newer.
+- Any Amiga with a 68020 or better, and Kickstart and Workbench 2.04 or newer.
   The game is written for an **A1200 with 4 MB Fast RAM**.
 - About 1 MB of free Chip memory and about 2.5 MB of further free memory (Fast or
   Chip). The game says so and does not start when it is not there.
