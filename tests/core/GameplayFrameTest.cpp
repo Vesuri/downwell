@@ -30,12 +30,6 @@ int main(){
         for(unsigned i=0;i<source.destroyedBlockCount;++i){source.blockX[i]=iteration+i;source.blockY[i]=-int(iteration+i);}
         for(unsigned i=0;i<capacity;++i){retained.blockX[i]=12345;retained.blockY[i]=-54321;}
         retained=source;equal(retained,source);
-#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
-        // Poisoned unused destination entries survive assignment: no capacity
-        // clear/copy is permitted, including when the result contains no events.
-        for(unsigned i=source.destroyedBlockCount;i<capacity;++i)
-            assert(retained.blockX[i]==12345&&retained.blockY[i]==-54321);
-#endif
         GameplayFrame copy(source);equal(copy,source);
         auto& alias=copy;copy=alias;equal(copy,source);
         // A retained result stays a value, not a borrowed next-update buffer.

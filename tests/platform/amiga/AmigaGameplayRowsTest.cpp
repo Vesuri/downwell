@@ -68,9 +68,6 @@ int main() {
         tracker.sync(targets[b],source,b);
         assert(copies.size()==2&&copies[0].y==0&&copies[0].h==8&&
                copies[1].y==rows-8&&copies[1].h==8);
-#if defined(DOWNWELL_ROW_SYNC_AUDIT) && defined(DOWNWELL_FRAME_WORK_CANDIDATE)
-        assert(amigaRowSyncVisited<=48); // The clean middle is not visited.
-#endif
     }
     initialize();
     unsigned random=17;

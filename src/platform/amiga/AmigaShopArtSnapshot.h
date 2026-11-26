@@ -9,19 +9,11 @@ class AmigaShopArtSnapshot {
     bool populated_=false;
 public:
     void capture(const downwell::ShopWorld& shops){
-#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
-        populated_=shops.allocatedCount!=0;
-        if(!populated_)return;
-#endif
         for(unsigned i=0;i<downwell::ShopWorld::capacity;++i)
             revisions_[i]=shops.instances[i].artRevision;
     }
     bool changed(unsigned i,const downwell::ShopWorld::Instance& shop)const{
-#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
         return revisions_[i]!=shop.artRevision;
-#else
-        return (populated_?revisions_[i]:0)!=shop.artRevision;
-#endif
     }
 };
 #endif

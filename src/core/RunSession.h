@@ -598,16 +598,7 @@ struct RunSession {
     unsigned weaponSelectionStreak = 0;
     bool weaponSelectionValid = false, weaponSelectionHigh = false;
     void selectWeaponLevel(const CurrencyAccount& currency) {
-#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
         gemHigh = machineGunProfileForStreak(currency.streak).level != 0;
-#else
-        if(!weaponSelectionValid || weaponSelectionStreak != currency.streak){
-            weaponSelectionHigh = machineGunProfileForStreak(currency.streak).level != 0;
-            weaponSelectionStreak = currency.streak;
-            weaponSelectionValid = true;
-        }
-        gemHigh = weaponSelectionHigh;
-#endif
     }
     // Pickup-only upgrade effects: nonGemGainGem (combo rewards) does not
     // invoke scrRechargeGem. Ownership is sampled at collection, not birth.

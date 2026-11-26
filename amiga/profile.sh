@@ -29,10 +29,7 @@ case "$mode" in
       ready_marker=DOWNWELL_QUIET_LANDED
       if [[ ${TERRAIN_BATCH_VERIFY:-0} == 1 ]]; then
         mkdir -p ../tmp
-        preparation_check=0
-        if [[ ${PREPARED_PATTERN_ROWS:-0} == 1 ]]; then preparation_check=1; fi
         sed -e 's/^set $sPatternVerification = 0$/set $sPatternVerification = 1/' \
-          -e "s/^set \$sPatternPreparationVerification = 0\$/set \$sPatternPreparationVerification = $preparation_check/" \
           profile_quiet_landing.gdb > ../tmp/profile-quiet-pattern-rows.gdb
         script="$PWD/../tmp/profile-quiet-pattern-rows.gdb"
       fi
@@ -272,8 +269,6 @@ restore() {
   unset REFERENCE_INITIAL_RASTER_STORAGE
   unset REFERENCE_ROOM_PREPARE
   unset REFERENCE_TERRAIN_RECORDS
-  unset PREPARED_PATTERN_ROWS
-  unset FRAME_WORK_CANDIDATE
   unset REFERENCE_FIELD_BANK
   unset REFERENCE_FIELD_ADMISSION
   unset REFERENCE_ENTRY_ASSETS

@@ -45,11 +45,10 @@ private:
     unsigned revision_=0;
     unsigned fallbackFirst_=rows,fallbackEnd_=0;
     unsigned shopRevision_[downwell::ShopWorld::capacity]{};
-    bool shopRevisionsPopulated_=false;
 public:
     static constexpr unsigned rows = 8192, words = AmigaGameplayRows::terrainWords;
     static_assert((ringRows&(ringRows-1))==0&&ringRows%16==0&&ringRows<=rows,"ring laps are whole bands");
-#if defined(DOWNWELL_PLATFORM_AMIGA) && !defined(DOWNWELL_PREPARED_PATTERN_ROWS)
+#if defined(DOWNWELL_PLATFORM_AMIGA)
     static constexpr unsigned bandStorageBytes=0;
 #else
     static constexpr unsigned bandStorageBytes=512*sizeof(AmigaPatternRow);
@@ -68,7 +67,6 @@ public:
         for(auto& column:dirty_)for(auto& row:column)row=0;
         for(auto& column:owner_)for(auto& row:column)row=0;
         for(auto& revision:shopRevision_)revision=0;
-        shopRevisionsPopulated_=false;
         return true;
     }
     void releaseStorage(){ready=false;initial_=nullptr;pixels_=nullptr;bands_=nullptr;patternBorrowed_=false;

@@ -14,21 +14,5 @@ struct GameplayFrame {
     unsigned destroyedBlockCount;
     int blockX[downwell::gameplayRepaintCapacity];
     int blockY[downwell::gameplayRepaintCapacity];
-#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
-    GameplayFrame():playerMotion{},ammoChanged(false),healthChanged(false),currencyChanged(false),
-        streakChanged(false),bulletChanged(false),scrolled(false),scrollDelta(0),
-        cameraXChanged(false),cameraXDelta(0),destroyedBlockCount(0){}
-    GameplayFrame(const GameplayFrame& other){*this=other;}
-    GameplayFrame& operator=(const GameplayFrame& other){
-        playerMotion=other.playerMotion;
-        ammoChanged=other.ammoChanged;healthChanged=other.healthChanged;
-        currencyChanged=other.currencyChanged;streakChanged=other.streakChanged;
-        bulletChanged=other.bulletChanged;scrolled=other.scrolled;scrollDelta=other.scrollDelta;
-        cameraXChanged=other.cameraXChanged;cameraXDelta=other.cameraXDelta;
-        destroyedBlockCount=other.destroyedBlockCount;
-        for(unsigned i=0;i<destroyedBlockCount;++i){blockX[i]=other.blockX[i];blockY[i]=other.blockY[i];}
-        return *this;
-    }
-#endif
 };
 #endif

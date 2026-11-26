@@ -439,9 +439,6 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         }
         return true;
     };
-#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
-    if(port.shops().allocatedCount){
-#endif
     downwell::drawShopKeepers(port.shops(), [&](int sprite, unsigned frame, int x, int y) {
         if (!append( sprite, frame,
             downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) ready = false;
@@ -450,9 +447,6 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         if (!append( sprite, frame,
             downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) ready = false;
     });
-#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
-    }
-#endif
 #ifndef DOWNWELL_REPLAY_VERIFY
     for (unsigned index = 0; !compositeCurrency && index < port.gemSlotEnd(); ++index) {
         // Direct Draw depth 10000 precedes bullet 0 and player -50000.

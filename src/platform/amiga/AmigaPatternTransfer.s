@@ -89,29 +89,3 @@ downwellComposePatternBand:
     movem.l (%sp)+,%d7/%a2-%a6
     rts
     .size downwellComposePatternBand,.-downwellComposePatternBand
-
-    .section .text.downwellPreparePatternBand,"ax"
-    .balign 2
-    .globl downwellPreparePatternBand
-    .type downwellPreparePatternBand,@function
-    # void (band, ordinary interleaved row storage, rows).
-    # Same portable pixel oracle as Chip publication, but finish both planes
-    # consecutively in the existing 44-byte cache row before preparing another.
-downwellPreparePatternBand:
-    movem.l %d7/%a3-%a6,-(%sp)
-    move.l 24(%sp),%a0
-    move.l 28(%sp),%a1
-    move.l 32(%sp),%d7
-    beq.w 6f
-    subq.l #1,%d7
-    movem.l (%a0),%a3-%a6
-5:
-    pattern_plane
-    addq.l #4,%a6
-    pattern_plane
-    addq.l #4,%a6
-    dbra %d7,5b
-6:
-    movem.l (%sp)+,%d7/%a3-%a6
-    rts
-    .size downwellPreparePatternBand,.-downwellPreparePatternBand

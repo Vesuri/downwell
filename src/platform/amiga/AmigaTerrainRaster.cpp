@@ -28,16 +28,6 @@ void AmigaTerrainRaster::invalidate(int first, int end) {
 }
 
 void AmigaTerrainRaster::invalidateShops(const downwell::ShopWorld& shops) {
-#ifdef DOWNWELL_FRAME_WORK_CANDIDATE
-    if(!shops.allocatedCount){
-        if(shopRevisionsPopulated_){
-            for(auto& revision:shopRevision_)revision=0;
-            shopRevisionsPopulated_=false;
-        }
-        return;
-    }
-    shopRevisionsPopulated_=true;
-#endif
     for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
         const auto& shop = shops.instances[i];
         if (shop.artRevision == shopRevision_[i]) continue;
@@ -48,15 +38,6 @@ void AmigaTerrainRaster::invalidateShops(const downwell::ShopWorld& shops) {
 
 typedef ULONG RasterLong __attribute__((may_alias));
 
-#if defined(__m68k__) && defined(DOWNWELL_PREPARED_PATTERN_ROWS)
-extern "C" void downwellPreparePatternBand(const AmigaPatternRow*,UWORD*,unsigned);
-#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
-extern "C" {
-extern volatile ULONG gDownwellTerrainBatchFailures,gDownwellPatternTransferChecks;
-volatile ULONG gDownwellPatternPreparationChecks=0;
-}
-#endif
-#endif
 
 unsigned AmigaTerrainRaster::materializePatternRows(unsigned first,unsigned budget){
     if(first>=rows||!budget||!needsPatternMaterialization(first))return 0;
@@ -64,23 +45,10 @@ unsigned AmigaTerrainRaster::materializePatternRows(unsigned first,unsigned budg
     unsigned end=first;
     while(end<rows&&end-first<budget&&(end+8)/16==band&&needsPatternMaterialization(end))++end;
     const auto source=bands_[band].offset((first+8)&15);
-#if defined(__m68k__) && defined(DOWNWELL_PREPARED_PATTERN_ROWS)
-    auto* pixels=writeRows(1,first,end-first);
-    downwellPreparePatternBand(&source,pixels,end-first);
-#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
-    for(unsigned y=0;y<end-first;++y){
-        UWORD expected[22];source.offset(y).write(expected,expected+words);
-        for(unsigned w=0;w<22;++w)if(expected[w]!=pixels[y*22+w])++gDownwellTerrainBatchFailures;
-        ++gDownwellPatternTransferChecks;
-        ++gDownwellPatternPreparationChecks;
-    }
-#endif
-#else
     for(unsigned y=0;y<end-first;++y){
         auto* target=writeRows(1,first+y,1);
         source.offset(y).write(target,target+words);
     }
-#endif
     return end-first;
 }
 

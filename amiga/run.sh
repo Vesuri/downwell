@@ -34,7 +34,7 @@ else
   exec 9>>../tmp/amiga.lock
   # Development-only defines (amiga-knobs.py's verify, profile, reference
   # and development sets): such a build needs more memory than the target.
-  development='_VERIFY$|_AUDIT$|CENSUS|PROBE|FPSCOUNT|PROFILE_|PHASE_SAMPLING|GENERATION_|TRACE_FRAMES|FRAME_DUMP|SAMPLE_FRAME|REFERENCE_|COLLISION_OWNER|SCENE_COLLISION_BACKEND|FRAME_WORK_CANDIDATE|SKIP_'
+  development='_VERIFY$|_AUDIT$|CENSUS|PROBE|FPSCOUNT|PROFILE_|PHASE_SAMPLING|GENERATION_|TRACE_FRAMES|FRAME_DUMP|SAMPLE_FRAME|REFERENCE_|COLLISION_OWNER|SCENE_COLLISION_BACKEND|SKIP_'
   why=""
   if ! python3 ../tools/hold-lock.py 9 --try; then
     why="a check is rebuilding out/"

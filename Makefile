@@ -84,9 +84,6 @@ endif
 ifeq ($(REFERENCE_CONTACT_SPRITE_BOUNDS),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_SPRITE_BOUNDS
 endif
-# The host runs the parked frame-work candidate (section 0 D); the Amiga
-# build keeps the measured production path unless FRAME_WORK_CANDIDATE=1.
-CXXFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -1714,21 +1711,19 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp t
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
 FRAME_WORK_TEST_SOURCES = tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp
-build/frame-work-test build/frame-work-reference-test: $(FRAME_WORK_TEST_SOURCES) $(wildcard src/core/*.h tests/core/*.h)
+build/frame-work-test: $(FRAME_WORK_TEST_SOURCES) $(wildcard src/core/*.h tests/core/*.h)
 	@mkdir -p build
-	$(CXX_LINK) -Isrc $(CXXFLAGS) -DDOWNWELL_FRAME_WORK_TEST $(if $(findstring reference,$@),-UDOWNWELL_FRAME_WORK_CANDIDATE) -o $@ $(FRAME_WORK_TEST_SOURCES)
+	$(CXX_LINK) -Isrc $(CXXFLAGS) -DDOWNWELL_FRAME_WORK_TEST -o $@ $(FRAME_WORK_TEST_SOURCES)
 .PHONY: test-frame-work
-test-frame-work: build/frame-work-test build/frame-work-reference-test
+test-frame-work: build/frame-work-test
 	./build/frame-work-test
-	./build/frame-work-reference-test
 
-build/gameplay-frame-test build/gameplay-frame-reference-test: tests/core/GameplayFrameTest.cpp src/core/GameplayFrame.h src/core/GameplayLimits.h src/core/PlayerMotion.h
+build/gameplay-frame-test: tests/core/GameplayFrameTest.cpp src/core/GameplayFrame.h src/core/GameplayLimits.h src/core/PlayerMotion.h
 	@mkdir -p build
-	$(CXX_LINK) -Isrc $(CXXFLAGS) $(if $(findstring reference,$@),-UDOWNWELL_FRAME_WORK_CANDIDATE) -o $@ $<
+	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: test-gameplay-frame
-test-gameplay-frame: build/gameplay-frame-test build/gameplay-frame-reference-test
+test-gameplay-frame: build/gameplay-frame-test
 	./build/gameplay-frame-test
-	./build/gameplay-frame-reference-test
 test: test-gameplay-frame
 
 # Native enemy updates cross-checked against the walks they replace, and

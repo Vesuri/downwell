@@ -58,9 +58,6 @@ REFERENCE_DRAW_LIST ?= 0
 # 1 keeps GameplayCollisionOwner and the registered-family session in the
 # normal build: the owned A/B reference for WR.5. 0 ships the compact world.
 COLLISION_OWNER ?= 0
-# Parked section 0 D candidate (counted destruction results, empty-family
-# admission, packed row debts); 0 is the production path.
-FRAME_WORK_CANDIDATE ?= 0
 REFERENCE_VALIDATION ?= 0
 REFERENCE_ANIMATION ?= 0
 REFERENCE_GENERATED_BOXES ?= 0
@@ -70,9 +67,6 @@ REFERENCE_ROOM_PREPARE ?= 0
 # 1 selects the retained per-span terrain owners, the oracle for the
 # source-record owner (see "Source-record terrain owner" in the audit).
 REFERENCE_TERRAIN_RECORDS ?= 0
-# Parked section 0 C candidate (prepared pattern rows, paint-ahead); 0 is
-# the production row painter.
-PREPARED_PATTERN_ROWS ?= 0
 REFERENCE_FIELD_BANK ?= 0
 REFERENCE_FIELD_ADMISSION ?= 0
 REFERENCE_ENTRY_ASSETS ?= 0
@@ -170,8 +164,8 @@ $(error PROFILE_OVERFLOW requires ordinary autorun with SKIP_TO_GAME=1 and no ot
 endif
 endif
 endif
-ifneq ($(REFERENCE_FRAME_WORK)$(REFERENCE_ROW_PAINTING),)
-$(error REFERENCE_FRAME_WORK and REFERENCE_ROW_PAINTING were renamed: use FRAME_WORK_CANDIDATE=1 and PREPARED_PATTERN_ROWS=1 for the candidates)
+ifneq ($(REFERENCE_FRAME_WORK)$(REFERENCE_ROW_PAINTING)$(FRAME_WORK_CANDIDATE)$(PREPARED_PATTERN_ROWS),)
+$(error the frame-work and prepared-pattern-row candidates were retired on 26.11.2026 (docs/open-work.md, W3 closed approaches))
 endif
 # WR.3: -Os by default, the per-update hot paths at -O2. On the A500 the
 # quiet fall takes 227 fields this way, 200 at -O3, 211 at -O2 and 261 at
@@ -417,9 +411,6 @@ endif
 ifeq ($(REFERENCE_DRAW_LIST),1)
 CFLAGS += -DDOWNWELL_REFERENCE_DRAW_LIST
 endif
-ifeq ($(FRAME_WORK_CANDIDATE),1)
-CFLAGS += -DDOWNWELL_FRAME_WORK_CANDIDATE
-endif
 ifeq ($(COLLISION_OWNER),1)
 CFLAGS += -DDOWNWELL_COLLISION_OWNER
 endif
@@ -521,9 +512,6 @@ CFLAGS += -DDOWNWELL_EFFECT_CLEAR_VERIFY
 endif
 ifeq ($(EFFECT_PIXEL_VERIFY),1)
 CFLAGS += -DDOWNWELL_EFFECT_PIXEL_VERIFY
-endif
-ifeq ($(PREPARED_PATTERN_ROWS),1)
-CFLAGS += -DDOWNWELL_PREPARED_PATTERN_ROWS
 endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
 CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
@@ -897,7 +885,6 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(AMIGA_HOT_OPTIMIZATION) $(AMIGA_HOT_OBJECTS)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DRAW_LIST)' >> $@.tmp
-	@printf '%s\n' '$(FRAME_WORK_CANDIDATE)' >> $@.tmp
 	@printf '%s\n' '$(COLLISION_OWNER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_VALIDATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
@@ -914,7 +901,6 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER_STORAGE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_PREPARE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_TERRAIN_RECORDS)' >> $@.tmp
-	@printf '%s\n' '$(PREPARED_PATTERN_ROWS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_ADMISSION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp

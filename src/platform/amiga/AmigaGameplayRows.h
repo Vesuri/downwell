@@ -7,11 +7,7 @@ class Bitmap;
 // Independent debts to the private terrain backing for two display rings.
 // Physical row coordinates are used here, never camera/world coordinates.
 class AmigaGameplayRows {
-#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     unsigned char dirty_[downwellGameRingHeight]{};
-#else
-    AmigaRowDebt<downwellGameRingHeight> debt_[2];
-#endif
     bool pending_[2]{}, initialized_[2]{}, queued_{};
     unsigned first_[2]{downwellGameRingHeight, downwellGameRingHeight};
     unsigned end_[2]{};
@@ -22,11 +18,7 @@ public:
     void reset();
     void damage(unsigned origin, unsigned y, unsigned height, unsigned char buffers = 3);
     bool dirty(unsigned row, unsigned buffer) const {
-#ifndef DOWNWELL_FRAME_WORK_CANDIDATE
         return (dirty_[row] & (1u << buffer)) != 0;
-#else
-        return debt_[buffer].contains(row);
-#endif
     }
     // Nonwrapping physical span already copied by the pipelined terrain path.
     // The pending range may
