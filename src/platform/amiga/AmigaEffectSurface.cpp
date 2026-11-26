@@ -298,19 +298,31 @@ bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
     SerialBlit timed(effectBlitPublish);
 #endif
     if constexpr(interleaved){
-        Bitmap mask(boundStorage,192,284,1,false,false,576);
-        Bitmap low(boundStorage+rowBytes,192,284,1,false,false,576);
-        Bitmap high(boundStorage+rowBytes*2,192,284,1,false,false,576);
-        Bitmap targetLow(display.data,downwellDmaWidth,downwellGameRingHeight,1,false,false,downwellDmaWidth);
-        Bitmap targetHigh(static_cast<UBYTE*>(display.data)+downwellGameRingPlaneBytes,
-            downwellDmaWidth,downwellGameRingHeight,1,false,false,downwellDmaWidth);
+        // Bitmap::copyWithMask's registers for these copies: rectangles are
+        // whole surface words (x and width multiples of 16) and the surface's
+        // guard word puts x at bit 16, so source and mask are word aligned and
+        // the playfield's x (14 bits into a word) is the only shift. Each
+        // row copies one extra word, cut by the zero last-word mask.
+        static_assert(downwellPlayfieldX%16==14&&downwellDmaWidth%16==0,"publish registers assume this layout");
+        constexpr unsigned surfaceRow=rowBytes*3,targetRow=downwellDmaWidth/8,shift=downwellPlayfieldX%16;
+        constexpr uint16_t con0=BC0F_SRCA|BC0F_SRCB|BC0F_SRCC|BC0F_DEST|0xca|(shift<<12),con1=shift<<12;
+        auto* target=static_cast<UBYTE*>(display.data);
         surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
             rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
+            const unsigned words=width/16+1;
+            const int16_t surfaceModulo=int16_t(surfaceRow-words*2),targetModulo=int16_t(targetRow-words*2);
             unsigned destination=UWORD(origin+y)%downwellGameRingHeight;
             while(height){
                 const unsigned count=height<downwellGameRingHeight-destination?height:downwellGameRingHeight-destination;
-                targetLow.copyWithMask(low,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
-                targetHigh.copyWithMask(high,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
+                UBYTE* alpha=boundStorage+ULONG(UWORD(y))*UWORD(surfaceRow)+2+x/8;
+                UBYTE* plane=target+ULONG(UWORD(destination))*UWORD(targetRow)+(downwellPlayfieldX/16)*2+x/8;
+                AmigaHardware::MaskedBlit blit{reinterpret_cast<uint16_t*>(alpha),
+                    reinterpret_cast<uint16_t*>(alpha+rowBytes),reinterpret_cast<uint16_t*>(plane),
+                    surfaceModulo,surfaceModulo,targetModulo,con0,con1,0xffff,0,uint16_t((count<<6)|words)};
+                AmigaHardware::blitterMasked(blit);
+                blit.pixels=reinterpret_cast<uint16_t*>(alpha+rowBytes*2);
+                blit.destination=reinterpret_cast<uint16_t*>(plane+downwellGameRingPlaneBytes);
+                AmigaHardware::blitterMasked(blit);
                 height-=count;y+=count;destination=0;
             }
         });
