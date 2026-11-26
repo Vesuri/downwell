@@ -2480,7 +2480,11 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     // period (variant/40). Shots draw RNG, so every policy change reshuffles
     // the whole route; DOWNWELL_SLICE_VARIANT sweeps them (and
     // DOWNWELL_SLICE_OUTPUT redirects the tape) when re-searching.
-    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):119u;
+    // Default autopilot variants: the plain world-one route (re-searched
+    // when frog and shard motion changed), hard-mode-death and the spray
+    // profile route.
+    const unsigned defaultVariant=hardRoute||std::getenv("DOWNWELL_SLICE_SPRAY")?119u:9u;
+    const unsigned variant=std::getenv("DOWNWELL_SLICE_VARIANT")?unsigned(std::atoi(std::getenv("DOWNWELL_SLICE_VARIANT"))):defaultVariant;
     const bool hover=!std::getenv("DOWNWELL_SLICE_NO_HOVER");
     const bool shopTour=std::getenv("DOWNWELL_SLICE_SHOP_TOUR")!=nullptr;
     // W1.9 coverage (DOWNWELL_SLICE_MODULE_SHOT): with Reverse Engineering,
@@ -3143,7 +3147,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         routeName=hardRoute?"hard-upgrade":"upgrade";
         for(unsigned id:slicePicks)routeName+="-"+std::to_string(id);
     }
-    if(variant!=119u||shopTour||moduleShot||upgradeRoute)routeName+="-v"+std::to_string(variant);
+    if(variant!=defaultVariant||shopTour||moduleShot||upgradeRoute)routeName+="-v"+std::to_string(variant);
     if(shopTour)routeName+="-tour";
     if(moduleShot)routeName+="-shot";
     sounds.flush(); // complete even when a check below fails (route sweeps)

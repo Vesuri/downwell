@@ -23,6 +23,7 @@
 #include "core/AlarmBank.h"
 #include "core/FrogBehavior.h"
 #include "core/FrogMotion.h"
+#include "core/FrogSourceStep.h"
 #include "core/StandardBulletStep.h"
 #include "core/StandardBulletImpact.h"
 #include "core/PlayerLifeRules.h"
@@ -1368,6 +1369,14 @@ bool GameplayWorld::timeShardOutsideView(downwell::RunnerImageValue publishedY,b
     retire=order>0;return true;
 }
 
+// The compact shards' published y is a whole pixel; the view top is
+// boneViewTopQ8_/256 as above, and the comparisons are exact.
+bool GameplayWorld::timeShardOutsideView(std::int32_t publishedY,bool& retire)const{
+    if(!run_.effectsSucceeded)return false;
+    const long top=boneViewTopQ8_/256;
+    retire=publishedY<top||publishedY>top+320;return true;
+}
+
 bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publishedCameraX,long generationCameraY)
 {
     auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(key));
@@ -1471,24 +1480,50 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
         downwell::FrogVerticalMotion vertical{
             enemy.preciseY * 5 + enemy.gravityPositionRemainder,
             enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
-        const auto effects = downwell::stepFrogMotion(enemy.frogHorizontal, vertical,
-            enemy.frogHit, integrate, [this](int x, int y) {
-                return solidResolver_(solidResolverContext_, x, y);
-            },[this,&enemy]{
-            enemy.auxiliaryState = 0;
-            enemy.alarm0 = 0;
-            enemy.alarm1 = 60;
-            enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
-            if(!publishEnemyImage(enemy,0))return false;
-            enemy.imagePhase = 0;
-            enemy.imageRemainder = 0;
-            return true;
-        },[this,&enemy](int scale){
-            if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
-            enemy.facing=scale;return true;
-        },[&enemy](bool grounded){
-            if(downwell::frogLandingEdge(grounded,enemy.frogLanded))enemy.alarm1=60;
-        });
+        struct FrogOps {
+            GameplayWorld& world;EnemyState& enemy;
+            // Mask 166 (symmetric, so image_xscale does not move it) at room
+            // offsets: x in Q16, y in fifths of Q8, whose fraction maps to
+            // Q16 exactly at whole pixels and halves.
+            bool meeting(int object,std::int32_t x,std::int32_t y,bool& hit){
+                std::int32_t whole=y/1280,fraction=y%1280;
+                if(fraction<0){fraction+=1280;--whole;}
+                downwell::ContactBounds bounds;
+                if(!downwell::CurrencyCollisionBounds::calculateMaskQ16(
+                       downwell::enemyContactMask(113,enemy.spriteId),x+240*65536,
+                       (whole+176)*65536+fraction*256/5,bounds))
+                    return world.run_.effectsSucceeded=false;
+                if(object==57)return world.steeringWallContact(bounds,hit);
+                if(object==56)return world.solidContact(bounds,true,hit);
+                // parentThinwall 87: rmMain's only thin walls are the
+                // generated platforms; worlds without the platform resolver
+                // (host fixtures) have none, as solidContact assumes.
+                if(object!=87||!world.currencyOnlyPlatforms_)return world.run_.effectsSucceeded=false;
+                hit=false;
+                return !world.platformContactResolver_||
+                    world.platformContactResolver_(world.solidResolverContext_,bounds,hit)||
+                    (world.run_.effectsSucceeded=false);
+            }
+            bool hit(){
+                enemy.auxiliaryState = 0;
+                enemy.alarm0 = 0;
+                enemy.alarm1 = 60;
+                enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
+                if(!world.publishEnemyImage(enemy,0))return false;
+                enemy.imagePhase = 0;
+                enemy.imageRemainder = 0;
+                return true;
+            }
+            bool scale(int sign){
+                if(!world.publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,sign))return false;
+                enemy.facing=sign;return true;
+            }
+            void landing(bool grounded){
+                if(downwell::frogLandingEdge(grounded,enemy.frogLanded))enemy.alarm1=60;
+            }
+        } ops{*this,enemy};
+        downwell::FrogSourceStep source;
+        const auto effects = source.step(enemy.frogHorizontal, vertical, enemy.frogHit, integrate, ops);
         enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
         enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
         enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
@@ -4323,11 +4358,16 @@ bool GameplayWorld::beginCompactTimeStop(int publishedX,int publishedY){
     return true;
 }
 
-bool GameplayWorld::stepTimeShards(downwell::TimeShardEffects<downwell::gameplayCompactShardCapacity>::Phase phase){
+bool GameplayWorld::stepTimeShards(decltype(timeStop_.shards)::Phase phase){
     const bool ok=timeStop_.shards.step(phase,stopped(),enemyRandom_,
-        [this](auto,const downwell::TimeShardAnimation&,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
-            return solidMeeting(91,x,y,true,hit);
-        },[this](auto,const auto& effect,bool& retire){return timeShardOutsideView(effect.y,retire);});
+        [this](auto,const downwell::TimeShardParticle&,std::int32_t x,std::int32_t y,bool& hit){
+            downwell::ContactBounds bounds; // sprite 91's mask from the Q16 position
+            if(!run_.effectsSucceeded||!downwell::CurrencyCollisionBounds::calculateMaskQ16(91,x,y,bounds))
+                return run_.effectsSucceeded=false;
+            return solidContact(bounds,true,hit);
+        },[this](auto,const downwell::TimeShardParticle& effect,bool& retire){
+            return timeShardOutsideView(effect.y.v,retire);
+        });
     return (ok&&run_.effectsSucceeded)||(run_.effectsSucceeded=false);
 }
 
@@ -4339,7 +4379,7 @@ bool GameplayWorld::collideTimeShards(){
     const auto l=downwell::contactSpriteBounds(91);
     std::uint32_t touched[downwell::gameplayCompactShardCapacity];unsigned count=0;
     bool valid=true;
-    timeStop_.shards.visitNewest([&](std::uint32_t handle,const downwell::TimeShardAnimation& shard){
+    timeStop_.shards.visitNewest([&](std::uint32_t handle,const downwell::TimeShardParticle& shard){
         std::int32_t sx,sy;
         if(!shard.x.roundPixel(sx)||!shard.y.roundPixel(sy)){valid=false;return;}
         if(!shard.noTouch&&downwell::contactBoundsOverlap(player,{sx+l.left,sx+l.right,sy+l.top,sy+l.bottom}))

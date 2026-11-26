@@ -1180,6 +1180,7 @@ public:
     bool retireTimeShardRoomEffect(downwell::InstanceHandle key);
     bool collideTimeShardRoomEffect(downwell::InstanceHandle key);
     bool timeShardOutsideView(downwell::RunnerImageValue publishedY,bool& retire);
+    bool timeShardOutsideView(std::int32_t publishedY,bool& retire)const;
     template<class Outside> bool stepTimeShardRoomEffect(downwell::InstanceHandle key,bool stopped,Outside outside){
         return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
             timeShardInstances_->dispatchStep(key,*timeShardEffects_,stopped,enemyRandom_,outside);
@@ -3349,7 +3350,7 @@ private:
     // scrTimeShard's fxTimeShard 238 and fxTimeChange 211's room-speed ramp.
     // Field queries use integer contact rectangles against the serialized
     // 82/255/371 masks instead of the runner's per-pixel sampling.
-    downwell::TimeStopEffects<downwell::gameplayCompactShardCapacity> timeStop_;
+    downwell::TimeStopEffects<downwell::gameplayCompactShardCapacity,downwell::TimeShardParticle> timeStop_;
     unsigned pauseMilliseconds_=0;
     struct FieldHit{bool hit=false;int x=0,y=0;};
     bool compactTimeStop()const{return compactTimeStopAdmitted&&!playerTimeTransition_;}
@@ -3366,7 +3367,7 @@ private:
     bool timeStopBound(const downwell::ContactBounds& bounds,int x)const;
     bool timeStopBound(int sprite,int x,int y)const;
     bool beginCompactTimeStop(int publishedX,int publishedY);
-    bool stepTimeShards(downwell::TimeShardEffects<downwell::gameplayCompactShardCapacity>::Phase phase);
+    bool stepTimeShards(decltype(timeStop_.shards)::Phase phase);
     using TimeChangePhase=decltype(timeStop_.changes.beginPhase());
     using TimeShardPhase=decltype(timeStop_.shards.beginPhase());
     bool advanceTimeEffectAlarm(TimeChangePhase changePhase,TimeShardPhase shardPhase,unsigned alarm);
@@ -3460,7 +3461,7 @@ public:
     bool timeStopped()const{return stopped();}
     int roomSpeed()const{return timeStop_.roomSpeed;}
     unsigned takePauseMilliseconds(){const unsigned ms=pauseMilliseconds_;pauseMilliseconds_=0;return ms;}
-    const downwell::TimeShardEffects<downwell::gameplayCompactShardCapacity>& compactTimeShards()const{return timeStop_.shards;}
+    const decltype(timeStop_.shards)& compactTimeShards()const{return timeStop_.shards;}
     int gunType()const{return run_.gunType;}
     int aimAngle()const{return aimAngle_;}
     // Current builder art for one generated scenery decoration, by its

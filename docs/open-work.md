@@ -187,18 +187,14 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     Decide what these checks compare against (native frames reviewed and
     pinned, or a host reference brought up to the world-1 features), then
     find why the gem-high fixture no longer reaches gem high.
-19. **Frogs fall through thin platforms.** The frog (113) still moves with
-    the provisional point query of `FrogVerticalMotion`/`FrogMotion`
-    against `solidResolver_`, which sees only walls and breakables (60,
-    92). `enmFrog` Step runs `scrCheckCollisionWith(87)` (thin platforms,
-    landing only when not already inside a `parentThinwall`), then
-    `scrCheckCollisionWith(57)`, then `place_meeting(xx, yy + 1,
-    sParentSolid)` for `grounded`, all with mask 166. Seen in play: a
-    frog falling below the thin platform it stood on. Move it onto
-    `CheckCollisionWithScript` (as the white jelly, bat and eyefish are),
-    keeping the current step as its reference, then search the routes
-    again: frog motion moves every route that meets one. Of the world-1
-    families only the frog collides with 87.
+19. **The compact bullets can run out.** `birthBullet` fails the whole
+    gameplay step when all `gameplayCompactBulletCapacity` (32) slots are
+    live: the world-one slice at `DOWNWELL_SLICE_VARIANT=154` stops at 1-3
+    tick 8671 firing the shotgun (sprite 473) after picking upgrade 5. The
+    original has no such limit. Find the live-bullet bound per gun, style
+    and upgrade (pellets per shot, lifetime, fire rate) and size the pool
+    from it, or retire the oldest bullet as an explicit, documented
+    approximation.
 
 ### WM. Music (deferred)
 
@@ -369,8 +365,8 @@ resets it; that is the first owner to find.
     - gem high: up to nine afterimage BOBs with two RNG draws each, and the
       streak block recomposed and published every update; `currencyText`
       while it counts; the Timer's 16 HUD rows while shown;
-    - time-stop: up to 20 binary64 time shards with a solid query each, the
-      y-sorted field index for the player and every enemy, and
+    - time-stop: up to 20 time shards (Q16) with three or more
+      `sParentSolid` queries each, the y-sorted field index for the player and every enemy, and
       `TimeStopBound` for casings, debris, moving effects and TorchFires;
     - deaths: up to 16 corpses, each a `TimeStopBound` and two mask-599
       wall queries per update; a bullet or casing at a wall steps up to 101
@@ -404,7 +400,15 @@ resets it; that is the first owner to find.
     `ScriptSpawnEffect` and `MovingFx` remain the registered forms and
     oracle); the compact debris, gem and corpse animations (debris and gems
     on `Binary32Timeline`, bit-exact; compact corpses skip their one-frame
-    timeline).
+    timeline); the compact time shards (`TimeShardParticle`, Q16 position
+    and velocity, whole published pixels, the burst's direction and speed
+    from `FixedTrig`; `TimeShardAnimation` remains the registered form and
+    oracle, compared in `verify-time-shard-particle`). On the spray route's
+    first side room this took update 987 (the exit burst) from 82.4 to
+    45.2 ms, 875 from 57.8 to 31.9 ms and 988-1009 from 46-57 to 35-45 ms
+    on the A1200; those updates are now the shard queries (about 4 ms), the
+    actors' draw (11 ms, 3 ms of it bordered glyphs drawn by the CPU), the
+    time-field overlay (4.5 ms) and the rows.
     Converting at an owner's boundary pays only where trig dominates: for
     drawFx placement it cost as much as it saved (rejected, see the frame
     cost audit). So the remaining owners convert their stored state (positions

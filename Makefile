@@ -925,6 +925,13 @@ verify-debris-particle: build/debris-particle-test
 build/debris-particle-test: tests/core/DebrisParticleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/DebrisParticleTest.cpp src/core/GameMakerRandom.cpp
+.PHONY: verify-time-shard-particle
+test: verify-time-shard-particle
+verify-time-shard-particle: build/time-shard-particle-test
+	./build/time-shard-particle-test
+build/time-shard-particle-test: tests/core/TimeShardParticleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardParticleTest.cpp src/core/GameMakerRandom.cpp
 .PHONY: verify-white-jelly-fixed
 test: verify-white-jelly-fixed
 verify-white-jelly-fixed: build/white-jelly-fixed-test
@@ -2295,7 +2302,7 @@ build/gem-homing-test: tests/core/GemHomingTest.cpp src/core/GemHoming.h src/cor
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/GemHomingTest.cpp
 
-build/frog-behavior-test: tests/core/FrogBehaviorTest.cpp src/core/FrogBehavior.h src/core/FrogMotion.h src/core/FrogHitState.h src/core/FractionalMotion.h src/core/FrogHorizontalMotion.h src/core/FrogVerticalMotion.h src/core/EnemyContact.h
+build/frog-behavior-test: tests/core/FrogBehaviorTest.cpp src/core/FrogBehavior.h src/core/FrogMotion.h src/core/FrogSourceStep.h src/core/CheckCollisionUnits.h src/core/FrogHitState.h src/core/FractionalMotion.h src/core/FrogHorizontalMotion.h src/core/FrogVerticalMotion.h src/core/EnemyContact.h
 	@mkdir -p build
 	$(CXX_LINK) -Isrc $(CXXFLAGS) -o $@ tests/core/FrogBehaviorTest.cpp
 
@@ -3895,13 +3902,13 @@ test: verify-terrain-ownership
 # W1.9 upgrade routes: upgrade-<ids>-v<variant> picks the first offered ID of
 # the list at each clear (DOWNWELL_SLICE_PICK) and checks those upgrades'
 # effects instead of the default route's coverage.
-UPGRADE_ROUTES := upgrade-0-18-v58 upgrade-5-9-v53 upgrade-3-v58 upgrade-11-v18 upgrade-8-v17 upgrade-15-v2 upgrade-1-v682-shot upgrade-17-v16 upgrade-22-v25 upgrade-12-v155
+UPGRADE_ROUTES := upgrade-0-18-v13 upgrade-5-9-v73 upgrade-3-v9 upgrade-11-v5 upgrade-8-v9 upgrade-15-v2 upgrade-1-v5-shot upgrade-17-v9 upgrade-22-v94 upgrade-12-v0
 # W2.6 coverage routes: other slice variants (DOWNWELL_SLICE_VARIANT; -tour
 # adds DOWNWELL_SLICE_SHOP_TOUR, a climb onto the shop's cases after the
 # visit; -shot adds DOWNWELL_SLICE_MODULE_SHOT, shooting a resting gun
 # module down with Reverse Engineering), picked so that every world-1 sound the core requests plays on some
 # route. The pause menu's sounds are on the native menus route.
-SOUND_COVERAGE_ROUTES := world-one-v1150-tour hard-mode-death-v80-tour hard-mode-death-v195 hard-mode-death-v514 hard-mode-death-v294-tour hard-mode-death-v157-tour \
+SOUND_COVERAGE_ROUTES := world-one-v185-tour hard-mode-death-v76-tour hard-mode-death-v30 hard-mode-death-v114 hard-mode-death-v101-tour hard-mode-death-v17-tour \
 	$(UPGRADE_ROUTES)
 # W2.3 sound routes: each route's SoundRequests summary against
 # tests/data/sound-routes/<route>.summary (DOWNWELL_WRITE_SOUND_ROUTES=1

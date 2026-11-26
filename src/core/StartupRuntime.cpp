@@ -20,6 +20,8 @@
 #include "CurrencyStep.h"
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
+#include "FrogSourceStep.h"
+#include "CurrencyCollisionBounds.h"
 #include "StandardBulletStep.h"
 #include "ProjectilePublication.h"
 #include "StandardBulletImpact.h"
@@ -1298,25 +1300,63 @@ void StartupRuntime::updateMainEnemy(InstanceRecord& enemy) {
             enemy.frogMotionInitialized = true;
         }
         enemy.frogVertical.grounded = enemy.grounded;
-        const auto effects = stepFrogMotion(enemy.frogHorizontal, enemy.frogVertical,
-            enemy.frogHit, integrate, [this](int x, int y) {
-                return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y);
-            },[this,index,&enemy]{
-            enemy.auxiliaryState = 0;
-            enemy.alarms.set(0, 0);
-            enemy.alarms.set(1, 60);
-            enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
-            if(!publishMainEnemyImage(index,0))return false;
-            enemy.imageIndex = 0;
-            enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
-            ++soundPlayRequests_;
-            return true;
-        },[this,index,&enemy](int scale){
-            if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
-            enemy.scaleX=static_cast<float>(scale);return true;
-        },[&enemy](bool grounded){
-            if(frogLandingEdge(grounded,enemy.frogLanded))enemy.alarms.set(1,60);
-        });
+        // enmFrog Step with its source collisions (FrogSourceStep), as the
+        // compact world: mask 166 against parentThinwall 87 (objThinPlatform
+        // 93), parentWall 57 (walls 60/92/293 and the shop walls) and
+        // sParentSolid 56 (both).
+        struct FrogOps {
+            StartupRuntime& world;InstanceRecord& enemy;std::size_t index;
+            bool meeting(int object,std::int32_t x,std::int32_t y,bool& hit){
+                std::int32_t whole=y/1280,fraction=y%1280;
+                if(fraction<0){fraction+=1280;--whole;}
+                ContactBounds bounds;
+                if(!CurrencyCollisionBounds::calculateMaskQ16(
+                       enemyContactMask(113,enemy.spriteId,enemy.maskId),
+                       x+std::int32_t(world.mainPlayerOriginX_)*65536,
+                       (whole+std::int32_t(world.mainPlayerOriginY_))*65536+fraction*256/5,bounds))
+                    return world.run_.effectsSucceeded=false;
+                const bool walls=object!=87,platforms=object!=57;
+                bool found=false;
+                for(std::size_t i=0;i<world.instances_.size()&&!found;++i){
+                    const auto& tile=world.instances_.at(i);
+                    if(!tile.active||tile.destroyRequested)continue;
+                    const int id=tile.objectId;
+                    if(walls&&(id==60||id==92||id==293)){
+                        if((tile.scaleX!=1&&tile.scaleX!=-1)||(tile.scaleY!=1&&tile.scaleY!=-1)||tile.rotation!=0)
+                            return world.run_.effectsSucceeded=false;
+                        found=contactBoundsOverlap(bounds,contactWorldBounds({long(tile.x)*256,long(tile.y)*256,
+                            int(tile.scaleX),int(tile.scaleY),id==293?569:585}));
+                    }else if(platforms&&id==93){
+                        // sprThinPlatform mask 49: origin 12,12; margins 4,4..19,5.
+                        const int px=int(tile.x),py=int(tile.y);
+                        found=contactBoundsOverlap(bounds,{px-8,px+8,py-8,py-6});
+                    }
+                }
+                if(!found&&walls&&!world.run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))
+                    return world.run_.effectsSucceeded=false;
+                hit=found;return true;
+            }
+            bool hit(){
+                enemy.auxiliaryState = 0;
+                enemy.alarms.set(0, 0);
+                enemy.alarms.set(1, 60);
+                enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
+                if(!world.publishMainEnemyImage(index,0))return false;
+                enemy.imageIndex = 0;
+                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
+                ++world.soundPlayRequests_;
+                return true;
+            }
+            bool scale(int sign){
+                if(!world.publishMainEnemyTransform(index,RunnerTransformField::scaleX,sign))return false;
+                enemy.scaleX=static_cast<float>(sign);return true;
+            }
+            void landing(bool grounded){
+                if(frogLandingEdge(grounded,enemy.frogLanded))enemy.alarms.set(1,60);
+            }
+        } ops{*this,enemy,index};
+        FrogSourceStep source;
+        const auto effects = source.step(enemy.frogHorizontal, enemy.frogVertical, enemy.frogHit, integrate, ops);
         enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
         enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
         enemy.grounded = enemy.frogVertical.grounded;

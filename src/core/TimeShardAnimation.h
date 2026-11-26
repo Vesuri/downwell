@@ -4,7 +4,10 @@
 #include "EffectSequenceAnimation.h"
 namespace downwell {
 struct TimeShardAnimation : TimeShardMotion {
+    static constexpr bool fixedPoint=false;
     RunnerImageValue timeline{};
+    // TimeShardEffects' slot position before Create.
+    bool place(MotionBinary64 px,MotionBinary64 py){return x.assign(px)&&y.assign(py);}
     template<class Random> bool create(MotionBinary64 px,MotionBinary64 py,bool lowSpec,Random& random){
         if(!TimeShardMotion::create(px,py,lowSpec,random))return false;
         timeline={};return true;

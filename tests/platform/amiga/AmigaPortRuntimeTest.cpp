@@ -1190,6 +1190,13 @@ int main() {
             "preparation retains the idle animation rate");
     for (unsigned frame = 0; frame < 60; ++frame)
         frog.step(0);
+    // enmFrog Step: on the alarm's launch update place_meeting(xx, yy + 1,
+    // sParentSolid) still meets the ground with ysp < 0, which leaves
+    // grounded set and skips xx += xsp; the frog is airborne one update on.
+    require(frog.enemyAt(0).grounded && frog.enemyAt(0).speedY < 0 &&
+                frog.enemyAt(0).preciseX == 40L * 256L,
+            "frog alarm's launch update keeps the source grounded latch");
+    frog.step(0);
     require(!frog.enemyAt(0).grounded &&
                 frog.enemyAt(0).auxiliaryState == 0 &&
                 frog.enemyAt(0).speedY < 0 &&
@@ -1296,13 +1303,14 @@ int main() {
     require(fractionalLanding.configureEnemy(0, 113, 166, 40, 0,
                 0, 0, 35, 20, 0, 0, -1, -1), "configure fractional frog landing");
     for (unsigned i = 0; i < 4; ++i) fractionalLanding.step(0);
-    require(fractionalLanding.enemyAt(0).grounded &&
-                fractionalLanding.enemyAt(0).gravityPositionRemainder == 2,
-            "whole-pixel provisional landing movement preserves the position fraction");
+    // scrCheckCollisionWith places a vertical contact at a whole pixel.
+    require(fractionalLanding.enemyAt(0).grounded && fractionalLanding.enemyAt(0).preciseY == 256 &&
+                fractionalLanding.enemyAt(0).gravityPositionRemainder == 0,
+            "source landing contact settles on a whole pixel");
     const long restingY = fractionalLanding.enemyAt(0).preciseY;
     fractionalLanding.step(0);
     require(fractionalLanding.enemyAt(0).preciseY == restingY &&
-                fractionalLanding.enemyAt(0).gravityPositionRemainder == 2,
+                fractionalLanding.enemyAt(0).gravityPositionRemainder == 0,
             "resting on support preserves complete position, not just Q8 whole");
     unsupportedFrog.configureSolidResolver(flatGround, nullptr);
     require(unsupportedFrog.configureEnemy(0, 113, 171, 40, 1,

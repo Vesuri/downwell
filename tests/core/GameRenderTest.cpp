@@ -1464,6 +1464,11 @@ int main() {
     const_cast<downwell::StartupRuntime&>(naturalDeath.startup()).useCaptureGarden(true); // W1.14
     // This separate route retains natural startup and room-entry timing.
     unsigned combatTicks = 1;
+    // The jumping, hovering sweep can orbit above a narrow funnel without
+    // dropping in (one deep in level 1 since the frogs' source platform
+    // collisions, 2026-11-26): after 1200 combat ticks without new depth,
+    // walk to the shaft's centre without firing until the tape descends.
+    float deepestY = 0; unsigned deepestTick = 0; bool stalled = false;
     bool retried = false;
     unsigned observedFlashFrames = 0;
     unsigned naturalClearFrames = 0;
@@ -1497,12 +1502,18 @@ int main() {
                 }
                 if (menu.goalPassed && menu.goalNotice >= 3) input.fire = (frame % 2) == 0;
             } else {
+                if (runtime.mainPlayerY() > deepestY + 16) {
+                    deepestY = runtime.mainPlayerY(); deepestTick = combatTicks; stalled = false;
+                } else if (combatTicks > deepestTick + 1200) stalled = true;
                 input.left = (combatTicks / 90) % 2 == 0;
                 input.right = !input.left;
                 input.fire = (combatTicks + downwell::gameplayContactProfilePhase) % 10 < 5;
                 // Do not let the timed sweep settle into the left side room:
                 // its floor can trap this periodic tape away from new enemies.
-                if (runtime.mainPlayerX() < 192) { input.left=false; input.right=true; }
+                if (stalled) {
+                    input.left = runtime.mainPlayerX() > 242; input.right = runtime.mainPlayerX() < 238;
+                    input.fire = false;
+                } else if (runtime.mainPlayerX() < 192) { input.left=false; input.right=true; }
                 else if (runtime.mainPlayerX() > 288) { input.left=true; input.right=false; }
                 if (runtime.runStage().level == 1 && runtime.mainPlayerY() < 1264) {
                     // Only level one has this recovered entrance bowl. Later

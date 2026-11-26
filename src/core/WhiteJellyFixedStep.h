@@ -3,72 +3,10 @@
 #include "WhiteJellyBirth.h"
 #include "RunnerRealComparison.h"
 #include "FixedPoint.h"
+#include "CheckCollisionUnits.h"
 namespace downwell {
-// scrCheckCollisionWith on Q16 positions and velocities (W3 fixed point):
-// CheckCollisionWithScript's walks with whole-pixel steps. Query(x, y, hit)
-// takes Q16 coordinates and must not mutate the caller. Positions must stay
-// inside +-2^29 and velocities inside +-8 pixels.
-struct CheckCollisionFixed {
-    int xcollision=0,ycollision=0;
-    static std::int32_t magnitude(std::int32_t v){return v<0?-v:v;}
-    static int sign(std::int32_t v){return v>0?1:v<0?-1:0;}
-    static std::int32_t rounded(std::int32_t q16){return Fixed16::roundPixel(q16)*65536;}
-    // round(position) plus the velocity rounded away from zero to a pixel.
-    static std::int32_t probe(std::int32_t position,std::int32_t velocity){
-        const std::int32_t speed=magnitude(velocity);
-        std::int32_t extent=rounded(speed);
-        if(extent<speed)extent+=65536;
-        return rounded(position)+(velocity<0?-extent:extent);
-    }
-    template<class Query> bool run(std::int32_t& xx,std::int32_t& yy,std::int32_t xsp,std::int32_t ysp,Query query){
-        constexpr std::int32_t range=std::int32_t(1)<<29,fast=8*65536;
-        if(magnitude(xx)>=range||magnitude(yy)>=range||magnitude(xsp)>fast||magnitude(ysp)>fast)return false;
-        const std::int32_t wx=probe(xx,xsp),wy=probe(yy,ysp);
-        xcollision=0;ycollision=0;
-        const int sx=sign(xsp),sy=sign(ysp);
-        const std::int32_t dx=sx*65536,dy=sy*65536;
-        bool hit;
-        if(!query(wx,yy,hit))return false;
-        if(hit){
-            xx=rounded(xx);
-            std::int32_t move=0;
-            for(;;){
-                if(!query(xx+move+dx,yy,hit))return false;
-                if(hit)break;
-                move+=dx;
-                if(magnitude(move)>=magnitude(xsp)){move=0;break;}
-            }
-            xx+=move;xcollision=sx;
-        }
-        if(!query(xx,wy,hit))return false;
-        if(hit){
-            yy=rounded(yy);
-            std::int32_t move=0;
-            for(;;){
-                if(!query(xx,yy+move+dy,hit))return false;
-                if(hit)break;
-                move+=dy;
-                if(magnitude(move)>=magnitude(ysp)){move=0;break;}
-            }
-            yy+=move;ycollision=sy;
-        }
-        if(xcollision||ycollision)return true;
-        if(!query(wx,wy,hit))return false;
-        if(!hit)return true;
-        yy=rounded(yy);xx=rounded(xx);
-        std::int32_t mx=0,my=0;
-        for(;;){
-            if(!query(xx+mx+dx,yy+my,hit))return false;
-            if(hit)break;
-            mx+=dx;
-            if(!query(xx+mx,yy+my+dy,hit))return false;
-            if(hit)break;
-            my+=dy;
-            if(magnitude(my)>=magnitude(ysp)){mx=0;my=0;break;}
-        }
-        yy+=my;xx+=mx;ycollision=sy;xcollision=sx;return true;
-    }
-};
+// scrCheckCollisionWith on Q16 positions and velocities.
+using CheckCollisionFixed=CheckCollisionUnits<65536,65536>;
 
 // enmWhiteJelly Step with Q16 position, velocity and heading (W3 fixed
 // point) for the compact world. movesp and maxsp are whole thousandths: every

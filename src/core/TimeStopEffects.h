@@ -13,11 +13,14 @@ namespace downwell {
 // Shared transition/effect coordination. Backend adapters still supply exact
 // field masks, audio state and synchronous side effects. Emit(change) performs
 // the source sleep(30ms), after the owned time-change Create sets roomSpeed.
-// Callbacks must not change this owner's state.
-template<unsigned Capacity> struct TimeStopEffects {
+// Callbacks must not change this owner's state. Shard is TimeShardAnimation
+// (the VM form) or TimeShardParticle (the compact world's Q16 shards, born
+// by TimeShardBurst::emitFixed).
+template<unsigned Capacity,class Shard=TimeShardAnimation> struct TimeStopEffects {
     PlayerTimeStop player;
     TimeShardBurst burst;
-    TimeShardEffects<Capacity> shards;
+    TimeShardEffects<Capacity,Shard> shards;
+    static constexpr bool fixedShards=Shard::fixedPoint;
     TimeChangeEffects<8> changes;
     int roomSpeed=60; // Source target rate; PAL backend must not add catch-up.
     int shakeAmt=0,shakeDur=0; // scrSShake's caller-local writes.
@@ -75,7 +78,11 @@ template<unsigned Capacity> struct TimeStopEffects {
             if(effect==PlayerTimeStop::Effect::change)
                 return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
             if(effect!=PlayerTimeStop::Effect::shards)return emit(effect);
-            return burst.emit(pose.x,pose.y,pose.xsp,pose.ysp,lowSpec,random,shards,lookup,
+            if constexpr(fixedShards){
+                Fixed16 xsp,ysp;
+                return Fixed16::fromBinary64(pose.xsp,xsp)&&Fixed16::fromBinary64(pose.ysp,ysp)&&
+                    burst.emitFixed(pose.x,pose.y,xsp.v,ysp.v,lowSpec,random,shards,lookup);
+            }else return burst.emit(pose.x,pose.y,pose.xsp,pose.ysp,lowSpec,random,shards,lookup,
                 [](auto ax,auto ay,auto bx,auto by,auto& angle){
                     return RunnerPointDirection::evaluate(ax,ay,bx,by,angle,portableAtan);
                 },[](auto speed,auto angle,bool vertical,auto& result){

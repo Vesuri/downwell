@@ -4,6 +4,7 @@
 #include "core/FrogVerticalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogMotion.h"
+#include "core/FrogSourceStep.h"
 #include "core/GameMakerRounding.h"
 #include "core/FrogPresentation.h"
 #include "core/EnemyStepPresentation.h"
@@ -16,7 +17,62 @@ void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
 
+
+// A thin platform whose top is y=0 (parentThinwall rows 0..1 across x
+// -64..63), a floor at y>=28 and a wall at x>=40 (parentWall); sParentSolid
+// is both. Mask 166 (-6..6, -5..8) at room offsets: x Q16, y fifths of Q8.
+struct FrogTestWorld {
+    unsigned queries=0;
+    static int roundUnits(long v,long unit){
+        long whole=v/unit,fraction=v%unit;if(fraction<0){fraction+=unit;--whole;}
+        if(fraction>unit/2||(fraction==unit/2&&(whole&1)))++whole;
+        return int(whole);
+    }
+    bool meeting(int object,std::int32_t x,std::int32_t y,bool& hit){
+        ++queries;
+        const int left=roundUnits(x-6*65536L,65536),right=roundUnits(x+6*65536L,65536);
+        const int top=roundUnits(y-5*1280L,1280),bottom=roundUnits(y+8*1280L,1280);
+        const bool platform=left<64&&right>-64&&top<2&&bottom>0;
+        const bool wall=bottom>28||right>40;
+        hit=object==87?platform:object==57?wall:object==56?(platform||wall):false;
+        return object==87||object==57||object==56;
+    }
+    bool hit(){return true;}
+    bool scale(int){return true;}
+    void landing(bool){}
+};
+static void testFrogSourceStep(){
+    {   // Standing on the platform (feet at its top): it never falls through.
+        FrogTestWorld world;downwell::FrogSourceStep step;downwell::FrogHitState hit;
+        downwell::FrogHorizontalMotion x{0,0};downwell::FrogVerticalMotion y{-8*1280L,0,true};
+        for(int i=0;i<200;++i)require(step.step(x,y,hit,true,world).succeeded,"standing frog steps");
+        require(y.position==-8*1280L&&y.grounded&&y.velocity==0,"a frog stands on a thin platform");
+    }
+    {   // Jump from the floor below: up through the platform, land on top.
+        FrogTestWorld world;downwell::FrogSourceStep step;downwell::FrogHitState hit;
+        downwell::FrogHorizontalMotion x{0,0};downwell::FrogVerticalMotion y{20*1280L,-4*1280L,false};
+        int highest=20*1280;
+        for(int i=0;i<200;++i){
+            require(step.step(x,y,hit,true,world).succeeded,"jumping frog steps");
+            highest=std::min<long>(highest,y.position);
+        }
+        require(highest<-8*1280&&y.position==-8*1280L&&y.grounded,"a frog jumps up through a thin platform and lands on it");
+    }
+    {   // Moving right into the wall: xsp * -0.3, at most one pixel short.
+        FrogTestWorld world;downwell::FrogSourceStep step;downwell::FrogHitState hit;
+        downwell::FrogHorizontalMotion x{30*65536L,2*65536L};downwell::FrogVerticalMotion y{-8*1280L,0,true};
+        y.grounded=false;y.velocity=-1280;
+        bool rebounded=false;
+        for(int i=0;i<40&&!rebounded;++i){
+            require(step.step(x,y,hit,true,world).succeeded,"walled frog steps");
+            rebounded=x.velocity<0;
+        }
+        require(rebounded&&x.velocity==-39322&&x.position<=34*65536L,"a wall rebounds the frog by -0.3");
+    }
+}
+
 int main() {
+    testFrogSourceStep();
     // Source round(xx/yy), not round(the lossy public coordinate mirror).
     for(long unit:{65536L,1280L})for(long whole=-512;whole<=512;++whole)
         for(long delta=-4;delta<=4;++delta){

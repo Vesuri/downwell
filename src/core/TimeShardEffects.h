@@ -1,15 +1,18 @@
 #ifndef DOWNWELL_CORE_TIME_SHARD_EFFECTS_H
 #define DOWNWELL_CORE_TIME_SHARD_EFFECTS_H
 #include "TimeShardAnimation.h"
+#include "TimeShardParticle.h"
 namespace downwell {
 // Object-238 storage. Capture phase cutoffs at GLOBAL phase entry. World
 // callbacks must not mutate this store or retain references beyond a call.
-template<unsigned Capacity> class TimeShardEffects {
+// Effect is TimeShardAnimation (registered paths, the VM form) or
+// TimeShardParticle (the compact world's Q16 motion).
+template<unsigned Capacity,class Effect=TimeShardAnimation> class TimeShardEffects {
     static_assert(Capacity>0,"Shard storage must be nonempty");
 public:
     using Handle=std::uint32_t;
     struct Phase{Handle newest;};
-    struct Slot{Handle handle=0;std::uint32_t sourceId=0;TimeShardAnimation effect;};
+    struct Slot{Handle handle=0;std::uint32_t sourceId=0;Effect effect;};
     // Borrowed world registration. The world owns the numeric instance ID;
     // our monotonic handle only identifies an effect lifetime/phase cutoff.
     // Registration precedes synchronous Create and therefore its six RNG words.
@@ -18,13 +21,13 @@ public:
     template<class World> bool bind(World& world){
         if(count_||context_||!succeeded_)return false;
         context_=&world;
-        birth_=[](void* p,Handle h,const TimeShardAnimation& effect,std::uint32_t& id){
+        birth_=[](void* p,Handle h,const Effect& effect,std::uint32_t& id){
             return static_cast<World*>(p)->birth(h,effect.x,effect.y,id);
         };
-        created_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+        created_=[](void* p,Handle h,std::uint32_t id,const Effect& effect){
             return static_cast<World*>(p)->created(h,id,effect);
         };
-        retire_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+        retire_=[](void* p,Handle h,std::uint32_t id,const Effect& effect){
             return static_cast<World*>(p)->retire(h,id,effect);
         };
         return true;
@@ -40,16 +43,16 @@ public:
         animationEligible_=[](void* p,Handle h,std::uint32_t id,bool& eligible){
             return static_cast<World*>(p)->animationEligible(h,id,eligible);
         };
-        animation_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+        animation_=[](void* p,Handle h,std::uint32_t id,const Effect& effect){
             return static_cast<World*>(p)->publishAnimation(h,id,effect);
         };
-        step_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+        step_=[](void* p,Handle h,std::uint32_t id,const Effect& effect){
             return static_cast<World*>(p)->publishStep(h,id,effect);
         };
-        alarm_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+        alarm_=[](void* p,Handle h,std::uint32_t id,const Effect& effect){
             return static_cast<World*>(p)->publishAlarm(h,id,effect);
         };
-        destroyed_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+        destroyed_=[](void* p,Handle h,std::uint32_t id,const Effect& effect){
             return static_cast<World*>(p)->destroyed(h,id,effect);
         };
         return true;
@@ -67,7 +70,7 @@ public:
         for(unsigned i=0;i<count_;++i)if(!slots_[order_[i]].effect.destroyRequested)++alive;
         return alive;
     }
-    TimeShardAnimation* get(Handle handle){
+    Effect* get(Handle handle){
         if(handle)for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle==handle && !slot.effect.destroyRequested)return &slot.effect;
         }
@@ -82,8 +85,8 @@ public:
         if(!succeeded_||(!deferCleanup_&&!retireRequested()))return 0;
         if(!next_ || count_==Capacity)return 0;
         for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
-            TimeShardAnimation initial;
-            if(!initial.x.assign(x)||!initial.y.assign(y))return 0;
+            Effect initial;
+            if(!initial.place(x,y))return 0;
             auto& slot=slots_[index];slot.effect=initial;
             slot.handle=next_++;slot.sourceId=slot.handle;
             for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
@@ -246,7 +249,7 @@ private:
             slot.effect.alarm0=alarms->get(0);slot.effect.alarm1=alarms->get(1);slot.effect.alarm2=alarms->get(2);
         }
         if(!slot.effect.step(stopped,random,
-            [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const TimeShardAnimation&>(slot.effect),x,y,hit);},
+            [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const Effect&>(slot.effect),x,y,hit);},
             [&](){
                 unsigned count=size();
                 if(population_&&(!population_(context_,count)||count>0x7fffffffu))return -1;
@@ -282,13 +285,13 @@ private:
     bool (*population_)(void*,unsigned&)=nullptr;
     bool (*eligible_)(void*,Handle,std::uint32_t,bool&)=nullptr;
     bool (*animationEligible_)(void*,Handle,std::uint32_t,bool&)=nullptr;
-    bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
-    bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
-    bool (*retire_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
-    bool (*animation_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
-    bool (*step_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
-    bool (*alarm_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
-    bool (*destroyed_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
+    bool (*birth_)(void*,Handle,const Effect&,std::uint32_t&)=nullptr;
+    bool (*created_)(void*,Handle,std::uint32_t,const Effect&)=nullptr;
+    bool (*retire_)(void*,Handle,std::uint32_t,const Effect&)=nullptr;
+    bool (*animation_)(void*,Handle,std::uint32_t,const Effect&)=nullptr;
+    bool (*step_)(void*,Handle,std::uint32_t,const Effect&)=nullptr;
+    bool (*alarm_)(void*,Handle,std::uint32_t,const Effect&)=nullptr;
+    bool (*destroyed_)(void*,Handle,std::uint32_t,const Effect&)=nullptr;
 };
 }
 #endif

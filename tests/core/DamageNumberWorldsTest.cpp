@@ -156,7 +156,7 @@ int main(){
         assert(encounter.tick()==stoppedTick);
     }
     {
-        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,2,&builderPack);
+        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,7,&builderPack);
         encounter.skipToGameForTesting();Input fire{};fire.fire=true;
         InstanceRecord* victim=nullptr;
         for(unsigned tick=0;tick<6000&&(!victim||!encounter.mainBulletCount());++tick){
