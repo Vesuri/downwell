@@ -1,212 +1,97 @@
-# Downwell — SDL reference and Amiga 500 port
+# Downwell — Amiga
 
-Behavior-first reimplementation of the Windows Steam release of *Downwell*.
-The project starts from GameMaker VM bytecode and resource data, produces an
-auditable intermediate representation, implements a portable SDL reference,
-and progressively lowers that implementation to native 68000 Amiga C/C++ and
-selected 68000 assembly.
+An unofficial native Amiga port of **Downwell**, the 2015 action game by Moppin
+(Ojiro Fumoto), published by Devolver Digital. Fall down a well, stomp and shoot
+your way through its monsters with the gun boots, collect gems, and spend them in
+the shops on the way down.
 
-This repository does not distribute the original game. A locally owned Steam
-build lives under `data/`, which is ignored by Git and treated as immutable.
+The port is written from the Windows Steam release's own program and data: its
+GameMaker bytecode and resources were studied and reimplemented in C and C++ for
+the Amiga, and the port is tested against them. It runs on AGA with the
+original's well, art and palettes, and plays the sound effects on Paula.
 
-See [remaining work](docs/open-work.md) for the single current work queue.
-Completed changes are recorded in the git log.
+Current Amiga release: **0.1 (26.11.2026), an early alpha**.
 
-## Startup shortcut
+## What to expect from 0.1
 
-In the SDL window, press **F12** (Fn+F12 if required by the keyboard) to save
-the current rendered framebuffer as a PNG in `~/Pictures/Screenshots/`.
-Captures use the actual renderer resolution, including HiDPI scaling and
-letterboxing, without the window border. Timestamped names never overwrite
-existing captures. The save path or an error is printed to the console.
+0.1 is the **world 1 slice**: the game from its start to the end of level 1-3.
+It is for people who want to try the port early and report what they find.
 
-To build directly into STYLE SELECT for testing, skipping logos, credits,
-controls and the garden:
+- **In this version:** the menus and the garden, the style select with all five
+  styles, gameplay with the world's enemies, guns, combos and gem high, the shops,
+  the side rooms with their time-stop, the upgrade choice between levels, death,
+  results and Retry, hard mode, the pause menu with its palettes and options, and
+  the saved game and records.
+- **Not yet:** music; world 2 onwards. After level 1-3 the run ends at an
+  end-of-slice screen.
+- **Speed:** optimizing for the A1200 is under way. Quiet moments run at full
+  speed, but the game slows down as enemies, gems and effects fill the screen,
+  and in side rooms. A faster processor helps. On a PAL Amiga it runs at 50
+  frames per second, against the original's 60.
+- **Known problems:**
+  - the first level appears with a hard cut instead of the original's dithered
+    reveal;
+  - gems about to vanish can show as white outlines;
+  - with many shotgun pellets in the air at once, the game can stop: it has
+    room for 32 bullets.
+- **Testing:** on an emulated A1200 with 4 MB Fast RAM; not yet on real hardware.
 
-```sh
-make SKIP_INTRO=1                 # SDL
-make run SKIP_INTRO=1             # build and run SDL
-make amiga SKIP_INTRO=1           # Amiga
-# Or, from amiga/: . ./env.sh && make SKIP_INTRO=1
-```
+Please [report problems](https://github.com/Vesuri/downwell/issues) with what you
+were doing when they happened.
 
-The default is `SKIP_INTRO=0`. Switching the value rebuilds the target's objects
-automatically. This sets `DOWNWELL_SKIP_INTRO`; it skips presentation, not the
-asset/controller initialization required by later scenes. Style selection keeps
-its normal entrance animation and confirmation behavior. Use normal startup
-for garden profiling and intro replay checks. The headless regression check is
-`make build/skip-intro-test && build/skip-intro-test`.
+## Requirements and installation
 
-To skip directly into gameplay with Usual Style, including skipping STYLE SELECT:
+- An Amiga with AGA and a 68020 or better, Kickstart and Workbench 2.04 or newer.
+  The game is written for an **A1200 with 4 MB Fast RAM**.
+- About 1 MB of free Chip memory and about 2.5 MB of further free memory (Fast or
+  Chip). The game says so and does not start when it is not there.
+- Installer 43 or newer and about 4 MB free on the hard disk.
+- Your own copy of **Downwell for Windows from Steam** (app 360740), version
+  1.0.5. Copy its `Downwell` drawer (`Steam\steamapps\common\Downwell`) to the
+  Amiga or to a medium the Amiga can read.
 
-```sh
-make run SKIP_TO_GAME=1          # SDL
-make amiga SKIP_TO_GAME=1        # Amiga
-```
+Extract `Downwell-0.1.lha`, open its **Downwell Install** drawer and run
+**Install**. Choose where the `Downwell` drawer goes, then select your Steam
+Downwell drawer. Every file is checked, and other versions are refused. The
+installer converts the game's graphics, rooms and sounds from your files into the
+port's own data files: about an hour on an A1200, about eight minutes on a 50 MHz
+68030. Updating keeps your saved game.
 
-`SKIP_TO_GAME` defaults to `0` and takes precedence over `SKIP_INTRO` when
-both are enabled. Normal controller/room initialization is preserved; the
-player starts at the normal level entrance. Both toggles trigger automatic
-rebuilds when changed. Use `SKIP_TO_GAME=0 SKIP_INTRO=0` for the full startup.
-Headless check: `make build/skip-to-game-test && build/skip-to-game-test`.
+Start the installed **Downwell** icon, or `Downwell` from a Shell in its drawer.
 
-To test the first level's completion sequence without playing the descent:
+No part of the original game is distributed: the archive holds only the port's
+own files. See [the release ReadMe](release/ReadMe) for the full instructions.
 
-```sh
-make run SKIP_LEVEL=1           # SDL
-make amiga SKIP_LEVEL=1         # Amiga; then run with amiga/run.sh
-```
+## Controls
 
-`SKIP_LEVEL=1` implies direct gameplay startup and takes precedence over the
-other skip options. It places the normal level-exit trigger at the player's
-starting position: the exit alarms, wipe, completion screen and upgrade
-selection still run normally. It does not generate an entire level offscreen
-or fabricate score/rewards. Only the first level is skipped; after choosing
-an upgrade and leaving the completion room, the next level plays normally.
-The default is `0`; switching it automatically rebuilds both targets.
-Use `SKIP_LEVEL=0 SKIP_TO_GAME=0 SKIP_INTRO=0` for normal startup.
-Headless regression: `make test-skip-level`.
+Joystick in port 2: left and right move, fire jumps and shoots (hold it to keep
+shooting while you fall), and the second button cancels in the menus. On the
+keyboard, X cancels, Escape or P pauses during play, and Escape quits elsewhere.
 
-## Repository layout
+## Building
 
-```text
-data/                 local Windows Steam build; read-only and never committed
-src/core/             platform-independent game/reference logic
-src/platform/sdl/     SDL2 host backend
-src/platform/amiga/   native Amiga backend and hardware integration
-amiga/                Amiga cross-build, emulator, and debugger entry points
-tools/                GameMaker extraction and verification tools
-docs/                 architecture, evidence, learnings, and work queue
-extracted/            bulk GameMaker exports; generated and ignored
-generated/            generated manifests/tables; ignored by default
-captures/             reference captures and replay evidence; ignored
-build/                host output; ignored
-```
-
-## Host reference build
-
-Requirements: a C++17 compiler, `pkg-config`, SDL2, SDL2_image and libsndfile.
-Run `python3 tools/extract-audio.py` after the UTMT export to supply the original
-wind sounds. The SDL backend decodes them before gameplay; missing audio assets
-or an unavailable audio device return exit code 20. Only time-field wind contacts
-are connected to device playback so far; this is not full game audio support.
+The Amiga build uses `m68k-amiga-elf-gcc`, `elf2hunk` and vasm, from AmigaXDev's
+`make setup` (`~/.local/share/amiga/env.sh`). The tests and the data conversion
+read your own Steam copy of the game, read-only, in `data/`; Git ignores it.
 
 ```sh
-make
-make test
-make run
+make extract           # the game's resources from data/, into extracted/ and generated/
+make amiga             # the Amiga program: amiga/out/Downwell.exe
+make release           # dist/Downwell-$(cat VERSION).lha, audited; clean tree only
+make                   # the SDL host reference, then make run
 ```
 
-`make` runs a third of the machine's cores in parallel by default;
-`make DOWNWELL_JOBS=1` runs serially. Test programs share one object per
-source and flag set under `build/obj/` (`tools/cxx-objects.py`), so a header
-change recompiles only what includes it. Recipes that rebuild `amiga/` or run
-the emulator take one lock (`tmp/amiga.lock`) and never overlap.
+How the port is built and tested is in the [development guide](docs/development.md),
+the [release notes](docs/release.md) and the [project plan](PROJECT.md). Remaining
+work is in [open-work.md](docs/open-work.md).
 
-The host build uses `-O2` with debug symbols and floating-point contraction
-disabled (no fast-math). For instruction-by-instruction debugging, use
-`make HOST_OPT=-O0`. Changing this option automatically rebuilds the SDL objects.
+## Credits and licensing
 
-To diagnose slowdown during interactive play, run
-`DOWNWELL_PROFILE=1 make run SKIP_TO_GAME=1`. Every 180 frames it reports player
-Y, resident record count, frame rate, simulation/drawing time, presentation
-(including vsync wait), pacing, and peak simulation-plus-drawing time in ms.
-The selected SDL rendering backend is printed at startup. This does not skip
-simulation or rendering work; retain the output from before and during a slowdown.
+Downwell and its original assets belong to Moppin and Devolver Digital. This is an
+unofficial fan port, not affiliated with or endorsed by them. Amiga port by Vesa
+Halttunen (Vesuri).
 
-The native player/scroll slice also has a real host-versus-emulated-A500 replay
-gate. With the Amiga toolchain and FS-UAE installed, run
-`make verify-cross-replay`; both targets must produce the pinned 64-frame
-trajectory digest before the normal interactive Amiga executable is rebuilt.
-
-Use Left/Right or A/D to move, Space or Z to jump/fire and confirm selections,
-X to cancel, and Escape to quit in SDL. On Amiga, use the joystick for movement
-and fire; X or the second joystick button cancels, and Escape quits.
-Cancel is separate from Pause. Use the startup shortcuts above for focused testing.
-
-Remaining behavior, rendering, performance and verification work is tracked only
-in [the work queue](docs/open-work.md). Implementation history and past test
-results belong in the git log, not this build guide.
-
-The cross-target replay and state-comparison contract is documented in
-[docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional
-GameMaker behavior is tracked separately in
-[docs/runtime-semantics.md](docs/runtime-semantics.md).
-
-The default, locked, and accepted style-selection states have emulator-backed
-raster gates (`make verify-amiga-style-frame`,
-`make verify-amiga-locked-style-frame`, and
-`make verify-amiga-selected-style-frame`). The full scene verifier visits the
-locked carousel entry before returning to and accepting the default style; the
-last gate pins the hardware-dither transition into the well.
-
-## GameMaker extraction
-
-The extractor verifies the known Steam `data.win` hash before doing any work
-and writes only to ignored `extracted/` and `generated/` directories:
-
-```sh
-make extract
-```
-
-Once an extraction exists, its manifest, code exports, failure reports, and
-byte-identical container round trip can be checked independently:
-
-```sh
-make verify-extraction
-```
-
-The current verified result is summarized in
-[docs/extraction-report.md](docs/extraction-report.md). Tool pinning and output
-details are in [tools/README.md](tools/README.md).
-
-The audited room metadata can then be lowered into the ignored native room pack:
-
-```sh
-make generate-room-pack
-make verify-room-pack
-```
-
-Its endian-explicit format is documented in
-[docs/room-pack.md](docs/room-pack.md). `make verify-room-pack` checks both
-deterministic generation, the portable C++ decoder, and startup entry into the
-fully populated recovered `rmMenu` state.
-
-The complete object/property/event graph has a separate native lowering:
-
-```sh
-make generate-object-pack
-make verify-object-pack
-```
-
-The `DWOB` format is documented in
-[docs/object-pack.md](docs/object-pack.md). Its code-entry IDs retain an exact
-link to recovered GML and VM assembly for the native event dispatcher. The
-portable reader validates inheritance and resolves inherited bindings without
-host-endian or structure-layout assumptions.
-
-Sprite/frame/atlas metadata has its own deterministic `DWSP` lowering,
-documented in [docs/sprite-pack.md](docs/sprite-pack.md). The corresponding
-decoded texture-page PNGs are produced by the guarded extraction and remain
-ignored alongside other copyrighted derived data.
-
-`make run` loads both packs. Implemented startup events are now selected through
-their recovered object/event bindings and VM code IDs; resolved event calls
-without a native translation remain visible in runtime diagnostics rather than
-being mistaken for implemented behavior. `make verify-native-data` exercises
-the complete room-to-object-to-code routing path.
-
-## Amiga toolchain
-
-The executable requires an 8 KiB task stack (`Stack 8192` when launching
-manually). The supplied launchers set it; an undersized stack returns code 20
-before game initialization. This does not change the 68000 CPU requirement.
-
-```sh
-. amiga/env.sh
-make -C amiga
-```
-
-Or use `make amiga` from the repository root to build the native executable.
-
-The project architecture and phase gates are in [PROJECT.md](PROJECT.md).
+The installer's converter decodes the game's Ogg Vorbis sounds with Xiph.Org's
+Tremor and libogg (BSD licences) and uses the AmigaXDev installer helpers
+(LGPL-2.1-or-later); see [tools/install-data](tools/install-data). Those licences
+apply to the converter only, not to the original game.

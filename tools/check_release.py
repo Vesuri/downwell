@@ -28,7 +28,7 @@ from pathlib import Path
 from package_release import (FILES, OWN_DATA, PREFIX, ROOT, STAMP, archive_name, members,
                              original_hashes, release)
 
-DATE = '23.11.2026'
+DATE = '26.11.2026'
 HUNK = b'\0\0\3\xf3'
 ICONS = {'Downwell.inf': 3, 'Install.info': 4, 'ReadMe.info': 4, '@drawer': 2}
 

@@ -2,7 +2,7 @@
 ; From Wing Commander 2's release/Install (the WHDLoad Install Template
 ; conventions): ReadMe first, the parent drawer, Keep or Remove an existing
 ; drawer, Use existing or Replace the converted data, then the player's files.
-; $VER: Install 0.1 (23.11.2026)
+; $VER: Install 0.1 (26.11.2026)
 (set @app-name "Downwell")
 (if (< @installer-version (* 43 65536))
   (abort "This installation requires Amiga Installer 43 or newer."))

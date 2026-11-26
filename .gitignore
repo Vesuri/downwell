@@ -29,3 +29,6 @@
 /tools/vendor/
 __pycache__/
 *.pyc
+
+# Release archives (make release, make publish); see docs/release.md.
+/dist/

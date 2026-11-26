@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT / 'tools/install-data'))
 from test_install import FILES, SECTIONS  # noqa: E402  (the converter's installed names)
 
 PREFIX = 'Downwell Install'
-STAMP = release.dos_stamp(2026, 11, 23)
+STAMP = release.dos_stamp(2026, 11, 26)
 ICONS = ROOT / 'release/icons'
 EXE = ROOT / 'amiga/out/Downwell.exe'
 CONVERTER = ROOT / 'build/install-data/DownwellInstallData.exe'

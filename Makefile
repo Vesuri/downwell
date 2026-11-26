@@ -790,6 +790,27 @@ package-release:
 	python3 tools/check_release.py
 check-release:
 	python3 tools/check_release.py
+# The published release (docs/release.md): from a clean tree, the archive as
+# package-release builds it, audited, into dist/ with its .sha256. publish
+# remakes the build outputs at HEAD, audits the archive against them and checks
+# the .sha256; it is a dry run, PUBLISH=1 tags and creates the GitHub release.
+.PHONY: release publish
+RELEASE_VERSION = $(shell cat VERSION)
+release:
+	@git diff --quiet HEAD || { echo "release needs a clean tree: commit first"; exit 1; }
+	@test ! -e dist/Downwell-$(RELEASE_VERSION).lha || { echo "dist/Downwell-$(RELEASE_VERSION).lha exists"; exit 1; }
+	$(MAKE) package-release
+	mkdir -p dist
+	cp build/release/Downwell-$(RELEASE_VERSION).lha dist/
+	python3 tools/check_release.py dist
+	cd dist && shasum -a 256 Downwell-$(RELEASE_VERSION).lha > Downwell-$(RELEASE_VERSION).lha.sha256
+publish:
+	@git diff --quiet HEAD || { echo "publish needs a clean tree: commit first"; exit 1; }
+	$(MAKE) package-release
+	cmp build/release/Downwell-$(RELEASE_VERSION).lha dist/Downwell-$(RELEASE_VERSION).lha
+	python3 tools/check_release.py dist
+	cd dist && shasum -a 256 -c Downwell-$(RELEASE_VERSION).lha.sha256
+	PUBLISH=$(PUBLISH) python3 tools/publish_release.py
 INSTALLER_MODES ?=
 test-installer:
 	$(AMIGA_SERIAL) bash -c '. amiga/env.sh && python3 tools/test_release_installer.py $(INSTALLER_MODES)'

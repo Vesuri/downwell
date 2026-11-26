@@ -10,8 +10,9 @@
  This install applies to "Downwell", an unofficial native Amiga port of the
  2015 game by Moppin (Ojiro Fumoto), published by Devolver Digital.
 
- THIS IS A WORK IN PROGRESS: the first world only. It is not WHDLoad; the
- game runs from Workbench or from a Shell.
+ THIS IS AN EARLY RELEASE, A WORK IN PROGRESS: the first world only, no
+ music yet, and busy scenes run slowly. It is not WHDLoad; the game runs
+ from Workbench or from a Shell.
 
 
  What to expect:
@@ -22,10 +23,20 @@
  program and data, and is tested against them.
 
  - Music: not in this version (the sound effects play on Paula).
- - Speed: optimizing comes after world 1 is complete; busy scenes can slow
-   down. On a PAL Amiga the game runs at 50 frames per second, slower than
-   the original's 60.
+ - Speed: optimizing for the A1200 is under way. Quiet moments run at full
+   speed, but the game slows down as enemies, gems and effects fill the
+   screen, and in side rooms. A faster processor helps. On a PAL Amiga the
+   game runs at 50 frames per second, slower than the original's 60.
  - After level 1-3 the slice ends: world 2 is not in this version.
+
+ Known problems:
+ - The first level appears with a hard cut instead of the original's
+   dithered reveal.
+ - Gems about to vanish can show as white outlines.
+ - With many shotgun pellets in the air at once (the shotgun and some
+   upgrades), the game can stop: it has room for 32 bullets.
+
+ Please report problems at https://github.com/Vesuri/downwell/issues
 
 
  Requirements:
@@ -71,12 +82,11 @@
 
  Playing:
  --------
- Start the Downwell icon, or from a Shell:
+ Start the Downwell icon, or from a Shell in the Downwell drawer:
 
-     Stack 8192
      Downwell
 
- The game needs a stack of 8 KB; the installer sets it in the icon.
+ The game sets up the 8 KB of stack it needs itself.
  Joystick in port 2: left and right move, fire jumps and shoots (hold it to
  keep shooting while you fall), the second button cancels in the menus.
  Keyboard: X cancels; Escape or P pauses during play, and Escape quits
@@ -98,10 +108,10 @@
 
  History:
  --------
- version 0.1 (23.11.2026):
- - The world 1 slice: from the start to the end of level 1-3, with sound
-   effects and no music.
- - First install archive.
+ version 0.1 (26.11.2026):
+ - First release: the world 1 slice, from the start to the end of level
+   1-3, with sound effects and no music.
+ - The installer converts the game's data from your own Steam copy.
 
 
  Credits:
