@@ -2488,7 +2488,10 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
     const bool moduleShot=std::getenv("DOWNWELL_SLICE_MODULE_SHOT")!=nullptr;
     // W3.7 workload (DOWNWELL_SLICE_SPRAY): tap fire every other pair of
     // updates throughout, breaking every block below (a profiling route; it
-    // is not expected to meet the coverage checks).
+    // is not expected to meet the coverage checks). It sees side-room
+    // targets from further above, enters the first side room (opening a gem
+    // chunk or collecting a module there) and ends back in the shaft once the
+    // exit's room-speed ramp is over.
     const bool spray=std::getenv("DOWNWELL_SLICE_SPRAY")!=nullptr;
     std::vector<unsigned> slicePicks;
     if(const char* picks=std::getenv("DOWNWELL_SLICE_PICK"))
@@ -2558,11 +2561,18 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
         unsigned modules=0,pickups=0,gunChanges=0,rangedShots=0,laserShots=0,casings=0,trails=0,notices=0;
         unsigned peakBullets=0,peakCasings=0,peakTrails=0,lastModuleEnd=0,lastTextEnd=0;
         std::set<std::uint32_t> seenShots;
-        unsigned stopBegan=0,sideStops=0,frozenFrames=0,fieldKills=0,peakShards=0,stoppedUpdates=0,fireViews=0;
+        unsigned resumedAt=0,stopBegan=0,sideStops=0,frozenFrames=0,fieldKills=0,peakShards=0,stoppedUpdates=0,fireViews=0;
         const unsigned blocksBefore=game.blocksDestroyed(),currencyBefore=game.currency();
         require(!game.finishWorldOneSlice(),"cannot finish before Result Alarm 1");
         for(;updates<8000&&!game.levelResultRequested()&&!game.dead();++updates){
             const int x=240+game.player().offsetX(),y=176+game.player().offsetY();
+            // Past the exit's room-speed ramp (about a dozen updates).
+            if(spray&&sideStops&&!game.timeStopped()&&x>=200&&x<=280&&updates>=resumedAt+24){
+                tape.flush();states.flush();sounds.flush();
+                std::cout<<"Spray slice ends in the shaft after its first side room: level "<<level
+                    <<" tick "<<game.tick()<<" x="<<x<<" y="<<y<<'\n';
+                return;
+            }
             if(updates%16==0){
                 int best=-1000000;
                 for(int candidate=168;candidate<=312;candidate+=8){
@@ -2621,7 +2631,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 // W1.4: collect a resting GunModule in the side rooms first.
                 {const auto& g=game.compactGuns();
                 for(unsigned i=0;!scenery&&i<g.moduleEnd;++i){const auto& m=g.modules[i];
-                    if(m.live&&m.ysp==0&&!abandoned.count({m.x,m.y})&&m.y>=y-64&&m.y<=y+24&&std::abs(m.x-x)<=220)
+                    if(m.live&&m.ysp==0&&!abandoned.count({m.x,m.y})&&m.y>=y-64&&m.y<=y+(spray?120:24)&&std::abs(m.x-x)<=220)
                         {scenery=module=true;sx=m.x;sy=m.y;
                          // Shoot it like a gem chunk until it has been rerolled.
                          if(moduleShot&&game.upgrades().levels[1]&&m.objHp>0&&m.objHp<9999)module=false;}}}
@@ -2771,7 +2781,7 @@ void testWorldOneSlice(const char* roomPath, const char* objectPath, const char*
                 // A side-room stop begins after the start field's and
                 // resumes before the exit (the goal field never resumes).
                 if(game.timeStopped()&&!stoppedBefore)stopBegan=updates;
-                if(!game.timeStopped()&&stoppedBefore&&stopBegan>0)++sideStops;
+                if(!game.timeStopped()&&stoppedBefore&&stopBegan>0){++sideStops;resumedAt=updates;}
                 (void)px;
                 if(game.timeStopped())++stoppedUpdates;
                 peakShards=std::max(peakShards,game.compactTimeShards().size());

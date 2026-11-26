@@ -187,6 +187,18 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     Decide what these checks compare against (native frames reviewed and
     pinned, or a host reference brought up to the world-1 features), then
     find why the gem-high fixture no longer reaches gem high.
+19. **Frogs fall through thin platforms.** The frog (113) still moves with
+    the provisional point query of `FrogVerticalMotion`/`FrogMotion`
+    against `solidResolver_`, which sees only walls and breakables (60,
+    92). `enmFrog` Step runs `scrCheckCollisionWith(87)` (thin platforms,
+    landing only when not already inside a `parentThinwall`), then
+    `scrCheckCollisionWith(57)`, then `place_meeting(xx, yy + 1,
+    sParentSolid)` for `grounded`, all with mask 166. Seen in play: a
+    frog falling below the thin platform it stood on. Move it onto
+    `CheckCollisionWithScript` (as the white jelly, bat and eyefish are),
+    keeping the current step as its reference, then search the routes
+    again: frog motion moves every route that meets one. Of the world-1
+    families only the frog collides with 87.
 
 ### WM. Music (deferred)
 
