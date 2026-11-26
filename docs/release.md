@@ -60,11 +60,14 @@ optimized for the A1200 with 4 MB Fast. Its purpose is to announce the
 project. Gate: `make release` (package and audit) and `make test-installer`
 (every mode, both starts) on this build.
 
-Built by `make release` from `2d285dff` on 26.11.2026; `make test-installer`
-passed every mode and both starts on that archive:
+Built by `make release` from `7c086dbc` on 26.11.2026. It replaced the first
+0.1 archive, built from `2d285dff` (709,639 bytes, SHA-256 `c08cc30d…5a07cdb2`),
+whose ReadMe still gave AGA and an older speed note; the program and the
+converter are unchanged. `make test-installer` passed every mode and both
+starts on the first archive:
 
 | Artifact | SHA-256 |
 |---|---|
-| `Downwell-0.1.lha`, 709,639 bytes | `c08cc30dd4d6b964256b0caa1ef895e6fb32cfdf4adf6fa4553f4d5d5a07cdb2` |
+| `Downwell-0.1.lha`, 709,645 bytes | `958d57e7eac6cc052ff90384cf19204b9e3bce2bb0d5883a822aed4b3dbf0a35` |
 | `Downwell` (exe) | `f3743aa5ed5ba6d8e3b598e03273d1ec6e73ebdf2b5d7cef415328336284685a` |
 | `DownwellInstallData` | `a5b48787f8b781a5cb59ad7f20f6b939579574974d01144bcd1221776d79d9dd` |
