@@ -195,6 +195,12 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     and upgrade (pellets per shot, lifetime, fire rate) and size the pool
     from it, or retire the oldest bullet as an explicit, documented
     approximation.
+20. **Gameplay starts with a hard cut.** STYLE SELECT fades out through the
+    dithered overlay, but the first level appears at once. The original
+    reveals it with the same dither (the entry-dither lifetime,
+    `EntryDither` / `GameplayEntryDithers`). This worked earlier, so find
+    the regression first: check that the first room creates and draws its
+    entry dither in StartupRuntime and on the Amiga.
 
 ### WM. Music (deferred)
 
