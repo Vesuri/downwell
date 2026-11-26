@@ -8,7 +8,9 @@
 #include <cstdio>
 #include <climits>
 using Surface=downwell::PaletteEffectSurface<>;
-static_assert(sizeof(Surface)<=18300,"portable scratch and backend bindings must stay outside the task stack");
+// 13,632 bytes of scratch, the per-row extents and the 16-entry rectangle
+// cache (18,384 bytes with 64-bit host pointers).
+static_assert(sizeof(Surface)<=18400,"portable scratch and backend bindings must stay outside the task stack");
 static unsigned word(const unsigned char* p){return unsigned(p[0])*256+p[1];}
 static unsigned dword(const unsigned char* p){return word(p)*65536u+word(p+2);}
 struct Asset {Surface::Asset image;int ox,oy;};
