@@ -737,6 +737,10 @@ is in the audit and the git log.
 - Standalone registration-owner replacements and registry encodings.
 - Fresh-cell default preinitialisation and copy-loop variants.
 - Immutable-row and copy-on-write spatial encodings.
+- Deferring the effect surface's per-stamp row extents into merged bands:
+  the stamps saved 0.44 ms per update, but the wider rows made each
+  `intersects` about four times dearer and the flushes cost 0.5 ms (spray
+  route, +0.13 ms mean).
 
 The source-record owner that completed the former item A replaced all the
 per-span structures together, behind one record per segment; do not
