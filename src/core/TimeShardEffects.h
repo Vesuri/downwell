@@ -82,31 +82,16 @@ public:
         return retireRequested();
     }
     template<class Random> Handle create(MotionBinary64 x,MotionBinary64 y,bool lowSpec,Random& random){
-        if(!succeeded_||(!deferCleanup_&&!retireRequested()))return 0;
-        if(!next_ || count_==Capacity)return 0;
-        for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
-            Effect initial;
-            if(!initial.place(x,y))return 0;
-            auto& slot=slots_[index];slot.effect=initial;
-            slot.handle=next_++;slot.sourceId=slot.handle;
-            for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
-            order_[0]=index;++count_;
-            if(birth_&&!birth_(context_,slot.handle,slot.effect,slot.sourceId)){
-                succeeded_=false;return 0;
-            }
-            if(!slot.sourceId||slot.sourceId>0x7fffffffu){succeeded_=false;return 0;}
-            for(unsigned i=1;i<count_;++i)if(slots_[order_[i]].sourceId==slot.sourceId){
-                succeeded_=false;return 0;
-            }
-            if(!slot.effect.create(x,y,lowSpec,random)||
-               (created_&&!created_(context_,slot.handle,slot.sourceId,slot.effect))){
-                succeeded_=false;return 0;
-            }
-            return slot.handle;
-        }
-        return 0;
+        return createWith([&](Effect& e){return e.place(x,y);},
+                          [&](Effect& e){return e.create(x,y,lowSpec,random);});
     }
-    // Global scheduler owns the outer alarm-index loop, including other types.
+    // Whole-pixel births for effects that create without binary64
+    // (TimeShardParticle::createWhole).
+    template<class Random> Handle createWhole(std::int32_t x,std::int32_t y,bool lowSpec,Random& random){
+        return createWith([&](Effect& e){e.x.v=x;e.y.v=y;return true;},
+                          [&](Effect& e){return e.createWhole(x,y,lowSpec,random);});
+    }
+    // Global scheduler owns the outer alarm-index loop    // Global scheduler owns the outer alarm-index loop, including other types.
     void advanceAlarm(Phase phase,unsigned index){
         if(!succeeded_)return;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
@@ -241,6 +226,30 @@ public:
         }
     }
 private:
+    template<class Place,class Make> Handle createWith(Place place,Make make){
+        if(!succeeded_||(!deferCleanup_&&!retireRequested()))return 0;
+        if(!next_ || count_==Capacity)return 0;
+        for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
+            auto& slot=slots_[index];slot.effect=Effect{};
+            if(!place(slot.effect))return 0;
+            slot.handle=next_++;slot.sourceId=slot.handle;
+            for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
+            order_[0]=index;++count_;
+            if(birth_&&!birth_(context_,slot.handle,slot.effect,slot.sourceId)){
+                succeeded_=false;return 0;
+            }
+            if(!slot.sourceId||slot.sourceId>0x7fffffffu){succeeded_=false;return 0;}
+            for(unsigned i=1;i<count_;++i)if(slots_[order_[i]].sourceId==slot.sourceId){
+                succeeded_=false;return 0;
+            }
+            if(!make(slot.effect)||
+               (created_&&!created_(context_,slot.handle,slot.sourceId,slot.effect))){
+                succeeded_=false;return 0;
+            }
+            return slot.handle;
+        }
+        return 0;
+    }
     template<class Random,class Meeting,class Outside>
     bool stepOne(Slot& slot,const AlarmBank* alarms,bool stopped,Random& random,Meeting meeting,Outside outside){
         bool eligible=true;if(!eventEligible(slot,eligible))return false;

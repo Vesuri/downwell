@@ -63,7 +63,7 @@ struct TimeShardBurst {
             scattered16=direction16+std::int32_t(random.nextU32()>>16)*90-45*65536;
             speed16=std::int32_t(random.nextU32()>>16)*5+65536;
             // Complete all six child Create draws before evaluating lengthdir.
-            const auto handle=effects.create(MotionBinary64::fromInteger(px),MotionBinary64::fromInteger(py),lowSpec,random);
+            const auto handle=effects.createWhole(px,py,lowSpec,random);
             shard=effects.sourceId(handle);
             auto* child=effects.get(handle);
             if(!child)return false;

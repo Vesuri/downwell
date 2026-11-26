@@ -57,6 +57,50 @@ struct TimeShardParticle {
         disappearing=birth.disappearing;noTouch=birth.noTouch;destroyRequested=false;
         return true;
     }
+    // TimeShardBirth::create on whole pixels with no binary64: the same RNG
+    // draws in order (irandom(3) - 2, choose(7), choose(5), random(7) and the
+    // alarm), image_speed as the binary32 the table narrows to, and random(7)
+    // narrowed once to binary32 (7 * word / 2^32 is exact in binary64).
+    template<class Random> bool createWhole(std::int32_t px,std::int32_t py,bool lowSpec,Random& random){
+        if(px< -(1<<14)||px>=(1<<14)||py< -(1<<14)||py>=(1<<14))return false;
+        x.v=px;y.v=py;x16=px*65536;y16=py*65536;
+        xsp=(std::int32_t(random.irandomSmall(4))-2)*65536;
+        static constexpr std::int32_t vertical[]={0,-1,-1,-1,-2,-2,-3};
+        ysp=vertical[random.chooseIndexSmall(7)]*65536;
+        shardLimit=lowSpec?3:20;
+        // -0.5, -0.3, 0, 0.3, 0.5 narrowed to binary32.
+        static constexpr std::uint32_t rates[]={0xbf000000u,0xbe99999au,0,0x3e99999au,0x3f000000u};
+        savedSpeed=RunnerImageValue{rates[random.chooseIndexSmall(5)]};imageSpeed=savedSpeed;
+        imageIndex=RunnerImageValue{seventhsBinary32(random.nextU32())};
+        alarm0=90+int(random.randomIntegerSmall(70));alarm1=40;alarm2=30;dflash=-1;
+        timeline={};timed=false;frame27=0;
+        disappearing=false;noTouch=true;destroyRequested=false;
+        return true;
+    }
+    // Round-to-nearest-even binary32 of 7 * word / 2^32, on 32-bit words
+    // (the product has at most three bits above the low word).
+    static std::uint32_t seventhsBinary32(std::uint32_t word){
+        if(!word)return 0;
+        const std::uint32_t low=word*7u;
+        const std::uint32_t high=((word>>16)*7u+(((word&0xffffu)*7u)>>16))>>16;
+        int top;std::uint32_t mantissa,rest=0,half=0;
+        if(high){
+            top=high>=4?34:high>=2?33:32;
+            const int shift=top-23; // 9..11
+            mantissa=(high<<(32-shift))|(low>>shift);
+            rest=low&((1u<<shift)-1u);half=1u<<(shift-1);
+        }else{
+            top=31;while(!(low>>top))--top;
+            if(top<=23)mantissa=low<<(23-top);
+            else{
+                const int shift=top-23; // 1..8
+                mantissa=low>>shift;rest=low&((1u<<shift)-1u);half=1u<<(shift-1);
+            }
+        }
+        if(half&&(rest>half||(rest==half&&(mantissa&1u))))++mantissa;
+        if(mantissa>>24){mantissa>>=1;++top;}
+        return (std::uint32_t(top-32+127)<<23)|(mantissa&0x7fffffu);
+    }
     // scrTimeShard's lengthdir velocity writes, after Create.
     void setVelocity(std::int32_t horizontal,std::int32_t vertical){xsp=horizontal;ysp=vertical;}
     // TimeShardAnimation::advanceImage: the first advance reconciles

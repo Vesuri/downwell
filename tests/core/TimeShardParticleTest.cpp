@@ -31,6 +31,19 @@ int pixel(downwell::RunnerImageValue v){std::int32_t n;checkAt(v.promoted().roun
 std::int32_t q16(N v){downwell::Fixed16 f;checkAt(downwell::Fixed16::fromBinary64(v,f),__LINE__);return f.v;}
 }
 int main(){
+    // random(7) narrowed to binary32: the native rounding against the VM's
+    // binary64 product and its narrowing, on edge words and a stride.
+    {
+        unsigned checked=0;
+        const auto one=[&](std::uint32_t word){
+            N index;check(downwell::randomBinary64(word,N::fromInteger(7),index));
+            downwell::RunnerImageValue reference;check(reference.assign(index));
+            check(downwell::TimeShardParticle::seventhsBinary32(word)==reference.bits);++checked;
+        };
+        for(std::uint32_t w=0;w<4096;++w){one(w);one(0xffffffffu-w);one(0x80000000u+w-2048);}
+        for(std::uint64_t w=0;w<=0xffffffffu;w+=65521)one(std::uint32_t(w));
+        std::printf("Time shard random(7): %u words narrow as the VM does\n",checked);
+    }
     unsigned bursts=0,shards=0,steps=0,pixelDifferences=0,streamsParted=0,meetings=0,hits=0,timed=0;
     std::int32_t worstVelocity=0;
     for(unsigned seed=0;seed<512;++seed){
