@@ -7951,7 +7951,7 @@ int main(){
             assert(world->createGeneratedInstance({60,x,640},objects,[](const auto&){return true;})&&walls.append(60,x,640));
             assert(world->createGeneratedInstance({93,x,640},objects,[](const auto&){return true;}));
         }
-        world->configureSolidResolver(nullptr,&walls,nullptr,nullptr,[](void* context,const ContactBounds& bounds,unsigned& count){
+        world->configureSolidResolver(nullptr,&walls,nullptr,nullptr,[](void* context,const ContactBounds& bounds,unsigned,unsigned& count){
             count=0;return static_cast<TerrainWallContacts<16>*>(context)->visit(bounds,
                 [](int,int,int){return true;},[&](){++count;return true;});
         },[](void*,const ContactBounds& bounds,bool& hit){
@@ -8150,7 +8150,7 @@ int main(){
             auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,moving->enemyBinding(),
                 moving->breakableBinding(),moving->playerBinding(),&moving->terrain());
             assert(moving->attach(*scene)&&scene->createGeneratedInstance({92,240,544},objects,[](const auto&){return true;}));
-            scene->configureSolidResolver(nullptr,nullptr,nullptr,nullptr,[](void*,const ContactBounds& bounds,unsigned& count){
+            scene->configureSolidResolver(nullptr,nullptr,nullptr,nullptr,[](void*,const ContactBounds& bounds,unsigned,unsigned& count){
                 count=contactBoundsOverlap(bounds,{232,248,536,552})?1:0;return true;
             },[](void*,const ContactBounds&,bool& hit){hit=false;return true;});
             struct Queries {

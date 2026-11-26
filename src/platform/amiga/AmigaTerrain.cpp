@@ -459,9 +459,10 @@ bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y) {
     return (indexCell(index, x, y) & roomWallCell) != 0;
 }
 
-// Counts every overlapping parentWall instance: each cell's coincident walls
-// and flagged box, then the overflow records. Callers need multiplicity only.
-bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count){
+// Counts every overlapping parentWall instance, up to limit: each cell's
+// coincident walls and flagged box, then the overflow records. Callers need
+// multiplicity only, and place_meeting callers only whether there is one.
+bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned limit,unsigned& count){
     count=0;
     const auto& context=*static_cast<const AmigaTerrainCollisionContext*>(opaque);
     if(!context.index || !context.index->wallContactsComplete)return false;
@@ -471,8 +472,31 @@ bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds&
         if(object==293)return context.runtime->gemChunkSolidAt(x,y);
         return object!=92 || context.runtime->breakableActiveAt(x-240,y-176);
     };
-    if(query.left>=query.right || query.top>=query.bottom || query.right<=-521 ||
+    if(!limit||query.left>=query.right || query.top>=query.bottom || query.right<=-521 ||
        query.left>=1546 || query.bottom<=-8 || query.top>=8201)return true;
+#ifndef DOWNWELL_REFERENCE_WALL_CONTACT_SCAN
+    // The cells whose 16x16 contact box (mask 585: -8..8 about the cell
+    // origin) overlaps, exactly: no per-cell bounds test. A cell at column c
+    // spans [minX+16c-8, minX+16c+8), so it overlaps when
+    // left-8-minX < 16c < right+8-minX; rows likewise from y 0.
+    static_assert(AmigaTerrainIndex::minX==-512,"column origin");
+    int firstRow=((query.top-8)>>4)+1,lastRow=(query.bottom+7)>>4;
+    int firstColumn=((query.left+504)>>4)+1,lastColumn=(query.right+519)>>4;
+    if(firstRow<0)firstRow=0;
+    if(lastRow>=AmigaTerrainIndex::rows)lastRow=AmigaTerrainIndex::rows-1;
+    if(firstColumn<0)firstColumn=0;
+    if(lastColumn>=AmigaTerrainIndex::columns)lastColumn=AmigaTerrainIndex::columns-1;
+    for(int row=firstRow;row<=lastRow;++row){
+        const unsigned char* cell=index.cells+row*AmigaTerrainIndex::columns+firstColumn;
+        for(int column=firstColumn;column<=lastColumn;++column,++cell){
+            const unsigned flags=*cell;
+            if(!(flags&(wallContactMask|breakableCell)))continue;
+            count+=flags/wallContactUnit;
+            if((flags&breakableCell) && active(92,AmigaTerrainIndex::minX+column*16,row*16))++count;
+            if(count>=limit)return true;
+        }
+    }
+#else
     // Superset of the cells whose 16x16 contact box can overlap; each is tested exactly.
     const int firstRow=query.top<=9?0:(query.top-9)/16;
     const int lastRow=query.bottom>=8184?AmigaTerrainIndex::rows-1:(query.bottom+8)/16;
@@ -488,8 +512,12 @@ bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds&
             if(!downwell::contactBoundsOverlap(query,{x+local.left,x+local.right,y+local.top,y+local.bottom}))continue;
             count+=flags/wallContactUnit;
             if((flags&breakableCell) && active(92,x,y))++count;
+            if(count>=limit)return true;
         }
-    return index.extraContacts.visit(query,active,[&](){++count;return true;});
+#endif
+    if(!index.extraContacts.size())return true;
+    bool full=false;
+    return index.extraContacts.visit(query,active,[&](){full=++count>=limit;return !full;})||full;
 }
 
 unsigned amigaTerrainContacts(const AmigaTerrainIndex& index, int objectId, int x, int y) {

@@ -257,7 +257,7 @@ bool amigaResolveTerrainCorners(void*,int left,int top,int right,int bottom);
 downwell::SolidCellGrid amigaTerrainSolidCells(const AmigaTerrainCollisionContext& context);
 bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path);
-bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count);
+bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned limit,unsigned& count);
 // Object 93 only, not every member of parentThinwall (87).
 bool amigaResolveTerrainPlatformContact(void* opaque,const downwell::ContactBounds& query,bool& hit);
 

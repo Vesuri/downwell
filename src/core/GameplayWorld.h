@@ -136,7 +136,9 @@ public:
     static constexpr unsigned breakableCapacity = 512;
     typedef bool (*SolidResolver)(void* context, int x, int y);
     typedef bool (*SegmentResolver)(void* context, const downwell::ProjectileSegment& path);
-    using WallContactResolver = bool (*)(void*,const downwell::ContactBounds&,unsigned&);
+    // Counts the parentWall instances overlapping the bounds, stopping once the
+    // count reaches limit: place_meeting callers need only the first.
+    using WallContactResolver = bool (*)(void*,const downwell::ContactBounds&,unsigned limit,unsigned&);
     using PlatformContactResolver = bool (*)(void*,const downwell::ContactBounds&,bool&);
     // Called once after existing alarms and camera Step, before bullets and
     // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
@@ -900,7 +902,7 @@ public:
             !downwell::CurrencyCollisionBounds::calculate(r->maskId<0?r->spriteId:r->maskId,x,y,bounds))
             return run_.effectsSucceeded=false;
         unsigned count=0;
-        if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+        if(!wallContactResolver_(solidResolverContext_,bounds,1,count))return run_.effectsSucceeded=false;
         bool found=count!=0;
         if(!run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))return run_.effectsSucceeded=false;
         hit=found;return true;
@@ -2227,7 +2229,7 @@ public:
     // (W1.4) ask for wall contacts and fail the effects without a resolver.
     void configureOpenSpaceContacts() {
         configureSolidResolver(nullptr,nullptr,nullptr,nullptr,
-            [](void*,const downwell::ContactBounds&,unsigned& count){count=0;return true;},
+            [](void*,const downwell::ContactBounds&,unsigned,unsigned& count){count=0;return true;},
             [](void*,const downwell::ContactBounds&,bool& found){found=false;return true;});
     }
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,

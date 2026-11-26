@@ -237,8 +237,11 @@ void verifyContactMultiplicity() {
             require(reference.visit(query,[&](unsigned object,int bx,int by){
                 return object!=92||!context.runtime||context.runtime->breakableActiveAt(bx-240,by-176);
             },[&]{++expected;return true;}),"reference query");
-            require(amigaResolveTerrainWallContacts(&context,query,actual)&&actual==expected,
+            require(amigaResolveTerrainWallContacts(&context,query,~0u,actual)&&actual==expected,
                 "cell counts report every overlapping instance");
+            for(unsigned limit:{1u,2u}){unsigned limited=0;
+                require(amigaResolveTerrainWallContacts(&context,query,limit,limited)&&limited<=expected&&
+                    (limited>=limit||limited==expected),"a limited query stops once it reaches its limit");}
             for(int sprite:{133,134}){
                 auto gx=downwell::MotionBinary64::fromInteger(left),gy=downwell::MotionBinary64::fromInteger(top);
                 downwell::ContactBounds gem;
@@ -247,7 +250,7 @@ void verifyContactMultiplicity() {
                 expected=actual=0;
                 require(reference.visit(gem,[&](unsigned object,int bx,int by){
                     return object!=92||!context.runtime||context.runtime->breakableActiveAt(bx-240,by-176);
-                },[&]{++expected;return true;})&&amigaResolveTerrainWallContacts(&context,gem,actual)&&actual==expected,
+                },[&]{++expected;return true;})&&amigaResolveTerrainWallContacts(&context,gem,~0u,actual)&&actual==expected,
                     "currency queries retain coincident walls and box retirement");
                 bool expectedPlatform=false,actualPlatform=false;
                 for(auto p:platforms)expectedPlatform|=downwell::contactBoundsOverlap(gem,{p.first-8,p.first+8,p.second-8,p.second-6});
@@ -302,10 +305,10 @@ void verifyTerrainSegments() {
             amigaAddTerrainObject(index, 60, 256, 192), "segment test tiles register");
     require(amigaAddTerrainObject(index,60,256,192),"duplicate wall Create is retained separately");
     unsigned contacts=0;
-    require(amigaResolveTerrainWallContacts(&context,{247,250,183,186},contacts) && contacts==3,
+    require(amigaResolveTerrainWallContacts(&context,{247,250,183,186},~0u,contacts) && contacts==3,
         "native query reports box and both overlapping wall instances");
     index.wallContactsComplete=false;
-    require(!amigaResolveTerrainWallContacts(&context,{247,250,183,186},contacts),
+    require(!amigaResolveTerrainWallContacts(&context,{247,250,183,186},~0u,contacts),
         "reconstructed occupancy cannot masquerade as actual collision instances");
     index.wallContactsComplete=true;
     AmigaPortRuntime runtime(0);
@@ -315,7 +318,7 @@ void verifyTerrainSegments() {
     for (unsigned state = 0; state < 3; ++state) {
         if (state) context.runtime = &runtime;
         if (state == 2) runtime.configureBreakables(&bx, &by, 0);
-        require(amigaResolveTerrainWallContacts(&context,{247,250,183,186},contacts) && contacts==(state==2?2u:3u),
+        require(amigaResolveTerrainWallContacts(&context,{247,250,183,186},~0u,contacts) && contacts==(state==2?2u:3u),
             "native contact query filters destroyed boxes without merging walls");
         for (int x = -40; x <= 40; ++x) for (int y = -40; y <= 40; ++y) {
             const bool corners = amigaResolveTerrainSolid(&context, x-4, y-4) ||

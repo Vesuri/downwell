@@ -2234,7 +2234,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // These retained adapters still need replacement by the mixed source pass.
     run_.collideSmokeWalls([&](const downwell::ContactBounds& bounds,auto emit){
         unsigned count=0;
-        if(wallContactResolver_ && !wallContactResolver_(solidResolverContext_,bounds,count))return false;
+        if(wallContactResolver_ && !wallContactResolver_(solidResolverContext_,bounds,~0u,count))return false;
         for(unsigned i=0;i<count;++i)if(!emit())return false;
         return true;
     });
@@ -2618,7 +2618,7 @@ bool GameplayWorld::steeringWallContact(const downwell::ContactBounds& bounds,bo
     // parentWall 57: walls and boxes (resolver) plus the compact shop walls.
     unsigned count=0;
     if(wallContactResolver_){
-        if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+        if(!wallContactResolver_(solidResolverContext_,bounds,1,count))return run_.effectsSucceeded=false;
     }else if(solidResolver_){
         // Worlds without the instance resolver: grid walls and boxes answer
         // every covered pixel, in room offsets, as the bullet fallback does.
@@ -3044,7 +3044,7 @@ bool GameplayWorld::solidContact(const downwell::ContactBounds& bounds,bool plat
     bool found=false;
     if(wallContactResolver_&&(!platforms||platformContactResolver_)){
         unsigned count=0;
-        if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+        if(!wallContactResolver_(solidResolverContext_,bounds,1,count))return run_.effectsSucceeded=false;
         found=count!=0;
     }else if(solidResolver_){
         // Worlds with only a point resolver (host fixtures) scan the mask's
