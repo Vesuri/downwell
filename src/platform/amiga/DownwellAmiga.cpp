@@ -4515,6 +4515,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                 gDownwellActorFailureFrame = actorList.failedFrame;
                 frameReady = false;
             }
+            // The back buffer is off screen (fenced) and its terrain is final:
+            // let the row restore run on the blitter during the composition's
+            // CPU work. A laser or goal field retires its pixels before sync.
+            if(!actorList.rayVisible&&!gameplayRays[back].present()&&
+                    !fieldShape.visible&&!gameplayFields[back].present())
+                gameplayRows.queue(gameDisplay[back], gameBitmap, back);
             using Real = downwell::MotionBinary64;
             bool hardwareEntryCover=false;
             // Immutable cover DMA cannot reproduce shade-subtracted alpha.

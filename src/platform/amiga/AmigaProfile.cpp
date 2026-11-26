@@ -327,12 +327,13 @@ static int censusCameraX;
 // spent draining the effect queue. busy: ticks from the update's first
 // queued effect stamp to the end of its first drain (everything queued ahead
 // of the stamps included). serial: EFFECT_BLIT_CENSUS=2's blitter ticks per
-// DownwellEffectBlit kind. clears: the clear's rectangle blits.
+// DownwellEffectBlit kind. clears: the clear's rectangle blits. sync: the
+// gameplay row sync's copied words, its drain ticks and its copy runs.
 struct DownwellEffectCensusRecord {
-    ULONG words[4], clearWords, publishWords, wait, busy, serial[6];
-    UWORD stamps[4], drains, clears;
+    ULONG words[4], clearWords, publishWords, wait, busy, serial[6], syncWords, syncWait;
+    UWORD stamps[4], drains, clears, syncRuns, pad;
 };
-static_assert(sizeof(DownwellEffectCensusRecord) == 68, "effect census layout");
+static_assert(sizeof(DownwellEffectCensusRecord) == 80, "effect census layout");
 extern "C" { DownwellEffectCensusRecord gDownwellEffectCensus[DOWNWELL_CENSUS_UPDATES]; }
 static DownwellEffectCensusRecord effectCurrent;
 static ULONG effectFirst, effectWaitStart;
@@ -356,6 +357,12 @@ void downwellEffectPublishCensus(unsigned long words) { effectCurrent.publishWor
 void downwellEffectSerialCensus(DownwellEffectBlit kind, unsigned long ticks)
 {
     effectCurrent.serial[kind] += ticks;
+}
+void downwellRowSyncCensus(unsigned long words, unsigned runs, unsigned long ticks)
+{
+    effectCurrent.syncWords += words;
+    effectCurrent.syncRuns += runs;
+    effectCurrent.syncWait += ticks;
 }
 #endif
 #ifdef DOWNWELL_BLIT_CENSUS

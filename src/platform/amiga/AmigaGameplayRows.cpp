@@ -58,10 +58,10 @@ void AmigaGameplayRows::copied(unsigned first, unsigned count, unsigned buffer) 
 #endif
 }
 
-void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigned buffer) {
-    DW_PROFILE_SCOPE(profileGameCopy);
+void AmigaGameplayRows::queue(Bitmap& destination, const Bitmap& backing, unsigned buffer) {
     if (!pending_[buffer]) return;
     pending_[buffer] = false;
+    queued_ = true;
 #ifndef DOWNWELL_FRAME_WORK_CANDIDATE
     const unsigned char bit = static_cast<unsigned char>(1u << buffer);
 #endif
@@ -69,6 +69,10 @@ void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigne
     const unsigned end = end_[buffer];
     first_[buffer] = downwellGameRingHeight;
     end_[buffer] = 0;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    unsigned long syncWords = 0;
+    unsigned syncRuns = 0;
+#endif
     while (row < end) {
 #ifndef DOWNWELL_FRAME_WORK_CANDIDATE
 #ifdef DOWNWELL_ROW_SYNC_AUDIT
@@ -95,9 +99,29 @@ void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigne
         const unsigned x = initialized_[buffer] ? terrainX : 0;
         const unsigned width = initialized_[buffer] ? terrainWords * 16 : downwellDmaWidth;
         destination.copy(backing, x, first, x, first, width, row - first);
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+        syncWords += (unsigned long)(width / 16) * (row - first) * destination.bitplanes;
+        ++syncRuns;
+#endif
     }
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    downwellRowSyncCensus(syncWords, syncRuns, 0);
+#endif
+    initialized_[buffer] = true;
+}
+
+void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigned buffer) {
+    DW_PROFILE_SCOPE(profileGameCopy);
+    queue(destination, backing, buffer);
+    if (!queued_) return;
+    queued_ = false;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    const unsigned long syncStart = downwellEffectCensusTick();
+#endif
     AmigaHardware::setBlitterNasty(true);
     AmigaHardware::blitterDrain();
     AmigaHardware::setBlitterNasty(false);
-    initialized_[buffer] = true;
+#ifdef DOWNWELL_EFFECT_BLIT_CENSUS
+    downwellRowSyncCensus(0, 0, downwellEffectCensusTick() - syncStart);
+#endif
 }

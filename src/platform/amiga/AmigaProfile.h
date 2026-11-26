@@ -38,5 +38,7 @@ void downwellEffectBlitCensus(DownwellEffectBlit kind, unsigned long words);
 void downwellEffectWaitCensus(bool begin);
 unsigned long downwellEffectCensusTick();
 void downwellEffectSerialCensus(DownwellEffectBlit kind, unsigned long ticks);
+// The gameplay row sync's copied words (all planes), runs and drain ticks.
+void downwellRowSyncCensus(unsigned long words, unsigned runs, unsigned long ticks);
 #endif
 #endif

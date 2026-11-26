@@ -12,7 +12,7 @@ class AmigaGameplayRows {
 #else
     AmigaRowDebt<downwellGameRingHeight> debt_[2];
 #endif
-    bool pending_[2]{}, initialized_[2]{};
+    bool pending_[2]{}, initialized_[2]{}, queued_{};
     unsigned first_[2]{downwellGameRingHeight, downwellGameRingHeight};
     unsigned end_[2]{};
 public:
@@ -32,6 +32,12 @@ public:
     // The pending range may
     // remain conservative; sync skips these rows without copying them again.
     void copied(unsigned first, unsigned count, unsigned buffer);
+    // Queue the copies of every row dirty so far without waiting for them.
+    // Only once the buffer's previous list is off screen, and only while no
+    // display-resident pixels (laser, goal field) still have to be retired
+    // before their rows are restored.
+    void queue(Bitmap& destination, const Bitmap& backing, unsigned buffer);
+    // Queue the remaining rows, then wait until the buffer matches the backing.
     void sync(Bitmap& destination, const Bitmap& backing, unsigned buffer);
 };
 #endif
