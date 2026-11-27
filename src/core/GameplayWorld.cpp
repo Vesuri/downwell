@@ -2606,7 +2606,7 @@ bool GameplayWorld::createCompactSpawner(int y){
     // scrBuilder's spawner: spawnerSet1, or hardSet1 in hard mode.
     if(compactSpawnerLive_||run_.stage.area!=1||
        !compactSpawner_.createCaverns(run_.stage.level,run_.hardMode))return run_.effectsSucceeded=false;
-    compactSpawnerY_=downwell::MotionBinary64::fromInteger(y);
+    compactSpawnerY_=y;
     compactSpawnerMask_=-1;compactSpawnerLive_=true;
     return true;
 }
@@ -2634,10 +2634,18 @@ bool GameplayWorld::steeringWallContact(const downwell::ContactBounds& bounds,bo
     hit=found;return true;
 }
 
-bool GameplayWorld::steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+bool GameplayWorld::steeringWallMeeting(int mask,int x,int y,bool& hit){
+    downwell::ContactBounds bounds;
+    if(x< -32767||x>32767||y< -32767||y>32767||
+       !downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,x*65536,y*65536,bounds))return run_.effectsSucceeded=false;
+    return steeringWallContact(bounds,hit);
+}
+
+bool GameplayWorld::steeringEnemyMeeting(int mask,int x,int y,bool& hit){
     // subparentEnemy 83: every compact family. Deactivated records are absent.
     downwell::ContactBounds bounds;
-    if(!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
+    if(x< -32767||x>32767||y< -32767||y>32767||
+       !downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,x*65536,y*65536,bounds))return run_.effectsSucceeded=false;
     hit=false;
     for(unsigned i=0;i<enemyCount_&&!hit;++i){
         const auto& enemy=enemies_[i];
@@ -2650,23 +2658,25 @@ bool GameplayWorld::steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,dow
 }
 
 struct GameplayWorld::SpawnerOps {
-    using Real=downwell::MotionBinary64;
     GameplayWorld& world;long cameraQ8;
-    bool playerY(Real& value){
-        Real x;return downwell::ContactCoordinates::playerGlobals(world.player_.frameStartXFixed(),
-            world.player_.frameStartYFixed(),240,176,x,value);
+    // ply: the frame-start Q8 offset plus the room origin.
+    bool playerYQ8(std::int32_t& value){
+        const long q8=world.player_.frameStartYFixed();
+        if(q8< -0x20000000L||q8>0x20000000L)return false;
+        value=std::int32_t(q8)+176*256;return true;
     }
     bool area(int& value){value=world.run_.stage.area;return true;}
-    bool fallDepth(Real& value){
-        if(world.playerChildrenStarted_)return world.sourceFallDepth(value);
-        // global.falldepth = yy - objDepthMeter.y; the meter keeps the birth
-        // y. yy is the Q8 player offset plus 176, so the difference is a Q8
-        // integer and its binary64 is exact: fromInteger, then /256.
+    // global.falldepth = yy - objDepthMeter.y, a Q8 value: the meter keeps
+    // the birth y and yy is the Q8 player offset plus 176.
+    bool fallDepthQ8(std::int32_t& value){
+        if(world.playerChildrenStarted_){
+            downwell::MotionBinary64 depth;downwell::Fixed16 q;
+            if(!world.sourceFallDepth(depth)||!downwell::Fixed16::fromBinary64(depth,q)||(q.v&255))return false;
+            value=q.v>>8;return true;
+        }
         const std::int32_t offset=world.player_.offsetYFixed(),meter=176-world.depthMeterY_;
         if(offset< -0x20000000||offset>0x20000000||meter< -0x100000||meter>0x100000)return false;
-        const std::int32_t q8=offset+meter*256;
-        value=Real::fromInteger(q8);
-        if(q8)value.high-=8u<<20;
+        value=offset+meter*256;
         return true;
     }
     bool death(bool& value){value=world.dead();return true;}
@@ -2687,7 +2697,7 @@ struct GameplayWorld::SpawnerOps {
         }
     }
     bool mask(int value){world.compactSpawnerMask_=value;return true;}
-    bool meeting(Real x,Real y,int object,bool& hit){
+    bool meeting(int x,int y,int object,bool& hit){
         const int mask=world.compactSpawnerMask_<0?702:world.compactSpawnerMask_;
         if(object==57)return world.steeringWallMeeting(mask,x,y,hit);
         if(object==83)return world.steeringEnemyMeeting(mask,x,y,hit);
@@ -2696,12 +2706,13 @@ struct GameplayWorld::SpawnerOps {
     // Compact walls are never replaced by depth-100 tiles: where the original
     // finds a tile, this world still has the wall, which obstructs the same
     // retry. The final wall-only test then rejects both identically.
-    bool tile(int depth,Real,Real,bool& hit){hit=false;return depth==100;}
-    bool viewY(Real& value){
-        value=exactQ8(cameraQ8);return value.add(Real::fromInteger(34));
+    bool tile(int depth,int,int,bool& hit){hit=false;return depth==100;}
+    bool viewYQ8(std::int32_t& value){
+        if(cameraQ8< -0x20000000L||cameraQ8>0x20000000L)return false;
+        value=std::int32_t(cameraQ8)+34*256;return true;
     }
-    bool viewHeight(Real& value){value=Real::fromInteger(284);return true;}
-    bool create(int object,Real x,Real y,unsigned& id){
+    bool viewHeight(int& value){value=284;return true;}
+    bool create(int object,int x,int y,unsigned& id){
         id=1;return world.createSpawnedEnemy(object,x,y);
     }
     bool deactivate(unsigned){return true;} // Children are created inactive.
@@ -2714,10 +2725,8 @@ bool GameplayWorld::stepCompactSpawner(long generationCameraY){
     return true;
 }
 
-bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y){
-    std::int32_t px,py;
-    if(!run_.effectsSucceeded||!x.roundPixel(px)||!y.roundPixel(py)||enemyCount_>=enemyCapacity)
-        return run_.effectsSucceeded=false;
+bool GameplayWorld::createSpawnedEnemy(int object,int px,int py){
+    if(!run_.effectsSucceeded||enemyCount_>=enemyCapacity)return run_.effectsSucceeded=false;
     if(object==114)return createEyefish(px,py);
     if(object==116){
         // enmBat Create, as AreaOneBuilder's: one discarded word, then heading.

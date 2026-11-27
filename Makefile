@@ -950,6 +950,14 @@ verify-time-shard-particle: build/time-shard-particle-test
 build/time-shard-particle-test: tests/core/TimeShardParticleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardParticleTest.cpp src/core/GameMakerRandom.cpp
+.PHONY: verify-spawner-fixed
+test: verify-spawner-fixed
+verify-spawner-fixed: build/spawner-fixed-test
+	./build/spawner-fixed-test
+build/spawner-fixed-test: tests/core/SpawnerFixedStepTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SpawnerFixedStepTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-red-ball-fixed
 test: verify-red-ball-fixed
 verify-red-ball-fixed: build/red-ball-fixed-test

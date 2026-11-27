@@ -38,6 +38,7 @@
 #include "core/GameplayRedBalls.h"
 #include "core/WhiteJellyFixedStep.h"
 #include "core/RedBallFixedStep.h"
+#include "core/SpawnerFixedStep.h"
 #include "core/GameplayShopInstances.h"
 #include "core/CompactShopSpeech.h"
 #include "core/MovingFxInstances.h"
@@ -3185,8 +3186,8 @@ private:
     static constexpr unsigned steeringCapacity=24;
     SteeringActor steering_[steeringCapacity];
     std::uint32_t steeringOwner_[steeringCapacity]{};
-    downwell::SpawnerStep compactSpawner_;
-    downwell::MotionBinary64 compactSpawnerY_{};
+    downwell::SpawnerFixedStep compactSpawner_;
+    int compactSpawnerY_=0;
     int compactSpawnerMask_=-1;
     bool compactSpawnerLive_=false;
     unsigned steeringPopulation_=0; // Owned pool slots; gates the contact pass.
@@ -3199,7 +3200,7 @@ private:
     void releaseSteering(const EnemyState& enemy);
     bool createCompactSpawner(int y);
     bool stepCompactSpawner(long generationCameraY);
-    bool createSpawnedEnemy(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    bool createSpawnedEnemy(int object,int px,int py);
     bool stepSteeringEnemy(EnemyState& enemy);
     bool createEyefish(int x,int y);
     bool stepEyefish(EnemyState& enemy);
@@ -3207,8 +3208,9 @@ private:
     bool hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTurns,int damage);
     bool collideSteeringEnemies();
     bool steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+    bool steeringWallMeeting(int mask,int x,int y,bool& hit); // whole room pixels
     bool steeringWallContact(const downwell::ContactBounds& bounds,bool& hit);
-    bool steeringEnemyMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+    bool steeringEnemyMeeting(int mask,int x,int y,bool& hit);
 
     // Compact world-one effect chains (W1.3): box destruction, scenery
     // (Scattered16 289, gemChunk 293, TorchFire 295, Torch 296), debris 370,
