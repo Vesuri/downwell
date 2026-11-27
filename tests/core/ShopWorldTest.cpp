@@ -231,23 +231,22 @@ int main() {
             downwell::RunSession run;
             run.shops=world;
             struct Random { unsigned draws=0;std::uint32_t nextU32(){++draws;return 0;} } random;
-            const auto handle=run.smokeEffects.create(downwell::MotionBinary64::fromInteger(45),{},random);
+            const auto handle=run.smokeEffects.create(downwell::Fixed16::fromInteger(45),{},random);
             require(handle!=0,"session collision fixture creates smoke at the table/case seam");
             auto& smoke=*run.smokeEffects.get(handle);
             const auto before=smoke.speed;
             run.collideSmokeShopWalls();
-            require(smoke.speed.high==before.high && smoke.speed.low==before.low,"nocol suppresses live shop responses");
+            require(smoke.speed==before,"nocol suppresses live shop responses");
             smoke.alarm0();
             run.collideSmokeShopWalls();
-            double expected=2.0;expected*=0.2;expected*=0.2;
-            std::uint64_t bits;std::memcpy(&bits,&expected,sizeof(bits));
-            require(run.effectsSucceeded && smoke.speed.high==std::uint32_t(bits>>32) &&
-                smoke.speed.low==std::uint32_t(bits) && random.draws==3,
+            using Q=downwell::Fixed16;
+            const Q expected=Q::multiply(Q::multiply(Q::fromInteger(2),Q::raw(13107)),Q::raw(13107)); // 2 * 0.2 * 0.2
+            require(run.effectsSucceeded && smoke.speed==expected && random.draws==3,
                 "shared session applies separate case and table responses without RNG");
             smoke.destroyRequested=true;
             const auto retiredSpeed=smoke.speed;
             run.collideSmokeShopWalls();
-            require(smoke.speed.high==retiredSpeed.high && smoke.speed.low==retiredSpeed.low,
+            require(smoke.speed==retiredSpeed,
                 "pending smoke destruction suppresses shop collision dispatch");
         }
         // Independently enumerate the source default child rectangles, rather

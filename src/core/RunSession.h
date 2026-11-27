@@ -518,16 +518,16 @@ struct RunSession {
     void advanceFlashAnimation(){
         if(effectsSucceeded)effectsSucceeded=flashEffects.advanceAnimation(flashEffects.beginAnimation());
     }
-    bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+    bool emitFlashBurst(Fixed16 x,Fixed16 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=flashEffects.skeletonBurst(x,y,random);
         return effectsSucceeded;
     }
     template<unsigned Count,unsigned Variation,unsigned Radius>
-    bool emitFlash(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+    bool emitFlash(Fixed16 x,Fixed16 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=flashEffects.template burst<Count,Variation,Radius>(x,y,random);
         return effectsSucceeded;
     }
-    bool emitBoxFlash(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+    bool emitBoxFlash(Fixed16 x,Fixed16 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=flashEffects.boxBurst(x,y,random);
         return effectsSucceeded;
     }
@@ -579,12 +579,12 @@ struct RunSession {
                 return terrain(bounds,emit) && shops.visitWallContacts(bounds,emit);
             });
     }
-    bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+    bool emitSmokeBurst(Fixed16 x,Fixed16 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.skeletonBurst(x,y,random);
         return effectsSucceeded;
     }
     // The box script supplies y+4; do not add its offset a second time here.
-    bool emitBoxSmoke(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+    bool emitBoxSmoke(Fixed16 x,Fixed16 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.boxBurst(x,y,random);
         return effectsSucceeded;
     }

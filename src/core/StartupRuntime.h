@@ -2998,14 +2998,16 @@ public:
     }
     bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const SmokeEffects<downwell::RunSession::smokeCapacity>& smokeEffects() const {return run_.smokeEffects;}
-    bool emitBoxSmoke(MotionBinary64 x,MotionBinary64 y){return run_.emitBoxSmoke(x,y,random_);}
-    bool emitBoxFlash(MotionBinary64 x,MotionBinary64 y){return run_.emitBoxFlash(x,y,random_);}
+    bool emitBoxSmoke(Fixed16 x,Fixed16 y){return run_.emitBoxSmoke(x,y,random_);}
+    bool emitBoxFlash(Fixed16 x,Fixed16 y){return run_.emitBoxFlash(x,y,random_);}
+    bool emitBoxSmoke(MotionBinary64 x,MotionBinary64 y){Fixed16 qx,qy;return Fixed16::fromBinary64(x,qx)&&Fixed16::fromBinary64(y,qy)&&run_.emitBoxSmoke(qx,qy,random_);}
+    bool emitBoxFlash(MotionBinary64 x,MotionBinary64 y){Fixed16 qx,qy;return Fixed16::fromBinary64(x,qx)&&Fixed16::fromBinary64(y,qy)&&run_.emitBoxFlash(qx,qy,random_);}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
     const WallBackgroundTiles<RunSession::wallTileCapacity>& wallBackgroundTiles()const{return run_.wallBackground;}
     bool addWallBackground(MotionBinary64 x,MotionBinary64 y){return run_.addWallBackground(x,y);}
-    bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y){return run_.emitSmokeBurst(x,y,random_);}
+    bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y){Fixed16 qx,qy;return Fixed16::fromBinary64(x,qx)&&Fixed16::fromBinary64(y,qy)&&run_.emitSmokeBurst(qx,qy,random_);}
     bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y) {
-        return run_.emitFlashBurst(x,y,random_);
+        Fixed16 qx,qy;return Fixed16::fromBinary64(x,qx)&&Fixed16::fromBinary64(y,qy)&&run_.emitFlashBurst(qx,qy,random_);
     }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     const OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}

@@ -29,15 +29,12 @@ struct FlashBallEffect {
         imageSpeed={0x3e99999au};
         return publish.imageSpeed(imageSpeed);
     }
-    template<class Random> bool create(MotionBinary64 px,MotionBinary64 py,Random& random) {
+    // The compact owner's Create on a Q16 position: x and y take the
+    // binary32 of the jittered Q16 value, once (W3.20).
+    template<class Random> bool create(Fixed16 px,Fixed16 py,Random& random) {
         FlashBallEffect next;
-        if(!next.x.assign(px) || !next.y.assign(py)) return false;
-        auto jitterX=next.x.promoted();
-        if(!jitterX.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2)) ||
-           !next.x.assign(jitterX)) return false;
-        auto jitterY=next.y.promoted();
-        if(!jitterY.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2)) ||
-           !next.y.assign(jitterY)) return false;
+        if(!px.addInteger(int(random.irandomSmall(4))-2) || !next.x.assignQ16(px.v) ||
+           !py.addInteger(int(random.irandomSmall(4))-2) || !next.y.assignQ16(py.v)) return false;
         std::int32_t published;
         if(!next.x.roundPixel(published) || !next.y.roundPixel(published)) return false;
         *this=next;return true;
@@ -87,7 +84,7 @@ public:
         for(unsigned i=0;i<count_;++i)draw(slots_[order_[i]].effect);
     }
     Phase beginAnimation() const {return {nextHandle_?nextHandle_-1u:0xffffffffu};}
-    template<class Random> std::uint32_t create(MotionBinary64 x,MotionBinary64 y,Random& random) {
+    template<class Random> std::uint32_t create(Fixed16 x,Fixed16 y,Random& random) {
         if(!nextHandle_)return 0;
         for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle) {
             auto& slot=slots_[index];
@@ -110,21 +107,21 @@ public:
         count_=kept;
         return true;
     }
-    template<class Random> bool skeletonBurst(MotionBinary64 x,MotionBinary64 y,Random& random) {
-        return skeletonFlashBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+    template<class Random> bool skeletonBurst(Fixed16 x,Fixed16 y,Random& random) {
+        return skeletonFlashBurst(x,y,random,[&](int object,Fixed16 px,Fixed16 py){
             return object==224 && create(px,py,random)!=0;
         });
     }
     // scrFlashballfx(x,y,Count,Variation,Radius) for the compact callers:
     // steering deaths (1,0,0) and opened gem chunks (3,0,5).
     template<unsigned Count,unsigned Variation,unsigned Radius,class Random>
-    bool burst(MotionBinary64 x,MotionBinary64 y,Random& random) {
-        return flashBurstScript<Count,Variation,Radius>(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+    bool burst(Fixed16 x,Fixed16 y,Random& random) {
+        return flashBurstScript<Count,Variation,Radius>(x,y,random,[&](int object,Fixed16 px,Fixed16 py){
             return object==224 && create(px,py,random)!=0;
         });
     }
-    template<class Random> bool boxBurst(MotionBinary64 x,MotionBinary64 y,Random& random) {
-        return boxFlashBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+    template<class Random> bool boxBurst(Fixed16 x,Fixed16 y,Random& random) {
+        return boxFlashBurst(x,y,random,[&](int object,Fixed16 px,Fixed16 py){
             return object==224 && create(px,py,random)!=0;
         });
     }

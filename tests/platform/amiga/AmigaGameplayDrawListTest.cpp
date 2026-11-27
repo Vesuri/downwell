@@ -816,8 +816,8 @@ int main() {
     for(unsigned tick=0;tick<600;++tick) {
         world.step((tick%13==0 ? 4 : 0) | (tick%80<40 ? 1 : 2));
         const int vx=160+world.cameraOffsetX(), vy=34+world.cameraOffsetY();
-        if(tick%61==0) assert(world.emitFlashBurst(downwell::MotionBinary64::fromInteger(vx+40),
-                                                  downwell::MotionBinary64::fromInteger(vy+60)));
+        if(tick%61==0) assert(world.emitFlashBurst(downwell::Fixed16::fromInteger(vx+40),
+                                                  downwell::Fixed16::fromInteger(vy+60)));
         if(tick%61==0)assert(world.emitCorpseExpiry(downwell::MotionBinary64::fromInteger(vx+50),
                                                   downwell::MotionBinary64::fromInteger(vy+80)));
         const auto checkpoint=world.checkpoint();

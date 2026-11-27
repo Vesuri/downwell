@@ -12,6 +12,17 @@
 #include <fstream>
 #include <iterator>
 #include <vector>
+// The registered flash ball's binary64 Create (narrow, jitter, narrow), the
+// oracle for the world-two burst children; the compact owner is Q16.
+template<class Random> static bool flashOracle(downwell::FlashBallEffect& child,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,Random& random){
+    using downwell::MotionBinary64;
+    if(!child.x.assign(x)||!child.y.assign(y))return false;
+    auto jx=child.x.promoted();
+    if(!jx.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2))||!child.x.assign(jx))return false;
+    auto jy=child.y.promoted();
+    return jy.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2))&&child.y.assign(jy);
+}
 static std::vector<unsigned char> load(const char* path){
     std::ifstream input(path,std::ios::binary);return {std::istreambuf_iterator<char>(input),{}};
 }
@@ -542,7 +553,7 @@ int main(){
         SkeletonActor actor;actor.xx=MotionBinary64::fromInteger(240);actor.yy=MotionBinary64::fromInteger(704);
         auto random=world->randomState();SmokeBurstCaller expected;std::vector<FlashBallEffect> children;
         assert((flashBurstPublished<6,2,10>(expected,actor.xx,actor.yy,random,[&](int,auto x,auto y){
-            FlashBallEffect child;if(!child.create(x,y,random))return false;children.push_back(child);return true;
+            FlashBallEffect child;if(!flashOracle(child,x,y,random))return false;children.push_back(child);return true;
         })));
         unsigned next=510000;
         assert(world->emitSkeletonFlash(actor,[&](unsigned& id){id=next++;return true;}));
@@ -637,7 +648,7 @@ int main(){
                 std::vector<FlashBallEffect> expectedFlashes;
                 assert((flashBurstPublished<6,2,10>(expected,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),random,
                     [&](int object,auto x,auto y){FlashBallEffect child;++count;
-                        if(object!=224||!child.create(x,y,random))return false;
+                        if(object!=224||!flashOracle(child,x,y,random))return false;
                         expectedFlashes.push_back(child);return true;})));
                 assert(skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool&){return world->emitSkeletonFlash(flash,actor);}));
                 assert(skeletons.instances().find(skeleton)->state.smokeScript.pvary==10);

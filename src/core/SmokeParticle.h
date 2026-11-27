@@ -1,19 +1,17 @@
 #ifndef DOWNWELL_CORE_SMOKE_PARTICLE_H
 #define DOWNWELL_CORE_SMOKE_PARTICLE_H
-#include "SmokeBirth.h"
 #include "FixedPoint.h"
 namespace downwell {
-// The compact smoke owner's fxSmoke (object 225, sprite 84) with Q16
-// position and velocity (W3 fixed point): within a pixel of SmokeEffect,
-// its VM form and oracle, which the registered room path still runs.
-// Create's RNG samples, speed, direction and the animation rate stay the
-// VM's binary64/binary32 values: Step reads speed and direction once, to
-// set the velocity, and the wall response scales speed only. The animation
-// position is Q16 too (frame16, nine unit frames): imageSpeed keeps the
-// VM's binary32 rate and is converted once per write.
+// The compact smoke owner's fxSmoke (object 225, sprite 84) in Q16 (W3.20):
+// within a pixel of SmokeEffect, its VM form and oracle, which the
+// registered room path still runs. Create's RNG draws are the VM's, in
+// order (random(2) + 2, the rate's random(0.08) + 0.05, random(359)), each
+// sampled as the nearest Q16. Step reads speed and direction once, to set
+// the velocity, and the wall response scales speed only. The animation
+// position and rate are Q16 too (frame16, nine unit frames), so a smoke may
+// end a tick before or after the VM's binary32 timeline.
 struct SmokeParticle {
-    MotionBinary64 speed{},direction{};
-    RunnerImageValue imageSpeed{};
+    Fixed16 speed{},direction{};
     std::int32_t frame16=0,rate16=0;
     std::int32_t xx=0,yy=0,xsp=0,ysp=0,xstart=0,ystart=0; // Q16
     std::int32_t x=0,y=0; // published whole pixels
@@ -25,16 +23,13 @@ struct SmokeParticle {
         if((q16&0xffff)==0x8000&&(whole&1))--whole;
         return whole;
     }
-    template<class Random> bool create(MotionBinary64 px,MotionBinary64 py,Random& random){
-        SmokeBirth birth;
-        Fixed16 fx,fy;
-        if(!birth.create(px,py,random)||!Fixed16::fromBinary64(birth.xx,fx)||
-           !Fixed16::fromBinary64(birth.yy,fy))return false;
+    template<class Random> bool create(Fixed16 px,Fixed16 py,Random& random){
         SmokeParticle next;
-        next.speed=birth.speed;next.direction=birth.direction;
-        if(!next.setRate(birth.imageSpeed))return false;
-        next.xx=next.xstart=fx.v;next.yy=next.ystart=fy.v;
-        next.x=round(fx.v);next.y=round(fy.v);
+        next.speed=Fixed16::random(random.nextU32(),Fixed16::fromInteger(2))+Fixed16::fromInteger(2);
+        if(!next.sampleRate(random))return false;
+        next.direction=Fixed16::random(random.nextU32(),Fixed16::fromInteger(359));
+        next.xx=next.xstart=px.v;next.yy=next.ystart=py.v;
+        next.x=round(px.v);next.y=round(py.v);
         *this=next;return true;
     }
     // Animation runs before Begin Step, as SmokeEffect::advanceImage.
@@ -49,14 +44,10 @@ struct SmokeParticle {
     template<class Random> bool step(Random& random){
         if(!allSet){
             // lengthdir(smokesp, smokedir), then Step's second rate sample.
-            Fixed16 length,angle;
-            if(!Fixed16::fromBinary64(speed,length)||length.v<0||length.v>8*65536||
-               !Fixed16::fromBinary64(direction,angle))return false;
-            xsp=FixedTrig::lengthdir(false,length.v,angle.v);
-            ysp=FixedTrig::lengthdir(true,length.v,angle.v);
-            SmokeBirth rate;rate.speed=speed;
-            if(!rate.sampleImageSpeed(random))return false;
-            if(!setRate(rate.imageSpeed))return false;
+            if(speed.v<0||speed.v>8*65536)return false;
+            xsp=FixedTrig::lengthdir(false,speed.v,direction.v);
+            ysp=FixedTrig::lengthdir(true,speed.v,direction.v);
+            if(!sampleRate(random))return false;
             allSet=true;
         }
         // Integrate the old velocity, publish whole pixels, then damp by 0.9.
@@ -70,16 +61,17 @@ struct SmokeParticle {
     // The source scales smokesp, not the velocity or image_speed.
     bool collideWall(){
         if(noCollision)return true;
-        MotionBinary64 scaled;
-        if(!multiplyBinary64(speed,{0x3fc99999u,0x9999999au},scaled))return false;
-        speed=scaled;return true;
+        speed=Fixed16::multiply(speed,Fixed16::raw(13107)); // 0.2
+        return true;
     }
 private:
     static constexpr std::int32_t frames16=9*65536;
-    bool setRate(RunnerImageValue value){
-        Fixed16 rate;
-        if(!Fixed16::fromBinary64(value.promoted(),rate)||rate.v<0||rate.v>=frames16)return false;
-        imageSpeed=value;rate16=rate.v;return true;
+    // image_speed = smokesp * (random(0.08) + 0.05).
+    template<class Random> bool sampleRate(Random& random){
+        const Fixed16 rate=Fixed16::multiply(speed,
+            Fixed16::random(random.nextU32(),Fixed16::raw(5243))+Fixed16::raw(3277));
+        if(rate.v<0||rate.v>=frames16)return false;
+        rate16=rate.v;return true;
     }
     static std::int32_t damp(std::int32_t q16){
         return std::int32_t((std::int64_t(q16)*58982+0x8000)>>16); // 0.9 in Q16

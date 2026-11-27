@@ -64,6 +64,13 @@ struct RunnerImageValue {
         }
         bits=sign|((top+127u)<<23)|(mantissa&0x7fffffu);return true;
     }
+    // Nearest-even binary32 of q16 / 65536: the integer's narrowing scaled
+    // by 2^-16, which is exact (|q16| >= 1 keeps the exponent normal).
+    bool assignQ16(std::int32_t q16) {
+        if(!assignInteger(q16))return false;
+        if(bits)bits-=16u<<23;
+        return true;
+    }
     bool assign(MotionBinary64 value) {
         const auto sign = value.high & 0x80000000u;
         const auto exponent = (value.high >> 20) & 2047u;

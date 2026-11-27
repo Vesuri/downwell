@@ -31,7 +31,7 @@ public:
         for(unsigned i=0;i<count_;++i)slots_[order_[i]].handle=0;
         count_=0; // Do not reuse handles or make a stale phase match new births.
     }
-    template<class Random> Handle create(MotionBinary64 x,MotionBinary64 y,Random& random){
+    template<class Random> Handle create(Fixed16 x,Fixed16 y,Random& random){
         if(!next_ || count_==Capacity)return 0;
         for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
             if(!slots_[index].effect.create(x,y,random))return 0;
@@ -43,20 +43,20 @@ public:
     }
     // emitSmoke: Create (with its random direction/speed draws), then the
     // caller's direction and speed overwrite those fields.
-    template<class Random> bool emitDirected(MotionBinary64 x,MotionBinary64 y,MotionBinary64 direction,
-                                             MotionBinary64 speed,Random& random){
+    template<class Random> bool emitDirected(Fixed16 x,Fixed16 y,Fixed16 direction,
+                                             Fixed16 speed,Random& random){
         const Handle h=create(x,y,random);
         SmokeParticle* e=h?get(h):nullptr;
         if(!e)return false;
         e->direction=direction;e->speed=speed;return true;
     }
-    template<class Random> bool skeletonBurst(MotionBinary64 x,MotionBinary64 y,Random& random){
-        return skeletonSmokeBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+    template<class Random> bool skeletonBurst(Fixed16 x,Fixed16 y,Random& random){
+        return skeletonSmokeBurst(x,y,random,[&](int object,Fixed16 px,Fixed16 py){
             return object==225 && create(px,py,random)!=0;
         });
     }
-    template<class Random> bool boxBurst(MotionBinary64 x,MotionBinary64 y,Random& random){
-        return boxSmokeBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+    template<class Random> bool boxBurst(Fixed16 x,Fixed16 y,Random& random){
+        return boxSmokeBurst(x,y,random,[&](int object,Fixed16 px,Fixed16 py){
             return object==225 && create(px,py,random)!=0;
         });
     }

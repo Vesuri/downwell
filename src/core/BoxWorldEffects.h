@@ -1,7 +1,7 @@
 #ifndef DOWNWELL_CORE_BOX_WORLD_EFFECTS_H
 #define DOWNWELL_CORE_BOX_WORLD_EFFECTS_H
 #include "InstanceHandle.h"
-#include "MotionBinary64.h"
+#include "FixedPoint.h"
 #include "SoundPlayScript.h"
 namespace downwell {
 // Concrete shared emissions for BoxDestructionScript. Controls supplies the
@@ -25,10 +25,12 @@ struct BoxWorldEffects:Controls {
         return alarm==0&&world.stopBoxAlarm0(box,[&](bool& allowed){return this->timeAllowed(allowed);});
     }
     bool smoke(MotionBinary64 x,MotionBinary64 y,int count,int vary){
-        return count==1&&vary==0&&world.emitBoxSmoke(x,y);
+        Fixed16 qx,qy;
+        return count==1&&vary==0&&Fixed16::fromBinary64(x,qx)&&Fixed16::fromBinary64(y,qy)&&world.emitBoxSmoke(qx,qy);
     }
     bool flash(MotionBinary64 x,MotionBinary64 y,int count,int vary,int radius){
-        return count==1&&vary==0&&radius==2&&world.emitBoxFlash(x,y);
+        Fixed16 qx,qy;
+        return count==1&&vary==0&&radius==2&&Fixed16::fromBinary64(x,qx)&&Fixed16::fromBinary64(y,qy)&&world.emitBoxFlash(qx,qy);
     }
     bool effect(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 speed,
         MotionBinary64 angle,int depth){

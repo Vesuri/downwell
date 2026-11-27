@@ -2507,16 +2507,16 @@ public:
     }
     bool emitCorpseExpiry(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const downwell::SmokeEffects<downwell::RunSession::smokeCapacity>& smokeEffects() const {return run_.smokeEffects;}
-    bool emitBoxSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitBoxSmoke(x,y,enemyRandom_);}
-    bool emitBoxFlash(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitBoxFlash(x,y,enemyRandom_);}
+    bool emitBoxSmoke(downwell::Fixed16 x,downwell::Fixed16 y){return run_.emitBoxSmoke(x,y,enemyRandom_);}
+    bool emitBoxFlash(downwell::Fixed16 x,downwell::Fixed16 y){return run_.emitBoxFlash(x,y,enemyRandom_);}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
     const downwell::WallBackgroundTiles<downwell::RunSession::wallTileCapacity>& wallBackgroundTiles()const{return run_.wallBackground;}
     bool addWallBackground(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.addWallBackground(x,y);}
-    bool emitSmokeBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+    bool emitSmokeBurst(downwell::Fixed16 x,downwell::Fixed16 y){
         return run_.emitSmokeBurst(x,y,enemyRandom_);
     }
     // Effect positions use original absolute room coordinates, not player offsets.
-    bool emitFlashBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y) {
+    bool emitFlashBurst(downwell::Fixed16 x,downwell::Fixed16 y) {
         return run_.emitFlashBurst(x,y,enemyRandom_);
     }
     unsigned enemyCount() const { return enemyCount_; }

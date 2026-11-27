@@ -2773,7 +2773,8 @@ int main(){
                     counts.stop==(rewardSuccess?1u:0u));
                 SmokeEffects<1> smoke;FlashBallEffects<1> flash;DebrisEffects<2> debris;
                 const auto px=MotionBinary64::fromInteger(240),py=MotionBinary64::fromInteger(512);
-                assert(smoke.boxBurst(px,MotionBinary64::fromInteger(516),soundRandom)&&flash.boxBurst(px,py,soundRandom)&&
+                assert(smoke.boxBurst(Fixed16::fromInteger(240),Fixed16::fromInteger(516),soundRandom)&&
+                    flash.boxBurst(Fixed16::fromInteger(240),Fixed16::fromInteger(512),soundRandom)&&
                     debris.create(px,py,1,soundRandom)&&debris.create(px,py,1,soundRandom));
                 struct CreateQueries {
                     bool wall(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}

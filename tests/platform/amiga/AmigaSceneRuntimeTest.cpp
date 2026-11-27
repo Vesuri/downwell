@@ -817,22 +817,22 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         downwell::GameMakerRandom a(91),b(91);
         auto& hs=const_cast<downwell::SmokeEffects<downwell::RunSession::smokeCapacity>&>(host.smokeEffects());
         auto& ns=const_cast<downwell::SmokeEffects<downwell::RunSession::smokeCapacity>&>(native.smokeEffects());
-        const auto hh=hs.create(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),a);
-        const auto nh=ns.create(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),b);
+        const auto hh=hs.create(downwell::Fixed16::fromInteger(x),downwell::Fixed16::fromInteger(y),a);
+        const auto nh=ns.create(downwell::Fixed16::fromInteger(x),downwell::Fixed16::fromInteger(y),b);
         require(hh && nh,"both owners create collision fixtures");
         // Isolate dispatch, not natural smoke motion (covered independently).
         for(auto* effect:{hs.get(hh),ns.get(nh)}) {
-            effect->allSet=true;effect->noCollision=false;effect->imageSpeed={};
+            effect->allSet=true;effect->noCollision=false;effect->rate16=0;
         }
         const auto initial=hs.get(hh)->speed;
         for(unsigned tick=0;tick<4;++tick){
             host.step(false);native.step(0);
             require(host.effectsSucceeded() && native.effectsSucceeded(),"live contact queries succeed");
             const auto& h=*hs.get(hh);const auto& n=*ns.get(nh);
-            require(h.speed.high==n.speed.high && h.speed.low==n.speed.low && h.x==n.x && h.y==n.y,
+            require(h.speed==n.speed && h.x==n.x && h.y==n.y,
                 "live decoded and native terrain collision responses agree bit-for-bit");
         }
-        require(hs.get(hh)->speed.high!=initial.high || hs.get(hh)->speed.low!=initial.low,"live terrain contact changed speed");
+        require(hs.get(hh)->speed!=initial,"live terrain contact changed speed");
         std::cout<<"Live smoke terrain contacts agree across both simulation adapters\n";
         return;
     }

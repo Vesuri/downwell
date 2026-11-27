@@ -13,6 +13,13 @@ static MotionBinary64 real(double x){
     std::uint64_t bits;std::memcpy(&bits,&x,8);return {std::uint32_t(bits>>32),std::uint32_t(bits)};
 }
 static void equal(MotionBinary64 x,double expected){auto y=real(expected);assert(x.high==y.high&&x.low==y.low);}
+// A Q16 value within units/65536 of the VM's double (W3.20).
+static void nearAt(std::int32_t q16,double expected,double units,int line){
+    if(!(q16/65536.-expected<=units/65536.&&expected-q16/65536.<=units/65536.)){
+        std::fprintf(stderr,"line %d: %d against %.9f\n",line,int(q16),expected*65536);assert(false);}
+}
+#define near(q16,expected,units) nearAt((q16),(expected),(units),__LINE__)
+static Fixed16 q16(MotionBinary64 v){Fixed16 q;assert(Fixed16::fromBinary64(v,q));return q;}
 static void randomEqual(const GameMakerRandom& a,const GameMakerRandom& b){
     assert(a.drawCount()==b.drawCount()&&a.stateIndex()==b.stateIndex());
     for(unsigned i=0;i<16;++i)assert(a.stateWord(i)==b.stateWord(i));
@@ -37,11 +44,11 @@ template<unsigned DebrisCapacity> struct Ops {
         assert(s==174&&v==50&&!loop&&cut==1&&!std::strcmp(channel,"waterThings"));++sounds;return true;
     }
     bool smoke(MotionBinary64 x,MotionBinary64 y,int n,int vary){
-        assert(n==1&&!vary&&!destroyed);return smokeOwner.boxBurst(x,y,random);
+        assert(n==1&&!vary&&!destroyed);return smokeOwner.boxBurst(q16(x),q16(y),random);
     }
     bool flash(MotionBinary64 x,MotionBinary64 y,int n,int vary,int radius){
         assert(n==1&&!vary&&radius==2&&!destroyed&&smokeOwner.size()==1);
-        return flashOwner.boxBurst(x,y,random);
+        return flashOwner.boxBurst(q16(x),q16(y),random);
     }
     bool effect(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 speed,MotionBinary64 angle,int depth){
         assert(!destroyed);
@@ -86,17 +93,20 @@ template<unsigned Capacity> static void run(unsigned seed,bool low,int area){
     const float smokeRate=float(smokeSpeed*(oracle.random(.13-.05)+.05));
     const double smokeDirection=oracle.random(359);
     const auto* smoke=ops.smokeOwner.get(1);assert(smoke);
-    // The compact owner holds Q16 positions (W3 fixed point).
-    Fixed16 birthX,birthY;
-    assert(Fixed16::fromBinary64(real(double(float(smokeX))),birthX)&&smoke->xx==birthX.v);
-    assert(Fixed16::fromBinary64(real(double(float(smokeY))),birthY)&&smoke->yy==birthY.v);
-    equal(smoke->speed,smokeSpeed);equal(smoke->direction,smokeDirection);
-    equal(smoke->imageSpeed.promoted(),smokeRate);
+    // The compact owner holds Q16 positions and samples (W3.20): the Q16
+    // position is exact, each sample the nearest Q16 and the rate a Q16
+    // product of two of them (truncated; about three steps at speed 4).
+    near(smoke->xx,smokeX,0);near(smoke->yy,smokeY,0);
+    near(smoke->speed.v,smokeSpeed,0.5);near(smoke->direction.v,smokeDirection,0.5);
+    near(smoke->rate16,smokeRate,4);
     oracle.irandom(0);
     const double flashY=y+(oracle.random(4)-2),flashX=x+(oracle.random(4)-2);
-    const float finalX=float(double(float(flashX))+int(oracle.irandom(4))-2);
-    const float finalY=float(double(float(flashY))+int(oracle.irandom(4))-2);
-    ops.flashOwner.visitNewest([&](const auto& flash){equal(flash.x.promoted(),finalX);equal(flash.y.promoted(),finalY);});
+    // The Q16 jitter is narrowed once: half a Q16 step from the sample and
+    // half a binary32 step (four Q16 steps near 512) from the narrowing.
+    const double finalX=flashX+int(oracle.irandom(4))-2,finalY=flashY+int(oracle.irandom(4))-2;
+    ops.flashOwner.visitNewest([&](const auto& flash){
+        Fixed16 fx,fy;assert(Fixed16::fromBinary32(flash.x.bits,fx)&&Fixed16::fromBinary32(flash.y.bits,fy));
+        near(fx.v,finalX,3);near(fy.v,finalY,3);});
     const auto* impact=ops.impactOwner.get(ops.caller);assert(impact&&impact->spriteId==603);
     equal(impact->x.promoted(),x);equal(impact->y.promoted(),y+12);
     equal(impact->imageSpeed.promoted(),.5);equal(impact->angle.promoted(),270);equal(impact->depth.promoted(),-60000);

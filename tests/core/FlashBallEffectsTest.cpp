@@ -2,8 +2,8 @@
 #include "core/FlashBallInstances.h"
 #include "core/GameMakerRandom.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
-bool nativeBoxFlash(downwell::FlashBallEffects<32>& effects,downwell::MotionBinary64 x,
-                    downwell::MotionBinary64 y,downwell::GameMakerRandom& random){
+bool nativeBoxFlash(downwell::FlashBallEffects<32>& effects,downwell::Fixed16 x,
+                    downwell::Fixed16 y,downwell::GameMakerRandom& random){
     return effects.boxBurst(x,y,random);
 }
 bool nativeRegisteredFlash(downwell::FlashBallInstances<32>& effects,std::uint32_t id,
@@ -23,7 +23,19 @@ static downwell::MotionBinary64 number(double x){
     std::uint64_t bits;std::memcpy(&bits,&x,8);return {std::uint32_t(bits>>32),std::uint32_t(bits)};
 }
 static float scalar(downwell::RunnerImageValue x){float value;std::memcpy(&value,&x.bits,4);return value;}
-struct Reference {float x,y,index=1;};
+// Exact for the Q16 values used here.
+static downwell::Fixed16 q(double x){return downwell::Fixed16::raw(std::int32_t(std::lround(x*65536)));}
+// The registered owner's binary64 Create (narrow, jitter, narrow).
+template<class Random> static bool flashOracle(downwell::FlashBallEffect& child,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,Random& random){
+    using downwell::MotionBinary64;
+    if(!child.x.assign(x)||!child.y.assign(y))return false;
+    auto jx=child.x.promoted();
+    if(!jx.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2))||!child.x.assign(jx))return false;
+    auto jy=child.y.promoted();
+    return jy.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2))&&child.y.assign(jy);
+}
+struct Reference {double x,y;float index=1;};
 using Registered=downwell::FlashBallInstances<2>;
 struct Owner {
     using Record=Registered::Record;
@@ -52,7 +64,7 @@ static void registeredTests(){
         downwell::GameMakerRandom random(seed),oracle(seed);downwell::FlashBallEffect reference;
         const auto x=number(seed%2?16777217.25:-64.125),y=number(-192.375);
         downwell::InstanceHandle key;
-        check(effects.create(1000,x,y,random,key)&&reference.create(x,y,oracle));
+        check(effects.create(1000,x,y,random,key)&&flashOracle(reference,x,y,oracle));
         const auto* r=effects.find(key);check(r&&r->x.bits==reference.x.bits&&r->y.bits==reference.y.bits);
         check(owner.births==1&&owner.images==1&&owner.moves==2&&effects.size()==1);
         check(random.drawCount()==oracle.drawCount()&&random.stateIndex()==oracle.stateIndex());
@@ -110,15 +122,15 @@ int main(){
         downwell::GameMakerRandom random(seed),oracle(seed);
         downwell::FlashBallEffects<16> effects;
         const auto before=effects.beginAnimation();
-        const double x=seed%2?16777217.25:-64.125,y=seed%3?192.375:-16777217.25;
-        check(box?effects.boxBurst(number(x),number(y),random):effects.skeletonBurst(number(x),number(y),random));
+        // The compact owner is Q16 (W3.20): positions inside its range.
+        const double x=seed%2?16000.25:-64.125,y=seed%3?192.375:-16000.25;
+        check(box?effects.boxBurst(q(x),q(y),random):effects.skeletonBurst(q(x),q(y),random));
         std::vector<Reference> expected;
         const unsigned count=(box?1:4)+unsigned(oracle.irandom(box?0:4));
         for(unsigned i=0;i<count;++i){
             const int radius=box?2:10;
             const double py=y+(oracle.random(radius*2)-radius),px=x+(oracle.random(radius*2)-radius);
-            const float finalX=float(double(float(px))+int(oracle.irandom(4))-2);
-            const float finalY=float(double(float(py))+int(oracle.irandom(4))-2);
+            const double finalX=px+int(oracle.irandom(4))-2,finalY=py+int(oracle.irandom(4))-2;
             expected.push_back({finalX,finalY,1});
         }
         check(random.drawCount()==oracle.drawCount());
@@ -129,7 +141,10 @@ int main(){
                 const auto& slot=effects.slot(i);
                 check(bool(slot.handle)==(frame<7));
                 if(frame<7){
-                    check(scalar(slot.effect.x)==expected[i].x && scalar(slot.effect.y)==expected[i].y);
+                    // The Q16 sample is within half a step and narrowed once.
+                    const auto near=[](float actual,double wanted){
+                        return std::fabs(actual-wanted)<=1/131072.+std::fabs(wanted)*0x1p-24;};
+                    check(near(scalar(slot.effect.x),expected[i].x) && near(scalar(slot.effect.y),expected[i].y));
                     check(scalar(slot.effect.imageIndex)==expected[i].index);
                     check(slot.effect.drawFrame()==unsigned(expected[i].index));
                 }
@@ -139,26 +154,26 @@ int main(){
             for(auto& ref:expected)ref.index=float(ref.index+0.3f);
         }
         const auto draws=random.drawCount();
-        check(effects.create(number(0),number(0),random)>count); // Stable handle on slot reuse.
+        check(effects.create(q(0),q(0),random)>count); // Stable handle on slot reuse.
         check(random.drawCount()==draws+4);
         births+=count;
     }
     downwell::FlashBallEffects<1> full;
     downwell::GameMakerRandom random(9);
-    check(full.create(number(0),number(0),random)==1);
+    check(full.create(q(0),q(0),random)==1);
     const auto draws=random.drawCount();
-    check(!full.create(number(0),number(0),random) && draws==random.drawCount());
+    check(!full.create(q(0),q(0),random) && draws==random.drawCount());
     unsigned visited=0;
     full.visitNewest([&](const downwell::FlashBallEffect&){++visited;});check(visited==1);
     full.clear();visited=0;
     full.visitNewest([&](const downwell::FlashBallEffect&){++visited;});check(visited==0);
     downwell::FlashBallEffects<3> ordered;
-    check(ordered.create(number(10),number(0),random));
+    check(ordered.create(q(10),q(0),random));
     const auto older=ordered.beginAnimation();
     for(unsigned i=0;i<6;++i)check(ordered.advanceAnimation(older));
-    check(ordered.create(number(100),number(0),random));
+    check(ordered.create(q(100),q(0),random));
     check(ordered.advanceAnimation(older)); // Retire older slot only.
-    check(ordered.create(number(200),number(0),random)); // Reuses lower slot.
+    check(ordered.create(q(200),q(0),random)); // Reuses lower slot.
     std::vector<int> order;
     ordered.visitNewest([&](const downwell::FlashBallEffect& effect){order.push_back(effect.pixelX());});
     check(order.size()==2 && order[0]>=198 && order[1]<=102);

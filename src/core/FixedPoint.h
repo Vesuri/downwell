@@ -142,6 +142,19 @@ struct Fixed16 {
     bool operator==(Fixed16 o) const { return v == o.v; }
     bool operator!=(Fixed16 o) const { return v != o.v; }
     bool zero() const { return !v; }
+    // GameMaker random(scale) from one RNG word, word / 2^32 * scale, as
+    // the nearest Q16 (halves up). The 68020 mulu.l gives the 64-bit
+    // product; scale must be nonnegative.
+    static Fixed16 random(std::uint32_t word, Fixed16 scale) {
+        return Fixed16{std::int32_t((std::uint64_t(word) * std::uint32_t(scale.v) + 0x80000000u) >> 32)};
+    }
+    // v + whole, false when the sum leaves the range.
+    bool addInteger(std::int32_t whole) {
+        if (whole < -32767 || whole > 32767) return false;
+        const std::int32_t d = whole * 65536;
+        if (d > 0 ? v > 0x7fffffff - d : v < -0x7fffffff - 1 - d) return false;
+        v += d; return true;
+    }
     // 68020 muls.l: 32 x 32 -> 64.
     static Fixed16 multiply(Fixed16 a, Fixed16 b) {
         return Fixed16{std::int32_t((std::int64_t(a.v) * b.v) >> 16)};

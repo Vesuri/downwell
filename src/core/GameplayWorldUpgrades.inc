@@ -134,8 +134,8 @@ bool GameplayWorld::compactExplodingKnees(int x,int y,int smokeX,int smokeY,bool
     if(!smoke||!compactDamageEffectsAdmitted)return run_.effectsSucceeded;
     static const int puffs[4][2]={{0,4},{180,4},{15,3},{165,3}};
     for(const auto& puff:puffs)
-        if(!run_.smokeEffects.emitDirected(UpgradeReal::fromInteger(smokeX),UpgradeReal::fromInteger(smokeY+4),
-            UpgradeReal::fromInteger(puff[0]),UpgradeReal::fromInteger(puff[1]),enemyRandom_))
+        if(!run_.smokeEffects.emitDirected(downwell::Fixed16::fromInteger(smokeX),downwell::Fixed16::fromInteger(smokeY+4),
+            downwell::Fixed16::fromInteger(puff[0]),downwell::Fixed16::fromInteger(puff[1]),enemyRandom_))
             return run_.effectsSucceeded=false;
     return true;
 }
@@ -148,8 +148,8 @@ bool GameplayWorld::compactRocketJump(int x,int y,int smokeX,int smokeY){
     if(!compactDamageEffectsAdmitted)return run_.effectsSucceeded;
     static const int directions[2]={15,165};
     for(int direction:directions)
-        if(!run_.smokeEffects.emitDirected(UpgradeReal::fromInteger(smokeX),UpgradeReal::fromInteger(smokeY+4),
-            UpgradeReal::fromInteger(direction),UpgradeReal::fromInteger(3),enemyRandom_))
+        if(!run_.smokeEffects.emitDirected(downwell::Fixed16::fromInteger(smokeX),downwell::Fixed16::fromInteger(smokeY+4),
+            downwell::Fixed16::fromInteger(direction),downwell::Fixed16::fromInteger(3),enemyRandom_))
             return run_.effectsSucceeded=false;
     return true;
 }
@@ -207,7 +207,7 @@ bool GameplayWorld::blastShootables(downwell::CompactBlastRecord& blast,const do
     const auto hit=[&](std::uint32_t key,int& objHp){
         if(!blast.remember(key)||objHp<=0)return true;
         objHp-=50;
-        return run_.emitFlash<1,0,0>(UpgradeReal::fromInteger(blast.x),UpgradeReal::fromInteger(blast.y),enemyRandom_);
+        return run_.emitFlash<1,0,0>(downwell::Fixed16::fromInteger(blast.x),downwell::Fixed16::fromInteger(blast.y),enemyRandom_);
     };
     for(unsigned i=0;i<guns_.moduleEnd;++i){auto& m=guns_.modules[i];
         if(m.live&&downwell::contactBoundsOverlap(bounds,downwell::contactPixelBounds(m.x,m.y,1,1,m.sprite()))&&
@@ -235,7 +235,7 @@ bool GameplayWorld::blastShootables(downwell::CompactBlastRecord& blast,const do
         if(!downwell::compareRunnerReal(corpse.health,{},order))return false;
         if(order<=0)return true;
         return corpse.health.add(downwell::MotionBinary64::fromInteger(-50))&&
-            run_.emitFlash<1,0,0>(UpgradeReal::fromInteger(blast.x),UpgradeReal::fromInteger(blast.y),enemyRandom_);
+            run_.emitFlash<1,0,0>(downwell::Fixed16::fromInteger(blast.x),downwell::Fixed16::fromInteger(blast.y),enemyRandom_);
     },hooks))return run_.effectsSucceeded=false;
     return run_.effectsSucceeded;
 }

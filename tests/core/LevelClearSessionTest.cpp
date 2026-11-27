@@ -295,9 +295,9 @@ int main() {
     run.levelResultRequested = true;
     run.levelExitPresent = run.goalStopped = run.exitControlsLocked = true;
     run.exitDither.create(160, 1000);
-    require(run.flashEffects.create(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),random)!=0,
+    require(run.flashEffects.create(downwell::Fixed16::fromInteger(240),downwell::Fixed16::fromInteger(176),random)!=0,
             "old room owns a flash effect");
-    require(run.smokeEffects.create(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),random)!=0,
+    require(run.smokeEffects.create(downwell::Fixed16::fromInteger(240),downwell::Fixed16::fromInteger(176),random)!=0,
             "old room owns a smoke effect");
     const auto draws = random.drawCount();
     require(run.emitBloodBurst(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),random),

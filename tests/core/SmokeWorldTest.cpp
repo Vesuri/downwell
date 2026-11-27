@@ -31,7 +31,7 @@ int main(){
     bool born=false;
     world.configureGenerationStep([](void* context,GameplayWorld& w,GameMakerRandom&,int){
         auto& born=*static_cast<bool*>(context);
-        if(!born){born=true;return w.emitSmokeBurst(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176));}
+        if(!born){born=true;return w.emitSmokeBurst(downwell::Fixed16::fromInteger(240),downwell::Fixed16::fromInteger(176));}
         return true;
     },&born);
     world.step(0);assert(born && world.effectsSucceeded() && world.smokeEffects().size()>=4);
@@ -43,7 +43,7 @@ int main(){
     world.smokeEffects().visitNewest([&](auto handle,const auto& e){
         const auto* r=expected.get(handle);assert(r && e.allSet);
         assert(e.xx==r->xx && e.yy==r->yy);
-        assert(e.frame16==r->frame16 && e.imageSpeed.bits==r->imageSpeed.bits);
+        assert(e.frame16==r->frame16 && e.rate16==r->rate16);
     });
     for(unsigned i=0;i<100;++i)world.step(0);
     assert(world.effectsSucceeded() && world.smokeEffects().size()==0);
@@ -81,7 +81,7 @@ int main(){
     StartupRuntime host(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
     host.skipToGameForTesting();assert(host.inMainRoom()&&host.roomLoadSucceeded());
     auto hostRandom=host.randomState();SmokeEffects<32> hostOracle;
-    assert(hostOracle.skeletonBurst(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(1250),hostRandom));
+    assert(hostOracle.skeletonBurst(Fixed16::fromInteger(240),Fixed16::fromInteger(1250),hostRandom));
     assert(host.emitSmokeBurst(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(1250)));
     equalRandom(host.randomState(),hostRandom);
     assert(host.smokeEffects().size()==hostOracle.size());

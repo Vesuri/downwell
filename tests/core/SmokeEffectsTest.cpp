@@ -4,8 +4,8 @@
 #include "core/SmokeDirection.h"
 #include "core/SmokeTrig.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
-bool nativeBoxSmoke(downwell::SmokeEffects<32>& effects,downwell::MotionBinary64 x,
-                    downwell::MotionBinary64 y,downwell::GameMakerRandom& random){
+bool nativeBoxSmoke(downwell::SmokeEffects<32>& effects,downwell::Fixed16 x,
+                    downwell::Fixed16 y,downwell::GameMakerRandom& random){
     return effects.boxBurst(x,y,random);
 }
 #else
@@ -14,7 +14,6 @@ bool nativeBoxSmoke(downwell::SmokeEffects<32>& effects,downwell::MotionBinary64
 #include <cstdio>
 static void checkAt(bool ok,int line){if(!ok){std::fprintf(stderr,"Smoke owner check failed at line %d\n",line);std::abort();}}
 #define check(ok) checkAt((ok),__LINE__)
-static bool same(downwell::MotionBinary64 a,downwell::MotionBinary64 b){return a.high==b.high && a.low==b.low;}
 int main(){
     unsigned births=0;
     long worst=0;unsigned lifeDifferences=0,frameSteps=0,frameDifferences=0,pixelSteps=0,pixelDifferences=0,escapeDifferences=0;
@@ -68,7 +67,9 @@ int main(){
                     const unsigned frame=exponent<127?0:((wanted.imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
                     check(actual->drawFrame()==frame||actual->drawFrame()+1==frame||actual->drawFrame()==frame+1);
                     ++frameSteps;frameDifferences+=actual->drawFrame()!=frame;
-                    check(actual->imageSpeed.bits==wanted.imageSpeed.bits);}
+                    // The Q16 rate: a product of two nearest-Q16 samples.
+                    downwell::Fixed16 rate;check(downwell::Fixed16::fromBinary32(wanted.imageSpeed.bits,rate));
+                    check(std::labs(long(actual->rate16)-rate.v)<=4);}
             }
             check(store.size()==live && rng.drawCount()==reference.drawCount());
             for(unsigned i=0;i<16;++i)check(rng.stateWord(i)==reference.stateWord(i));
@@ -92,8 +93,8 @@ int main(){
     check(reuse.advanceAnimation(reuse.beginPhase()) && reuse.size()==0);
     check(reuse.step(reuse.beginPhase(),rng) && rng.drawCount()==beforeRetirement);
     downwell::SmokeEffects<4> collisions;
-    const auto older=collisions.create(downwell::MotionBinary64::fromInteger(20),
-        downwell::MotionBinary64::fromInteger(30),rng);
+    const auto older=collisions.create(downwell::Fixed16::fromInteger(20),
+        downwell::Fixed16::fromInteger(30),rng);
     const auto phase=collisions.beginPhase();
     const auto newer=collisions.create({}, {},rng);
     collisions.get(newer)->noCollision=false;
@@ -105,18 +106,16 @@ int main(){
     smoke.noCollision=false;
     smoke.xx=999*65536; // NOT the collision coordinate
     const auto oldSpeed=smoke.speed;const auto oldXsp=smoke.xsp,oldYsp=smoke.ysp;
-    const auto oldRate=smoke.imageSpeed.bits;
+    const auto oldRate=smoke.rate16;
     const auto collisionDraws=rng.drawCount();
     auto expectedSpeed=oldSpeed;
-    for(unsigned i=0;i<3;++i){downwell::MotionBinary64 next;
-        check(downwell::multiplyBinary64(expectedSpeed,{0x3fc99999u,0x9999999au},next));expectedSpeed=next;
-    }
+    for(unsigned i=0;i<3;++i)expectedSpeed=downwell::Fixed16::multiply(expectedSpeed,downwell::Fixed16::raw(13107));
     check(collisions.collideWalls(phase,[&](auto bounds,auto emit){
         ++queries;check(bounds.left==18 && bounds.right==22 && bounds.top==29 && bounds.bottom==32);
         return emit() && emit() && emit();
     }));
-    check(queries==1 && same(smoke.speed,expectedSpeed) && smoke.xsp==oldXsp &&
-        smoke.ysp==oldYsp && smoke.imageSpeed.bits==oldRate && rng.drawCount()==collisionDraws);
+    check(queries==1 && smoke.speed==expectedSpeed && smoke.xsp==oldXsp &&
+        smoke.ysp==oldYsp && smoke.rate16==oldRate && rng.drawCount()==collisionDraws);
     check(!collisions.collideWalls(phase,[](auto,auto){return false;}));
     smoke.destroyRequested=true;
     check(collisions.collideWalls(phase,[](auto,auto){check(false);return true;}));

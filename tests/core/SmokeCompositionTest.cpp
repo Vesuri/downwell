@@ -53,7 +53,7 @@ int main(int argc,char**argv){
         assert(debris.mask.data==debris.high+debris.mask.bytes);
     }
     SmokeEffects<32> smoke;GameMakerRandom random(225);
-    for(unsigned i=0;i<24;++i)assert(smoke.create(number(int(i%6)*29-3),number(int(i/6)*75-2),random));
+    for(unsigned i=0;i<24;++i)assert(smoke.create(q(int(i%6)*29-3),q(int(i/6)*75-2),random));
     SmokeComposition composition;
     CurrencySmokeComposition colored;
     unsigned frames=0,directFrames=0,controllerFrames=0,hiddenFrames=0,shadeVisits=0;
@@ -160,7 +160,7 @@ int main(int argc,char**argv){
         const auto phase=smoke.beginPhase();assert(smoke.advanceAnimation(phase));assert(smoke.step(smoke.beginPhase(),random));
     }
     assert(smoke.size()==0 && directFrames && controllerFrames && hiddenFrames && shadeVisits);
-    assert(smoke.create(number(80),number(140),random));
+    assert(smoke.create(q(80),q(140),random));
     const EffectSurfacePlacement::View view{{},{},q(160),q(284)};
     auto noShades=[](auto){};
     assert(composition.prepare(smoke,assets,view,{},noShades,raster) && composition.visible());
@@ -169,7 +169,7 @@ int main(int argc,char**argv){
     unsigned words=0;composition.coverage().visit([&](auto,auto,auto){++words;});assert(!words);
     smoke.clear();EffectMaskAssets missing;
     assert(composition.prepare(smoke,missing,view,{},[](auto){assert(false);},raster));
-    assert(smoke.create(number(80),number(140),random));
+    assert(smoke.create(q(80),q(140),random));
     assert(!composition.prepare(smoke,missing,view,{},noShades,raster));
     auto oneGem=[](auto emit){emit(false,0,q(80),q(140));};
     assert(colored.prepare(oneGem,smoke,assets,view,{},noShades,raster) && colored.visible());

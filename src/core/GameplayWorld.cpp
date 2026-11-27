@@ -1923,11 +1923,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Empty charge: emitSmoke(plx, ply+4, 315, 4) and (225, 4). The puffs
     // follow the whole player Step here; the shot is its last RNG user.
     if(player_.emptyShots()!=emptyShotsBefore&&compactDamageEffectsAdmitted){
-        using Real=downwell::MotionBinary64;
-        const Real x=Real::fromInteger(emptyX),y=Real::fromInteger(emptyY+4);
+        using Q=downwell::Fixed16;
+        const Q x=Q::fromInteger(emptyX),y=Q::fromInteger(emptyY+4);
         static const int directions[]={315,225};
         for(int direction:directions)
-            if(!run_.smokeEffects.emitDirected(x,y,Real::fromInteger(direction),Real::fromInteger(4),enemyRandom_))
+            if(!run_.smokeEffects.emitDirected(x,y,Q::fromInteger(direction),Q::fromInteger(4),enemyRandom_))
                 {run_.effectsSucceeded=false;return {};}
     }
     if(player_.emptyShots()!=emptyShotsBefore)run_.soundPlay(26,90,false,true); // sfxGunEmpty
@@ -2581,10 +2581,12 @@ struct GameplayWorld::SteeringOps {
     // scrSmoke(x,y,1,0) and scrFlashballfx(x,y,1,0,0) create objects with
     // Create RNG; emitMovingFx 704 has none.
     bool smoke(Real x,Real y,int count,int vary){
-        return count==1&&vary==0&&world.emitBoxSmoke(x,y);
+        downwell::Fixed16 qx,qy;
+        return count==1&&vary==0&&q16(x,qx)&&q16(y,qy)&&world.emitBoxSmoke(qx,qy);
     }
     bool flash(Real x,Real y,int count,int vary,int radius){
-        return count==1&&vary==0&&radius==0&&world.run_.emitFlash<1,0,0>(x,y,world.enemyRandom_);
+        downwell::Fixed16 qx,qy;
+        return count==1&&vary==0&&radius==0&&q16(x,qx)&&q16(y,qy)&&world.run_.emitFlash<1,0,0>(qx,qy,world.enemyRandom_);
     }
     bool movingFx(Real x,Real y,int sprite,Real rate,Real angle,Real speed){
         downwell::Fixed16 qx,qy,qa,qs;downwell::RunnerImageValue r;
@@ -3203,7 +3205,10 @@ struct GameplayWorld::SceneryOps {
     bool inView(int px,int py,bool& visible){return world.compactInView(px,py,visible)||fail();}
     // gemChunk.
     bool openMask(){return true;} // gemChunkSolidAt reads the opened flag.
-    bool flash(Real px,Real py){return world.run_.emitFlash<3,0,5>(px,py,world.enemyRandom_);}
+    bool flash(Real px,Real py){
+        downwell::Fixed16 qx,qy;
+        return q16(px,qx)&&q16(py,qy)&&world.run_.emitFlash<3,0,5>(qx,qy,world.enemyRandom_);
+    }
     bool burstGem(long xRange,long xLow,long yRange,long yLow,int amount,bool large){
         gem=world.spawnCompactBurstGem(x-240,y-176,xRange,xLow,yRange,yLow,amount,large);
         return gem>=0;
@@ -3459,9 +3464,13 @@ struct GameplayWorld::BoxOps {
         world.run_.soundPlay(id,priority,loop!=0,cut!=0);
         return world.run_.effectsSucceeded;
     }
-    bool smoke(Real x,Real y,int count,int vary){return count==1&&vary==0&&world.emitBoxSmoke(x,y);}
+    bool smoke(Real x,Real y,int count,int vary){
+        downwell::Fixed16 qx,qy;
+        return count==1&&vary==0&&q16(x,qx)&&q16(y,qy)&&world.emitBoxSmoke(qx,qy);
+    }
     bool flash(Real x,Real y,int count,int vary,int radius){
-        return count==1&&vary==0&&radius==2&&world.emitBoxFlash(x,y);
+        downwell::Fixed16 qx,qy;
+        return count==1&&vary==0&&radius==2&&q16(x,qx)&&q16(y,qy)&&world.emitBoxFlash(qx,qy);
     }
     bool effect(Real x,Real y,int sprite,Real speed,Real angle,int){
         downwell::Fixed16 qx,qy,qa;downwell::RunnerImageValue r;
@@ -3958,7 +3967,8 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
             destroy=true;
             const auto wx=downwell::MotionBinary64::fromInteger(x+240),wy=downwell::MotionBinary64::fromInteger(py+176);
             if(!compactWallEffect(wx,wy,96,-10000))return false;
-            if(!emitBoxSmoke(wx,wy))return run_.effectsSucceeded=false;
+            if(!emitBoxSmoke(downwell::Fixed16::fromInteger(x+240),downwell::Fixed16::fromInteger(py+176)))
+                return run_.effectsSucceeded=false;
             run_.soundPlay(15,30,false,true);
         }
     }else{
@@ -4089,10 +4099,7 @@ bool GameplayWorld::stepGunModules(){
 // -2), is unobtainable for 30 Steps, and rerolls its type (choose(0, 1)) and
 // gun (irandom(bulletMaxNum) until it differs). objHp 9999 keeps it whole.
 bool GameplayWorld::reverseEngineerModule(downwell::CompactGunModuleRecord& m){
-    const auto x=GunReal::fromInteger(m.x);
-    GunReal y=GunReal::fromInteger(int(m.yy>>16)),fraction;
-    if((m.yy&0xffff)&&(!downwell::divideBinary64(GunReal::fromInteger(int(m.yy&0xffff)),GunReal::fromInteger(65536),fraction)||
-       !y.add(fraction)))return run_.effectsSucceeded=false;
+    const auto x=downwell::Fixed16::fromInteger(m.x),y=downwell::Fixed16::raw(std::int32_t(m.yy));
     if(!emitBoxSmoke(x,y)||!run_.emitFlash<1,0,0>(x,y,enemyRandom_))return false;
     m.obtainable=false;m.alarm0=30;m.ysp=-(2L<<16);
     m.type=int(enemyRandom_.chooseIndexSmall(2));
@@ -4502,7 +4509,8 @@ bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::MotionBinary
     enemy.takenImpactDamage=damage;
     compactMomentDelay(); // scrDamageEnemy
     if(!compactDamageEffectsAdmitted){if(laser)run_.soundPlay(16,50,false,true);return run_.effectsSucceeded;}
-    if(laser)return compactBloodfx(x,y)&&run_.emitFlash<1,0,2>(x,y,enemyRandom_)&&
+    downwell::Fixed16 flashX,flashY;
+    if(laser)return compactBloodfx(x,y)&&q16(x,flashX)&&q16(y,flashY)&&run_.emitFlash<1,0,2>(flashX,flashY,enemyRandom_)&&
         (run_.soundPlay(16,50,false,true),run_.effectsSucceeded);
     downwell::RunnerImageValue angle;downwell::Fixed16 qx,qy,qa;
     if(!downwell::ProjectilePublication::angle(direction,angle)||!q16(x,qx)||!q16(y,qy)||
@@ -4549,7 +4557,8 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         240+int(downwell::roundGameMakerQ8(player_.frameStartXFixed())),
         176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
-    if(!compactBloodfx(x,y)||!emitBoxSmoke(fx,fy)||!run_.emitFlash<1,0,0>(fx,fy,enemyRandom_))return false;
+    downwell::Fixed16 qx,qy;
+    if(!compactBloodfx(x,y)||!q16(fx,qx)||!q16(fy,qy)||!emitBoxSmoke(qx,qy)||!run_.emitFlash<1,0,0>(qx,qy,enemyRandom_))return false;
     spawnReward(enemy,stomped);
     if(!run_.effectsSucceeded)return false;
     downwell::DeadBodySource source;

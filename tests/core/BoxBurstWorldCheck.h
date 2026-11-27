@@ -20,7 +20,6 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
         assert(world.randomState().stateIndex()==random.stateIndex());
         for(unsigned i=0;i<16;++i)assert(world.randomState().stateWord(i)==random.stateWord(i));
     };
-    auto same64=[](MotionBinary64 a,MotionBinary64 b){assert(a.high==b.high&&a.low==b.low);};
     auto sameChildren=[&](){
         assert(world.smokeEffects().size()==smoke.size());
         for(unsigned i=0;i<smokeSlots;++i){
@@ -28,8 +27,8 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
             assert(a.handle==b.handle);
             if(a.handle){
                 assert(a.effect.xx==b.effect.xx&&a.effect.yy==b.effect.yy);
-                same64(a.effect.speed,b.effect.speed);same64(a.effect.direction,b.effect.direction);
-                assert(a.effect.imageSpeed.bits==b.effect.imageSpeed.bits);
+                assert(a.effect.speed==b.effect.speed&&a.effect.direction==b.effect.direction);
+                assert(a.effect.rate16==b.effect.rate16);
                 assert(a.effect.frame16==b.effect.frame16);
             }
             if(i>=32)continue;
@@ -42,15 +41,15 @@ template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
         }
     };
     for(unsigned i=0;i<smokeSlots;++i){
-        const auto x=MotionBinary64::fromInteger(240+i),y=MotionBinary64::fromInteger(304+i);
+        const auto x=Fixed16::fromInteger(240+i),y=Fixed16::fromInteger(304+i);
         assert(smoke.boxBurst(x,y,random));assert(world.emitBoxSmoke(x,y));
         sameRandom();sameChildren();
         if(i>=32)continue;
-        const auto baseY=MotionBinary64::fromInteger(300+i);
+        const auto baseY=Fixed16::fromInteger(300+i);
         assert(flash.boxBurst(x,baseY,random));assert(world.emitBoxFlash(x,baseY));
         sameRandom();sameChildren();
     }
-    const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(304);
+    const auto x=Fixed16::fromInteger(240),y=Fixed16::fromInteger(304);
     if(failSmoke){assert(!smoke.boxBurst(x,y,random));assert(!world.emitBoxSmoke(x,y));}
     else {assert(!flash.boxBurst(x,y,random));assert(!world.emitBoxFlash(x,y));}
     assert(!world.effectsSucceeded());sameRandom();sameChildren();

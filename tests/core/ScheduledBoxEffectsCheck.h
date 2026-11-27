@@ -22,8 +22,9 @@ template<class World,class Mark> struct ScheduledBoxEffects {
     std::function<bool(Handle,bool&)> timeQuery{};
     bool timeAllowed(bool& allowed){return alarmStop(0)&&timeQuery&&timeQuery(box,allowed);}
     bool soundOverlap(int,int,int,int,const char*){++counts.sound;sawSound=true;before=world.randomState();return true;}
-    bool smoke(Real x,Real y,int,int){++counts.smoke;return world.emitBoxSmoke(x,y);}
-    bool flash(Real x,Real y,int,int,int){++counts.flash;return world.emitBoxFlash(x,y);}
+    static downwell::Fixed16 q16(Real v){downwell::Fixed16 q;assert(downwell::Fixed16::fromBinary64(v,q));return q;}
+    bool smoke(Real x,Real y,int,int){++counts.smoke;return world.emitBoxSmoke(q16(x),q16(y));}
+    bool flash(Real x,Real y,int,int,int){++counts.flash;return world.emitBoxFlash(q16(x),q16(y));}
     bool effect(Real x,Real y,int sprite,Real speed,Real angle,int depth){
         ++counts.impact;
         return world.spawnBoxScriptEffect(box,x,y,sprite,speed,angle,Real::fromInteger(depth),
@@ -37,7 +38,8 @@ template<class World,class Mark> struct ScheduledBoxEffects {
         if(verifyDebris&&sawSound){
             downwell::SmokeEffects<1> smoke;downwell::FlashBallEffects<1> flash;downwell::DebrisEffects<2> debris;
             const auto x=Real::fromInteger(240),y=Real::fromInteger(512);
-            assert(smoke.boxBurst(x,Real::fromInteger(516),before)&&flash.boxBurst(x,y,before));
+            assert(smoke.boxBurst(downwell::Fixed16::fromInteger(240),downwell::Fixed16::fromInteger(516),before)&&
+                flash.boxBurst(downwell::Fixed16::fromInteger(240),downwell::Fixed16::fromInteger(512),before));
             assert(debris.create(x,y,1,before)&&debris.create(x,y,1,before));
             assert(before.drawCount()==world.randomState().drawCount()&&before.stateIndex()==world.randomState().stateIndex());
             for(unsigned i=0;i<16;++i)assert(before.stateWord(i)==world.randomState().stateWord(i));
