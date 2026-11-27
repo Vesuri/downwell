@@ -958,6 +958,14 @@ build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-compact-balloon
+test: verify-compact-balloon
+verify-compact-balloon: build/compact-balloon-test
+	./build/compact-balloon-test
+build/compact-balloon-test: tests/core/CompactBalloonTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/CompactBalloonTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-spawner-fixed
 test: verify-spawner-fixed
 verify-spawner-fixed: build/spawner-fixed-test
@@ -1264,12 +1272,11 @@ trace-contact-direction-domain: build/contact-direction-domain-test
 	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$< generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_LASER_SIGHT=1 DOWNWELL_VERIFY_COMBAT=1 ./$< generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
-verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test build/runner-object-membership-test build/runner-sprite-bounds-test build/mask-bounds-memo-test build/runner-place-query-test build/runner-spatial-instances-test
+verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test build/runner-object-membership-test build/runner-sprite-bounds-test build/runner-place-query-test build/runner-spatial-instances-test
 	./build/runner-spatial-split-test
 	./build/runner-spatial-dirty-test
 	./build/runner-object-membership-test
 	./build/runner-sprite-bounds-test
-	./build/mask-bounds-memo-test
 	./build/runner-place-query-test
 	./build/runner-spatial-instances-test
 	python3 tools/verify-runner-field-lookup.py
@@ -1282,10 +1289,6 @@ build/runner-spatial-instances-test: tests/core/RunnerSpatialInstancesTest.cpp $
 build/runner-sprite-bounds-test: tests/core/RunnerSpriteBoundsTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpriteBoundsTest.cpp
-
-build/mask-bounds-memo-test: tests/core/MaskBoundsMemoTest.cpp $(wildcard src/core/*.h)
-	@mkdir -p build
-	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/MaskBoundsMemoTest.cpp
 
 build/runner-place-query-test: tests/core/RunnerPlaceQueryTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build

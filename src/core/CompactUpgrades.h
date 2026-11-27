@@ -5,6 +5,7 @@
 #include "RandomBinary64.h"
 #include "RunnerImageValue.h"
 #include "UnitSequenceFrames.h"
+#include "FixedPoint.h"
 #include <cstdint>
 namespace downwell {
 // Compact owners for the world-one upgrades' own objects (W1.9). Room pixel
@@ -84,8 +85,58 @@ struct CompactDroneRecord {
 // xx/yy are the Step's VM doubles; x/y their rounded builtin position.
 struct CompactBalloonRecord {
     bool live = false, held = false;
-    MotionBinary64 xx{}, yy{}, ysp{};
+    std::int32_t xx = 0, yy = 0, ysp = 0; // Q16
+    int rising = 0; // the loose rise's 0.02 steps, at most 40 (0.8)
     int x = 0, y = 0, sprite = 526, stringLength = 20;
+    // decoyBalloon's motion in Q16 (W3.20). The source's comparisons are
+    // exact (no 1e-5 band); each constant here is the Q16 bound that keeps
+    // the comparison's outcome. The easing divisions round to the nearest
+    // Q16, halves away from zero, so the eased position drifts within a few
+    // Q16 units of the VM's binary64.
+    static std::int32_t divide(std::int32_t v, std::int32_t d) {
+        const std::int32_t m = v < 0 ? -v : v, q = (m + d / 2) / d;
+        return v < 0 ? -q : q;
+    }
+    static std::int32_t magnitude(std::int32_t v) { return v < 0 ? -v : v; }
+    // Held: the string's top is ply - climb + |plx - xx| / 2; xx eases by
+    // (plx - xx) / (stringLength / 2), yy by (top - yy) / 4 below the string
+    // limit, / 10 within it. Returns false outside the Q16 range.
+    bool ease(std::int32_t plx, std::int32_t ply, int climb, std::int32_t& xMove) {
+        constexpr std::int32_t range = std::int32_t(1) << 29;
+        if (magnitude(plx) >= range || magnitude(ply) >= range || magnitude(xx) >= range || magnitude(yy) >= range ||
+            climb < 0 || climb > 32 || (stringLength != 10 && stringLength != 20)) return false;
+        const std::int32_t dx = plx - xx;
+        const std::int32_t top = ply - climb * 65536 + divide(magnitude(dx), 2);
+        xMove = divide(dx, stringLength / 2);
+        xx += xMove;
+        const std::int32_t limit = ply - stringLength * 65536;
+        yy += divide(top - yy, yy < limit ? 4 : 10);
+        return true;
+    }
+    // The held art: sprDecoyBalloonMove 700 and its pull frame when
+    // 0.2 < |xMove|, else sprDecoyBalloon 701 at image_speed 0.08.
+    bool pose(std::int32_t xMove) {
+        if (magnitude(xMove) > 13107) { // 0.2 < |xMove|
+            sprite = 700; imageSpeed = {};
+            constexpr std::int32_t pull = 78643; // 1.2 < xMove
+            const int frame = xMove > 0 ? (xMove > pull ? 1 : 0) : (xMove < -pull ? 3 : 2);
+            return imageIndex.assignInteger(frame);
+        }
+        sprite = 701; imageSpeed = {0x3da3d70au};
+        return true;
+    }
+    // Loose, after the wall query at yy + ysp: rise by 0.02 to 0.8. ysp is
+    // the nearest Q16 of rising * -0.02 rather than a sum of rounded steps,
+    // which would drift 0.28 Q16 further per step.
+    bool rise(bool wall) {
+        if (magnitude(yy) >= (std::int32_t(1) << 29)) return false;
+        if (wall) rising = 0;
+        else if (rising < 40) ++rising; // -0.8 < ysp: ysp += -0.02
+        ysp = -((rising * 131072 + 50) / 100);
+        yy += ysp; // xsp stays 0
+        return true;
+    }
+    void publish() { x = Fixed16::roundQ16(xx); y = Fixed16::roundQ16(yy); }
     RunnerImageValue imageIndex{}, imageSpeed{0x3da3d70au}; // imgSp 0.08
     // mask_index 526 (sprDecoyBalloon).
     ContactBounds bounds() const { return contactPixelBounds(x, y, 1, 1, 526); }

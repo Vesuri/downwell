@@ -43,7 +43,6 @@
 #include "core/CompactShopSpeech.h"
 #include "core/MovingFxInstances.h"
 #include "core/RegisteredScatteredContact.h"
-#include "core/MaskBoundsMemo.h"
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
 #include "core/LevelNumberInstances.h"
@@ -3407,11 +3406,9 @@ private:
     int spawnCompactBurstGem(int x,int y,long xRange,long xLow,long yRange,long yLow,int amount,bool large);
     bool attractCompactGem(int slot);
     bool spawnCompactDebris(downwell::Fixed16 x,downwell::Fixed16 y,std::uint32_t& handle);
-    bool solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
     bool solidMeetingQ16(int mask,std::int32_t x,std::int32_t y,bool platforms,bool& hit);
     bool solidMeetingPixel(int mask,int x,int y,bool platforms,bool& hit);
     bool solidContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit);
-    downwell::MaskBoundsMemo maskBounds_;
     bool segmentSolid(const downwell::ProjectileSegment& path)const;
     bool compactInView(int x,int y,bool& visible)const;
 public:

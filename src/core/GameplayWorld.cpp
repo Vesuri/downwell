@@ -3048,12 +3048,6 @@ bool GameplayWorld::segmentSolid(const downwell::ProjectileSegment& path)const{
     return false;
 }
 
-bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
-    downwell::ContactBounds bounds;
-    if(!run_.effectsSucceeded||!maskBounds_.calculate(mask,x,y,bounds))
-        return run_.effectsSucceeded=false;
-    return solidContact(bounds,platforms,hit);
-}
 
 bool GameplayWorld::solidMeetingQ16(int mask,std::int32_t x,std::int32_t y,bool platforms,bool& hit){
     downwell::ContactBounds bounds;

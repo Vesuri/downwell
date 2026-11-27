@@ -25,7 +25,7 @@ bool GameplayWorld::createCompactCompanions(int x,int y){
     drone_={};balloon_={};
     if(run_.upgrades.levels[15]){
         balloon_.live=true;balloon_.x=x;balloon_.y=y;
-        balloon_.xx=UpgradeReal::fromInteger(x);balloon_.yy=UpgradeReal::fromInteger(y);
+        balloon_.xx=x*65536;balloon_.yy=y*65536;
     }
     if(run_.upgrades.levels[9]){
         drone_.live=true;drone_.x=long(x)<<16;drone_.y=long(y)<<16;
@@ -386,36 +386,20 @@ bool GameplayWorld::compactSolidPoint(int x,int y)const{
 // eases there, and its art follows the horizontal pull. Loose: it is picked
 // up when the player crosses its string, and otherwise rises to 0.8.
 bool GameplayWorld::stepCompactBalloon(){
-    using R=UpgradeReal;
     auto& b=balloon_;
     const auto fail=[&]{return run_.effectsSucceeded=false;};
-    const auto negative=[](R v){if(!v.zero())v.high^=0x80000000u;return v;};
-    const auto less=[](R a,R c){return downwell::PlayerHorizontalBinary64::less(a,c);};
-    const auto magnitude=[](R v){v.high&=0x7fffffffu;return v;};
     if(b.held){
         b.stringLength=player_.spinJumping()?10:20;
-        R plx,ply;
-        if(!downwell::ContactCoordinates::playerGlobals(player_.frameStartXFixed(),player_.frameStartYFixed(),
-            240,176,plx,ply))return fail();
+        // plx/ply in Q16: the frame-start Q8 position plus the room offset.
+        const long fx=player_.frameStartXFixed(),fy=player_.frameStartYFixed();
+        if(fx< -0x200000L||fx>0x200000L||fy< -0x200000L||fy>0x200000L)return fail();
         // pointy is ply minus whole pixels; Q8 floors give the tested pixel.
-        const int px=240+int(player_.frameStartXFixed()>>8),py=176+int(player_.frameStartYFixed()>>8);
+        const int px=240+int(fx>>8),py=176+int(fy>>8);
         int climb=0;
         while(!compactSolidPoint(px,py-climb-4))if(++climb>b.stringLength)break;
-        R pointy=ply,dx=plx,half,xMove,dy,step,limit=ply;
-        if(!pointy.add(R::fromInteger(-climb))||!dx.add(negative(b.xx))||
-           !downwell::divideBinary64(magnitude(dx),R::fromInteger(2),half)||!pointy.add(half)||
-           !downwell::divideBinary64(dx,R::fromInteger(b.stringLength/2),xMove)||!b.xx.add(xMove)||
-           !limit.add(R::fromInteger(-b.stringLength))||!dy.add(pointy)||!dy.add(negative(b.yy))||
-           !downwell::divideBinary64(dy,R::fromInteger(less(b.yy,limit)?4:10),step)||!b.yy.add(step))
+        std::int32_t xMove;
+        if(!b.ease(std::int32_t(fx)*256+240*65536,std::int32_t(fy)*256+176*65536,climb,xMove)||!b.pose(xMove))
             return fail();
-        if(less({0x3fc99999u,0x9999999au},magnitude(xMove))){ // 0.2
-            b.sprite=700;b.imageSpeed={};
-            const R pull{0x3ff33333u,0x33333333u}; // 1.2
-            const int frame=less({},xMove)?(less(pull,xMove)?1:0):(less(xMove,negative(pull))?3:2);
-            if(!b.imageIndex.assignInteger(frame))return fail();
-        }else{
-            b.sprite=701;b.imageSpeed={0x3da3d70au};
-        }
     }
     if(!b.held){
         // collision_line(x, y, x, y + stringLength + 4, objPlayer_n); noHold
@@ -423,19 +407,10 @@ bool GameplayWorld::stepCompactBalloon(){
         const auto player=downwell::contactWorldBounds({240L*256+player_.offsetXFixed(),
             176L*256+player_.offsetYFixed(),1,1,31});
         if(b.x>=player.left&&b.x<player.right&&b.y<player.bottom&&b.y+b.stringLength+4>=player.top)b.held=true;
-        R y=b.yy;bool hit=false;
-        if(!y.add(b.ysp)||!solidMeeting(526,b.xx,y,false,hit))return fail();
-        if(hit)b.ysp={};
-        else{
-            const R maximum{0xbfe99999u,0x9999999au}; // -0.8
-            if(less(maximum,b.ysp)){if(!b.ysp.add({0xbf947ae1u,0x47ae147bu}))return fail();} // -0.02
-            else b.ysp=maximum;
-        }
-        if(!b.yy.add(b.ysp))return fail(); // xsp stays 0
+        bool hit=false;
+        if(!solidMeetingQ16(526,b.xx,b.yy+b.ysp,false,hit)||!b.rise(hit))return fail();
     }
-    std::int32_t x,y;
-    if(!b.xx.roundPixel(x)||!b.yy.roundPixel(y))return fail();
-    b.x=x;b.y=y;return true;
+    b.publish();return true;
 }
 
 bool GameplayWorld::advanceCompactBalloonAnimation(){
