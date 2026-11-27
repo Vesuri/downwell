@@ -43,6 +43,17 @@ public:
         if(!succeeded_)return false;
         if(count_==Capacity || !next_)return fail();
         RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return fail();
+        return createNarrowed(px,py,speed,pause);
+    }
+    // createAt on a Q16 position (the compact world, W3.20).
+    template<class Pause> bool createAtQ16(std::int32_t x16,std::int32_t y16,int& speed,Pause pause){
+        if(!succeeded_)return false;
+        if(count_==Capacity || !next_)return fail();
+        RunnerImageValue px,py;if(!px.assignQ16(x16)||!py.assignQ16(y16))return fail();
+        return createNarrowed(px,py,speed,pause);
+    }
+private:
+    template<class Pause> bool createNarrowed(RunnerImageValue px,RunnerImageValue py,int& speed,Pause pause){
         // Insert before synchronous Create. A failing pause leaves the source
         // assignments and instance present; caller must latch the failure.
         for(unsigned i=count_;i>0;--i)slots_[i]=slots_[i-1];
@@ -55,6 +66,7 @@ public:
         }))return fail();
         return true;
     }
+public:
     void advanceAlarm(Phase phase,unsigned index,int& speed){
         if(!succeeded_||index>1)return;
         for(unsigned i=0;i<count_;++i){

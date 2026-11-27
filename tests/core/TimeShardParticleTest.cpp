@@ -80,7 +80,9 @@ int main(){
                 N x,y;if(!downwell::SmokeDirection::vector(speed,angle,x,y,downwell::smokeTrigNarrowed))return false;
                 result=vertical?y:x;return true;
             }));
-        check(fixedBurst.emitFixed(rx,ry,vx*65536,vy*65536,false,fixedRandom,fixed,lookup));
+        check(fixedBurst.emitFixed(rx,ry,vx*65536,vy*65536,false,fixedRandom,fixed,
+            [&](downwell::RunnerImageValue,downwell::RunnerImageValue,std::int32_t& id,std::int32_t& fx,std::int32_t& fy){
+                id=field?1:-4;fx=fieldX;fy=fieldY;return true;}));
         check(referenceRandom.drawCount()==fixedRandom.drawCount()&&reference.size()==3&&fixed.size()==3);
         ++bursts;
         // Both owners hold the newest first.

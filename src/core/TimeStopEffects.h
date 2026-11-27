@@ -25,7 +25,21 @@ template<unsigned Capacity,class Shard=TimeShardAnimation> struct TimeStopEffect
     int roomSpeed=60; // Source target rate; PAL backend must not add catch-up.
     int shakeAmt=0,shakeDur=0; // scrSShake's caller-local writes.
     bool succeeded=true;
-    struct PlayerPose {
+    // The compact world's pose in Q16 (W3.20): exact from the player's Q8
+    // position and speed, the vertical speed's fifths/1280 rounded.
+    struct FixedPlayerPose {
+        RunnerImageValue x,y; // published builtins, not private xx/yy
+        Fixed16 xsp,ysp,xx,yy;
+        bool fromQ8(int publishedX,int publishedY,long xxQ8,long yyQ8,long xspQ8,long yspFifths){
+            if(xxQ8< -0x7fffffL||xxQ8>0x7fffffL||yyQ8< -0x7fffffL||yyQ8>0x7fffffL||
+               xspQ8< -0x7fffffL||xspQ8>0x7fffffL||yspFifths< -0x7fffffL||yspFifths>0x7fffffL)return false;
+            xx.v=std::int32_t(xxQ8*256);yy.v=std::int32_t(yyQ8*256);xsp.v=std::int32_t(xspQ8*256);
+            const std::int32_t n=std::int32_t(yspFifths)*256; // fifths / 1280 = n / 5 in Q16
+            ysp.v=(n<0?n-2:n+2)/5;
+            return x.assignInteger(publishedX)&&y.assignInteger(publishedY);
+        }
+    };
+    struct Binary64PlayerPose {
         RunnerImageValue x,y; // published builtins, not private xx/yy
         MotionBinary64 xsp,ysp;
         MotionBinary64 xx,yy; // private motion coordinates used by time-change Create
@@ -41,6 +55,10 @@ template<unsigned Capacity,class Shard=TimeShardAnimation> struct TimeStopEffect
                 divideBinary64(MotionBinary64::fromInteger(motion.speedYFifths()),MotionBinary64::fromInteger(1280),ysp);
         }
     };
+    // No <type_traits> in the freestanding build.
+    template<bool Fixed,class=void> struct PoseFor {using type=Binary64PlayerPose;};
+    template<class Unused> struct PoseFor<true,Unused> {using type=FixedPlayerPose;};
+    using PlayerPose=typename PoseFor<fixedShards>::type;
     template<class Side,class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStepWithAudio(bool mainRoom,Side side,const PlayerPose& pose,bool lowSpec,
                    Random& random,Field field,Lookup lookup,TimeStopAudio& audioState,
@@ -75,14 +93,15 @@ template<unsigned Capacity,class Shard=TimeShardAnimation> struct TimeStopEffect
         if(!succeeded||!shards.succeeded()||!changes.succeeded()){succeeded=false;return false;}
         succeeded=player.stepWithAudioChecked(mainRoom,side,field,audio,[&](PlayerTimeStop::Effect effect){
             if(effect==PlayerTimeStop::Effect::shake){shakeAmt=2;shakeDur=2;}
-            if(effect==PlayerTimeStop::Effect::change)
-                return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
+            if(effect==PlayerTimeStop::Effect::change){
+                if constexpr(fixedShards)
+                    return changes.createAtQ16(pose.xx.v,pose.yy.v,roomSpeed,[&](unsigned){return emit(effect);});
+                else return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
+            }
             if(effect!=PlayerTimeStop::Effect::shards)return emit(effect);
-            if constexpr(fixedShards){
-                Fixed16 xsp,ysp;
-                return Fixed16::fromBinary64(pose.xsp,xsp)&&Fixed16::fromBinary64(pose.ysp,ysp)&&
-                    burst.emitFixed(pose.x,pose.y,xsp.v,ysp.v,lowSpec,random,shards,lookup);
-            }else return burst.emit(pose.x,pose.y,pose.xsp,pose.ysp,lowSpec,random,shards,lookup,
+            if constexpr(fixedShards)
+                return burst.emitFixed(pose.x,pose.y,pose.xsp.v,pose.ysp.v,lowSpec,random,shards,lookup);
+            else return burst.emit(pose.x,pose.y,pose.xsp,pose.ysp,lowSpec,random,shards,lookup,
                 [](auto ax,auto ay,auto bx,auto by,auto& angle){
                     return RunnerPointDirection::evaluate(ax,ay,bx,by,angle,portableAtan);
                 },[](auto speed,auto angle,bool vertical,auto& result){

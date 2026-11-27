@@ -50,10 +50,11 @@ struct TimeShardBurst {
     template<unsigned Capacity,class Random,class Lookup>
     bool emitFixed(RunnerImageValue x,RunnerImageValue y,std::int32_t xsp,std::int32_t ysp,
                    bool lowSpec,Random& random,TimeShardEffects<Capacity,TimeShardParticle>& effects,Lookup lookup){
-        std::int32_t found=-4,px,py,fieldX,fieldY;MotionBinary64 fx,fy;
-        if(!x.roundPixel(px)||!y.roundPixel(py)||!lookup(x,y,found,fx,fy))return false;
+        // lookup(x, y, id, fieldX, fieldY) gives the field's whole pixels.
+        std::int32_t found=-4,px,py,fieldX,fieldY;
+        if(!x.roundPixel(px)||!y.roundPixel(py)||!lookup(x,y,found,fieldX,fieldY))return false;
         if(found>0){
-            if(!lookup(x,y,field,fx,fy)||field<0||!fx.roundPixel(fieldX)||!fy.roundPixel(fieldY)||
+            if(!lookup(x,y,field,fieldX,fieldY)||field<0||
                px-fieldX< -(1<<14)||px-fieldX>=(1<<14)||py-fieldY< -(1<<14)||py-fieldY>=(1<<14))return false;
             direction16=FixedTrig::pointDirection((px-fieldX)*65536,(py-fieldY)*65536);
         }else direction16=FixedTrig::pointDirection(xsp,ysp);

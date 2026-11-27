@@ -4335,19 +4335,15 @@ bool GameplayWorld::beginCompactTimeStop(int publishedX,int publishedY){
     const bool wanted=inField||outside;
     if(wanted!=timeStop_.player.checkStop||wanted!=timeStop_.player.stopped){
         // Only transitions emit shards: build the exact pose just for them.
-        pose.xx=exactQ8(xxQ8);pose.yy=exactQ8(yyQ8);pose.xsp=exactQ8(player_.speedXFixed());
-        if(!pose.x.assign(downwell::MotionBinary64::fromInteger(publishedX))||
-           !pose.y.assign(downwell::MotionBinary64::fromInteger(publishedY))||
-           !downwell::divideBinary64(downwell::MotionBinary64::fromInteger(player_.speedYFifths()),
-               downwell::MotionBinary64::fromInteger(1280),pose.ysp))return run_.effectsSucceeded=false;
+        if(!pose.fromQ8(publishedX,publishedY,xxQ8,yyQ8,player_.speedXFixed(),player_.speedYFifths()))
+            return run_.effectsSucceeded=false;
     }
     const bool ok=timeStop_.beginStepWithAudioChecked(true,[&](bool& o){o=outside;return true;},pose,false,
         enemyRandom_,[&](bool& hit){hit=inField;return true;},
         [&](downwell::RunnerImageValue,downwell::RunnerImageValue,std::int32_t& id,
-            downwell::MotionBinary64& fx,downwell::MotionBinary64& fy){
+            std::int32_t& fx,std::int32_t& fy){
             const auto field=fieldAt(downwell::contactWorldBounds({publishedX*256L,publishedY*256L,facing,1,31}));
-            id=field.hit?1:-4;fx=downwell::MotionBinary64::fromInteger(field.x);
-            fy=downwell::MotionBinary64::fromInteger(field.y);return true;
+            id=field.hit?1:-4;fx=field.x;fy=field.y;return true;
         },[&](downwell::PlayerTimeStop::AudioQuery query,bool& value){
             auto audio=run_.audio();
             return downwell::TimeStopAudio::query(query,run_.backgroundMusicId,run_.fieldWind.voice,audio,value);
