@@ -68,6 +68,7 @@
 #include "core/CompactUpgrades.h"
 #include "core/CorpseEffects.h"
 #include "core/ConsumptionBloodInstances.h"
+#include "core/CompactBoxState.h"
 #include "core/CorpseDraw.h"
 #include "core/SmokeInstances.h"
 #include "core/BlastInstances.h"
@@ -305,7 +306,7 @@ public:
         bool active;
         std::uint32_t lifetimeId;
         bool destroyRequested=false;
-        downwell::BreakableState state{};
+        downwell::CompactBoxState state{};
         std::int32_t alarm0=-1;
         downwell::InstanceHandle myFx{}; // Internal lifetime, never a VM numeric ID.
         downwell::SoundPlayState sound{};
@@ -2009,8 +2010,11 @@ public:
           amount,allocate,queries);
     }
     bool publishBoxHealth(downwell::InstanceHandle h,downwell::MotionBinary64 health){
-        if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
-        breakables_[h.slot].state.wallHp=health;observeBoxHealth(breakables_[h.slot]);return true;
+        // The owned reference's binary64 boundary: exact Q16 health only.
+        std::int32_t q16;
+        if(!run_.effectsSucceeded||!findBreakable(h)||!downwell::CompactBoxState::healthFromReference(health,q16))
+            return run_.effectsSucceeded=false;
+        breakables_[h.slot].state.wallHp=q16;observeBoxHealth(breakables_[h.slot]);return true;
     }
     template<class Controls,class Position,class Allocate,class Queries>
     auto boxCurrencyOperations(const downwell::ObjectPack& objects,downwell::InstanceHandle box,
@@ -2233,7 +2237,7 @@ public:
     // Append a newly generated batch without reviving destroyed earlier blocks.
     // Reject capacity failure before changing any state.
     bool appendBreakables(const int* x, const int* y, unsigned count,
-        const downwell::BreakableState* creation=nullptr,const std::uint32_t* sourceIds=nullptr);
+        const downwell::CompactBoxState* creation=nullptr,const std::uint32_t* sourceIds=nullptr);
     bool appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation,
         std::uint32_t sourceId=0);
     // Replay fixtures run in open space: no solid, wall or platform. Casings
@@ -2343,7 +2347,7 @@ public:
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;
-            const auto state=command.boxCreate();
+            const auto state=command.compactBoxCreate();
             return appendBreakables(&x, &y, 1,&state);
         }
         const auto profile = downwell::enemyCreateProfile(command.objectId);
@@ -2400,7 +2404,7 @@ public:
             return true;
         }
         if(command.objectId==92){
-            const int x=command.x-240,y=command.y-176;const auto state=command.boxCreate();
+            const int x=command.x-240,y=command.y-176;const auto state=command.compactBoxCreate();
             const std::uint32_t sourceId=source;
             return run_.effectsSucceeded=appendBreakables(&x,&y,1,&state,&sourceId);
         }
@@ -3326,7 +3330,6 @@ private:
     int sceneryRepaintX_[downwell::gameplaySceneryRepaintCapacity]{};
     int sceneryRepaintY_[downwell::gameplaySceneryRepaintCapacity]{};
     unsigned sceneryRepaintCount_=0;
-    struct BoxOps;
     struct SceneryOps;
     // Compact guns (W1.4): the seven bStatInitLevel1 guns, their shots,
     // casings, laser trails, GunModule pickups and their texts.

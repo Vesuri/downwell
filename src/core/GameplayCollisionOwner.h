@@ -4646,7 +4646,7 @@ public:
     bool projectileBoxHealth(InstanceHandle h,MotionBinary64& health)const{
         View::Record record;
         if(!valid()||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
-        health=record.breakable->state.wallHp;return true;
+        health=record.breakable->state.reference().wallHp;return true;
     }
     bool readBoxDestruction(InstanceHandle h,BoxDestructionScript::Caller& out)const{
         if(native_){
@@ -4657,11 +4657,11 @@ public:
             RunnerImageValue px,py;
             if(!x.add(MotionBinary64::fromInteger(240))||!y.add(MotionBinary64::fromInteger(176))||
                 !px.assign(x)||!py.assign(y))return false;
-            out={box->state,px.promoted(),py.promoted()};return true;
+            out={box->state.reference(),px.promoted(),py.promoted()};return true;
         }
         View::Record record;const auto position=state(h);
         if(!position||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
-        out={record.breakable->state,position->x.promoted(),position->y.promoted()};return true;
+        out={record.breakable->state.reference(),position->x.promoted(),position->y.promoted()};return true;
     }
     bool projectileBoxHealthWrite(InstanceHandle h,MotionBinary64 health){
         View::Kind kind;InstanceHandle local;

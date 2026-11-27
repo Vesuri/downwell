@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_DEFERRED_INSTANCE_QUEUE_H
 
 #include "InstanceStore.h"
+#include "CompactBoxState.h"
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
 #include <array>
@@ -52,6 +53,13 @@ struct DeferredCreateInstance {
     void setBoxCreate(unsigned sound,unsigned gems){auxiliaryState=static_cast<std::int32_t>(sound|(gems<<16));}
     BreakableState boxCreate()const{
         BreakableState state;
+        if(auxiliaryState){state.breakSound=static_cast<unsigned short>(auxiliaryState&65535);
+            state.haveGem=static_cast<unsigned char>(static_cast<unsigned>(auxiliaryState)>>16);}
+        return state;
+    }
+    // The shipping world's twin, with Q16 health.
+    CompactBoxState compactBoxCreate()const{
+        CompactBoxState state;
         if(auxiliaryState){state.breakSound=static_cast<unsigned short>(auxiliaryState&65535);
             state.haveGem=static_cast<unsigned char>(static_cast<unsigned>(auxiliaryState)>>16);}
         return state;

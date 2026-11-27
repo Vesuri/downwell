@@ -968,7 +968,7 @@ void GameplayWorld::prepareBreakableSlotsForReuse(){
 }
 
 bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
-    const downwell::BreakableState* creation,const std::uint32_t* sourceIds)
+    const downwell::CompactBoxState* creation,const std::uint32_t* sourceIds)
 {
     if(!run_.effectsSucceeded)return false;
     if (count > breakableCapacity - breakableCount_ || (count && (!x || !y)))
@@ -999,7 +999,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         breakables_[index].y = y[source];
         breakables_[index].active = true;
         breakables_[index].destroyRequested = false;
-        breakables_[index].state=creation?creation[source]:downwell::BreakableState{};
+        breakables_[index].state=creation?creation[source]:downwell::CompactBoxState{};
         observeBoxHealth(breakables_[index]);
         breakables_[index].alarm0=-1;
         breakables_[index].myFx={};
@@ -1054,7 +1054,7 @@ bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::Generat
     // The retained family's bindings may read the builder; the native
     // allocation above runs no observer.
     publishPendingBuilderPosition();
-    downwell::BreakableState state;
+    downwell::CompactBoxState state;
     state.breakSound=static_cast<unsigned short>(creation.sound);
     state.haveGem=static_cast<unsigned char>(creation.gems);
     return appendBreakables(&x,&y,1,&state,sourceId?&sourceId:nullptr);
@@ -1863,7 +1863,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             bool hit=false;
             if(!downwell::PlayerBoxContact::testPrepared(bounds,box.x+240,box.y+176,hit))return false;
             if (hit) {
-                box.state.wallHp={}; // scrWallCol leaves destruction to Step.
+                box.state.wallHp=0; // scrWallCol leaves destruction to Step.
                 runtime.observeBoxHealth(box);
                 found=true;
                 return true;
@@ -3392,96 +3392,60 @@ bool GameplayWorld::gemChunkSolidAt(int x,int y)const{
     return true;
 }
 
-struct GameplayWorld::BoxOps {
-    using Real=downwell::MotionBinary64;
-    using Handle=std::uint32_t;
-    GameplayWorld& world;downwell::InstanceHandle key;
-    bool fail(){return world.run_.effectsSucceeded=false;}
-    // objBox_n Step: the break on waterThings (channel 7: no view test) and
-    // the gunpowder chain's sfxUpgradeGunpowder_Bullet.
-    bool soundOverlap(int id,int priority,int loop,int cut,const char* channel){
-        world.run_.soundPlayOL(id,priority,loop!=0,cut!=0,channel);
-        return world.run_.effectsSucceeded;
-    }
-    bool sound(int id,int priority,int loop,int cut){
-        world.run_.soundPlay(id,priority,loop!=0,cut!=0);
-        return world.run_.effectsSucceeded;
-    }
-    bool smoke(Real x,Real y,int count,int vary){
-        downwell::Fixed16 qx,qy;
-        return count==1&&vary==0&&q16(x,qx)&&q16(y,qy)&&world.emitBoxSmoke(qx,qy);
-    }
-    bool flash(Real x,Real y,int count,int vary,int radius){
-        downwell::Fixed16 qx,qy;
-        return count==1&&vary==0&&radius==2&&q16(x,qx)&&q16(y,qy)&&world.emitBoxFlash(qx,qy);
-    }
-    bool effect(Real x,Real y,int sprite,Real speed,Real angle,int){
-        downwell::Fixed16 qx,qy,qa;downwell::RunnerImageValue r;
-        return (q16(x,qx)&&q16(y,qy)&&r.assign(speed)&&q16(angle,qa)&&
-            world.compactEffects_.spawnNoLoop(qx,qy,sprite,r,qa))||fail();
-    }
-    // global.ug[5] (Gunpowder Blocks): bulletDrone 266 at the box, then
-    // Alarm 0 = 5 on each boxed neighbour 16 pixels away.
-    bool chainReaction(){return world.run_.upgrades.levels[5]!=0;}
-    GameplayWorld::BulletState* shot=nullptr;
-    bool create(int object,Real x,Real y,Handle& child){
-        downwell::Fixed16 qx,qy;
-        if(object==370)return q16(x,qx)&&q16(y,qy)&&world.spawnCompactDebris(qx,qy,child);
-        std::int32_t px,py;
-        if(object!=266||!x.roundPixel(px)||!y.roundPixel(py))return fail();
-        shot=world.createDroneBullet(px,py,270,4);
-        child=shot?shot->lifetimeId:0;
-        return shot!=nullptr;
-    }
-    bool myBullet(Handle h){return shot&&shot->lifetimeId==h;}
-    bool bulletDirection(Handle h,int degrees){
-        if(!myBullet(h))return fail();
-        shot->shot.direction=downwell::RangedShot::degreesToTurns(degrees);return true;
-    }
-    bool bulletDamage(Handle h,int damage){if(!myBullet(h))return fail();shot->damage=damage;return true;}
-    // instance_place(x, y, objBox_n) with the caller's 16-pixel mask.
-    bool place(int object,Real x,Real y,Handle& target,bool& found){
-        std::int32_t px,py;
-        if(object!=92||!x.roundPixel(px)||!y.roundPixel(py))return fail();
-        found=false;target=0;
-        for(unsigned i=0;i<world.breakableCount_;++i){const auto& b=world.breakables_[i];
-            if(b.active&&!b.destroyRequested&&i!=key.slot&&b.x+240>px-16&&b.x+240<px+16&&b.y+176>py-16&&b.y+176<py+16){
-                found=true;target=i+1;break;
-            }
-        }
-        return true;
-    }
-    bool target(Handle){return true;}
-    bool targetAlarm(Handle h,int alarm,int value){
-        if(!h||alarm!=0||h>world.breakableCount_)return fail();
-        const auto& b=world.breakables_[h-1];
-        return world.publishBoxAlarm0({h-1,b.lifetimeId},value);
-    }
-    bool targetChecked(Handle,bool){return fail();} // autoTile is never set
-    bool destroySelf(){return world.markBreakableDestroyed(key);}
-    bool lowSpec(){return false;}
-    int area(){return world.run_.stage.area;}
-    // scrCurrencySpawn at the box: objBox_n is not a subparentEnemy child.
-    bool currency(int amount){
-        const auto* box=world.findBreakable(key);
-        return box?world.spawnCompactCurrency(amount,box->x,box->y,false)>=0:fail();
-    }
-    bool alarmStop(int alarm){return alarm==0;} // No pTimeStop in this world.
-};
-
+// objBox_n Step (BoxDestructionScript in whole room pixels, W3.20): at no
+// health, the break sound on waterThings, smoke at y + 4, the flash, the
+// 603 splash at y + 12; Gunpowder Blocks' (global.ug[5]) upward bulletDrone
+// and Alarm 0 = 5 on each boxed neighbour 16 pixels away; then the destroy
+// request, two debris and the gem reward outside area 4. A callback may
+// change or compact the box, so it is re-read after each one.
 bool GameplayWorld::stepCompactBox(unsigned index){
     const downwell::InstanceHandle key{index,breakables_[index].lifetimeId};
-    BoxOps ops{*this,key};
-    bool good=run_.effectsSucceeded;
-    downwell::BoxDestructionScript::runRetained([&](downwell::BoxDestructionScript::Caller& caller){
+    if(!run_.effectsSucceeded)return false;
+    const auto fail=[&]{return run_.effectsSucceeded=false;};
+    const auto at=[](int v){return downwell::Fixed16::fromInteger(v);};
+    int x=0,y=0;downwell::CompactBoxState state;
+    const auto refresh=[&]{
         const auto* box=findBreakable(key);
-        if(!box)return false;
-        caller.state=box->state;
-        caller.x=downwell::MotionBinary64::fromInteger(box->x+240);
-        caller.y=downwell::MotionBinary64::fromInteger(box->y+176);
-        return true;
-    },ops,good);
-    return run_.effectsSucceeded=good&&run_.effectsSucceeded;
+        if(!box||!run_.effectsSucceeded)return false;
+        x=box->x+240;y=box->y+176;state=box->state;return true;
+    };
+    if(!refresh())return fail();
+    if(!state.exhausted())return true;
+    run_.soundPlayOL(state.breakSound,50,false,true,"waterThings");
+    if(!refresh()||!emitBoxSmoke(at(x),at(y+4))||!refresh()||!emitBoxFlash(at(x),at(y))||!refresh()||
+       !compactEffects_.spawnNoLoop(at(x),at(y+12),603,downwell::RunnerImageValue{0x3f000000u},at(270)))
+        return fail();
+    if(run_.upgrades.levels[5]){
+        if(!refresh())return fail();
+        BulletState* shot=createDroneBullet(x,y,270,4);
+        if(!shot)return fail();
+        shot->shot.direction=downwell::RangedShot::degreesToTurns(90);shot->damage=20;
+        run_.soundPlay(342,50,false,true);
+        const int dx[]={0,16,0,-16},dy[]={-16,0,16,0};
+        for(unsigned n=0;n<4;++n){
+            if(!refresh())return fail();
+            // instance_place(x, y, objBox_n) with the caller's 16-pixel mask.
+            const int px=x+dx[n],py=y+dy[n];
+            for(unsigned i=0;i<breakableCount_;++i){const auto& b=breakables_[i];
+                if(!b.active||b.destroyRequested||i==key.slot||b.x+240<=px-16||b.x+240>=px+16||
+                   b.y+176<=py-16||b.y+176>=py+16)continue;
+                if(!publishBoxAlarm0({i,b.lifetimeId},5)||!refresh())return fail();
+                if(state.autoTile)return fail(); // autoTile is never set
+                break;
+            }
+        }
+    }
+    std::uint32_t debris;
+    if(!markBreakableDestroyed(key)||!refresh()||!spawnCompactDebris(at(x),at(y),debris)||
+       !refresh()||!spawnCompactDebris(at(x),at(y),debris))return fail();
+    if(run_.stage.area!=4){
+        // scrCurrencySpawn at the box: objBox_n is not a subparentEnemy child.
+        for(int gem=1;gem<=2;++gem){
+            if(!refresh())return fail();
+            if(state.haveGem==gem&&spawnCompactCurrency(gem==1?3:10,x-240,y-176,false)<0)return fail();
+        }
+    }
+    return run_.effectsSucceeded;
 }
 
 // ---------------------------------------------------------------------------
@@ -3771,7 +3735,7 @@ bool GameplayWorld::bulletSolidContact(BulletState& bullet,const downwell::Proje
         if(block.active&&!block.destroyRequested&&(breakableIndexReady_||path.intersects(block.x-8,block.x+8,
                                                    block.y-8,block.y+8))){
             bool applied=false;
-            if(!block.state.bulletHit(GunReal::fromInteger(bullet.damage),applied))return run_.effectsSucceeded=false;
+            if(!block.state.bulletHit(bullet.damage,applied))return run_.effectsSucceeded=false;
             observeBoxHealth(block);
             consumed=applied;return true;
         }
@@ -3898,9 +3862,9 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         const int block=breakableAt(x,py);
         if(block>=0){
             auto& box=breakables_[block];
-            if(box.state.wallHp.high||box.state.wallHp.low){
+            if(box.state.wallHp){
                 bool applied=false;
-                if(!box.state.bulletHit(GunReal::fromInteger(bullet.damage),applied))return run_.effectsSucceeded=false;
+                if(!box.state.bulletHit(bullet.damage,applied))return run_.effectsSucceeded=false;
                 observeBoxHealth(box);
             }
         }else if(gemChunkBlocks(x+240,py+176)){

@@ -83,8 +83,8 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
         const auto& fresh=world->breakableSlot(0);
         require(!world->findBreakable(old)&&fresh.alarm0==-1&&!fresh.myFx.generation&&
             fresh.sound.sndsnd==-1&&!fresh.state.hit&&fresh.state.scriptIndex==0&&
-            fresh.state.breakSound==171&&fresh.state.wallHp.high==0x3ff00000u&&
-            fresh.state.wallHp.low==0&&!fresh.destroyRequested,
+            fresh.state.breakSound==171&&fresh.state.reference().wallHp.high==0x3ff00000u&&
+            fresh.state.reference().wallHp.low==0&&!fresh.destroyRequested,
             "prepared defaults replace all previous-lifetime script state");
     }
     for(unsigned i=world->breakableSlots();i;--i)
@@ -219,7 +219,7 @@ struct Scene {
         d.addU32(w.breakableSlots());
         for(unsigned i=0;i<w.breakableSlots();++i){const auto& b=w.breakableSlot(i);
             d.addU32(b.lifetimeId);d.addBool(b.active);d.addBool(b.destroyRequested);d.addI32(b.alarm0);
-            d.addI32(b.x);d.addI32(b.y);d.addU32(b.state.wallHp.high);d.addU32(b.state.wallHp.low);
+            d.addI32(b.x);d.addI32(b.y);d.addU32(b.state.reference().wallHp.high);d.addU32(b.state.reference().wallHp.low);
             d.addU32(b.state.breakSound);d.addU32(b.state.haveGem);d.addI32(b.state.scriptIndex);
             d.addBool(b.state.hit);d.addBool(b.state.drilled);d.addBool(b.state.autoTile);d.addBool(b.state.checked);}
         unsigned drawn=0;
@@ -421,7 +421,7 @@ int main(int argc,char** argv){
                 // the grid accelerator without changing first-hit ownership.
                 const int x=i%3?0:1,y=int(i%128)*16;
                 const downwell::GeneratedBreakableCreate create{16+i%2,171+i%4,i%7?0u:2u};
-                downwell::BreakableState state;state.breakSound=create.sound;state.haveGem=create.gems;
+                downwell::CompactBoxState state;state.breakSound=create.sound;state.haveGem=create.gems;
                 const bool expected=reference->world->appendBreakables(&x,&y,1,&state);
                 require(direct->world->appendGeneratedBreakable(x,y,create)==expected,
                     "direct box capacity prefix equals the retained allocator");

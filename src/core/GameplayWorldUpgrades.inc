@@ -245,8 +245,7 @@ bool GameplayWorld::blastWalls(downwell::CompactBlastRecord& blast,const downwel
         if(!box.active||box.destroyRequested||!downwell::contactBoundsOverlap(bounds,
             {box.x+240-8,box.x+240+8,box.y+176-8,box.y+176+8}))continue;
         if(!blast.remember(blastHitBox|(box.lifetimeId&0x0fffffffu))||box.state.exhausted())continue;
-        auto damage=UpgradeReal::fromInteger(-50);
-        if(!box.state.wallHp.add(damage))return run_.effectsSucceeded=false;
+        if(!box.state.blastHit(50))return run_.effectsSucceeded=false;
         observeBoxHealth(box);
     }
     for(unsigned i=0;i<scenery_.gemChunkEnd;++i){

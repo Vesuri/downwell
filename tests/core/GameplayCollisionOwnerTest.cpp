@@ -2701,7 +2701,7 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
-        const int x=0,y=336;BreakableState creation;
+        const int x=0,y=336;CompactBoxState creation;
         if(mode>=12)creation.haveGem=2;
         assert(world->appendBreakables(&x,&y,1,&creation));
         const InstanceHandle box{0,1};
@@ -4807,7 +4807,7 @@ int main(){
             world->step(4);return world->effectsSucceeded();
         });}));
         assert(calls==1&&collisionPasses==1);
-        if(target==0){const auto* box=world->findBreakable({0,1});assert(box&&box->state.hit&&box->state.wallHp.high==0xc0200000u);}
+        if(target==0){const auto* box=world->findBreakable({0,1});assert(box&&box->state.hit&&box->state.reference().wallHp.high==0xc0200000u);}
         if(target==2){const auto* victim=owner->bones().find(bone);assert(victim&&victim->state.hit&&victim->state.health.high==0xc0200000u);}
         assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shot));
     }
@@ -4962,7 +4962,7 @@ int main(){
         }
         const auto* box=world->findBreakable({0,1});assert(box);
         const auto expected=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
-        assert(box->state.wallHp.high==expected.high&&box->state.wallHp.low==expected.low&&box->state.hit);
+        assert(box->state.reference().wallHp.high==expected.high&&box->state.reference().wallHp.low==expected.low&&box->state.hit);
         assert(box->active&&!box->destroyRequested); // Its Step, not bullet damage, owns destruction effects.
         GameplayCollisionOwner::Owner::Result selected;
         const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(512);
@@ -4979,7 +4979,7 @@ int main(){
         }
         if(!worldRandom)std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
-            unsigned(box->state.wallHp.high),unsigned(box->state.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
+            unsigned(box->state.reference().wallHp.high),unsigned(box->state.reference().wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
         assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shotKey)&&!owner->state(shotShared));
         if(worldRandom){const auto before=world->randomDrawCount();
             assert(!world->stepSourceBullet(shotKey,motion,ops,frames)&&!world->effectsSucceeded()&&world->randomDrawCount()==before);}
@@ -4996,7 +4996,7 @@ int main(){
         InstanceStore<1> stored;DeferredInstanceQueue<1> queue;std::uint32_t next=100000;
         assert(queue.enqueueCreate(box)&&queue.applyChecked(stored,objects,11,next,[](auto&){return true;})==ApplyInstanceCommandsResult::success);
         const auto* native=world->findBreakable({0,1});assert(native);
-        const auto& a=native->state;const auto& b=stored.at(0).box;
+        const auto a=native->state.reference();const auto& b=stored.at(0).box;
         assert(a.wallHp.high==0x3ff00000u&&!a.wallHp.low&&a.wallHp.high==b.wallHp.high&&
             a.breakSound==174&&a.breakSound==b.breakSound&&a.haveGem==2&&a.haveGem==b.haveGem&&
             !a.hit&&!b.hit&&!a.drilled&&!b.drilled&&!a.autoTile&&!b.autoTile&&!a.checked&&!b.checked);
@@ -5033,12 +5033,12 @@ int main(){
         const int x=0,y=336;assert(world->appendBreakables(&x,&y,1));
         const auto* fresh=world->findBreakable({0,2});
         assert(fresh&&fresh->state.breakSound==171&&!fresh->state.haveGem&&!fresh->state.hit&&
-            fresh->state.wallHp.high==0x3ff00000u);
+            fresh->state.reference().wallHp.high==0x3ff00000u);
         assert(!owner->projectileBoxHealthWrite(selected,fractional)&&!fresh->state.hit);
         InstanceHandle replacement;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,{0,2},replacement));
         assert(!owner->projectileBoxHealthWrite(replacement,{0x7ff00000u,0})&&
-            !owner->projectileBoxHit(replacement)&&!fresh->state.hit&&fresh->state.wallHp.high==0x3ff00000u);
+            !owner->projectileBoxHit(replacement)&&!fresh->state.hit&&fresh->state.reference().wallHp.high==0x3ff00000u);
     }
     {
         auto owner=makeCollisionOwner(objects,sprites);
@@ -8606,7 +8606,7 @@ int main(){
                 assert(ok==knownId);
             }
             const auto& state=world->breakableSlot(0).state;
-            assert(state.wallHp.high==MotionBinary64::fromInteger(knownId?-49:1).high&&!state.wallHp.low&&!state.hit&&
+            assert(state.reference().wallHp.high==MotionBinary64::fromInteger(knownId?-49:1).high&&!state.reference().wallHp.low&&!state.hit&&
                 !world->breakableSlot(0).destroyRequested);
             const auto* actor=owner->registeredBlasts().find(blast);
             assert(actor&&actor->state.hits.count==unsigned(knownId));
@@ -9182,8 +9182,8 @@ int main(){
             assert(world->effectsSucceeded()&&world->findBreakable(idle)->alarm0==-1&&
                 world->findBreakable(armed)->alarm0==expected);
         }
-        assert(world->findBreakable(armed)->state.wallHp.zero()&&world->findBreakable(armed)->destroyRequested&&
-            !world->findBreakable(idle)->state.wallHp.zero()&&!world->findBreakable(idle)->destroyRequested);
+        assert(world->findBreakable(armed)->state.reference().wallHp.zero()&&world->findBreakable(armed)->destroyRequested&&
+            !world->findBreakable(idle)->state.reference().wallHp.zero()&&!world->findBreakable(idle)->destroyRequested);
     }
     {
         GameplayWorld world(300,true);
@@ -9197,8 +9197,8 @@ int main(){
         assert(world.appendBreakables(xs,ys,1));
         const InstanceHandle newborn{3,world.breakableSlot(3).lifetimeId};
         assert(world.publishBoxAlarm0(newborn,1)&&world.advanceBoxAlarmPrefix(phase));
-        assert(world.findBreakable(a)->alarm0==0&&world.findBreakable(a)->state.wallHp.zero());
-        assert(world.findBreakable(b)->alarm0==-1&&!world.findBreakable(b)->state.wallHp.zero());
+        assert(world.findBreakable(a)->alarm0==0&&world.findBreakable(a)->state.reference().wallHp.zero());
+        assert(world.findBreakable(b)->alarm0==-1&&!world.findBreakable(b)->state.reference().wallHp.zero());
         assert(world.findBreakable(c)->alarm0==1&&world.findBreakable(newborn)->alarm0==1);
         world.configureBreakables(xs,ys,3);
         const InstanceHandle replacement{0,world.breakableSlot(0).lifetimeId};
@@ -9244,12 +9244,12 @@ int main(){
         assert(world->publishBoxAlarm0(key,2));
         world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1&&
-            world->findBreakable(key)->state.wallHp.high==0x3ff00000u);
+            world->findBreakable(key)->state.reference().wallHp.high==0x3ff00000u);
         // Zero retires to -1 without dispatching a second event.
         assert(world->publishBoxAlarm0(key,0)&&world->publishBoxHealth(key,MotionBinary64::fromInteger(3)));
         world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-1&&
-            world->findBreakable(key)->state.wallHp.high==0x40080000u);
+            world->findBreakable(key)->state.reference().wallHp.high==0x40080000u);
         assert(world->publishBoxAlarm0(key,-2));world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-2);
         if(registered){
@@ -9261,7 +9261,7 @@ int main(){
             assert(owner->stopBoxAlarm0(key,true,480,masks)&&world->findBreakable(key)->alarm0==2);
             world->step(0);
             assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==2&&
-                world->findBreakable(key)->state.wallHp.high==0x40080000u);
+                world->findBreakable(key)->state.reference().wallHp.high==0x40080000u);
             assert(owner->prepareDraw()&&!world->findBreakable(key)&&!world->breakableActiveAt(x,y));
         }
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none);
