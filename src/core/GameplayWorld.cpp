@@ -1662,6 +1662,9 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
 {
     if(!bullet.active||bullet.destroyRequested)return true;
     bulletChanged = true;
+#ifndef DOWNWELL_WORLD_ONE_ONLY
+    // StartupRuntime's source bullets (withSourceBulletSteps); the shipping
+    // world never dispatches them, so it keeps no source motion.
     if(sourceBulletDispatch_){
         if(!bullet.sourceOwned){
             if(bullet.trajectory.initialized||!bullet.sourceMotion.reset(bullet.sourceMotion.x.promoted(),
@@ -1671,6 +1674,7 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
         const bool ok=sourceBulletDispatch_(sourceBulletContext_,{bullet.identitySlot,bullet.lifetimeId},bullet.sourceMotion);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+#endif
     if(bullet.kind==BulletState::ranged)return stepRangedBullet(bullet,generationCameraY);
     if(bullet.kind==BulletState::laser)return stepLaserBullet(bullet,generationCameraY);
     const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
@@ -1986,8 +1990,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         bullet.animation = {};
         bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
         const downwell::InstanceHandle handle{identity,bullet.lifetimeId};
-        if(!bullet.sourceMotion.reset(downwell::MotionBinary64::fromInteger(bullet.x+240),
+        if(
+#ifndef DOWNWELL_WORLD_ONE_ONLY
+            !bullet.sourceMotion.reset(downwell::MotionBinary64::fromInteger(bullet.x+240),
                 downwell::MotionBinary64::fromInteger(bullet.y+176),bullet.trajectory.zeroSpread)||
+#endif
             !bulletLifecycle_.birth(handle,bullet)||
             !bulletLifecycle_.sprite(handle,bullet,downwell::machineGunProfile(bullet.gemHigh).sprite)){
             run_.effectsSucceeded=false;return {};
@@ -3535,7 +3542,10 @@ GameplayWorld::BulletState* GameplayWorld::birthBullet(int x,int y,int sprite){
     bullet.x=x;bullet.y=y;bullet.gemHigh=run_.gemHigh;bullet.sprite=sprite;
     bullet.trajectory.reset(x,y,false);
     const downwell::InstanceHandle handle{identity,bullet.lifetimeId};
-    if(!bullet.sourceMotion.reset(GunReal::fromInteger(x+240),GunReal::fromInteger(y+176),false)||
+    if(
+#ifndef DOWNWELL_WORLD_ONE_ONLY
+       !bullet.sourceMotion.reset(GunReal::fromInteger(x+240),GunReal::fromInteger(y+176),false)||
+#endif
        !bulletLifecycle_.birth(handle,bullet)||!bulletLifecycle_.sprite(handle,bullet,sprite)){
         run_.effectsSucceeded=false;return nullptr;
     }
