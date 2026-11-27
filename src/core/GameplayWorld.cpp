@@ -2466,81 +2466,36 @@ SteeringReal exactQ8(long q8){
     if(!value.zero())value.high-=8u<<20; // Exact division by 256.
     return value;
 }
-// Q32 turns -> degrees, exactly (turns*360 < 2^53).
-bool turnsDegrees(std::uint32_t turns,SteeringReal& out){
-    auto value=SteeringReal::fromInteger(static_cast<std::int32_t>(turns>>16));
-    if(!value.zero())value.high+=16u<<20;
-    SteeringReal product;
-    if(!value.add(SteeringReal::fromInteger(static_cast<std::int32_t>(turns&0xffffu)))||
-       !downwell::multiplyBinary64(value,SteeringReal::fromInteger(360),product))return false;
-    if(!product.zero())product.high-=32u<<20;
-    out=product;return true;
-}
-// Exact ceil(value*256), for typStompable's yy > ply+2 on the Q8 lattice.
-bool ceilQ8(SteeringReal value,long& out){
-    if(!value.zero())value.high+=8u<<20;
-    std::int32_t nearest;
-    if(!value.roundPixel(nearest)||!value.add(SteeringReal::fromInteger(-nearest)))return false;
-    out=nearest+((!value.zero()&&!(value.high&0x80000000u))?1:0);
-    return true;
-}
 bool steeringObject(int object){return object==115||object==118||object==173;}
 }
 
 struct GameplayWorld::SteeringOps {
-    using Real=downwell::MotionBinary64;
     using Image=downwell::RunnerImageValue;
     GameplayWorld& world;
     EnemyState* enemy; // Null during Create: the record is configured after it.
-    downwell::SteeringEnemyBirthState& actor;
+    downwell::SteeringFixedState& actor;
     int alarm0=-1,alarm1=-1;
-    bool player(bool vertical,Real& value){
-        Real x,y;
-        if(!downwell::ContactCoordinates::playerGlobals(world.player_.frameStartXFixed(),
-            world.player_.frameStartYFixed(),240,176,x,y))return false;
-        value=vertical?y:x;return true;
+    // plx/ply in Q16: the frame-start Q8 position plus the room offset.
+    bool playerQ16(bool vertical,std::int32_t& value){
+        const long q8=vertical?world.player_.frameStartYFixed():world.player_.frameStartXFixed();
+        if(q8<-30000L*256||q8>30000L*256)return false;
+        value=std::int32_t(q8)*256+(vertical?176:240)*65536;return true;
     }
-    bool playerX(Real& value){return player(false,value);}
-    bool playerY(Real& value){return player(true,value);}
     // eplx/eply alias plx/ply unless pugDecoy has a held balloon.
-    bool enemyPlayerX(Real& value){
-        if(world.balloonHeld()){value=Real::fromInteger(world.balloon_.x);return true;}
-        return player(false,value);
-    }
-    bool enemyPlayerY(Real& value){
-        if(world.balloonHeld()){value=Real::fromInteger(world.balloon_.y);return true;}
-        return player(true,value);
-    }
-    // eplx/eply in Q16: the frame-start Q8 position plus the room offset.
     bool enemyPlayerQ16(bool vertical,std::int32_t& value){
         if(world.balloonHeld()){
             const int pixel=vertical?world.balloon_.y:world.balloon_.x;
             if(pixel<-32000||pixel>32000)return false;
             value=pixel*65536;return true;
         }
-        const long q8=vertical?world.player_.frameStartYFixed():world.player_.frameStartXFixed();
-        if(q8<-30000L*256||q8>30000L*256)return false;
-        value=std::int32_t(q8)*256+(vertical?176:240)*65536;return true;
-    }
-    // point_direction in Q16 fixed point (FixedPoint.h), not the VM's
-    // binary32/binary64 wrapper.
-    bool pointDirection(Real x,Real y,Real targetX,Real targetY,Real& value){
-        downwell::Fixed16 ax,ay,bx,by;
-        if(!downwell::Fixed16::fromBinary64(x,ax)||!downwell::Fixed16::fromBinary64(y,ay)||
-            !downwell::Fixed16::fromBinary64(targetX,bx)||!downwell::Fixed16::fromBinary64(targetY,by))return false;
-        value=downwell::Fixed16::raw(downwell::FixedTrig::pointDirection(bx.v-ax.v,by.v-ay.v)).binary64();
-        return true;
-    }
-    bool direction(Real wanted,Real& accepted){
-        Image value;if(!downwell::RunnerDirectionValue::normalize(wanted,value))return false;
-        accepted=value.promoted();return true;
+        return playerQ16(vertical,value);
     }
     bool position(bool,Image value,Image& accepted){
         if(!downwell::RunnerSpatialSplit::valid(value))return false;
         accepted=value;return true;
     }
     bool imageSpeed(Image value,Image& accepted){
-        if(!value.promoted().valid())return false;
+        if((value.bits&0x7f800000u)==0x7f800000u)return false; // Not finite.
         accepted=value;return true;
     }
     bool alarm(int number,int ticks){
@@ -2560,13 +2515,6 @@ struct GameplayWorld::SteeringOps {
         world.soundPlayOLAt(id,priority,loop!=0,cut!=0,channel,enemy->y+176);
         return world.run_.effectsSucceeded;
     }
-    bool lengthdir(bool vertical,Real speed,Real angle,Real& value){
-        return downwell::WhiteJellyStep::movementComponent(vertical,speed,angle,value);
-    }
-    bool meeting(Real x,Real y,int object,bool& hit){
-        return enemy&&object==57&&world.steeringWallMeeting(
-            downwell::enemyContactMask(enemy->objectId,enemy->spriteId),x,y,hit);
-    }
     bool meetingQ16(std::int32_t x,std::int32_t y,int object,bool& hit){
         downwell::ContactBounds bounds;
         if(!enemy||object!=57||!downwell::CurrencyCollisionBounds::calculateMaskQ16(
@@ -2580,18 +2528,10 @@ struct GameplayWorld::SteeringOps {
     }
     // scrSmoke(x,y,1,0) and scrFlashballfx(x,y,1,0,0) create objects with
     // Create RNG; emitMovingFx 704 has none.
-    bool smoke(Real x,Real y,int count,int vary){
-        downwell::Fixed16 qx,qy;
-        return count==1&&vary==0&&q16(x,qx)&&q16(y,qy)&&world.emitBoxSmoke(qx,qy);
-    }
-    bool flash(Real x,Real y,int count,int vary,int radius){
-        downwell::Fixed16 qx,qy;
-        return count==1&&vary==0&&radius==0&&q16(x,qx)&&q16(y,qy)&&world.run_.emitFlash<1,0,0>(qx,qy,world.enemyRandom_);
-    }
-    bool movingFx(Real x,Real y,int sprite,Real rate,Real angle,Real speed){
-        downwell::Fixed16 qx,qy,qa,qs;downwell::RunnerImageValue r;
-        return (q16(x,qx)&&q16(y,qy)&&r.assign(rate)&&q16(angle,qa)&&q16(speed,qs)&&
-            world.compactEffects_.spawnMoving(qx,qy,sprite,r,qa,qs))||(world.run_.effectsSucceeded=false);
+    bool smokeQ16(downwell::Fixed16 x,downwell::Fixed16 y){return world.emitBoxSmoke(x,y);}
+    bool flashQ16(downwell::Fixed16 x,downwell::Fixed16 y){return world.run_.emitFlash<1,0,0>(x,y,world.enemyRandom_);}
+    bool movingFxQ16(downwell::Fixed16 x,downwell::Fixed16 y,int sprite,Image rate,downwell::Fixed16 angle,downwell::Fixed16 speed){
+        return world.compactEffects_.spawnMoving(x,y,sprite,rate,angle,speed)||(world.run_.effectsSucceeded=false);
     }
     bool currency(int money){ // scrCurrencySpawn: atrState follows stomped.
         if(!enemy)return false;
@@ -2612,24 +2552,14 @@ struct GameplayWorld::SteeringOps {
         enemy->facing=sign;return true;
     }
     bool inView(bool& visible){ // scrInView(0,0,0): strict, builtin x/y.
-        visible=false;
         const int left=160+world.cameraOffsetX(),top=34+world.cameraOffsetY();
-        int order;
-        if(!downwell::compareRunnerReal(actor.x.promoted(),Real::fromInteger(left),order))return false;
-        if(order<=0)return true;
-        if(!downwell::compareRunnerReal(actor.x.promoted(),Real::fromInteger(left+160),order))return false;
-        if(order>=0)return true;
-        if(!downwell::compareRunnerReal(actor.y.promoted(),Real::fromInteger(top),order))return false;
-        if(order<=0)return true;
-        if(!downwell::compareRunnerReal(actor.y.promoted(),Real::fromInteger(top+284),order))return false;
-        visible=order<0;return true;
+        visible=actor.pixelX>left&&actor.pixelX<left+160&&actor.pixelY>top&&actor.pixelY<top+284;
+        return true;
     }
-    bool effectAlarmReset(Real value){
-        std::int32_t ticks;
-        if(!enemy||!downwell::runnerAlarmValue(value,ticks))return false;
+    bool effectAlarmReset(int ticks){
+        if(!enemy)return false;
         enemy->alarm0=ticks;return true;
     }
-    bool emitTimer(Real&){return false;} // Jelly Create never arms Alarm 0.
 };
 
 void GameplayWorld::resetCompactSpawning(){
@@ -2637,7 +2567,7 @@ void GameplayWorld::resetCompactSpawning(){
     steeringPopulation_=0;compactSpawnerLive_=false;compactSpawnerMask_=-1;generationEndReached_=false;
 }
 
-downwell::SteeringEnemyBirthState* GameplayWorld::steeringActor(const EnemyState& enemy){
+downwell::SteeringFixedState* GameplayWorld::steeringActor(const EnemyState& enemy){
     const int slot=enemy.auxiliaryState;
     if(!steeringObject(enemy.objectId)||slot<0||unsigned(slot)>=steeringCapacity||
        !enemy.lifetimeId||steeringOwner_[slot]!=enemy.lifetimeId)return nullptr;
@@ -2786,17 +2716,14 @@ bool GameplayWorld::createSpawnedEnemy(int object,downwell::MotionBinary64 x,dow
     unsigned slot=0;
     while(slot<steeringCapacity&&steeringOwner_[slot])++slot;
     if(slot==steeringCapacity)return run_.effectsSucceeded=false;
-    downwell::SteeringEnemyBirthState* actor;
+    downwell::SteeringFixedState* actor;
     if(object==115)actor=new(&steering_[slot].jelly) downwell::WhiteJellyFixedStep{};
-    else{actor=new(&steering_[slot].ball) downwell::RedBallStep{};steering_[slot].ball.neon=object==173;}
+    else{actor=new(&steering_[slot].ball) downwell::RedBallFixedStep{};steering_[slot].ball.neon=object==173;}
     SteeringOps ops{*this,nullptr,*actor};
-    downwell::RunnerImageValue cx,cy;
-    if(!cx.assignInteger(px)||!cy.assignInteger(py))return run_.effectsSucceeded=false;
-    const bool born=object==115?steering_[slot].jelly.create(cx,cy,enemyRandom_,ops):
-        steering_[slot].ball.create(cx,cy,enemyRandom_,ops);
-    std::int32_t bx,by;
-    if(!born||!run_.effectsSucceeded||!actor->x.roundPixel(bx)||!actor->y.roundPixel(by))
-        return run_.effectsSucceeded=false;
+    const bool born=object==115?steering_[slot].jelly.create(px,py,enemyRandom_,ops):
+        steering_[slot].ball.create(px,py,enemyRandom_,ops);
+    if(!born||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    const std::int32_t bx=actor->pixelX,by=actor->pixelY;
     // instance_deactivate_object follows Create: born inactive and pending.
     if(!configureEnemy(enemyCount_,object,object==115?176:object==118?702:352,bx-240,by-176,0,0,actor->health,actor->money,
         0,int(slot),ops.alarm0,ops.alarm1,0,0,false,false,true,0))return false;
@@ -2860,8 +2787,7 @@ bool GameplayWorld::stepSteeringEnemy(EnemyState& enemy){
     if(!stepped||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
     enemy.health=actor->health;
     if(!enemy.active){releaseSteering(enemy);enemy.auxiliaryState=-1;return true;}
-    std::int32_t px,py;
-    if(!actor->x.roundPixel(px)||!actor->y.roundPixel(py))return run_.effectsSucceeded=false;
+    const std::int32_t px=actor->pixelX,py=actor->pixelY;
     if(!enemyLifecycle_.recordOwnsAppearance()&&
        !enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,px,py))
         return run_.effectsSucceeded=false;
@@ -2872,21 +2798,9 @@ bool GameplayWorld::stepSteeringEnemy(EnemyState& enemy){
     while((enemy.imagePhase>>8)>=frames)enemy.imagePhase-=frames<<8;
     if(!publishEnemyImage(enemy,enemy.imagePhase))return false;
     enemy.imageFrame=enemy.imagePhase>>8;
-    if(enemy.objectId==118||enemy.objectId==173){
-        // Draw's eye sector depends only on Step state; record it here.
-        struct DrawOps {
-            const EnemyState& enemy;
-            bool shade(){return true;} // Lighting surface: not on this target.
-            bool drawSelf(){return true;}
-            bool imageIndex(downwell::MotionBinary64& value){
-                value=exactQ8(long(enemy.imagePhase));return true;
-            }
-            bool drawSpriteExt(int,downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64,
-                int,int,int,unsigned,int){return true;}
-        } draw{enemy};
-        // A first Draw in the unmatched (359,360) sector has no eye to draw.
-        (void)steering_[enemy.auxiliaryState].ball.draw(draw);
-    }
+    // Draw's eye sector depends only on Step state; record it here. A first
+    // Draw in the unmatched (359,360) sector has no eye to draw.
+    if(enemy.objectId==118||enemy.objectId==173)(void)steering_[enemy.auxiliaryState].ball.updateEye();
     return true;
 }
 
@@ -2904,7 +2818,8 @@ bool GameplayWorld::hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTu
     // scrTypicalBulletDamage: hit, hitDir = bDir, hitDmg, then ehp -= bdmg.
     // Death follows in the enemy's own Step, not at the impact.
     auto* actor=steeringActor(enemy);
-    if(!actor||!turnsDegrees(directionTurns,actor->hitDirection))return run_.effectsSucceeded=false;
+    if(!actor)return run_.effectsSucceeded=false;
+    actor->hitDirection16=downwell::SteeringFixedState::turnsDegrees(directionTurns);
     actor->hit=true;actor->hitDamage+=damage;actor->health-=damage;
     enemy.health=actor->health;
     compactMomentDelay(); // scrDamageEnemy
@@ -2917,11 +2832,8 @@ bool GameplayWorld::collideSteeringEnemies(){
         auto& enemy=enemies_[i];
         if(!steeringObject(enemy.objectId)||!enemy.active||enemy.destroyRequested||enemy.health<=0)continue;
         auto* actor=steeringActor(enemy);
-        long stompY;
         if(!actor)return run_.effectsSucceeded=false;
-        if(enemy.objectId==115)stompY=steering_[enemy.auxiliaryState].jelly.stompCeilQ8();
-        else if(!ceilQ8(actor->yy,stompY))return run_.effectsSucceeded=false;
-        stompY-=176L*256;
+        const long stompY=actor->stompCeilQ8()-176L*256;
         const downwell::ContactActor contact{enemy.x*256L,enemy.y*256L,enemy.facing,1,
             downwell::enemyContactMask(enemy.objectId,enemy.spriteId)};
         bool active=true;int health=enemy.health;decltype(run_.kills) defeated=0;
@@ -2982,8 +2894,7 @@ bool GameplayWorld::collideSteeringEnemies(){
             if(!actor)return run_.effectsSucceeded=false;
             struct CollisionOps : SteeringOps {
                 const EnemyState& other;
-                bool otherX(Real& value){value=Real::fromInteger(other.x+240);return true;}
-                bool otherY(Real& value){value=Real::fromInteger(other.y+176);return true;}
+                bool otherPixel(bool vertical,std::int32_t& value){value=vertical?other.y+176:other.x+240;return true;}
             } ops{{*this,&self,*actor},other};
             const bool collided=self.objectId==115?steering_[self.auxiliaryState].jelly.enemyContact(enemyRandom_,ops):
                 steering_[self.auxiliaryState].ball.enemyContact(enemyRandom_,ops);

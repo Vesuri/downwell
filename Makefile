@@ -950,6 +950,14 @@ verify-time-shard-particle: build/time-shard-particle-test
 build/time-shard-particle-test: tests/core/TimeShardParticleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardParticleTest.cpp src/core/GameMakerRandom.cpp
+.PHONY: verify-red-ball-fixed
+test: verify-red-ball-fixed
+verify-red-ball-fixed: build/red-ball-fixed-test
+	./build/red-ball-fixed-test
+build/red-ball-fixed-test: tests/core/RedBallFixedStepTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc generated/narrow-atan-q64.inc generated/narrow-trig-q64.inc
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RedBallFixedStepTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-white-jelly-fixed
 test: verify-white-jelly-fixed
 verify-white-jelly-fixed: build/white-jelly-fixed-test

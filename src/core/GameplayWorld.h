@@ -37,6 +37,7 @@
 #include "core/GameplayWhiteJellies.h"
 #include "core/GameplayRedBalls.h"
 #include "core/WhiteJellyFixedStep.h"
+#include "core/RedBallFixedStep.h"
 #include "core/GameplayShopInstances.h"
 #include "core/CompactShopSpeech.h"
 #include "core/MovingFxInstances.h"
@@ -3174,11 +3175,11 @@ private:
     // Compact spawner 78 and its source-exact steering children 115/118.
     // Each live steering record owns one pool slot through auxiliaryState,
     // keyed by its enemy lifetime; Step/alarm/contact events run the shared
-    // WhiteJellyFixedStep/RedBallStep state machines. The registered stores above
+    // WhiteJellyFixedStep/RedBallFixedStep state machines. The registered stores above
     // remain the reference owners and are not used by this compact world.
     union SteeringActor {
         downwell::WhiteJellyFixedStep jelly;
-        downwell::RedBallStep ball;
+        downwell::RedBallFixedStep ball;
         SteeringActor():jelly(){}
     };
     static constexpr unsigned steeringCapacity=24;
@@ -3194,7 +3195,7 @@ private:
     struct SteeringOps;
     struct SpawnerOps;
     void resetCompactSpawning();
-    downwell::SteeringEnemyBirthState* steeringActor(const EnemyState& enemy);
+    downwell::SteeringFixedState* steeringActor(const EnemyState& enemy);
     void releaseSteering(const EnemyState& enemy);
     bool createCompactSpawner(int y);
     bool stepCompactSpawner(long generationCameraY);

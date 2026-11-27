@@ -56,6 +56,10 @@ struct CommonOps {
         hit=overlaps(b);return true;
     }
     bool enemyPlayerQ16(bool vertical,std::int32_t& v){v=(vertical?world.targetY:world.targetX)*65536;return true;}
+    bool playerQ16(bool vertical,std::int32_t& v){return enemyPlayerQ16(vertical,v);}
+    bool smokeQ16(downwell::Fixed16,downwell::Fixed16){return true;}
+    bool flashQ16(downwell::Fixed16,downwell::Fixed16){return true;}
+    bool movingFxQ16(downwell::Fixed16,downwell::Fixed16,int,F,downwell::Fixed16,downwell::Fixed16){return true;}
     bool meetingQ16(std::int32_t x,std::int32_t y,int object,bool& hit){
         downwell::ContactBounds b;
         if(object!=57||!downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,x,y,b))return false;
@@ -90,13 +94,15 @@ int main(){
         CommonOps referenceOps{world},fixedOps{world};
         const int sx=48+16*int(path.irandomSmall(14)),sy=16*int(path.irandomSmall(20));
         F px,py;check(px.assignInteger(sx)&&py.assignInteger(sy));
-        check(reference.create(px,py,referenceRandom,referenceOps)&&fixed.create(px,py,fixedRandom,fixedOps));
+        check(reference.create(px,py,referenceRandom,referenceOps)&&fixed.create(sx,sy,fixedRandom,fixedOps));
         for(unsigned tick=0;tick<600;++tick){
             // The target wanders the shaft; now and then a shot lands.
             if(tick%40==0){world.targetX=48+int(path.irandomSmall(224));world.targetY=sy-64+int(path.irandomSmall(400));}
             if(tick%97==50){
                 const N angle=N::fromInteger(int(path.irandomSmall(359)));
-                reference.hit=fixed.hit=true;reference.hitDirection=fixed.hitDirection=angle;
+                reference.hit=fixed.hit=true;reference.hitDirection=angle;
+                downwell::Fixed16 heading;check(downwell::Fixed16::fromBinary64(angle,heading));
+                fixed.hitDirection16=heading.v;
             }
             if(tick%97==55)reference.hitStun=fixed.hitStun=false; // Alarm 1
             check(reference.step(false,referenceRandom,referenceOps)&&fixed.step(false,fixedRandom,fixedOps));
