@@ -3223,17 +3223,17 @@ private:
     // corpses, apart from the registered skeleton corpse owner.
     downwell::CorpseEffects<downwell::gameplayCompactCorpseCapacity,downwell::CorpseParticle> compactCorpses_;
     bool compactEnemyDeath(EnemyState& enemy,bool stomped);
-    bool compactBulletImpact(EnemyState& enemy,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+    bool compactBulletImpact(EnemyState& enemy,downwell::Fixed16 x,downwell::Fixed16 y,
         std::uint32_t direction,int damage,bool laser);
-    bool compactImmuneSpark(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
-    bool compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    bool compactImmuneSpark(downwell::Fixed16 x,downwell::Fixed16 y);
+    bool compactBloodfx(downwell::Fixed16 x,downwell::Fixed16 y);
     void compactMomentDelay();
     // material: soundBullet's index (2 foliage terrain, 3 rock, 4 metal).
     bool compactBulletWallHit(const downwell::ProjectileSegment& path,int material=2);
     // W2.6: shop children on a local bullet path (ShopWorld::wallMaterialOn).
     int shopWallOn(const downwell::ProjectileSegment& path,bool cases)const;
-    bool compactWallEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,int depth);
-    bool compactCosmeticEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,int depth);
+    bool compactWallEffect(downwell::Fixed16 x,downwell::Fixed16 y,int sprite,int depth);
+    bool compactCosmeticEffect(downwell::Fixed16 x,downwell::Fixed16 y,int sprite,downwell::RunnerImageValue speed,int depth);
     void compactDamageSlowdown();
     void advanceCompactControllerAlarm();
     int compactControllerAlarm0_=0;
@@ -3345,7 +3345,7 @@ private:
     bool stepRangedBullet(BulletState& bullet,long generationCameraY);
     bool stepLaserBullet(BulletState& bullet,long generationCameraY);
     bool typicalBulletDamage(EnemyState& enemy,int damage,std::uint32_t direction,
-        downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& consumed);
+        downwell::Fixed16 x,downwell::Fixed16 y,bool& consumed);
     bool collideHotCasings();
     bool bulletEnemyContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed);
     bool bulletSolidContact(BulletState& bullet,const downwell::ProjectileSegment& path,bool& consumed);

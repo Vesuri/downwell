@@ -42,6 +42,22 @@ namespace {
 // W3.20: binary64 producers of the Q16 effect owners convert at the call;
 // these go as stages 3 and 4 convert the producers themselves.
 bool q16(downwell::MotionBinary64 v,downwell::Fixed16& out){return downwell::Fixed16::fromBinary64(v,out);}
+// A shot's published builtin x or y (binary32, ProjectilePublication) as
+// the nearest Q16.
+bool publishedQ16(downwell::MachineGunTrajectory::Coordinate c,int origin,downwell::Fixed16& out){
+    downwell::RunnerImageValue value;
+    return downwell::ProjectilePublication::coordinate(c,origin,value)&&downwell::Fixed16::fromBinary32(value.bits,out);
+}
+// A Q20 shot coordinate plus its room origin as the nearest Q16, halves to
+// even (the wall hit's exact pixel + fraction / 2^20).
+bool shotQ16(downwell::MachineGunTrajectory::Coordinate c,int origin,downwell::Fixed16& out){
+    static_assert(downwell::MachineGunTrajectory::unit==1<<20,"Q20 shot fractions");
+    const std::int32_t pixel=c.pixel+origin;
+    if(pixel< -32767||pixel>32767||c.fraction>=unsigned(downwell::MachineGunTrajectory::unit))return false;
+    const std::uint32_t rest=c.fraction&15u;std::int32_t q=pixel*65536+std::int32_t(c.fraction>>4);
+    if(rest>8||(rest==8&&(q&1)))++q;
+    out=downwell::Fixed16::raw(q);return true;
+}
 // Image speeds stay binary32 (the source's image_speed), so the animation
 // timeline is unchanged: 0.5, 0.4, 0.3 and 1.
 constexpr downwell::RunnerImageValue half{0x3f000000u},fourTenths{0x3ecccccdu},threeTenths{0x3e99999au},unitSpeed{0x3f800000u};
@@ -1906,13 +1922,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Animation End, no RNG. The smaller puff draws itself and a mirrored
     // copy (62094) unless emitTo selects one side.
     for(unsigned i=0;i<player_.dustCount();++i){
-        using Real=downwell::MotionBinary64;
         const auto& d=player_.dust(i);
-        const Real x=Real::fromInteger(240+int(downwell::roundGameMakerQ8(d.x)));
-        const Real y=Real::fromInteger(176+int(downwell::roundGameMakerQ8(d.y)));
-        if(d.jump){if(!compactCosmeticEffect(x,y,95,{0x3fe00000u,0},0))return {};continue;}
-        if(d.emitTo!=1&&!compactCosmeticEffect(x,y,94,{0x3fe00000u,0},0))return {};
-        if(d.emitTo!=-1&&!compactCosmeticEffect(x,y,62094,{0x3fe00000u,0},0))return {};
+        const auto x=downwell::Fixed16::fromInteger(240+int(downwell::roundGameMakerQ8(d.x)));
+        const auto y=downwell::Fixed16::fromInteger(176+int(downwell::roundGameMakerQ8(d.y)));
+        if(d.jump){if(!compactCosmeticEffect(x,y,95,half,0))return {};continue;}
+        if(d.emitTo!=1&&!compactCosmeticEffect(x,y,94,half,0))return {};
+        if(d.emitTo!=-1&&!compactCosmeticEffect(x,y,62094,half,0))return {};
     }
     // The first empty shot since landing: scrRisingText(plx, ply, "EMPTY!").
     // A full notice pool drops the cosmetic text.
@@ -3667,17 +3682,16 @@ bool GameplayWorld::bulletEnemyContact(BulletState& bullet,const downwell::Proje
             enemy.imageScaleY(),
             downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)};
         if(!enemy.active||enemy.health<=0||!path.intersects(contact))continue;
-        downwell::RunnerImageValue bx,by;
-        if(!downwell::ProjectilePublication::coordinate(path.x,240,bx)||
-           !downwell::ProjectilePublication::coordinate(path.y,176,by))return run_.effectsSucceeded=false;
-        return typicalBulletDamage(enemy,bullet.damage,bulletDirection(bullet),bx.promoted(),by.promoted(),consumed);
+        downwell::Fixed16 bx,by;
+        if(!publishedQ16(path.x,240,bx)||!publishedQ16(path.y,176,by))return run_.effectsSucceeded=false;
+        return typicalBulletDamage(enemy,bullet.damage,bulletDirection(bullet),bx,by,consumed);
     }
     return true;
 }
 
 // scrTypicalBulletDamage from a shot (or a Hot Casing) at (x, y) room pixels.
 bool GameplayWorld::typicalBulletDamage(EnemyState& enemy,int damage,std::uint32_t direction,
-    downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& consumed){
+    downwell::Fixed16 x,downwell::Fixed16 y,bool& consumed){
     consumed=true;
     // soundPlay(29, 90, 0, 1) after the damage (a compact death runs inside
     // the damage below, so it plays first).
@@ -3873,8 +3887,8 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
             // scrEffectSpawn(x, y, hitWallFx 96, 0.5, 0, -10000),
             // scrSmokefx(x, y, 1, 0), then soundPlay(15, 30, 0, 1).
             destroy=true;
-            const auto wx=downwell::MotionBinary64::fromInteger(x+240),wy=downwell::MotionBinary64::fromInteger(py+176);
-            if(!compactWallEffect(wx,wy,96,-10000))return false;
+            if(!compactWallEffect(downwell::Fixed16::fromInteger(x+240),downwell::Fixed16::fromInteger(py+176),96,-10000))
+                return false;
             if(!emitBoxSmoke(downwell::Fixed16::fromInteger(x+240),downwell::Fixed16::fromInteger(py+176)))
                 return run_.effectsSucceeded=false;
             run_.soundPlay(15,30,false,true);
@@ -3892,11 +3906,10 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         const auto b=downwell::contactWorldBounds({enemy.x*256L,enemy.y*256L,enemy.objectId==117?enemy.motionState:enemy.facing,
             enemy.imageScaleY(),downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId)});
         if(!downwell::contactBoundsOverlap(mask(py),b))continue;
-        downwell::RunnerImageValue lx,ly;
-        if(!downwell::ProjectilePublication::coordinate(shot.x,240,lx)||
-           !downwell::ProjectilePublication::coordinate(shot.y,176,ly))return run_.effectsSucceeded=false;
+        downwell::Fixed16 lx,ly;
+        if(!publishedQ16(shot.x,240,lx)||!publishedQ16(shot.y,176,ly))return run_.effectsSucceeded=false;
         if(enemy.objectId==112||enemy.objectId==114){ // bulletImmune: the 112 spark, then choose(30,31).
-            destroy=true;if(!compactImmuneSpark(lx.promoted(),ly.promoted()))return false;
+            destroy=true;if(!compactImmuneSpark(lx,ly))return false;
             run_.soundPlay(30+int(enemyRandom_.chooseIndexSmall(2)),50,false,true);break;
         }
         bool ignored=false;
@@ -3911,7 +3924,7 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         }
         // scrBloodfx, scrDamageEnemy, scrFlashballfx(x,y,1,0,2), soundPlay(16),
         // scrBulletImpact: the hit precedes the (here immediate) death.
-        if(!compactBulletImpact(enemy,lx.promoted(),ly.promoted(),shot.direction,bullet.damage,true))return false;
+        if(!compactBulletImpact(enemy,lx,ly,shot.direction,bullet.damage,true))return false;
         const auto impact=downwell::applyBulletDamage(enemy,run_.kills,enemyRandom_,
             [this,&enemy]{run_.combo.state.enemyDefeated();return compactEnemyDeath(enemy,false);},
             bullet.damage,shot.direction,[this](const EnemyState& record){return publishEnemyActivation(record,false);});
@@ -4384,41 +4397,35 @@ bool GameplayWorld::resetCompactTimeStop(){
 
 // scrBloodfx (arguments unused): emitMovingFx(x,y,84,0.5,0+random(20),2) and
 // emitMovingFx(x,y,84,0.5,180-random(20),2). parentMovingFx Create draws none.
-bool GameplayWorld::compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
-    using Real=downwell::MotionBinary64;
+// Each angle is the nearest Q16 of the VM's sample.
+bool GameplayWorld::compactBloodfx(downwell::Fixed16 x,downwell::Fixed16 y){
     for(unsigned side=0;side<2;++side){
-        Real offset,angle=Real::fromInteger(side?180:0);
-        if(!downwell::randomBinary64(enemyRandom_.nextU32(),Real::fromInteger(20),offset))
-            return run_.effectsSucceeded=false;
-        if(side&&!offset.zero())offset.high^=0x80000000u;
-        downwell::Fixed16 qx,qy,qa;
-        if(!angle.add(offset)||!q16(x,qx)||!q16(y,qy)||!q16(angle,qa)||
-           !compactEffects_.spawnMoving(qx,qy,84,half,qa,downwell::Fixed16::fromInteger(2)))
+        const std::int32_t offset=downwell::Fixed16::random(enemyRandom_.nextU32(),downwell::Fixed16::fromInteger(20)).v;
+        const auto angle=downwell::Fixed16::raw(side?180*65536-offset:offset);
+        if(!compactEffects_.spawnMoving(x,y,84,half,angle,downwell::Fixed16::fromInteger(2)))
             return run_.effectsSucceeded=false;
     }
     return true;
 }
 
 // The bullet-immune branch: scrEffectSpawn(x,y,112,0.3,0,10000).
-bool GameplayWorld::compactImmuneSpark(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
-    downwell::Fixed16 qx,qy;
-    return (q16(x,qx)&&q16(y,qy)&&compactEffects_.spawnNoLoop(qx,qy,112,threeTenths,{}))||(run_.effectsSucceeded=false);
+bool GameplayWorld::compactImmuneSpark(downwell::Fixed16 x,downwell::Fixed16 y){
+    return compactEffects_.spawnNoLoop(x,y,112,threeTenths,{})||(run_.effectsSucceeded=false);
 }
 
 // scrTypicalBulletDamage (usual and spread shots) or bulletLaser's Collision
 // with subparentEnemy, after the damage itself: the impact for scrDeadBody,
 // then the 605 splash (usual) or blood, a flash and sndEnemyhurt (laser).
-bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::Fixed16 x,downwell::Fixed16 y,
     std::uint32_t direction,int damage,bool laser){
     enemy.takenImpactDamage=damage;
     compactMomentDelay(); // scrDamageEnemy
     if(!compactDamageEffectsAdmitted){if(laser)run_.soundPlay(16,50,false,true);return run_.effectsSucceeded;}
-    downwell::Fixed16 flashX,flashY;
-    if(laser)return compactBloodfx(x,y)&&q16(x,flashX)&&q16(y,flashY)&&run_.emitFlash<1,0,2>(flashX,flashY,enemyRandom_)&&
+    if(laser)return compactBloodfx(x,y)&&run_.emitFlash<1,0,2>(x,y,enemyRandom_)&&
         (run_.soundPlay(16,50,false,true),run_.effectsSucceeded);
-    downwell::RunnerImageValue angle;downwell::Fixed16 qx,qy,qa;
-    if(!downwell::ProjectilePublication::angle(direction,angle)||!q16(x,qx)||!q16(y,qy)||
-       !downwell::Fixed16::fromBinary32(angle.bits,qa)||!compactEffects_.spawnNoLoop(qx,qy,605,fourTenths,qa))
+    downwell::RunnerImageValue angle;downwell::Fixed16 qa;
+    if(!downwell::ProjectilePublication::angle(direction,angle)||
+       !downwell::Fixed16::fromBinary32(angle.bits,qa)||!compactEffects_.spawnNoLoop(x,y,605,fourTenths,qa))
         return run_.effectsSucceeded=false;
     return true;
 }
@@ -4456,13 +4463,14 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         lastAct{*this,deathSound,enemy.y+176};
     // scrEnemyStomped: scrBloodfx(3, 0), then pugExplodingKnees; the death
     // the compact world runs at the contact follows.
-    if(stomped&&compactDamageEffectsAdmitted&&!compactBloodfx(x,y))return false;
+    const auto px=downwell::Fixed16::fromInteger(enemy.x+240),py=downwell::Fixed16::fromInteger(enemy.y+176);
+    if(stomped&&compactDamageEffectsAdmitted&&!compactBloodfx(px,py))return false;
     if(stomped&&run_.upgrades.levels[0]&&!compactExplodingKnees(enemy.x+240,enemy.y+176,
         240+int(downwell::roundGameMakerQ8(player_.frameStartXFixed())),
         176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
     downwell::Fixed16 qx,qy;
-    if(!compactBloodfx(x,y)||!q16(fx,qx)||!q16(fy,qy)||!emitBoxSmoke(qx,qy)||!run_.emitFlash<1,0,0>(qx,qy,enemyRandom_))return false;
+    if(!compactBloodfx(px,py)||!q16(fx,qx)||!q16(fy,qy)||!emitBoxSmoke(qx,qy)||!run_.emitFlash<1,0,0>(qx,qy,enemyRandom_))return false;
     spawnReward(enemy,stomped);
     if(!run_.effectsSucceeded)return false;
     downwell::DeadBodySource source;
@@ -4603,14 +4611,8 @@ bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path
         y.advance(vy);x.advance(vx);
         if(++step>100)break;
     }
-    const auto real=[](const downwell::ProjectileSegment::Coordinate& c,int origin){
-        downwell::MotionBinary64 value=downwell::MotionBinary64::fromInteger(c.pixel+origin),fraction;
-        if(c.fraction&&(!downwell::divideBinary64(downwell::MotionBinary64::fromInteger(int(c.fraction)),
-               downwell::MotionBinary64::fromInteger(downwell::MachineGunTrajectory::unit),fraction)||
-           !value.add(fraction)))return downwell::MotionBinary64::fromInteger(c.pixel+origin);
-        return value;
-    };
-    if(!compactWallEffect(real(x,240),real(y,176),101,0))return false;
+    downwell::Fixed16 wx,wy;
+    if(!shotQ16(x,240,wx)||!shotQ16(y,176,wy)||!compactWallEffect(wx,wy,101,0))return run_.effectsSucceeded=false;
     // soundBullet(thatWall): objWall_n is foliage, a single-sample table
     // whose irandom_range(1, 1) still consumes two words; the shop's rock
     // wall and metal table choose between two (initSfxBhit).
@@ -4620,16 +4622,14 @@ bool GameplayWorld::compactBulletWallHit(const downwell::ProjectileSegment& path
 }
 
 // A full no-loop pool drops the cosmetic puff rather than latching failure.
-bool GameplayWorld::compactWallEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,int depth){
-    return compactCosmeticEffect(x,y,sprite,{0x3fe00000u,0},depth);
+bool GameplayWorld::compactWallEffect(downwell::Fixed16 x,downwell::Fixed16 y,int sprite,int depth){
+    return compactCosmeticEffect(x,y,sprite,half,depth);
 }
-bool GameplayWorld::compactCosmeticEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,
-    downwell::MotionBinary64 speed,int depth){
+bool GameplayWorld::compactCosmeticEffect(downwell::Fixed16 x,downwell::Fixed16 y,int sprite,
+    downwell::RunnerImageValue speed,int depth){
     if(compactEffects_.noLoopFull())return true;
-    downwell::Fixed16 qx,qy;downwell::RunnerImageValue r;(void)depth;
-    if(!q16(x,qx)||!q16(y,qy)||!r.assign(speed)||!compactEffects_.spawnNoLoop(qx,qy,sprite,r,{}))
-        return run_.effectsSucceeded=false;
-    return true;
+    (void)depth;
+    return compactEffects_.spawnNoLoop(x,y,sprite,speed,{})||(run_.effectsSucceeded=false);
 }
 
 // levelBeginCue (scrPlMovement's landing, scrEnemyDeath): outside pTimeStop,
@@ -4790,7 +4790,7 @@ bool GameplayWorld::collideHotCasings(){
             if(!downwell::contactBoundsOverlap(casing,target))continue;
             bool consumed=false;
             if(!typicalBulletDamage(enemy,c.damage,downwell::RangedShot::degreesToTurns(0),
-                GunReal::fromInteger(cx),GunReal::fromInteger(cy),consumed))return false;
+                downwell::Fixed16::fromInteger(cx),downwell::Fixed16::fromInteger(cy),consumed))return false;
         }
     }
     return run_.effectsSucceeded;
