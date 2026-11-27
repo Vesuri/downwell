@@ -13,6 +13,8 @@ using N=downwell::MotionBinary64;
 using Fx=downwell::CompactRoomEffects<1,1>;
 namespace {
 int pixel(downwell::RunnerImageValue v){std::int32_t n;checkAt(v.promoted().roundPixel(n),__LINE__);return int(n);}
+downwell::Fixed16 q(N n){downwell::Fixed16 f;checkAt(downwell::Fixed16::fromBinary64(n,f),__LINE__);return f;}
+downwell::RunnerImageValue rate(N n){downwell::RunnerImageValue r;checkAt(r.assign(n),__LINE__);return r;}
 N real(double v){std::uint64_t b;std::memcpy(&b,&v,8);N n;n.high=std::uint32_t(b>>32);n.low=std::uint32_t(b);return n;}
 struct Ops {
     bool moving=true;
@@ -35,11 +37,11 @@ int main(){
                     Fx fx;downwell::ScriptSpawnEffect noLoop;downwell::MovingFx moving;
                     const auto accept=[](const auto&){return true;};
                     if(family==0){
-                        check(fx.spawnNoLoop(x,y,sprite,speed,angle,{}));
+                        check(fx.spawnNoLoop(q(x),q(y),sprite,rate(speed),q(angle)));
                         check(noLoop.create(x,y)&&noLoop.setSprite(sprite,count,accept)&&
                               noLoop.setValue(noLoop.imageSpeed,speed,accept)&&noLoop.setValue(noLoop.angle,angle,accept));
                     }else{
-                        check(fx.spawnMoving(x,y,sprite,speed,angle,move));
+                        check(fx.spawnMoving(q(x),q(y),sprite,rate(speed),q(angle),q(move)));
                         downwell::RunnerImageValue px,py;N component;
                         check(px.assign(x)&&py.assign(y)&&moving.create(px,py)&&moving.setSprite(sprite,count,accept)&&
                               moving.imageSpeed.assign(speed)&&moving.angle.assign(angle));

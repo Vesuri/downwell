@@ -27,8 +27,8 @@ int main(){
         // parentMovingFx: x/y advance only while TimeStopBound holds;
         // the animation is the runner's and continues either way.
         downwell::CompactRoomEffects<4,4> fx;
-        assert(fx.spawnMoving(MotionBinary64::fromInteger(100),MotionBinary64::fromInteger(50),84,
-            {0x3fe00000u,0},MotionBinary64::fromInteger(0),MotionBinary64::fromInteger(1)));
+        assert(fx.spawnMoving(downwell::Fixed16::fromInteger(100),downwell::Fixed16::fromInteger(50),84,
+            downwell::RunnerImageValue{0x3f000000u},downwell::Fixed16::fromInteger(0),downwell::Fixed16::fromInteger(1)));
         const auto x0=fx.moving(0).effect.x16;
         bool asked=false;
         assert(fx.stepMoving(fx.beginPhase(),[&](const downwell::CompactRoomEffects<4,4>::Effect& e,bool& moving){

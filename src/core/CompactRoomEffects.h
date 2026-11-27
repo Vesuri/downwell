@@ -15,7 +15,6 @@ template<unsigned NoLoopCapacity,unsigned MovingCapacity>
 class CompactRoomEffects {
     static_assert(NoLoopCapacity>0&&MovingCapacity>0,"compact effect storage must be nonempty");
 public:
-    using Real=MotionBinary64;
     // One compact record for both families (W3 fixed point): position and
     // velocity in Q16, the binary32 animation timeline in Q27
     // (Binary32Timeline); x/y are the published whole pixels and
@@ -68,35 +67,32 @@ public:
     const NoLoop& noLoop(unsigned index)const{return noLoop_[index];}
     const Moving& moving(unsigned index)const{return moving_[index];}
     void clear(){noLoopCount_=movingCount_=0;good_=true;} // Never rewind handles.
-    // scrEffectSpawn: Create, then sprite, image_speed, image_angle, depth
-    // (which no compact reader uses). x and y are builtin binary32 values.
-    bool spawnNoLoop(Real x,Real y,int sprite,Real speed,Real angle,Real){
+    // scrEffectSpawn: Create, then sprite, image_speed (binary32) and
+    // image_angle; depth has no compact reader. Positions are Q16.
+    bool spawnNoLoop(Fixed16 x,Fixed16 y,int sprite,RunnerImageValue speed,Fixed16 angle){
         unsigned count;
         if(!good_||!frames(sprite,count))return fail();
         // Both stores are cosmetic (no RNG, no gameplay reads): a full store
         // drops the new effect instead of ending the game.
         if(noLoopCount_==NoLoopCapacity){++dropped_;return true;}
         NoLoop record;record.handle=next_;
-        auto& e=record.effect;RunnerImageValue px,py;
-        if(!px.assign(x)||!py.assign(y)||!px.roundPixel(e.x)||!py.roundPixel(e.y)||
-           !begin(e,sprite,count,speed,angle))return fail();
+        auto& e=record.effect;
+        e.x=Fixed16::roundQ16(x.v);e.y=Fixed16::roundQ16(y.v);
+        if(!begin(e,sprite,count,speed,angle))return fail();
         noLoop_[noLoopCount_++]=record;++next_;return true;
     }
     // emitMovingFx: Create, sprite, image_speed, image_angle, then the
     // lengthdir velocity components (Q16, as WhiteJellyStep's).
-    bool spawnMoving(Real x,Real y,int sprite,Real imageSpeed,Real angle,Real speed){
+    bool spawnMoving(Fixed16 x,Fixed16 y,int sprite,RunnerImageValue imageSpeed,Fixed16 angle,Fixed16 speed){
         unsigned count;Moving record;record.handle=next_;
-        auto& e=record.effect;RunnerImageValue px,py;Fixed16 fx,fy,length,direction;
+        auto& e=record.effect;
         if(!good_||!frames(sprite,count))return fail();
         if(movingCount_==MovingCapacity){++dropped_;return true;}
-        if(!px.assign(x)||!py.assign(y)||!px.roundPixel(e.x)||!py.roundPixel(e.y)||
-           !Fixed16::fromBinary64(px.promoted(),fx)||!Fixed16::fromBinary64(py.promoted(),fy)||
-           !begin(e,sprite,count,imageSpeed,angle)||
-           !Fixed16::fromBinary64(speed,length)||length.v<0||length.v>3*65536||
-           !Fixed16::fromBinary64(angle,direction)||direction.v<0||direction.v>360*65536)return fail();
-        e.x16=fx.v;e.y16=fy.v;
-        e.xsp16=FixedTrig::lengthdir(false,length.v,direction.v);
-        e.ysp16=FixedTrig::lengthdir(true,length.v,direction.v);
+        if(!begin(e,sprite,count,imageSpeed,angle)||
+           speed.v<0||speed.v>3*65536||angle.v<0||angle.v>360*65536)return fail();
+        e.x16=x.v;e.y16=y.v;e.x=Fixed16::roundQ16(x.v);e.y=Fixed16::roundQ16(y.v);
+        e.xsp16=FixedTrig::lengthdir(false,speed.v,angle.v);
+        e.ysp16=FixedTrig::lengthdir(true,speed.v,angle.v);
         moving_[movingCount_++]=record;++next_;return true;
     }
     // Runner animation precedes Begin Step. Animation End destroys both.
@@ -134,12 +130,11 @@ public:
 private:
     bool fail(){good_=false;return false;}
     // Sprite, binary32 image_speed and the angle's nearest quarter turn.
-    static bool begin(Effect& e,int sprite,unsigned count,Real speed,Real angle){
-        RunnerImageValue rate,turn;std::int32_t degrees;
+    static bool begin(Effect& e,int sprite,unsigned count,RunnerImageValue rate,Fixed16 angle){
         if(count>Binary32Timeline::maximumFrames)return false;
         e.spriteId=sprite;e.frames27=std::int32_t(count)*Binary32Timeline::one;
-        if(!rate.assign(speed)||!Binary32Timeline::rate(rate.bits,e.rate27)||e.rate27>e.frames27||
-           !turn.assign(angle)||!turn.roundPixel(degrees))return false;
+        if(!Binary32Timeline::rate(rate.bits,e.rate27)||e.rate27>e.frames27)return false;
+        std::int32_t degrees=Fixed16::roundQ16(angle.v);
         e.fullRate27=e.rate27;
         degrees%=360;if(degrees<0)degrees+=360;
         e.turn=unsigned(std::uint16_t(degrees+45)/90)&3u;

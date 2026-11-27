@@ -38,6 +38,14 @@
 #include "core/BoxDestructionScript.h"
 #include "core/CurrencyCollisionBounds.h"
 #include "core/BoneViewRetirement.h"
+namespace {
+// W3.20: binary64 producers of the Q16 effect owners convert at the call;
+// these go as stages 3 and 4 convert the producers themselves.
+bool q16(downwell::MotionBinary64 v,downwell::Fixed16& out){return downwell::Fixed16::fromBinary64(v,out);}
+// Image speeds stay binary32 (the source's image_speed), so the animation
+// timeline is unchanged: 0.5, 0.4, 0.3 and 1.
+constexpr downwell::RunnerImageValue half{0x3f000000u},fourTenths{0x3ecccccdu},threeTenths{0x3e99999au},unitSpeed{0x3f800000u};
+}
 
 downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
@@ -2579,7 +2587,9 @@ struct GameplayWorld::SteeringOps {
         return count==1&&vary==0&&radius==0&&world.run_.emitFlash<1,0,0>(x,y,world.enemyRandom_);
     }
     bool movingFx(Real x,Real y,int sprite,Real rate,Real angle,Real speed){
-        return world.compactEffects_.spawnMoving(x,y,sprite,rate,angle,speed)||(world.run_.effectsSucceeded=false);
+        downwell::Fixed16 qx,qy,qa,qs;downwell::RunnerImageValue r;
+        return (q16(x,qx)&&q16(y,qy)&&r.assign(rate)&&q16(angle,qa)&&q16(speed,qs)&&
+            world.compactEffects_.spawnMoving(qx,qy,sprite,r,qa,qs))||(world.run_.effectsSucceeded=false);
     }
     bool currency(int money){ // scrCurrencySpawn: atrState follows stomped.
         if(!enemy)return false;
@@ -3150,7 +3160,9 @@ struct GameplayWorld::SceneryOps {
         return world.run_.effectsSucceeded;
     }
     bool movingFx(Real px,Real py,int sprite,Real rate,Real angle,Real speed){
-        return world.compactEffects_.spawnMoving(px,py,sprite,rate,angle,speed)||fail();
+        downwell::Fixed16 qx,qy,qa,qs;downwell::RunnerImageValue r;
+        return (q16(px,qx)&&q16(py,qy)&&r.assign(rate)&&q16(angle,qa)&&q16(speed,qs)&&
+            world.compactEffects_.spawnMoving(qx,qy,sprite,r,qa,qs))||fail();
     }
     bool appearanceChanged(){changed=true;return true;}
     // scrOutofview: instance_destroy outside the rmMain band; the event goes on.
@@ -3368,9 +3380,10 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
         if(!r.live||!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(r.x,r.y,r.scaleX,1,550)))continue;
         if(r.objHp<=0)return true;
         r.objHp-=damage;r.hit=1;
-        downwell::RunnerImageValue angle;
+        downwell::RunnerImageValue angle;downwell::Fixed16 qx,qy,qa;
         if(!downwell::ProjectilePublication::angle(bulletDirection(bullet),angle)||
-           !compactEffects_.spawnNoLoop(bx.promoted(),by.promoted(),605,{0x3fd99999u,0x9999999au},angle.promoted(),{}))
+           !downwell::Fixed16::fromBinary32(bx.bits,qx)||!downwell::Fixed16::fromBinary32(by.bits,qy)||
+           !downwell::Fixed16::fromBinary32(angle.bits,qa)||!compactEffects_.spawnNoLoop(qx,qy,605,fourTenths,qa))
             return run_.effectsSucceeded=false;
         consumed=true;return true;
     }
@@ -3396,9 +3409,10 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
         if(!downwell::compareRunnerReal(corpse.health,{},order))return false;
         if(order<=0)return true;
         if(!corpse.health.add(downwell::MotionBinary64::fromInteger(-damage)))return false;
-        downwell::RunnerImageValue angle;
+        downwell::RunnerImageValue angle;downwell::Fixed16 qx,qy,qa;
         ok=downwell::ProjectilePublication::angle(bulletDirection(bullet),angle)&&
-           compactEffects_.spawnNoLoop(bx.promoted(),by.promoted(),605,{0x3fd99999u,0x9999999au},angle.promoted(),{});
+           downwell::Fixed16::fromBinary32(bx.bits,qx)&&downwell::Fixed16::fromBinary32(by.bits,qy)&&
+           downwell::Fixed16::fromBinary32(angle.bits,qa)&&compactEffects_.spawnNoLoop(qx,qy,605,fourTenths,qa);
         consumed=true;return ok;
     },hooks))return run_.effectsSucceeded=false;
     return true;
@@ -3449,8 +3463,10 @@ struct GameplayWorld::BoxOps {
     bool flash(Real x,Real y,int count,int vary,int radius){
         return count==1&&vary==0&&radius==2&&world.emitBoxFlash(x,y);
     }
-    bool effect(Real x,Real y,int sprite,Real speed,Real angle,int depth){
-        return world.compactEffects_.spawnNoLoop(x,y,sprite,speed,angle,Real::fromInteger(depth))||fail();
+    bool effect(Real x,Real y,int sprite,Real speed,Real angle,int){
+        downwell::Fixed16 qx,qy,qa;downwell::RunnerImageValue r;
+        return (q16(x,qx)&&q16(y,qy)&&r.assign(speed)&&q16(angle,qa)&&
+            world.compactEffects_.spawnNoLoop(qx,qy,sprite,r,qa))||fail();
     }
     // global.ug[5] (Gunpowder Blocks): bulletDrone 266 at the box, then
     // Alarm 0 = 5 on each boxed neighbour 16 pixels away.
@@ -3609,8 +3625,8 @@ bool GameplayWorld::createCompactBullet(int x,int y,int angle,bool laserSight){
 bool GameplayWorld::emitPlayerBullets(int muzzleX,int muzzleY,int playerY,int angle,bool lastGetsLaserSight){
     const auto& gun=currentGun();
     const int emitX=muzzleX+emitter_.nextOffset();
-    if(!compactEffects_.spawnNoLoop(GunReal::fromInteger(emitX+240),GunReal::fromInteger(playerY+12+176),
-            gun.muzzle,{0x3fe00000u,0},GunReal::fromInteger(angle),GunReal::fromInteger(-60000)))
+    if(!compactEffects_.spawnNoLoop(downwell::Fixed16::fromInteger(emitX+240),downwell::Fixed16::fromInteger(playerY+12+176),
+            gun.muzzle,half,downwell::Fixed16::fromInteger(angle)))
         return run_.effectsSucceeded=false;
     if(!createCompactBullet(emitX,muzzleY,angle,false))return false;
     for(int i=1;i<=gun.sp1&&gun.spType;++i){
@@ -4161,8 +4177,8 @@ bool GameplayWorld::pickupGunModule(downwell::CompactGunModuleRecord& m){
     // scrEffectSpawn(plx, ply, sprFxAmmoCharge, 1, 0, -50500)
     const int px=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
     const int py=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
-    if(!compactEffects_.spawnNoLoop(GunReal::fromInteger(px),GunReal::fromInteger(py),111,
-            GunReal::fromInteger(1),{},GunReal::fromInteger(-50500)))return run_.effectsSucceeded=false;
+    if(!compactEffects_.spawnNoLoop(downwell::Fixed16::fromInteger(px),downwell::Fixed16::fromInteger(py),111,
+            unitSpeed,{}))return run_.effectsSucceeded=false;
     run_.gunType=m.gun;
     int amount=2;
     if(m.type==0)player_.increaseAmmoCapacity(2);
@@ -4464,8 +4480,9 @@ bool GameplayWorld::compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBi
         if(!downwell::randomBinary64(enemyRandom_.nextU32(),Real::fromInteger(20),offset))
             return run_.effectsSucceeded=false;
         if(side&&!offset.zero())offset.high^=0x80000000u;
-        if(!angle.add(offset)||
-           !compactEffects_.spawnMoving(x,y,84,{0x3fe00000u,0},angle,Real::fromInteger(2)))
+        downwell::Fixed16 qx,qy,qa;
+        if(!angle.add(offset)||!q16(x,qx)||!q16(y,qy)||!q16(angle,qa)||
+           !compactEffects_.spawnMoving(qx,qy,84,half,qa,downwell::Fixed16::fromInteger(2)))
             return run_.effectsSucceeded=false;
     }
     return true;
@@ -4473,8 +4490,8 @@ bool GameplayWorld::compactBloodfx(downwell::MotionBinary64 x,downwell::MotionBi
 
 // The bullet-immune branch: scrEffectSpawn(x,y,112,0.3,0,10000).
 bool GameplayWorld::compactImmuneSpark(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
-    return compactEffects_.spawnNoLoop(x,y,112,{0x3fd33333u,0x33333333u},{},
-        downwell::MotionBinary64::fromInteger(10000))||(run_.effectsSucceeded=false);
+    downwell::Fixed16 qx,qy;
+    return (q16(x,qx)&&q16(y,qy)&&compactEffects_.spawnNoLoop(qx,qy,112,threeTenths,{}))||(run_.effectsSucceeded=false);
 }
 
 // scrTypicalBulletDamage (usual and spread shots) or bulletLaser's Collision
@@ -4487,9 +4504,9 @@ bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::MotionBinary
     if(!compactDamageEffectsAdmitted){if(laser)run_.soundPlay(16,50,false,true);return run_.effectsSucceeded;}
     if(laser)return compactBloodfx(x,y)&&run_.emitFlash<1,0,2>(x,y,enemyRandom_)&&
         (run_.soundPlay(16,50,false,true),run_.effectsSucceeded);
-    downwell::RunnerImageValue angle;
-    if(!downwell::ProjectilePublication::angle(direction,angle)||
-       !compactEffects_.spawnNoLoop(x,y,605,{0x3fd99999u,0x9999999au},angle.promoted(),{}))
+    downwell::RunnerImageValue angle;downwell::Fixed16 qx,qy,qa;
+    if(!downwell::ProjectilePublication::angle(direction,angle)||!q16(x,qx)||!q16(y,qy)||
+       !downwell::Fixed16::fromBinary32(angle.bits,qa)||!compactEffects_.spawnNoLoop(qx,qy,605,fourTenths,qa))
         return run_.effectsSucceeded=false;
     return true;
 }
@@ -4696,7 +4713,8 @@ bool GameplayWorld::compactWallEffect(downwell::MotionBinary64 x,downwell::Motio
 bool GameplayWorld::compactCosmeticEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,
     downwell::MotionBinary64 speed,int depth){
     if(compactEffects_.noLoopFull())return true;
-    if(!compactEffects_.spawnNoLoop(x,y,sprite,speed,{},downwell::MotionBinary64::fromInteger(depth)))
+    downwell::Fixed16 qx,qy;downwell::RunnerImageValue r;(void)depth;
+    if(!q16(x,qx)||!q16(y,qy)||!r.assign(speed)||!compactEffects_.spawnNoLoop(qx,qy,sprite,r,{}))
         return run_.effectsSucceeded=false;
     return true;
 }

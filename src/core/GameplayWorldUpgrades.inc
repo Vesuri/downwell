@@ -48,8 +48,8 @@ bool GameplayWorld::advanceCompactDroneAlarm(){
     if(!drone_.live||drone_.alarm0<0||--drone_.alarm0>0)return true;
     drone_.alarm0=-1;
     const int x=int((drone_.x+0x8000)>>16),y=int((drone_.y+0x8000)>>16);
-    if(!compactEffects_.spawnNoLoop(UpgradeReal::fromInteger(x),UpgradeReal::fromInteger(y+12),603,{0x3fe00000u,0},
-        UpgradeReal::fromInteger(270),UpgradeReal::fromInteger(-60000)))return run_.effectsSucceeded=false;
+    if(!compactEffects_.spawnNoLoop(downwell::Fixed16::fromInteger(x),downwell::Fixed16::fromInteger(y+12),603,half,
+        downwell::Fixed16::fromInteger(270)))return run_.effectsSucceeded=false;
     if(!createDroneBullet(x,y+8,270,4))return false;
     run_.soundPlay(47,60,false,true);
     drone_.shooting=false;
@@ -195,8 +195,8 @@ bool GameplayWorld::blastEnemy(downwell::CompactBlastRecord& blast,EnemyState& e
         if(impact.kind==downwell::BulletImpactKind::failed)return run_.effectsSucceeded=false;
         compactMomentDelay(); // scrDamageEnemy
     }
-    if(compactDamageEffectsAdmitted&&!compactEffects_.spawnNoLoop(UpgradeReal::fromInteger(blast.x),
-        UpgradeReal::fromInteger(blast.y),605,{0x3fd99999u,0x9999999au},UpgradeReal::fromInteger(270),{}))
+    if(compactDamageEffectsAdmitted&&!compactEffects_.spawnNoLoop(downwell::Fixed16::fromInteger(blast.x),
+        downwell::Fixed16::fromInteger(blast.y),605,fourTenths,downwell::Fixed16::fromInteger(270)))
         return run_.effectsSucceeded=false;
     compactMomentDelay();
     return run_.effectsSucceeded;
