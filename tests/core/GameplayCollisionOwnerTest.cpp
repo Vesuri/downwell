@@ -6987,8 +6987,8 @@ int main(){
         assert(owner->attach(*world));auto& entries=owner->entryDithers();InstanceHandle key,shared;
         // Birth allocation is still explicit; all subsequent scheduling is the
         // ordinary gameplay path, with no manual alarm or Step dispatch.
-        assert(entries.create(410001,[](auto& x){x=MotionBinary64::fromInteger(240);return true;},
-            [&](auto& y){y=world->roomEntryView()->y.promoted();return true;},key));
+        assert(entries.create(410001,[](auto& x){return x.assignInteger(240);},
+            [&](auto& y){y=world->roomEntryView()->y;return true;},key));
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::entryDither,key,shared));
         assert(entries.activate(key,false)&&owner->reconcileActivation());
         world->step(0);

@@ -451,8 +451,8 @@ int main() {
             auto create=[&](int x,int y){
                 downwell::InstanceHandle key;
                 return entries.create(sourceId++,
-                    [&](auto& value){value=downwell::MotionBinary64::fromInteger(x);return true;},
-                    [&](auto& value){value=downwell::MotionBinary64::fromInteger(y);return true;},key);
+                    [&](auto& value){return value.assignInteger(x);},
+                    [&](auto& value){return value.assignInteger(y);},key);
             };
             for(int y:{-116,320,400,683,684,800}){
                 assert(entries.clear()&&create(240,y+34));

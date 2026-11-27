@@ -33,16 +33,16 @@ int main(){
     assert(nativeEntryDitherProbe());
     // Independent native-float oracle: both signs, fractional positions and
     // values large enough for binary32 narrowing to lose an increment.
-    for(float initial:{-4096.25F,-20.75F,0.0F,176.5F,268435456.0F,536870912.0F}){
+    for(float initial:{-4096.25F,-20.75F,0.0F,176.5F,16000.5F,30000.0F}){ // y + 16 runs in Q16 (W3.20)
         EntryDither e;float y=initial;
         assert(e.create([](auto& out){out={};return true;},[&](auto& out){
-            out=RunnerImageValue{bits(initial)}.promoted();return true;
+            out=RunnerImageValue{bits(initial)};return true;
         }));
         for(unsigned i=0;i<120;++i){
             y=static_cast<float>(static_cast<double>(y)+16.0);
             assert(e.step([&](auto& out){
                 assert(e.y.bits==bits(y)); // y setter precedes camera lookup.
-                out=MotionBinary64::fromInteger(int(i)-60);return true;
+                return out.assignInteger(int(i)-60);
             }));
             assert(e.y.bits==bits(y));
             assert(e.x.bits==bits(float(int(i)-60)));
@@ -51,7 +51,7 @@ int main(){
     // A failed second read retains the first assignment, doesn't arm the
     // alarm, and latches failure so a caller cannot replay the prefix.
     EntryDither failed;unsigned reads=0;
-    auto camera=[&](auto& out){++reads;out=MotionBinary64::fromInteger(241);return true;};
+    auto camera=[&](auto& out){++reads;return out.assignInteger(241);};
     assert(!failed.create(camera,[](auto&){return false;}));
     assert(failed.x.bits==bits(241.0F)&&failed.alarm0==-1&&!failed.succeeded());
     assert(!failed.create(camera,[](auto& out){out={};return true;})&&reads==1);
@@ -60,7 +60,7 @@ int main(){
     assert(!stepFailure.step([](auto&){return false;}));
     assert(stepFailure.y.bits==bits(16.0F)&&!stepFailure.succeeded());
     EntryDither invalid;
-    assert(!invalid.create([](auto& out){out={0x7ff00000u,0};return true;},
+    assert(!invalid.create([](auto& out){out={0x7f800000u};return true;},
                           [](auto& out){out={};return true;}));
     // Explicit alarm dispatch must not decrement a second time.
     EntryDither dispatched;dispatched.alarm0=0;

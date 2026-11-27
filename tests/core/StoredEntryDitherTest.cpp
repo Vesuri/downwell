@@ -26,10 +26,10 @@ int main(){
     StoredEntryDitherRegistration<4,1> registration(records,&objects,
         InstanceLifecycleBinding::bindDestruction(owner),next,room,good);
     InstanceHandle key;unsigned reads=0;
-    auto camera=[&](auto& out){++reads;out=RunnerImageValue{0x43704000u}.promoted();return true;};
+    auto camera=[&](auto& out){++reads;out=RunnerImageValue{0x43704000u};return true;};
     assert(registration.create(camera,[&](auto& out){
         assert(records.resolve(key)->preciseX==240.25F&&owner.moves==1);
-        out=RunnerImageValue{0xc1a60000u}.promoted();return true;
+        out=RunnerImageValue{0xc1a60000u};return true;
     },key));
     auto* record=records.resolve(key);assert(record&&record->instanceId==105187&&next==105188);
     assert(record->spriteId==129&&record->preciseY==-20.75F&&record->alarms.get(0)==120);
@@ -102,7 +102,7 @@ int main(){
     {
         InstanceStore<4> local;bool okay=true;InstanceHandle h;unsigned cameraReads=0;
         StoredEntryDitherRegistration<4,1> unindexed(local,&objects,{},next,room,okay,true);
-        auto read=[&](auto& out){++cameraReads;out=RunnerImageValue{0x43704000u}.promoted();return true;};
+        auto read=[&](auto& out){++cameraReads;out=RunnerImageValue{0x43704000u};return true;};
         assert(unindexed.create(read,[](auto& out){out={};return true;},h));
         auto* r=local.resolve(h);
         for(unsigned tick=1;tick<=120;++tick){

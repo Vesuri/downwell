@@ -2099,12 +2099,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     for(unsigned i=0;i<entryStepCount;++i){
         const auto key=entryStep[i];
         if(!entryDithers_->find(key))continue;
-        if(!entryDithers_->step(key,[&](downwell::MotionBinary64& x){
-            x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;
+        if(!entryDithers_->step(key,[&](downwell::RunnerImageValue& x){
+            return x.assignInteger(cameraMotion_.pixelX());
         })){run_.effectsSucceeded=false;return {};}
     }
-    if(compactEntryLive_&&!compactEntry_.step([&](downwell::MotionBinary64& x){
-        x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;
+    if(compactEntryLive_&&!compactEntry_.step([&](downwell::RunnerImageValue& x){
+        return x.assignInteger(cameraMotion_.pixelX());
     })){run_.effectsSucceeded=false;return {};}
 
     // Spawner 78 follows builder/entry work and precedes breakable Step.
@@ -4805,9 +4805,9 @@ void GameplayWorld::advanceCompactHudAlarms(){
 bool GameplayWorld::createCompactEntryDither(){
     const auto* view=roomEntryViews_.get(0);
     compactEntry_={};compactEntryLive_=false;
-    if(!view||!compactEntry_.create([&](downwell::MotionBinary64& x){
-            x=downwell::MotionBinary64::fromInteger(playerInstance_.x);return true;
-        },[&](downwell::MotionBinary64& y){y=view->y.promoted();return true;}))return false;
+    if(!view||!compactEntry_.create([&](downwell::RunnerImageValue& x){
+            return x.assignInteger(playerInstance_.x);
+        },[&](downwell::RunnerImageValue& y){y=view->y;return true;}))return false;
     compactEntryLive_=true;return true;
 }
 

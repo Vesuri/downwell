@@ -758,11 +758,11 @@ public:
             },[&](int){
                 unsigned id=0;downwell::InstanceHandle child;
                 if(!allocate(73,id)||!id)return false;
-                return entryDithers_->create(id,[&](downwell::MotionBinary64& x){
+                return entryDithers_->create(id,[&](downwell::RunnerImageValue& x){
                     const auto* camera=playerControllers_->find(playerControllers_->sourceHandle(playerInstance_.cameraSourceId));
                     if(!camera)return false;
-                    x=camera->x.promoted();return true;
-                },[&](downwell::MotionBinary64& y){y=view->y.promoted();return true;},child);
+                    x=camera->x;return true;
+                },[&](downwell::RunnerImageValue& y){y=view->y;return true;},child);
             });
     }
     unsigned droneNumber()const{return droneNumber_;}
