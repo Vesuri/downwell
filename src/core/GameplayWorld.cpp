@@ -3161,10 +3161,9 @@ struct GameplayWorld::SceneryOps {
         world.run_.soundPlay(id,priority,loop!=0,cut!=0);
         return world.run_.effectsSucceeded;
     }
-    bool movingFx(Real px,Real py,int sprite,Real rate,Real angle,Real speed){
-        downwell::Fixed16 qx,qy,qa,qs;downwell::RunnerImageValue r;
-        return (q16(px,qx)&&q16(py,qy)&&r.assign(rate)&&q16(angle,qa)&&q16(speed,qs)&&
-            world.compactEffects_.spawnMoving(qx,qy,sprite,r,qa,qs))||fail();
+    bool movingFx(downwell::Fixed16 px,downwell::Fixed16 py,int sprite,downwell::RunnerImageValue rate,
+        downwell::Fixed16 angle,downwell::Fixed16 speed){
+        return world.compactEffects_.spawnMoving(px,py,sprite,rate,angle,speed)||fail();
     }
     bool appearanceChanged(){changed=true;return true;}
     // scrOutofview: instance_destroy outside the rmMain band; the event goes on.
@@ -3205,10 +3204,7 @@ struct GameplayWorld::SceneryOps {
     bool inView(int px,int py,bool& visible){return world.compactInView(px,py,visible)||fail();}
     // gemChunk.
     bool openMask(){return true;} // gemChunkSolidAt reads the opened flag.
-    bool flash(Real px,Real py){
-        downwell::Fixed16 qx,qy;
-        return q16(px,qx)&&q16(py,qy)&&world.run_.emitFlash<3,0,5>(qx,qy,world.enemyRandom_);
-    }
+    bool flash(downwell::Fixed16 px,downwell::Fixed16 py){return world.run_.emitFlash<3,0,5>(px,py,world.enemyRandom_);}
     bool burstGem(long xRange,long xLow,long yRange,long yLow,int amount,bool large){
         gem=world.spawnCompactBurstGem(x-240,y-176,xRange,xLow,yRange,yLow,amount,large);
         return gem>=0;
