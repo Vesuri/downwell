@@ -1,6 +1,6 @@
 #ifndef DOWNWELL_CORE_SOUND_PLAY_SCRIPT_H
 #define DOWNWELL_CORE_SOUND_PLAY_SCRIPT_H
-#include "MultiplyBinary64.h"
+#include "AudioLevel.h"
 #include "PlayerHorizontalBinary64.h"
 namespace downwell {
 // Caller-visible script fields, not backend voice state. Preserve each write
@@ -9,10 +9,11 @@ struct SoundPlayState {
     int sfxIndex=0,soundPriority=0,sndsnd=-1,chanNum=0;
     bool loop=false,cutPrv=false,doNotPlay=false;
     const char* OLnum=nullptr;
-    MotionBinary64 sndgain{};
+    AudioLevel sndgain{};
 };
 struct SoundPlayEnvironment {
-    MotionBinary64 gameVolume=MotionBinary64::fromInteger(1),y{},viewY{},viewHeight{};
+    AudioLevel gameVolume=audio_level::one;
+    MotionBinary64 y{},viewY{},viewHeight{};
     bool inWater=false,noBgm=false;
 };
 struct SoundPlayScript {
@@ -65,19 +66,19 @@ struct SoundPlayScript {
     }
 private:
     static bool check(bool ok,bool& good){if(!ok)good=false;return ok;}
-    static MotionBinary64 pitch(bool water){return water?MotionBinary64{0x3fe19999u,0x9999999au}:MotionBinary64::fromInteger(1);}
+    // 0.55 under water.
+    static AudioLevel pitch(bool water){return water?AudioLevel::raw(36045):audio_level::one;}
     template<class Audio> static bool stopPlaying(int id,Audio& audio,bool& good){
         bool playing=false;
         return check(audio.isPlaying(id,playing),good)&&(!playing||check(audio.stop(id),good));
     }
     template<class Audio> static bool start(SoundPlayState& s,SoundPlayEnvironment& env,Audio& audio,bool& good){
-        int voice=-1;MotionBinary64 gain,scaled;
+        int voice=-1;AudioLevel gain;
         if(!check(audio.play(s.sfxIndex,s.soundPriority,s.loop,voice),good))return false;
         s.sndsnd=voice;
         if(!check(audio.getGain(s.sndsnd,gain),good))return false;
         s.sndgain=gain;
-        if(!check(multiplyBinary64(s.sndgain,env.gameVolume,scaled),good))return false;
-        s.sndgain=scaled;
+        s.sndgain=audio_level::product(s.sndgain,env.gameVolume);
         return check(audio.setGain(s.sndsnd,s.sndgain,0),good);
     }
 };

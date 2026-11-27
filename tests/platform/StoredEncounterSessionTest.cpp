@@ -44,7 +44,7 @@ int main(){
         SessionAudio missing;assert(missing.ready()&&!missing.hasResource(349));
         for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount-1;++id){
             char path[128];std::snprintf(path,sizeof(path),"extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
-            assert(missing.load(id,path,MotionBinary64::fromInteger(1)));
+            assert(missing.load(id,path,audio_level::one));
         }
         assert(missing.hasResource(349)&&!missing.hasResource(355));
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
@@ -61,7 +61,7 @@ int main(){
         SessionAudio audio;assert(audio.ready());
         for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount;++id){
             char path[128];std::snprintf(path,sizeof(path),"extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
-            assert(audio.load(id,path,MotionBinary64::fromInteger(1))&&audio.hasResource(id));
+            assert(audio.load(id,path,audio_level::one)&&audio.hasResource(id));
         }
         assert(!audio.hasResource(-1)&&!audio.hasResource(361));
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
@@ -71,7 +71,7 @@ int main(){
         assert(session->start()&&game->startupShortcutApplied());
         assert(audio.stops==1);
         assert(AudioSDLTestAccess::master(audio)==0x3f800000u);
-        session->settings().masterGain={0x3fe00000u,0};
+        session->settings().masterGain=audio_level::half;
         assert(session->update({})&&AudioSDLTestAccess::master(audio)==0x3f000000u);
         Sink sink;
         const_cast<StartupRuntime&>(game->startup()).useCaptureGarden(true); // W1.14: pinned walk
@@ -116,7 +116,7 @@ int main(){
         int oldVoice=-1;bool oldPlaying=false;
         // Keep the witness outside the admitted wind family so its ordinary
         // overlap-channel stop cannot accidentally satisfy this assertion.
-        assert(audio.load(348,"extracted/audio/sound-effects/348_sfxPickup_Cat.wav",MotionBinary64::fromInteger(1)));
+        assert(audio.load(348,"extracted/audio/sound-effects/348_sfxPickup_Cat.wav",audio_level::one));
         assert(audio.play(348,90,true,oldVoice)&&audio.isPlaying(oldVoice,oldPlaying)&&oldPlaying);
         const auto stopsBeforeRetry=audio.stops;
         assert(world.subtractPlayerHealth(MotionBinary64::fromInteger(world.mainPlayerHealth())));

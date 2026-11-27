@@ -1,6 +1,6 @@
 #ifndef DOWNWELL_CORE_SOUND_VOICES_H
 #define DOWNWELL_CORE_SOUND_VOICES_H
-#include "MotionBinary64.h"
+#include "AudioLevel.h"
 #include "SourceSoundDurations.h"
 #include <cstdint>
 namespace downwell {
@@ -29,7 +29,7 @@ public:
     static constexpr unsigned capacity=32;
     static constexpr int firstVoice=1000000;
     // Source gain of a fresh voice: the asset volume (SourceSoundDurations).
-    using AssetGain=MotionBinary64 (*)(int asset);
+    using AssetGain=AudioLevel (*)(int asset);
 
     void configureAssetGain(AssetGain gain){assetGain_=gain;}
     void advance(){
@@ -55,8 +55,8 @@ public:
         slot->id=voice;slot->asset=asset;slot->priority=priority;slot->loop=loop;
         slot->serial=serial_++;
         slot->remaining=remaining;
-        slot->gain=assetGain_?assetGain_(asset):MotionBinary64::fromInteger(1);
-        slot->pitch=MotionBinary64::fromInteger(1);
+        slot->gain=assetGain_?assetGain_(asset):audio_level::one;
+        slot->pitch=audio_level::one;
         return true;
     }
     bool isPlaying(int id,bool& playing)const{playing=find(id)!=nullptr;return true;}
@@ -77,16 +77,16 @@ public:
     // audio_sound_get_gain/audio_sound_gain/audio_sound_pitch on a voice or an
     // asset. The model keeps the values for the request log; they never
     // change a voice's length (pitch is 1 for every gameplay-visible sound).
-    bool getGain(int id,MotionBinary64& gain)const{
-        gain=assetGain_&&id>=0&&id<firstVoice?assetGain_(id):MotionBinary64::fromInteger(1);
+    bool getGain(int id,AudioLevel& gain)const{
+        gain=assetGain_&&id>=0&&id<firstVoice?assetGain_(id):audio_level::one;
         for(unsigned i=0;i<count_;++i)if(voices_[i].id==id){gain=voices_[i].gain;break;}
         return true;
     }
-    bool setGain(int id,MotionBinary64 gain,int){
+    bool setGain(int id,AudioLevel gain,int){
         for(unsigned i=0;i<count_;++i)if(matches(voices_[i],id))voices_[i].gain=gain;
         return true;
     }
-    bool setPitch(int id,MotionBinary64 pitch){
+    bool setPitch(int id,AudioLevel pitch){
         for(unsigned i=0;i<count_;++i)if(matches(voices_[i],id))voices_[i].pitch=pitch;
         return true;
     }
@@ -100,7 +100,7 @@ private:
         std::uint32_t serial=0;
         std::uint16_t remaining=0;
         bool loop=false,paused=false;
-        MotionBinary64 gain{},pitch{};
+        AudioLevel gain{},pitch{};
     };
     static bool matches(const Voice& v,int id){return id>=0&&(v.id==id||(id<firstVoice&&v.asset==id));}
     const Voice* find(int id)const{

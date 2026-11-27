@@ -62,12 +62,12 @@ int main(){
         // twelve steal) and 16 gain changes, on a scratch plan.
         downwell::PaulaVoicePlan scratch(audio.bank());
         downwell::SoundRequest r;r.kind=downwell::SoundRequest::play;r.priority=50;
-        r.gainValue={0x3fe00000u,0};r.pitchValue={0x3ff00000u,0};
+        r.gainValue=downwell::audio_level::half;r.pitchValue=downwell::audio_level::one;
         platform.waitVblank();
         unsigned first=rasterLine();
         for(int i=0;i<16;++i){r.asset=std::int16_t(i&1?18:3);r.voice=downwell::SoundVoices::firstVoice+i;scratch.apply(r);}
         gPaulaProbePlay16Lines=rasterLine()-first;
-        downwell::SoundRequest g;g.kind=downwell::SoundRequest::gain;g.gainValue={0x3fd66666u,0x66666666u};
+        downwell::SoundRequest g;g.kind=downwell::SoundRequest::gain;g.gainValue=downwell::AudioLevel::raw(22938);
         platform.waitVblank();
         first=rasterLine();
         for(int i=0;i<16;++i){g.voice=downwell::SoundVoices::firstVoice+12+(i&3);scratch.apply(g);}
@@ -128,7 +128,7 @@ int main(){
     // retires a live mixer.
     if(!audio.acquire(platform)||!audio.bind(downwell::AmigaPaulaAudio::resident,bank,DOWNWELL_SFX_BANK_BYTES))return fail(12);
     downwell::SoundRequest r;r.kind=downwell::SoundRequest::play;r.asset=3;r.voice=downwell::SoundVoices::firstVoice;
-    r.priority=50;r.gainValue={0x3ff00000u,0};r.pitchValue={0x3ff00000u,0};
+    r.priority=50;r.gainValue=downwell::audio_level::one;r.pitchValue=downwell::audio_level::one;
     audio.submit(r);audio.frame();
     platform.waitVblank();platform.waitVblank();
     platform.restore();

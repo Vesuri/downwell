@@ -16,14 +16,14 @@ struct Audio {
     unsigned failOperation=0;
     std::vector<int> operations;
     bool operation(int kind){operations.push_back(kind);return operations.size()!=failOperation;}
-    std::vector<MotionBinary64> gains;
-    MotionBinary64 expectedMaster{0x3ff00000u,0};
+    std::vector<AudioLevel> gains;
+    AudioLevel expectedMaster=audio_level::one;
     unsigned stops=0,updates=0;int missing=-1;bool masterOkay=true;
     bool ready()const{return true;}
     bool hasResource(int id)const{return id!=missing;}
     bool stopAll(){++stops;playing=false;return !fail;}
     void update(){++updates;}
-    bool setMasterGain(MotionBinary64 gain){return masterOkay&&gain.high==expectedMaster.high&&gain.low==expectedMaster.low;}
+    bool setMasterGain(AudioLevel gain){return masterOkay&&gain==expectedMaster;}
     bool isPlaying(int id,bool& out){calls.push_back(id);
         out=(id==900&&playing)||(resourcePlaying&&id>=TimeFieldWind::firstSound&&id<TimeFieldWind::firstSound+TimeFieldWind::soundCount);
         return operation(1)&&!fail;}
@@ -33,9 +33,9 @@ struct Audio {
         assert(priority==90&&!loop);calls.push_back(20000+id);
         if(!operation(3))return false;voice=900;playing=true;return true;
     }
-    bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return operation(4);}
-    bool setGain(int,MotionBinary64 gain,int){gains.push_back(gain);return operation(5);}
-    bool setPitch(int,MotionBinary64){return operation(6);}
+    bool getGain(int,AudioLevel& gain){gain=audio_level::one;return operation(4);}
+    bool setGain(int,AudioLevel gain,int){gains.push_back(gain);return operation(5);}
+    bool setPitch(int,AudioLevel){return operation(6);}
 };
 template<bool Prepared> static void exercise(int argc,char** argv,unsigned history=0){
     const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
@@ -87,12 +87,12 @@ template<bool Prepared> static void exercise(int argc,char** argv,unsigned histo
             const auto before=world->randomDrawCount();
             bool pending=true;
             auto room=[&]{return RunnerCollisionEventContext::RoomState{true,pending};};
-            assert(pass->run(*world,MotionBinary64::fromInteger(1),audio,room));
+            assert(pass->run(*world,audio_level::one,audio,room));
             assert(audio.calls.empty()&&world->randomDrawCount()==before);
             pending=false;
             presentation.rejectAt=failure>=2?failure-1:0;
             // Source dispatcher retains dirty collision entries for next pass.
-            const bool okay=pass->run(*world,MotionBinary64::fromInteger(1),audio,room);
+            const bool okay=pass->run(*world,audio_level::one,audio,room);
             assert(okay==!failure);
             // Pin the runner oracle's ordered notifications, including every
             // possible failing prefix. Remote non-contacting births change it.
@@ -110,7 +110,7 @@ template<bool Prepared> static void exercise(int argc,char** argv,unsigned histo
                 // native destruction also passes through world.effects.
                 if(failure<2||native)assert(!world->effectsSucceeded());
                 const auto count=audio.calls.size();
-                assert(!pass->run(*world,MotionBinary64::fromInteger(1),audio,room)&&audio.calls.size()==count);
+                assert(!pass->run(*world,audio_level::one,audio,room)&&audio.calls.size()==count);
             }else{
                 assert(world->randomDrawCount()==before+1&&world->timeFieldWindVoice()==900);
                 // Which overlapping lifetime owns the RNG-selected sound is
@@ -133,7 +133,7 @@ template<bool Prepared> static void exercise(int argc,char** argv,unsigned histo
                 assert(destroyed>0); // Same sealed stream also executed code 991.
                 const auto queries=audio.calls.size();unsigned passes=0;
                 assert(world->withCollisionPass([&]{++passes;return pass->run(*world,
-                    MotionBinary64::fromInteger(1),audio,room);},[&]{world->step(0);return world->effectsSucceeded();}));
+                    audio_level::one,audio,room);},[&]{world->step(0);return world->effectsSucceeded();}));
                 assert(passes==1&&audio.calls.size()>queries);
                 assert(owner->prepareDraw()); // Physical retirement only at Draw.
                 GameplayEncounterSession session(*world,*owner);assert(session.start());
@@ -218,12 +218,12 @@ static void sessionInputsAndSettings(int argc,char** argv){
         const auto dither=world->ditherAbove()->handle();
         auto& fields=const_cast<GameplayGoalFields&>(world->goalFieldInstances());
         assert(fields.create(240,176,371));
-        Audio audio;audio.expectedMaster={0x3fe00000u,0};
+        Audio audio;audio.expectedMaster=audio_level::half;
         auto roomState=[]{return RunnerCollisionEventContext::RoomState{true,false};};
         using Environment=GameplayEncounterEnvironment<Audio,decltype(roomState),256>;
         auto environment=std::make_unique<Environment>(*world,*owner,masks,audio,roomState);
         environment->settings().masterGain=audio.expectedMaster;
-        environment->settings().gameVolume={0x3fd00000u,0}; // A quarter, before the explicit wind override.
+        environment->settings().gameVolume=AudioLevel::raw(16384); // A quarter, before the explicit wind override.
         environment->settings().lowSpec=lowSpec;
         GameplayEncounterSession session(*world,*owner);assert(session.start());
         Input held;held.right=held.left=held.fire=held.cancel=true;
@@ -234,8 +234,8 @@ static void sessionInputsAndSettings(int argc,char** argv){
             const auto* actor=world->ditherAbove()->find(dither);assert(actor&&!actor->destroyRequested);
             RunnerImageValue expected;assert(expected.assignInteger(lowSpec?-48:-64));
             assert(actor->y.bits==expected.bits); // Camera y=176: only the 208-pixel branch advances.
-            assert(audio.gains.size()==2&&audio.gains[0].high==0x3fd00000u&&!audio.gains[0].low&&
-                audio.gains[1].high==0x3fe00000u&&!audio.gains[1].low);
+            assert(audio.gains.size()==2&&audio.gains[0]==AudioLevel::raw(16384)&&
+                audio.gains[1]==audio_level::half);
             const auto& edges=session.inputPublication();
             assert(edges.right&&edges.left&&edges.confirm&&edges.cancel); // Neither admitted event consumes controls.
             assert(frame.beginDraw(true)&&frame.publishable()&&frame.finish());

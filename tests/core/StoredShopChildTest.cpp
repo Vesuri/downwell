@@ -165,7 +165,7 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
             valid=valid&&records.size()==1&&records.at(0).objectId==277&&sound==(area==3?201:192)&&priority==100&&loop;
             handle=123;++calls;return reject!=1;
         }
-        bool setGain(int handle,MotionBinary64 gain,int duration){
+        bool setGain(int handle,AudioLevel gain,int duration){
             valid=valid&&records.size()==1&&calls==1&&handle==123&&gain.zero()&&duration==0;
             ++calls;return reject!=2;
         }
@@ -352,7 +352,7 @@ bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
 bool registeredShopSpeechCheck(const ObjectPack& objects){
     if(!checkShopSpeechScript())return false;
     InstanceStore<16> records;std::uint32_t next=930000;int room=11;bool good=true;
-    struct Audio {bool play(int,int,bool,int&){return false;} bool setGain(int,MotionBinary64,int){return false;}} audio;
+    struct Audio {bool play(int,int,bool,int&){return false;} bool setGain(int,AudioLevel,int){return false;}} audio;
     ShopChildObserver observer;
     StoredShopCreationOwner<16,1,Audio> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good,audio);
     ShopWorld::Instance shop;

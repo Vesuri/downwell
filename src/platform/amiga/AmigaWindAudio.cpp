@@ -120,17 +120,17 @@ bool AmigaWindAudio::stopAll(){
     if(!ready())return false;
     Disable();playing_=false;command_=3;Enable();return true;
 }
-bool AmigaWindAudio::getGain(int id,MotionBinary64& value){
+bool AmigaWindAudio::getGain(int id,AudioLevel& value){
     if(!ready())return false;
-    if(hasResource(id)){value=MotionBinary64::fromInteger(1);return true;}
+    if(hasResource(id)){value=audio_level::one;return true;}
     if(id!=voice_||id<1000000)return false;
-    value=gain_.current.promoted();return true;
+    return Fixed16::fromBinary64(gain_.current.promoted(),value);
 }
-bool AmigaWindAudio::setGain(int id,MotionBinary64 value,int milliseconds){
+bool AmigaWindAudio::setGain(int id,AudioLevel value,int milliseconds){
     if(!ready()||id!=voice_||id<1000000||milliseconds||!gain_.set(value,0,0))return false;
     updateVolume();return true;
 }
-bool AmigaWindAudio::setMasterGain(MotionBinary64 value){
+bool AmigaWindAudio::setMasterGain(AudioLevel value){
     if(!master_.set(value))return false;
     updateVolume();return true;
 }
@@ -151,8 +151,8 @@ void AmigaWindAudio::updateVolume(){
     }
     volume_=volume; // Only the low word varies; VBI alone writes AUDxVOL.
 }
-bool AmigaWindAudio::setPitch(int id,MotionBinary64 value){
-    return ready()&&id==voice_&&id>=1000000&&value.high==0x3ff00000u&&!value.low;
+bool AmigaWindAudio::setPitch(int id,AudioLevel value){
+    return ready()&&id==voice_&&id>=1000000&&value==audio_level::one;
 }
 unsigned AmigaWindAudio::fill(unsigned bank){
     unsigned bytes=sample_.length-offset_;

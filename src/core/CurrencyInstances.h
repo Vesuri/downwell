@@ -101,7 +101,7 @@ public:
         if(!r->active||r->destroyRequested||!r->state.alarms.advanceOne(index))return true;
         return dispatch(key,[&](auto& state,bool& good){return CurrencyAlarmEvents::run(state,index,other,good);});
     }
-    template<class Audio> bool expire(InstanceHandle key,MotionBinary64 volume,bool inWater,Audio& audio){
+    template<class Audio> bool expire(InstanceHandle key,AudioLevel volume,bool inWater,Audio& audio){
         auto* r=resolve(key);if(!r)return fail();
         if(r->state.attracted)return true;
         SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;int voice=-1;
@@ -119,13 +119,13 @@ public:
     template<class Random,class Queries,class Math,class View,class Audio>
     bool stepSource(InstanceHandle key,Random& random,bool stopped,int width,
         MotionBinary64 playerX,MotionBinary64 playerY,Queries& queries,Math& math,View view,
-        Audio& audio,MotionBinary64 volume,bool inWater){
+        Audio& audio,AudioLevel volume,bool inWater){
         auto* r=resolve(key);if(!r||executing_)return fail();
         if(!r->active||r->destroyRequested)return true;
         struct Ops {
             CurrencyInstances& owner;InstanceHandle key;Record& r;Random& random;
             bool stopped;int width;MotionBinary64 playerX,playerY;
-            Queries& queries;Math& math;View& view;Audio& audio;MotionBinary64 volume;bool inWater;
+            Queries& queries;Math& math;View& view;Audio& audio;AudioLevel volume;bool inWater;
             bool meeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){return queries.meeting(key,object,x,y,hit);}
             bool wall(MotionBinary64 x,MotionBinary64 y,bool& hit){return meeting(57,x,y,hit);}
             bool timeAllowed(bool& allowed){return TimeStopBound::evaluate(stopped,r.state.x.promoted(),r.state.y.promoted(),width,

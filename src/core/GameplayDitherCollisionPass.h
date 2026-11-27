@@ -9,7 +9,7 @@ template<unsigned Capacity=16384,bool PreparedPairs=true> class GameplayDitherCo
 public:
     GameplayDitherCollisionPass(GameplayCollisionOwner& owner,const SpriteMaskPack& masks)
         :owner_(owner),masks_(masks){}
-    template<class Audio,class RoomState> bool run(GameplayWorld& world,MotionBinary64 volume,
+    template<class Audio,class RoomState> bool run(GameplayWorld& world,AudioLevel volume,
         Audio& audio,RoomState roomState){
         if(!owner_.boundTo(world)||!world.effectsSucceeded()||!masks_.valid())return false;
         if(!owner_.collectCollisionPairs(pairs_))return false;

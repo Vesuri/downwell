@@ -78,9 +78,7 @@ public:
         return true;
     }
 private:
-    static double real(downwell::MotionBinary64 v){
-        const std::uint64_t bits=(std::uint64_t(v.high)<<32)|v.low;double d;std::memcpy(&d,&bits,8);return d;
-    }
+    static double real(downwell::AudioLevel v){return v.v/65536.0;}
     void record(const downwell::SoundRequest& r){
         static const char* names[]={"play","stop","stopall","pauseall","resumeall","gain","pitch","pause","resume"};
         ++requests_;++kinds_[r.kind];

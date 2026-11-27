@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_AUDIO_GAIN_H
 #define DOWNWELL_CORE_RUNNER_AUDIO_GAIN_H
 #include "RunnerImageValue.h"
+#include "AudioLevel.h"
 #include <cstring>
 
 namespace downwell {
@@ -14,8 +15,9 @@ struct RunnerAudioGain {
         float f;static_assert(sizeof(f)==sizeof(v.bits));
         std::memcpy(&f,&v.bits,sizeof(f));return f;
     }
-    bool set(MotionBinary64 gain,int milliseconds,std::int64_t now){
-        if(!gain.valid()||milliseconds<0||milliseconds>2147483||now<0||
+    bool set(AudioLevel level,int milliseconds,std::int64_t now){
+        MotionBinary64 gain=level.binary64();
+        if(milliseconds<0||milliseconds>2147483||now<0||
            now>0x7fffffffffffffffLL-2147483000)return false;
         if((gain.high&0x80000000u)&&!gain.zero())gain={};
         RunnerImageValue narrowed;if(!narrowed.assign(gain))return false;

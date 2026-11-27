@@ -16,16 +16,15 @@ struct BulletWallAudio {
     bool play(int id,int priority,bool loop,int& voice){
         valid=valid&&id==sound&&priority==60&&!loop&&caller.cutPrv;voice=900;return event(3);
     }
-    bool getGain(int id,downwell::MotionBinary64& gain){
-        valid=valid&&id==900;gain={0x3fe00000u,0};return event(4);
+    bool getGain(int id,downwell::AudioLevel& gain){
+        valid=valid&&id==900;gain=downwell::audio_level::half;return event(4);
     }
-    bool setGain(int id,downwell::MotionBinary64 gain,int duration){
-        valid=valid&&id==900&&gain.high==0x3fc00000u&&!gain.low&&!duration;return event(5);
+    bool setGain(int id,downwell::AudioLevel gain,int duration){
+        valid=valid&&id==900&&gain==downwell::AudioLevel::raw(8192)&&!duration;return event(5);
     }
-    bool setPitch(int id,downwell::MotionBinary64 pitch){
-        const downwell::MotionBinary64 expected=water?downwell::MotionBinary64{0x3fe19999u,0x9999999au}:
-            downwell::MotionBinary64::fromInteger(1);
-        valid=valid&&id==900&&pitch.high==expected.high&&pitch.low==expected.low;return event(6);
+    bool setPitch(int id,downwell::AudioLevel pitch){
+        const auto expected=water?downwell::AudioLevel::raw(36045):downwell::audio_level::one;
+        valid=valid&&id==900&&pitch==expected;return event(6);
     }
 };
 #endif

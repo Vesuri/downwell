@@ -4,7 +4,7 @@
 // frames * 60 / rate), for SoundVoices' audio_is_playing model. The table is
 // written by tools/sound-durations.py from the extracted audio; lengths only.
 // gain() is the asset volume a fresh voice reads back (audio_sound_get_gain).
-#include "MotionBinary64.h"
+#include "AudioLevel.h"
 #include <cstdint>
 #ifdef DOWNWELL_INSTALLED_TABLES
 // WI.3: bound from Downwell.tables (tools/install-table-headers.py).
@@ -25,13 +25,13 @@ struct SourceSoundDurations {
 #endif
         return id>=0&&unsigned(id)<count?table[id]:0;
     }
-    static MotionBinary64 gain(int id){
+    static AudioLevel gain(int id){
 #ifdef DOWNWELL_INSTALLED_TABLES
         constexpr unsigned count=sourceSoundGains_count;
         // scrInitialize: audio_sound_gain(sfxGunM, 0.5, 0) before any run.
-        if(id==18)return {0x3fe00000u,0};
-        if(id<0||unsigned(id)>=count)return MotionBinary64::fromInteger(1);
-        return {sourceSoundGains[id][0],sourceSoundGains[id][1]};
+        if(id==18)return audio_level::half;
+        if(id<0||unsigned(id)>=count)return audio_level::one;
+        return audio_level::fromBits(sourceSoundGains[id][0],sourceSoundGains[id][1]);
 #else
         struct Bits {std::uint32_t high,low;};
         static const Bits table[]={
@@ -39,9 +39,9 @@ struct SourceSoundDurations {
         };
         constexpr unsigned count=sizeof(table)/sizeof(table[0]);
         // scrInitialize: audio_sound_gain(sfxGunM, 0.5, 0) before any run.
-        if(id==18)return {0x3fe00000u,0};
-        if(id<0||unsigned(id)>=count)return MotionBinary64::fromInteger(1);
-        return {table[id].high,table[id].low};
+        if(id==18)return audio_level::half;
+        if(id<0||unsigned(id)>=count)return audio_level::one;
+        return audio_level::fromBits(table[id].high,table[id].low);
 #endif
     }
 };

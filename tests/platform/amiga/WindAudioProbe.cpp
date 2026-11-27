@@ -74,24 +74,24 @@ int main(){
             unsigned chooseIndexSmall(unsigned count){if(count!=7)gWindProbeFailed=5;++calls;return choice;}
         } random{resource-349};
         downwell::TimeFieldWind wind;std::int32_t sound=-1;int channel=-1;
-        const auto one=downwell::MotionBinary64::fromInteger(1);
+        const auto one=downwell::audio_level::one;
         if(!wind.contact(random,sound,channel,one,audio)||sound!=int(resource)||channel!=sound||
            random.calls!=1||wind.voice<1000000)return 20;
         voice=wind.voice;
-        downwell::MotionBinary64 gain;
-        if(!audio.getGain(voice,gain)||gain.high!=0x3fe00000u||gain.low||
+        downwell::AudioLevel gain;
+        if(!audio.getGain(voice,gain)||gain!=downwell::audio_level::half||
            !wind.contact(random,sound,channel,one,audio)||random.calls!=1||wind.voice!=voice)return 20;
-        if(!audio.setMasterGain({0x3fe33333u,0x33333333u})||
+        if(!audio.setMasterGain(downwell::AudioLevel::raw(39322))||
            downwell::AmigaWindAudioProbe::volume(audio)!=19||
-           !audio.getGain(voice,gain)||gain.high!=0x3fe00000u||gain.low||
-           audio.setMasterGain(downwell::MotionBinary64::fromInteger(2))||
+           !audio.getGain(voice,gain)||gain!=downwell::audio_level::half||
+           audio.setMasterGain(downwell::AudioLevel::fromInteger(2))||
            downwell::AmigaWindAudioProbe::volume(audio)!=19||
            !audio.setMasterGain(one)||downwell::AmigaWindAudioProbe::volume(audio)!=32)return 20;
-        if(!audio.setGain(voice,{0x80000000u,0},0)||downwell::AmigaWindAudioProbe::volume(audio)||
-           !audio.setGain(voice,{0x3fe00000u,0},0)||downwell::AmigaWindAudioProbe::volume(audio)!=32)return 20;
+        if(!audio.setGain(voice,downwell::AudioLevel{},0)||downwell::AmigaWindAudioProbe::volume(audio)||
+           !audio.setGain(voice,downwell::audio_level::half,0)||downwell::AmigaWindAudioProbe::volume(audio)!=32)return 20;
         int rejected=-1;
         if(audio.play(resource,90,false,rejected)||rejected!=-1||
-           audio.setPitch(voice,{0x3fe00000u,0})||audio.setGain(voice,one,100))return 20;
+           audio.setPitch(voice,downwell::audio_level::half)||audio.setGain(voice,one,100))return 20;
         const UWORD start=platform.vblankCount();unsigned checked=first;
         do {
             platform.waitVblank();

@@ -441,6 +441,26 @@ on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
     routes whose autopilot no longer survives. Done when the shipping
     executable links no binary64 arithmetic (no `MotionBinary64` or
     `MultiplyBinary64` callers, no hooks) and the 68020 hooks are removed.
+    Inventory (27.11.2026, shipping ELF): 92 functions take or return
+    `MotionBinary64`, about 2,850 source lines in 331 files (the SDL
+    reference owners included). Audio is Q16 (`AudioLevel`). In order:
+    1. effect drawing and placement: `EffectSurfacePlacement`,
+       `EffectSpriteDraw`, the smoke, debris, corpse and level-number
+       draws, entry dithers and dither-above, `CompactRoomEffects`,
+       flash balls, torch fire, `TimeStopEffects`, the sequence timelines
+       and `RunnerImageValue` assignment, the draw list;
+    2. enemies: `SteeringOps` and `RunnerPointDirection` /
+       `RunnerDirectionValue`, the red ball and its `CheckCollisionWithScript`,
+       the white jelly step, compact blood and immune sparks, the
+       machine-gun shot's source motion, projectile publication;
+    3. the player: `stepGameplayPlayer`, `PlayerSolidCollisionBinary64`,
+       `PlayerHorizontalBinary64`, `RunnerMoveSnap`, the mask bounds
+       (`RunnerSpriteBounds`, `CurrencyCollisionBounds`), box and goal
+       contact (`PlayerBoxContact`, `RunSession::playerGoalContact`,
+       `TimeStopGoalContact`), the shop world;
+    4. remove `MotionBinary64` from the shipping link, the binary64 hooks
+       and `Binary64Hooks*`. binary32 (`RunnerImageValue`) is a separate
+       follow-up once nothing promotes it to binary64.
 21. **W3.21 Structural options (approved 27.11.2026, not a priority).**
     Resting corpses kept outside the rebuilt effect surface (2.0 ms of
     composition at 5228), and a third gem-high streak design that visits

@@ -12,11 +12,11 @@ public:
     SoundPlayState soundState{}; // Standalone reference caller; live fields supply their own.
     bool succeeded()const{return good_;}
     template<class Random,class Audio>
-    bool contact(Random& random,std::int32_t& sound,int& channel,MotionBinary64 gameVolume,Audio& audio){
+    bool contact(Random& random,std::int32_t& sound,int& channel,AudioLevel gameVolume,Audio& audio){
         return contact(random,sound,soundState,channel,gameVolume,audio);
     }
     template<class Random,class Audio>
-    bool contact(Random& random,std::int32_t& sound,SoundPlayState& caller,int& channel,MotionBinary64 gameVolume,Audio& audio){
+    bool contact(Random& random,std::int32_t& sound,SoundPlayState& caller,int& channel,AudioLevel gameVolume,Audio& audio){
         if(!good_)return false;
         bool playing=false;
         if(!check(audio.isPlaying(voice,playing)))return false;
@@ -28,7 +28,7 @@ public:
             sound,90,false,true,"UI",result,returned,good_))return false;
         if(!check(returned))return false;
         voice=result;
-        return check(audio.setGain(voice,{0x3fe00000u,0},0));
+        return check(audio.setGain(voice,audio_level::half,0));
     }
 private:
     bool good_=true;

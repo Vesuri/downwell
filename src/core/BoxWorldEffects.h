@@ -11,8 +11,8 @@ template<class World,class Controls,class Frames,class Audio>
 struct BoxWorldEffects:Controls {
     using Handle=InstanceHandle;
     World& world;Handle box;Frames frames;
-    Audio& audio;MotionBinary64 volume;bool inWater;
-    BoxWorldEffects(World& w,Handle h,Controls controls,Frames lookup,Audio& backend,MotionBinary64 gain,bool water)
+    Audio& audio;AudioLevel volume;bool inWater;
+    BoxWorldEffects(World& w,Handle h,Controls controls,Frames lookup,Audio& backend,AudioLevel gain,bool water)
         :Controls(controls),world(w),box(h),frames(lookup),audio(backend),volume(gain),inWater(water){}
     bool sound(int id,int priority,int loop,int cut){
         return id==342&&priority==50&&loop==0&&cut==1&&world.playBoxChainSound(box,volume,inWater,audio);
@@ -41,7 +41,7 @@ struct BoxWorldEffects:Controls {
     }
 };
 template<class World,class Controls,class Frames,class Audio>
-auto boxWorldEffects(World& world,InstanceHandle box,Controls controls,Frames frames,Audio& audio,MotionBinary64 volume,bool inWater){
+auto boxWorldEffects(World& world,InstanceHandle box,Controls controls,Frames frames,Audio& audio,AudioLevel volume,bool inWater){
     return BoxWorldEffects<World,Controls,Frames,Audio>(world,box,controls,frames,audio,volume,inWater);
 }
 }

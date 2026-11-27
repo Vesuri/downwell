@@ -9,7 +9,7 @@ struct TransitionAudio {
     std::vector<int> calls;
     unsigned fail=0;
     bool playing=true,paused=true,wind=true,resource=true;
-    MotionBinary64 gain=MotionBinary64::fromInteger(1);
+    AudioLevel gain=audio_level::one;
     bool call(int code){calls.push_back(code);return calls.size()!=fail;}
     bool isPlaying(int id,bool& value){value=id==700?playing:id==701?wind:resource;return call(id);}
     bool isPaused(int id,bool& value){assert(id==700);value=paused;return call(1700);}
@@ -17,14 +17,14 @@ struct TransitionAudio {
     bool resume(int id){assert(id==700);return call(3700);}
     bool stop(int id){return call(4000+id);}
     bool play(int id,int priority,bool loop,int& voice){assert(priority==80&&!loop);voice=900;return call(5000+id);}
-    bool getGain(int id,MotionBinary64& value){value=id==700?gain:MotionBinary64::fromInteger(1);return call(6000+id);}
-    bool setGain(int id,MotionBinary64 value,int duration){
-        if(id==900)assert(value.high==0x3fd00000u&&!value.low&&!duration);
+    bool getGain(int id,AudioLevel& value){value=id==700?gain:audio_level::one;return call(6000+id);}
+    bool setGain(int id,AudioLevel value,int duration){
+        if(id==900)assert(value==AudioLevel::raw(16384)&&!duration);
         else {assert(id==700);assert(duration==0||duration==200);
-            assert(value.high==(duration?0x3ff00000u:0x3fe66666u)&&value.low==(duration?0:0x66666666u));}
+            assert(value==(duration?audio_level::one:AudioLevel::raw(45875)));}
         return call(7000+id+duration);
     }
-    bool setPitch(int id,MotionBinary64 value){assert(id==900&&value.high==0x3fe19999u&&value.low==0x9999999au);return call(8900);}
+    bool setPitch(int id,AudioLevel value){assert(id==900&&value==AudioLevel::raw(36045));return call(8900);}
 };
 static void checkedAudioTransitions(){
     using E=PlayerTimeStop::Effect;
@@ -32,7 +32,7 @@ static void checkedAudioTransitions(){
         1700,3700,701,4701,185,4185,5185,6900,7900,8900,700,6700,7700,7900};
     for(unsigned failure=0;failure<=expected.size();++failure){
         TimeStopEffects<16> state;GameMakerRandom random(2);TimeStopAudio audioState;
-        SoundPlayState caller;SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+        SoundPlayState caller;SoundPlayEnvironment env;env.gameVolume=AudioLevel::raw(16384);env.inWater=true;
         TransitionAudio audio;audio.fail=failure;bool hit=true;
         TimeStopEffects<16>::PlayerPose pose{};
         auto field=[&](bool& result){result=hit;return true;};
@@ -53,7 +53,7 @@ static void checkedAudioTransitions(){
         }else {
             assert(state.player.bgmOn&&!state.player.stopped&&random.drawCount()==96);
             assert(caller.sfxIndex==185&&caller.soundPriority==80&&!caller.loop&&caller.cutPrv);
-            assert(audioState.duckDuration==200&&audioState.duckAmt.high==0x3fe66666u);
+            assert(audioState.duckDuration==200&&audioState.duckAmt==AudioLevel::raw(45875));
             assert((effects==std::vector<E>{E::shake,E::change,E::oxygenFloor,E::change}));
         }
     }
@@ -61,9 +61,9 @@ static void checkedAudioTransitions(){
     for(unsigned guard=0;guard<3;++guard){
         TimeStopAudio state;SoundPlayState caller;SoundPlayEnvironment env;TransitionAudio audio;
         if(guard==1)audio.playing=false;
-        if(guard==2)audio.gain={0x3fe00000u,0};
+        if(guard==2)audio.gain=audio_level::half;
         assert(state.emit(E::duckMusic,caller,env,guard==0?5:1,700,701,audio));
-        assert(state.duckDuration==200&&state.duckAmt.low==0x66666666u);
+        assert(state.duckDuration==200&&state.duckAmt==AudioLevel::raw(45875));
         assert(audio.calls.size()==guard);
     }
 }
@@ -85,16 +85,16 @@ int main(){
             RunSession& run;MusicDuck& caller;unsigned& calls;unsigned failure;
             bool call(int id){assert(id==193+int(calls));++calls;++run.backgroundMusicId;return calls!=failure;}
             bool isPlaying(int id,bool& out){out=true;return call(id);}
-            bool getGain(int id,MotionBinary64& out){out=MotionBinary64::fromInteger(1);return call(id);}
-            bool setGain(int id,MotionBinary64 value,int milliseconds){
-                if(calls==2){assert(milliseconds==0&&value.high==0x3fe66666u);caller.duckDuration=777;}
-                else assert(calls==3&&milliseconds==777&&value.high==0x3ff00000u);
+            bool getGain(int id,AudioLevel& out){out=audio_level::one;return call(id);}
+            bool setGain(int id,AudioLevel value,int milliseconds){
+                if(calls==2){assert(milliseconds==0&&value==AudioLevel::raw(45875));caller.duckDuration=777;}
+                else assert(calls==3&&milliseconds==777&&value==audio_level::one);
                 return call(id);
             }
         } audio{run,caller,calls,failure};
-        const auto amount=MotionBinary64{0x3fe66666u,0x66666666u};
+        const auto amount=AudioLevel::raw(45875);
         assert(run.duckMusic(caller,500,amount,audio)==!failure&&run.effectsSucceeded==!failure);
-        assert(calls==(failure?failure:4)&&caller.duckDuration==(calls>=3?777:500)&&caller.duckAmt.low==amount.low);
+        assert(calls==(failure?failure:4)&&caller.duckDuration==(calls>=3?777:500)&&caller.duckAmt==amount);
         if(failure){const auto previous=calls;assert(!run.duckMusic(caller,123,{},audio)&&calls==previous);}
     }
     using Effect=PlayerTimeStop::Effect;

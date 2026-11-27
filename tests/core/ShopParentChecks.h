@@ -48,7 +48,7 @@ struct ShopParentProbe:ShopMenuProbe {
     bool death(bool& out){++deathReads;out=dead;return true;}
     bool distance(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64&){return false;}
     bool inView(downwell::MotionBinary64,downwell::MotionBinary64,bool&){return false;}
-    bool gain(int,downwell::MotionBinary64 gain,int duration){return gain.zero()&&!duration;}
+    bool gain(int,downwell::AudioLevel gain,int duration){return gain.zero()&&!duration;}
     bool noBgm(bool&){return false;}
     bool paused(int,bool&){return false;}
     bool resume(int){return false;}

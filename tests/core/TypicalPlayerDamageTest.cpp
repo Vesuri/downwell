@@ -77,8 +77,8 @@ struct CombinedEvents:Events {
     bool sound(int id,int priority,bool loop,bool variation){
         assert(id==5&&priority==90&&!loop&&!variation);return record(25);
     }
-    bool duckMusic(int milliseconds,MotionBinary64 gain){
-        assert(milliseconds==500&&equal(gain,{0x3fe66666u,0x66666666u}));return record(26);
+    bool duckMusic(int milliseconds,AudioLevel gain){
+        assert(milliseconds==500&&gain==AudioLevel::raw(45875));return record(26);
     }
     void setHit(){record(27);}
     struct Controller {

@@ -19,17 +19,17 @@ struct SoundPlayVerification {
         bool play(int id,int priority,bool loop,int& voice){
             valid=valid&&*channel==42&&priority==50&&!loop;voice=900;return call(2000+id);
         }
-        bool getGain(int id,MotionBinary64& gain){valid=valid&&id==900;gain={0x3fe00000u,0};return call(3000);}
-        bool setGain(int id,MotionBinary64 gain,int duration){
-            valid=valid&&id==900&&duration==0&&gain.high==0x3fc00000u&&gain.low==0;return call(4000);
+        bool getGain(int id,AudioLevel& gain){valid=valid&&id==900;gain=audio_level::half;return call(3000);}
+        bool setGain(int id,AudioLevel gain,int duration){
+            valid=valid&&id==900&&duration==0&&gain==AudioLevel::raw(8192);return call(4000);
         }
-        bool setPitch(int id,MotionBinary64 pitch){
-            valid=valid&&id==900&&pitch.high==0x3ff00000u&&pitch.low==0;return call(5000);
+        bool setPitch(int id,AudioLevel pitch){
+            valid=valid&&id==900&&pitch==audio_level::one;return call(5000);
         }
     };
     static bool run(){
         for(unsigned failure=0;failure<=7;++failure){
-            SoundPlayState s;SoundPlayEnvironment env;env.inWater=true;env.gameVolume={0x3fd00000u,0};
+            SoundPlayState s;SoundPlayEnvironment env;env.inWater=true;env.gameVolume=AudioLevel::raw(16384);
             int channel=73,result=88;bool good=true,returned=false;Audio audio;
             audio.channel=&channel;audio.fail=failure;
             const bool ok=SoundPlayScript::overlap(s,env,audio,[]{return false;},channel,

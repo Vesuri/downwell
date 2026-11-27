@@ -10,7 +10,7 @@ int main(){
     for(unsigned seed=0;seed<512;++seed)for(unsigned material=0;material<7;++material)
     for(bool water:{false,true})for(unsigned fail=0;fail<=8;++fail){
         GameMakerRandom random(seed),oracle(seed);SoundPlayState caller;caller.sfxIndex=123;
-        SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};environment.inWater=water;
+        SoundPlayEnvironment environment;environment.gameVolume=AudioLevel::raw(16384);environment.inWater=water;
         const unsigned index=material<5?material:0;
         // The general-width integer path checks the optimized small-range
         // path, including equal bounds. The table is pinned by the tool.

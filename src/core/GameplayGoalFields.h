@@ -29,7 +29,7 @@ public:
         return index>=retired_&&index<count_?InstanceHandle{index,records_[index].lifetimeId}:InstanceHandle{};
     }
     template<class Random,class Audio> bool contactWind(InstanceHandle h,TimeFieldWind& wind,
-        Random& random,int& channel,MotionBinary64 volume,Audio& audio){
+        Random& random,int& channel,AudioLevel volume,Audio& audio){
         auto* record=const_cast<Record*>(find(h));
         if(!good_||!record)return good_=false;
         return good_=wind.contact(random,record->windSound,record->sound,channel,volume,audio);

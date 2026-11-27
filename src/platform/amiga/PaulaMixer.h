@@ -152,7 +152,7 @@ public:
         std::uint16_t basePeriod=0,period=0,assetGainQ15=1,fadeFields=0;
         std::uint32_t serial=0,remaining=0,gainQ16=0,pitchQ16=65536,fadeTargetQ16=0; // remaining: half colour clocks
         std::int32_t fadeStepQ16=0;
-        MotionBinary64 gainRaw{},pitchRaw{}; // fresh: the request's values
+        AudioLevel gainRaw{},pitchRaw{}; // fresh: the request's values
     };
     struct Counters { std::uint32_t plays=0,steals=0,drops=0,missing=0,music=0,expired=0,stops=0; };
 
@@ -232,14 +232,9 @@ public:
             pending_[c]=PaulaChannelCommand{};
         }
     }
-    // MotionBinary64 (a nonnegative double) as Q16, saturating at 256.
-    static std::uint32_t q16(MotionBinary64 v){
-        if(v.high&0x80000000u)return 0;
-        const int e=int((v.high>>20)&0x7ffu)-1023;
-        if(e<-17)return 0;
-        if(e>=8)return 0xffffffu;
-        const std::uint32_t mantissa=(1u<<20)|(v.high&0xfffffu); // 1.20
-        return e>=4?mantissa<<(e-4):mantissa>>(4-e);
+    // A level as unsigned Q16, saturating at 256.
+    static std::uint32_t q16(AudioLevel v){
+        return v.v<=0?0u:v.v>=0x1000000?0xffffffu:std::uint32_t(v.v);
     }
     static unsigned side(unsigned channel){return channel==0||channel==3?0u:1u;}
 private:
@@ -327,7 +322,7 @@ private:
         v.paused=paused;
         if(!v.fresh)refreshVolume(c);
     }
-    void setGain(unsigned c,MotionBinary64 gain,unsigned fadeMs){
+    void setGain(unsigned c,AudioLevel gain,unsigned fadeMs){
         Voice& v=voices_[c];
         if(!fadeMs){
             v.fadeFields=0;
@@ -341,7 +336,7 @@ private:
         v.fadeStepQ16=(std::int32_t(target)-std::int32_t(v.gainQ16))/std::int32_t(v.fadeFields);
         if(!v.fresh)refreshVolume(c);
     }
-    void setPitch(unsigned c,MotionBinary64 value){
+    void setPitch(unsigned c,AudioLevel value){
         Voice& v=voices_[c];
         if(v.fresh){v.pitchRaw=value;return;}
         v.pitchQ16=q16(value);

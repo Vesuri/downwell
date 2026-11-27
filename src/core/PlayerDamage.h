@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_PLAYER_DAMAGE_H
 #define DOWNWELL_CORE_PLAYER_DAMAGE_H
 #include "MotionBinary64.h"
+#include "AudioLevel.h"
 #include "AlarmBank.h"
 #include "InstanceHandle.h"
 #include "CurrencyHomingMath.h"
@@ -89,7 +90,7 @@ struct PlayerDamage {
             if(!events.pointDirection(cx,cy,px,py,direction) ||
                !state.damageNumber(amount,direction) ||
                !audio.sound(5,90,0,0) ||
-               !audio.duckMusic(500,MotionBinary64{0x3fe66666u,0x66666666u}))return false;
+               !audio.duckMusic(500,AudioLevel::raw(45875)))return false;
             state.setHit();
             // room_speed is assigned once per controller in the with loop,
             // before that controller's slown and Alarm 0 writes.

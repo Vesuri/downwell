@@ -40,7 +40,7 @@ int main(){
     struct Audio {
         unsigned calls=0;
         bool play(int sound,int priority,bool loop,int& handle){require(sound==192&&priority==100&&loop,"radio");handle=777;++calls;return true;}
-        bool setGain(int handle,MotionBinary64 gain,int duration){require(handle==777&&gain.zero()&&duration==0,"gain");++calls;return true;}
+        bool setGain(int handle,AudioLevel gain,int duration){require(handle==777&&gain.zero()&&duration==0,"gain");++calls;return true;}
     } audio;
     auto owner=live.shopCreationOwner<1>(objects,audio);
     const char* language=shop_language::entries[0].language;
@@ -260,9 +260,9 @@ int main(){
         bool isPlaying(int,bool& playing){playing=false;return true;}
         bool stop(int){return false;}
         bool play(int id,int priority,bool loop,int& voice){++plays;voice=888;return id>=171&&id<=174&&priority==50&&!loop;}
-        bool getGain(int id,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return id==888;}
-        bool setGain(int id,MotionBinary64,int ticks){return id==888&&!ticks;}
-        bool setPitch(int id,MotionBinary64 pitch){return id==888&&pitch.high==0x3ff00000u&&!pitch.low;}
+        bool getGain(int id,AudioLevel& gain){gain=audio_level::one;return id==888;}
+        bool setGain(int id,AudioLevel,int ticks){return id==888&&!ticks;}
+        bool setPitch(int id,AudioLevel pitch){return id==888&&pitch==audio_level::one;}
     } breakAudio;
     SoundPlayEnvironment environment;
     auto blasts=live.blastRegistration<4>();

@@ -45,7 +45,7 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/GameplayShopInstances.h"
 struct NativeShopAudio {
     bool play(int,int,bool,int&);
-    bool setGain(int,downwell::MotionBinary64,int);
+    bool setGain(int,downwell::AudioLevel,int);
 };
 struct NativeShopAllocation {bool operator()(int,unsigned&);};
 bool nativeShopSpeech(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
@@ -285,7 +285,7 @@ bool nativeScatteredContact(downwell::GameplayScattered& store,downwell::Instanc
     downwell::GameMakerRandom& random,NativeScatteredEffects& effects){return store.playerContact(key,random,effects);}
 struct NativeShopBirthOwner {
     bool begin(downwell::ShopWorld::Instance&);
-    bool play(int,int,bool,int&);bool setGain(int,downwell::MotionBinary64,int);
+    bool play(int,int,bool,int&);bool setGain(int,downwell::AudioLevel,int);
     unsigned create(int,int,int);
     bool readX(unsigned,int&);bool readXReal(unsigned,downwell::MotionBinary64&);bool position(unsigned,int&,int&);
     bool upgrade(unsigned,unsigned);bool stored(unsigned,unsigned);
@@ -314,8 +314,8 @@ bool nativeGeneratedSourceBirth(GameplayWorld& world,const downwell::DeferredCre
 }
 struct NativeSkeletonAudio {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
-    bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
-    bool setPitch(int,downwell::MotionBinary64);
+    bool getGain(int,downwell::AudioLevel&);bool setGain(int,downwell::AudioLevel,int);
+    bool setPitch(int,downwell::AudioLevel);
 };
 bool nativeSkeletonSound(GameplayWorld& world,downwell::SkeletonActor& actor,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
@@ -437,8 +437,8 @@ struct NativeBulletVelocity {
 };
 struct NativeBulletSoundAudio {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
-    bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
-    bool setPitch(int,downwell::MotionBinary64);
+    bool getGain(int,downwell::AudioLevel&);bool setGain(int,downwell::AudioLevel,int);
+    bool setPitch(int,downwell::AudioLevel);
 };
 bool nativeBulletSound(downwell::GameplayCollisionOwner& owner,GameplayWorld& world,
     downwell::InstanceHandle shot,downwell::InstanceHandle wall,downwell::SoundPlayEnvironment& env,NativeBulletSoundAudio& audio){
@@ -559,8 +559,8 @@ bool nativeCorpseStep(downwell::GameplayCollisionOwner& owner,downwell::Instance
 }
 struct NativeCurrencyAudioProbe {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
-    bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
-    bool setPitch(int,downwell::MotionBinary64);
+    bool getGain(int,downwell::AudioLevel&);bool setGain(int,downwell::AudioLevel,int);
+    bool setPitch(int,downwell::AudioLevel);
 };
 struct NativeCurrencyGainProbe {
     using Handle=downwell::InstanceHandle;
@@ -583,13 +583,13 @@ bool nativeCurrencyStep(downwell::GameplayCollisionOwner& owner,downwell::Instan
     downwell::CurrencyHomingMath math{downwell::portableAtan};
     return owner.stepCurrency(key,true,480,downwell::MotionBinary64::fromInteger(240),
         downwell::MotionBinary64::fromInteger(512),masks,math,[](auto& top){top={};return true;},
-        audio,downwell::MotionBinary64::fromInteger(1),false);
+        audio,audio_level::one,false);
 }
 bool nativeCurrencyFrame(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
     const downwell::SpriteMaskPack& masks,NativeCurrencyAudioProbe& audio){
     return world.withCurrencyEvents([&](auto key,auto phase,unsigned alarm){
         if(phase==GameplayWorld::CurrencyPhase::alarm)
-            return alarm==2&&owner.currency().expire(key,downwell::MotionBinary64::fromInteger(1),false,audio);
+            return alarm==2&&owner.currency().expire(key,audio_level::one,false,audio);
         downwell::InstanceHandle shared;
         return downwell::GameplayCollisionView::encode(downwell::GameplayCollisionView::Kind::currency,key,shared)&&
             nativeCurrencyStep(owner,shared,masks,audio);
@@ -622,7 +622,7 @@ bool nativeFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::Run
 }
 bool nativeSessionFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
     NativeCurrencyAudioProbe& audio){
-    return owner.dispatchTimeFieldWind(event,downwell::MotionBinary64::fromInteger(1),audio);
+    return owner.dispatchTimeFieldWind(event,audio_level::one,audio);
 }
 bool nativePlayerControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
     downwell::RunnerImageValue x,downwell::RunnerImageValue y,downwell::InstanceHandle& key){
@@ -1918,7 +1918,7 @@ int main(){
         auto allocate=[&](int,unsigned& id){id=710000+allocations++;return true;};
         struct Audio {
             bool play(int,int,bool,int&){assert(false);return false;}
-            bool setGain(int,MotionBinary64,int){assert(false);return false;}
+            bool setGain(int,AudioLevel,int){assert(false);return false;}
         } audio;
         auto creation=shops.creation(allocate,audio);
         ShopWorld::Instance shop{};
@@ -1941,7 +1941,7 @@ int main(){
         auto allocate=[&](int,unsigned& id){id=next++;return true;};
         struct Audio {
             bool play(int,int,bool,int&){return false;}
-            bool setGain(int,MotionBinary64,int){return false;}
+            bool setGain(int,AudioLevel,int){return false;}
         } audio;
         auto creation=shops.creation(allocate,audio);
         const auto first=creation.create(212,0,0);const auto old=shops.sourceHandle(first);
@@ -2757,7 +2757,7 @@ int main(){
                     },[&](std::uint32_t& id){id=807000+rewardBirths++;return true;},rewardQueries);
                 return boxWorldEffects(*world,key,rewards,
                 [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
-                    frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0},false);},
+                    frames=art.frameCount;return true;},audio,AudioLevel::raw(16384),false);},
                 [&]{return world->stepWithOwnedDebris(0,stopped,meeting);});
             assert(completed==(mode==1||mode==10||rewardSuccess));
             if(mode>=12){
@@ -3165,9 +3165,9 @@ int main(){
             bool play(int sound,int priority,bool loop,int& voice){
                 assert(sound>=349&&sound<=355&&priority==90&&!loop);++plays;voice=900;playing=true;return true;
             }
-            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int,MotionBinary64,int){return true;}
-            bool setPitch(int,MotionBinary64){return true;}
+            bool getGain(int,AudioLevel& gain){gain=audio_level::one;return true;}
+            bool setGain(int,AudioLevel,int){return true;}
+            bool setPitch(int,AudioLevel){return true;}
         } audio;
         auto owner=makeCollisionOwner(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
@@ -3190,22 +3190,22 @@ int main(){
             RunnerCollisionEventContext::Frame event{field,player,4,35,binding.ownerObjectId,binding.codeId};
             auto oracle=world->randomState();const auto draws=world->randomDrawCount();
             audio.playing=false;const int sound=349+int(oracle.chooseIndexSmall(7));
-            assert(owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio));
+            assert(owner->dispatchTimeFieldWind(event,audio_level::one,audio));
             assert(record->windSound==sound&&world->overlapSound(8)==sound&&world->timeFieldWindVoice()==900&&world->randomDrawCount()==draws+1&&
                 record->sound.sfxIndex==sound&&record->sound.sndsnd==900&&record->sound.chanNum==8);
             if(!i)entrySound=record->sound;
             else {const auto& retained=world->goalFieldInstances().find(world->goalFieldInstances().handle(0))->sound;
                 assert(retained.sfxIndex==entrySound.sfxIndex&&retained.sndsnd==entrySound.sndsnd&&
-                    retained.sndgain.high==entrySound.sndgain.high&&retained.sndgain.low==entrySound.sndgain.low);}
+                    retained.sndgain==entrySound.sndgain);}
             const auto queries=audio.queries,plays=audio.plays;
-            assert(owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio)&&
+            assert(owner->dispatchTimeFieldWind(event,audio_level::one,audio)&&
                 world->randomDrawCount()==draws+1&&audio.queries==queries+1&&audio.plays==plays);
             if(i==1){
                 audio.fail=true;
-                assert(!owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio)&&
+                assert(!owner->dispatchTimeFieldWind(event,audio_level::one,audio)&&
                     !world->effectsSucceeded()&&!owner->valid()&&world->randomDrawCount()==draws+1);
                 const auto stoppedQueries=audio.queries;
-                assert(!owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio)&&audio.queries==stoppedQueries);
+                assert(!owner->dispatchTimeFieldWind(event,audio_level::one,audio)&&audio.queries==stoppedQueries);
             }
         }
     }
@@ -4728,7 +4728,7 @@ int main(){
             shot=key;++calls;RunnerImageValue x,y;
             assert(x.assignInteger(240)&&y.assignInteger(target==2?200:500)&&
                 world->publishBulletCollisionPosition(key,x,y));
-            SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};environment.inWater=true;
+            SoundPlayEnvironment environment;environment.gameVolume=AudioLevel::raw(16384);environment.inWater=true;
             BulletWallAudio audio{world->resolveBulletLifetime(key)->sound,world->overlapSound(2),29,true};
             const auto before=world->randomDrawCount();
             const bool ok=NativeSourceBulletStep::run(*world,*owner,key,motion,masks,frames,environment,audio);
@@ -4760,9 +4760,9 @@ int main(){
                     bool isPlaying(int id,bool& playing){assert(++calls==1&&id==29);playing=false;return true;}
                     bool stop(int){assert(false);return false;}
                     bool play(int id,int priority,bool loop,int& voice){assert(++calls==2&&id==29&&priority==90&&!loop);voice=123;return true;}
-                    bool getGain(int id,MotionBinary64& gain){assert(++calls==3&&id==123);gain=MotionBinary64::fromInteger(1);return true;}
-                    bool setGain(int id,MotionBinary64 gain,int duration){assert(++calls==4&&id==123&&gain.high==0x3ff00000u&&!gain.low&&!duration);return true;}
-                    bool setPitch(int id,MotionBinary64 pitch){assert(++calls==5&&id==123&&pitch.high==0x3ff00000u&&!pitch.low);return true;}
+                    bool getGain(int id,AudioLevel& gain){assert(++calls==3&&id==123);gain=audio_level::one;return true;}
+                    bool setGain(int id,AudioLevel gain,int duration){assert(++calls==4&&id==123&&gain==audio_level::one&&!duration);return true;}
+                    bool setPitch(int id,AudioLevel pitch){assert(++calls==5&&id==123&&pitch==audio_level::one);return true;}
                 } hitAudio;
                 SoundPlayEnvironment hitEnvironment;
                 InstanceHandle self,other;
@@ -4905,7 +4905,7 @@ int main(){
             bool effect(int,MotionBinary64,MotionBinary64){return false;}
             bool soundWall(){
                 const auto before=world.randomDrawCount();
-                SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+                SoundPlayEnvironment env;env.gameVolume=AudioLevel::raw(16384);env.inWater=true;
                 BulletWallAudio audio{world.resolveBulletLifetime(shotKey)->sound,world.overlapSound(2),29,true};
                 return world.playBulletWallSound(shotKey,env,[&](const char*& material){
                     return owner.projectileWallMaterial(selected,material);
@@ -4970,7 +4970,7 @@ int main(){
         assert(world->resolveBulletLifetime(shotKey)&&world->resolveBulletLifetime(shotKey)->destroyRequested);
         {
             const auto before=world->randomDrawCount();const int previous=world->overlapSound(2);
-            SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+            SoundPlayEnvironment env;env.gameVolume=AudioLevel::raw(16384);env.inWater=true;
             BulletWallAudio audio{world->resolveBulletLifetime(shotKey)->sound,previous,29,true};
             assert(world->playBulletWallSound(shotKey,env,[&](const char*& material){
                 return owner->projectileWallMaterial(ops.selected,material);
@@ -8109,9 +8109,9 @@ int main(){
                 bool play(int id,int priority,bool loop,int& voice){
                     assert(id==167&&priority==60&&!loop&&world.overlapSound(8)==167);++plays;voice=900;return failure!=1;
                 }
-                bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-                bool setGain(int,MotionBinary64,int){return true;}
-                bool setPitch(int voice,MotionBinary64 pitch){assert(voice==900&&pitch.high==0x3ff00000u&&!pitch.low);++pitches;return true;}
+                bool getGain(int,AudioLevel& gain){gain=audio_level::one;return true;}
+                bool setGain(int,AudioLevel,int){return true;}
+                bool setPitch(int voice,AudioLevel pitch){assert(voice==900&&pitch==audio_level::one);++pitches;return true;}
             } audio{*scene,failure};
             struct Controls {
                 using Handle=InstanceHandle;GameplayWorld& world;InstanceHandle key;Audio& audio;unsigned& resets;unsigned& effects;
@@ -8125,7 +8125,7 @@ int main(){
                 bool bulletDamage(int){return false;}bool bulletSpeed(int){return false;}bool sound(int,int,bool,bool){return false;}
                 bool soundOverlap(int id,int priority,bool loop,bool cut,const char* channel){
                     assert(id==167&&priority==60&&!loop&&cut&&std::strcmp(channel,"UI")==0);
-                    return world.playCurrencyPickupSound(key,MotionBinary64::fromInteger(1),audio);
+                    return world.playCurrencyPickupSound(key,audio_level::one,audio);
                 }
                 bool fxNoLoop(int sprite,MotionBinary64 speed){
                     assert(sprite==105&&speed.high==0x3fe99999u&&speed.low==0x9999999au);++effects;return false;
@@ -8166,9 +8166,9 @@ int main(){
                     if(id==166){++expiry;voice=800;return true;}
                     if(id<168||id>170)return false;voice=700+int(++sounds);return true;
                 }
-                bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-                bool setGain(int,MotionBinary64,int){return true;}
-                bool setPitch(int,MotionBinary64){return true;}
+                bool getGain(int,AudioLevel& gain){gain=audio_level::one;return true;}
+                bool setGain(int,AudioLevel,int){return true;}
+                bool setPitch(int,AudioLevel){return true;}
             } audio;
             InstanceHandle key,shared;
             assert(scene->createCurrencyWithSourceId(605092,MotionBinary64::fromInteger(248),
@@ -8178,7 +8178,7 @@ int main(){
             std::vector<std::uint32_t> motion;
             for(unsigned tick=0;tick<32;++tick){
                 assert(moving->stepCurrency(shared,false,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
-                    masks,math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false));
+                    masks,math,[](auto& top){top={};return true;},audio,audio_level::one,false));
                 const auto* r=moving->currency().find(key);std::int32_t x,y;
                 assert(r&&r->state.xx.roundPixel(x)&&r->state.yy.roundPixel(y));
                 RunnerImageValue px,py;assert(px.assignInteger(x)&&py.assignInteger(y)&&r->x.bits==px.bits&&r->y.bits==py.bits);
@@ -8196,7 +8196,7 @@ int main(){
             const auto before=moving->currency().find(key)->state;
             const auto draws=scene->randomDrawCount();
             assert(moving->stepCurrency(shared,true,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
-                masks,math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false));
+                masks,math,[](auto& top){top={};return true;},audio,audio_level::one,false));
             const auto& frozen=moving->currency().find(key)->state;
             assert(!frozen.imageSpeed.bits&&frozen.obtainable&&frozen.xx.high==before.xx.high&&frozen.xx.low==before.xx.low&&
                 frozen.yy.high==before.yy.high&&frozen.yy.low==before.yy.low&&scene->randomDrawCount()==draws);
@@ -8207,18 +8207,18 @@ int main(){
             const auto targetX=MotionBinary64::fromInteger(260),targetY=MotionBinary64::fromInteger(500);
             assert(CurrencyHomingSource::run(expected,targetX,targetY,math,good)&&
                 moving->stepCurrency(shared,true,480,targetX,targetY,masks,math,[](auto& top){top={};return true;},
-                    audio,MotionBinary64::fromInteger(1),false));
+                    audio,audio_level::one,false));
             const auto& attracted=moving->currency().find(key)->state;
             assert(attracted.xx.high==expected.xx.high&&attracted.xx.low==expected.xx.low&&
                 attracted.yy.high==expected.yy.high&&attracted.yy.low==expected.yy.low);
             unsigned scheduledSteps=0;
             auto events=[&](InstanceHandle current,GameplayWorld::CurrencyPhase phase,unsigned alarm){
                 if(phase==GameplayWorld::CurrencyPhase::alarm)
-                    return alarm==2&&moving->currency().expire(current,MotionBinary64::fromInteger(1),false,audio);
+                    return alarm==2&&moving->currency().expire(current,audio_level::one,false,audio);
                 ++scheduledSteps;InstanceHandle h;
                 return GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,current,h)&&
                     moving->stepCurrency(h,false,480,targetX,targetY,masks,math,[](auto& top){top={};return true;},
-                        audio,MotionBinary64::fromInteger(1),false);
+                        audio,audio_level::one,false);
             };
             assert(moving->currency().dispatch(key,[](auto& state,bool&){
                 state.attracted=false;state.alarms.set(0,1);state.alarms.set(1,-1);return true;
@@ -8235,7 +8235,7 @@ int main(){
                     !scene->nativeCurrencyQueriesReady());
                 const auto draws=scene->randomDrawCount();
                 assert(!moving->stepCurrency(shared,false,480,targetX,targetY,masks,math,[](auto& top){top={};return true;},
-                    audio,MotionBinary64::fromInteger(1),false)&&scene->randomDrawCount()==draws);
+                    audio,audio_level::one,false)&&scene->randomDrawCount()==draws);
             }else assert(moving->currency().clear());
         }
         {
@@ -8387,7 +8387,7 @@ int main(){
                 actor->state.alarms[3]==14&&!actor->state.imageIndex.high&&!actor->state.imageIndex.low);
             assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}));
             unsigned hurts=0;SkeletonSoundAudio audio;audio.wet=true;
-            SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume={0x3fd00000u,0};
+            SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume=AudioLevel::raw(16384);
             soundEnvironment.viewY=MotionBinary64::fromInteger(10000);soundEnvironment.inWater=true;
             auto stepPhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
             TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
@@ -8705,7 +8705,7 @@ int main(){
                         [&](auto& actor,auto& throwing){
                             auto launch=[&](int){
                                 const auto before=encounter->randomDrawCount();
-                                SkeletonSoundAudio audio;SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};
+                                SkeletonSoundAudio audio;SoundPlayEnvironment environment;environment.gameVolume=AudioLevel::raw(16384);
                                 const bool ok=encounter->throwSkeletonBoneWithSourceId(505201+throws,actor,throwing,environment,audio);
                                 assert(ok&&encounter->randomDrawCount()==before+4&&audio.calls==7&&encounter->overlapSound(4)==134&&
                                     throwing.xarc.high==0x3ff00000u&&!throwing.xarc.low);++throws;return ok;
@@ -9143,7 +9143,7 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true);
         const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
         BoxSoundVerification::Audio<GameplayWorld> audio{*world,171};audio.chain=true;audio.water=water;
-        const auto volume=MotionBinary64{0x3fd00000u,0};const auto draws=world->randomDrawCount();
+        const auto volume=AudioLevel::raw(16384);const auto draws=world->randomDrawCount();
         assert(world->playBoxBreakSound(box,volume,audio));
         audio.fail=failure?7+failure:0;
         assert(world->playBoxChainSound(box,volume,water,audio)==!failure);

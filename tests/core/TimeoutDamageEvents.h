@@ -22,7 +22,7 @@ struct TimeoutDamageEvents {
     bool subtractHealth(Number){return false;}
     bool damageNumber(Number,Number){return false;}
     bool sound(int,int,bool,bool){return false;}
-    bool duckMusic(int,Number){return false;}
+    bool duckMusic(int,downwell::AudioLevel){return false;}
     void setHit(){}
     template<class Visit> bool forEachController(Visit){return false;}
     void setRoomSpeed(int){}
@@ -64,7 +64,7 @@ struct DamageControllerFailureEvents:DamageSoundFailureEvents {
     bool sound(int id,int priority,bool loop,bool cut){
         DamageSoundFailureEvents::sound(id,priority,loop,cut);return true;
     }
-    bool duckMusic(int,Number){return true;}
+    bool duckMusic(int,downwell::AudioLevel){return true;}
 };
 // Explicit test effects for exercising real world state. These are not a
 // backend implementation. Deliberately stale death/health answers must be
@@ -76,8 +76,8 @@ struct DamageLiveStateEvents:TimeoutDamageEvents {
     bool sound(int id,int priority,bool loop,bool cut){
         ++sounds;return id==5&&priority==90&&!loop&&!cut;
     }
-    bool duckMusic(int ms,Number amount){
-        ++ducks;return ms==500&&amount.high==0x3fe66666u&&amount.low==0x66666666u;
+    bool duckMusic(int ms,downwell::AudioLevel amount){
+        ++ducks;return ms==500&&amount==downwell::AudioLevel::raw(45875);
     }
     bool shake(int force,int duration){++shakes;return force==5&&duration==8;}
     bool hitEffect(Number,Number,int sprite,Number speed,int angle,int depth){

@@ -945,7 +945,7 @@ public:
         if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=currencyInstances_->collect(key,enemyRandom_,ops);
     }
-    template<class Audio> bool playCurrencyPickupSound(downwell::InstanceHandle key,downwell::MotionBinary64 volume,Audio& audio){
+    template<class Audio> bool playCurrencyPickupSound(downwell::InstanceHandle key,downwell::AudioLevel volume,Audio& audio){
         if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=currencyInstances_->dispatchSound(key,[&](auto& sound){
             return run_.playCurrencyPickupSound(sound,volume,audio);
@@ -954,7 +954,7 @@ public:
     template<class Queries,class Math,class View,class Audio>
     bool stepCurrencyRoomEffect(downwell::InstanceHandle key,bool stopped,int width,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,Queries& queries,Math& math,View view,
-        Audio& audio,downwell::MotionBinary64 volume,bool inWater){
+        Audio& audio,downwell::AudioLevel volume,bool inWater){
         if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=currencyInstances_->stepSource(key,enemyRandom_,stopped,width,
             playerX,playerY,queries,math,view,audio,volume,inWater);
@@ -2111,16 +2111,16 @@ public:
                 downwell::MotionBinary64::fromInteger(actor.y),allocate,text,actor.sound,environment,audio);
         });
     }
-    template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
+    template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::AudioLevel volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         return run_.playBoxChainSound(breakables_[h.slot].sound,volume,inWater,audio);
     }
-    template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,Audio& audio){
+    template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,downwell::AudioLevel volume,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         auto& box=breakables_[h.slot];
         return run_.playBoxBreakSound(box.sound,box.state.breakSound,volume,audio);
     }
-    template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,int sound,downwell::MotionBinary64 volume,Audio& audio){
+    template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,int sound,downwell::AudioLevel volume,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         return run_.playBoxBreakSound(breakables_[h.slot].sound,sound,volume,audio);
     }
@@ -2649,7 +2649,7 @@ public:
     const downwell::SideCameraLockers& sideCameraLockers()const{return run_.sideCameraLockers;}
     const downwell::OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
     template<class Audio> bool duckMusic(downwell::MusicDuck& caller,int duration,
-        downwell::MotionBinary64 amount,Audio& audio){return run_.duckMusic(caller,duration,amount,audio);}
+        downwell::AudioLevel amount,Audio& audio){return run_.duckMusic(caller,duration,amount,audio);}
     bool createTimeFieldWithSourceId(std::uint32_t source,int x,int y){
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=run_.timeFields.createWithSourceId(source,x,y,enemyRandom_);
@@ -2704,11 +2704,11 @@ public:
     const downwell::GameplayGoalFields& goalFieldInstances()const{return goalFieldInstances_;}
     int timeFieldWindVoice()const{return run_.fieldWind.voice;}
     template<class Audio> bool contactGoalFieldWind(downwell::InstanceHandle key,
-        downwell::MotionBinary64 volume,Audio& audio){
+        downwell::AudioLevel volume,Audio& audio){
         return contactGoalFieldWind(key,run_.fieldWind,run_.overlapSounds[8],volume,audio);
     }
     template<class Audio> bool contactGoalFieldWind(downwell::InstanceHandle key,downwell::TimeFieldWind& wind,
-        int& channel,downwell::MotionBinary64 volume,Audio& audio){
+        int& channel,downwell::AudioLevel volume,Audio& audio){
         return run_.effectsSucceeded=run_.effectsSucceeded&&
             goalFieldInstances_.contactWind(key,wind,enemyRandom_,channel,volume,audio);
     }

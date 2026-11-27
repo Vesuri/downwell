@@ -63,7 +63,7 @@ private:
             collision_.valid()&&world.effectsSucceeded()&&world.roomLoadSucceeded()&&world.deferredCommandsSucceeded();
     }
     template<class Body> bool withUpdateEnvironment(Body body){
-        if(!settings_.gameVolume.valid()||!audio_.setMasterGain(settings_.masterGain))return false;
+        if(settings_.gameVolume.v<0||!audio_.setMasterGain(settings_.masterGain))return false;
         return game_.withRunAudio(audio_,[&]{return game_.withCollisionPass([&](StartupRuntime& world){
             return contacts_.run(world,settings_.gameVolume,audio_);
         },[&]{

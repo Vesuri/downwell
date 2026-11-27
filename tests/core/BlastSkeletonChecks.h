@@ -7,9 +7,9 @@ struct BlastHitAudio {
     bool isPlaying(int id,bool& playing){assert(id==29);playing=true;++calls;return true;}
     bool stop(int id){assert(id==29);++calls;return true;}
     bool play(int id,int priority,bool loop,int& voice){assert(id==29&&priority==90&&!loop);voice=1001;++calls;return true;}
-    bool getGain(int id,downwell::MotionBinary64& value){assert(id==1001);value=downwell::MotionBinary64::fromInteger(1);++calls;return true;}
-    bool setGain(int id,downwell::MotionBinary64 value,int time){assert(id==1001&&!time&&value.high==0x3ff00000u&&!value.low);++calls;return true;}
-    bool setPitch(int id,downwell::MotionBinary64 value){assert(id==1001&&value.high==0x3ff00000u&&!value.low);++calls;return true;}
+    bool getGain(int id,downwell::AudioLevel& value){assert(id==1001);value=downwell::audio_level::one;++calls;return true;}
+    bool setGain(int id,downwell::AudioLevel value,int time){assert(id==1001&&!time&&value==downwell::audio_level::one);++calls;return true;}
+    bool setPitch(int id,downwell::AudioLevel value){assert(id==1001&&value==downwell::audio_level::one);++calls;return true;}
 };
 // Impact is a deliberately explicit test dependency. These checks establish
 // target writes/event routing, not natural object-219 creation or rendering.

@@ -236,7 +236,7 @@ private:
     }
 public:
     // Non-combat admission using the SAME collected stream as authored dither.
-    template<class Audio> bool run(StartupRuntime& world,MotionBinary64 volume,Audio& audio){
+    template<class Audio> bool run(StartupRuntime& world,AudioLevel volume,Audio& audio){
         if(!owner_.boundTo(world))return false;
         return runSelected(world,[](auto,auto,const auto& a,const auto& b){return windPair(a,b);},
             [&](const auto& event){return event.owner==255?world.dispatchTimeFieldWind(event,volume,audio):

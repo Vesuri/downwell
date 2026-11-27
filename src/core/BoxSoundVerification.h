@@ -24,26 +24,26 @@ struct BoxSoundVerification {
             valid=valid&&world.overlapSound(7)==sound&&priority==50&&!loop;
             result=900;return call(2000+id);
         }
-        bool getGain(int id,MotionBinary64& gain){valid=valid&&id==900;gain={0x3fe00000u,0};return call(3000);}
-        bool setGain(int id,MotionBinary64 gain,int duration){
-            valid=valid&&id==900&&duration==0&&gain.high==0x3fc00000u&&gain.low==0;return call(4000);
+        bool getGain(int id,AudioLevel& gain){valid=valid&&id==900;gain=audio_level::half;return call(3000);}
+        bool setGain(int id,AudioLevel gain,int duration){
+            valid=valid&&id==900&&duration==0&&gain==AudioLevel::raw(8192);return call(4000);
         }
-        bool setPitch(int id,MotionBinary64 pitch){
-            const auto expected=calls>=7&&water?MotionBinary64{0x3fe19999u,0x9999999au}:MotionBinary64::fromInteger(1);
-            valid=valid&&id==900&&pitch.high==expected.high&&pitch.low==expected.low;return call(5000);
+        bool setPitch(int id,AudioLevel pitch){
+            const auto expected=calls>=7&&water?AudioLevel::raw(36045):audio_level::one;
+            valid=valid&&id==900&&pitch==expected;return call(5000);
         }
     };
     template<class World,class Read> static bool run(World& world,InstanceHandle box,int sound,Read read,unsigned failure=0){
         Audio<World> audio{world,sound,failure};const auto draws=world.randomDrawCount();
         const int before=world.overlapSound(7);
-        const bool ok=world.playBoxBreakSound(box,{0x3fd00000u,0},audio);
+        const bool ok=world.playBoxBreakSound(box,AudioLevel::raw(16384),audio);
         const auto* caller=read();
         if(!caller||!audio.valid||audio.calls!=(failure?failure:7)||ok!=(failure==0)||world.effectsSucceeded()!=ok||
             world.randomDrawCount()!=draws||caller->sfxIndex!=sound||caller->soundPriority!=50||
             caller->loop||caller->cutPrv||caller->chanNum!=7||caller->doNotPlay||
             world.overlapSound(7)!=((!failure||failure>=3)?sound:before))return false;
-        if(!failure)return caller->sndsnd==900&&caller->sndgain.high==0x3fc00000u&&caller->sndgain.low==0;
-        return !world.playBoxBreakSound(box,{0x3fd00000u,0},audio)&&audio.calls==failure&&world.randomDrawCount()==draws;
+        if(!failure)return caller->sndsnd==900&&caller->sndgain==AudioLevel::raw(8192);
+        return !world.playBoxBreakSound(box,AudioLevel::raw(16384),audio)&&audio.calls==failure&&world.randomDrawCount()==draws;
     }
 };
 }

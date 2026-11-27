@@ -82,7 +82,7 @@ int main() {
             {
                 auto& store=owner->shopInstances();unsigned next=1900000;
                 auto allocate=[&](int,unsigned& id){id=next++;return true;};
-                struct Audio {bool play(int,int,bool,int&){return false;}bool setGain(int,downwell::MotionBinary64,int){return false;}} audio;
+                struct Audio {bool play(int,int,bool,int&){return false;}bool setGain(int,downwell::AudioLevel,int){return false;}} audio;
                 auto creation=store.creation(allocate,audio);
                 for(int object:{278,279,280,283})assert(creation.create(object,240,134));
                 for(bool composite:{false,true}){

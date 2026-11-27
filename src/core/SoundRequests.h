@@ -27,7 +27,7 @@ struct SoundRequest {
     std::int8_t category=-1;
     bool loop=false,cut=false;
     std::uint16_t fadeMs=0; // gain: audio_sound_gain's time argument
-    MotionBinary64 gainValue{},pitchValue{};
+    AudioLevel gainValue{},pitchValue{};
 };
 
 class SoundRequests {
@@ -67,7 +67,7 @@ public:
         SoundRequest r;r.kind=SoundRequest::play;r.voice=voice;r.asset=std::int16_t(asset);
         r.priority=std::uint8_t(priority<0?0:priority>255?255:priority);
         r.category=category_;r.loop=loop;r.cut=cut_;
-        voices_.getGain(voice,r.gainValue);r.pitchValue=MotionBinary64::fromInteger(1);
+        voices_.getGain(voice,r.gainValue);r.pitchValue=audio_level::one;
         if(!voices_.playing(voice))voices_.getGain(asset,r.gainValue);
         requests_.push(r);
         return true;
@@ -87,12 +87,12 @@ public:
     bool pause(int id){return single(id,SoundRequest::pause,[&]{voices_.pause(id);});}
     bool resume(int id){return single(id,SoundRequest::resume,[&]{voices_.resume(id);});}
     bool isPaused(int id,bool& paused)const{return voices_.isPaused(id,paused);}
-    bool getGain(int id,MotionBinary64& gain)const{return voices_.getGain(id,gain);}
-    bool setGain(int id,MotionBinary64 gain,int time){
+    bool getGain(int id,AudioLevel& gain)const{return voices_.getGain(id,gain);}
+    bool setGain(int id,AudioLevel gain,int time){
         voices_.setGain(id,gain,time);
         return amend(id,SoundRequest::gain,gain,time);
     }
-    bool setPitch(int id,MotionBinary64 pitch){
+    bool setPitch(int id,AudioLevel pitch){
         voices_.setPitch(id,pitch);
         return amend(id,SoundRequest::pitch,pitch);
     }
@@ -100,7 +100,7 @@ private:
     // An immediate change to a voice started this step (by voice id, or by
     // asset id as scrShotSound's audio_sound_pitch does) settles that play
     // request; a fade, or a change to an older live voice, is its own request.
-    bool amend(int id,SoundRequest::Kind kind,MotionBinary64 value,int time=0){
+    bool amend(int id,SoundRequest::Kind kind,AudioLevel value,int time=0){
         if(id<0)return true;
         for(unsigned i=time?0:requests_.size();i--;){
             SoundRequest& n=requests_.at(i);

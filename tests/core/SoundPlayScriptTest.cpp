@@ -8,14 +8,14 @@ struct Audio {
     std::vector<int> calls;
     unsigned fail=0;
     bool resourcePlaying=true,voicePlaying=true;
-    MotionBinary64 lastGain{},lastPitch{};
+    AudioLevel lastGain{},lastPitch{};
     bool call(int op){calls.push_back(op);return calls.size()!=fail;}
     bool isPlaying(int id,bool& yes){yes=id==900?voicePlaying:resourcePlaying;return call(id);}
     bool stop(int id){return call(1000+id);}
     bool play(int id,int priority,bool loop,int& voice){assert(id==42&&priority==50&&!loop);voice=900;return call(2000+id);}
-    bool getGain(int id,MotionBinary64& gain){assert(id==900);gain={0x3fe00000u,0};return call(3000);}
-    bool setGain(int id,MotionBinary64 gain,int duration){assert(id==900&&duration==0);lastGain=gain;return call(4000);}
-    bool setPitch(int id,MotionBinary64 value){assert(id==900);lastPitch=value;return call(5000);}
+    bool getGain(int id,AudioLevel& gain){assert(id==900);gain=audio_level::half;return call(3000);}
+    bool setGain(int id,AudioLevel gain,int duration){assert(id==900&&duration==0);lastGain=gain;return call(4000);}
+    bool setPitch(int id,AudioLevel value){assert(id==900);lastPitch=value;return call(5000);}
 };
 int main(){
     assert(SoundPlayVerification::run());
@@ -26,7 +26,7 @@ int main(){
     for(bool cut:{false,true})for(bool playing:{false,true})for(int y:{9,10,30,31}){
         const int ch=c==10?0:c;assert(SoundPlayScript::channel(names[c])==ch);
         SoundPlayState s;SoundPlayEnvironment env;env.inWater=water;env.noBgm=muted;
-        env.gameVolume={0x3fd00000u,0};env.y=MotionBinary64::fromInteger(y);
+        env.gameVolume=AudioLevel::raw(16384);env.y=MotionBinary64::fromInteger(y);
         env.viewY=MotionBinary64::fromInteger(10);env.viewHeight=MotionBinary64::fromInteger(20);
         Audio audio;audio.resourcePlaying=playing;bool good=true,returned=true;int channel=73,result=88;
         assert(SoundPlayScript::overlap(s,env,audio,[&]{return audio.call(6000);},channel,
@@ -40,11 +40,10 @@ int main(){
             if(ch==5&&muted)expected.push_back(1042);
             expected.push_back(900);
             assert(channel==42&&returned&&result==900);
-            assert(s.sndgain.high==0x3fc00000u&&s.sndgain.low==0);
-            assert(audio.lastGain.high==0x3fc00000u&&audio.lastGain.low==0);
+            assert(s.sndgain==AudioLevel::raw(8192));
+            assert(audio.lastGain==AudioLevel::raw(8192));
             const bool lowPitch=water&&(ch<5||ch>=9);
-            assert(audio.lastPitch.high==(lowPitch?0x3fe19999u:0x3ff00000u));
-            assert(audio.lastPitch.low==(lowPitch?0x9999999au:0));
+            assert(audio.lastPitch==(lowPitch?AudioLevel::raw(36045):audio_level::one));
         }else assert(channel==73&&!returned&&result==88&&s.sndsnd==-1);
         assert(s.doNotPlay==blocked&&s.chanNum==ch&&s.cutPrv==(cut&&!spatial&&ch<7));
         assert(s.sfxIndex==42&&s.soundPriority==50&&!s.loop&&s.OLnum==names[c]);
@@ -69,7 +68,7 @@ int main(){
         assert(SoundPlayScript::plain(s,env,a,42,50,false,cut,result,good)&&result==900);
         std::vector<int> expected;if(cut){expected.push_back(42);if(playing)expected.push_back(1042);}
         for(int op:{2042,3000,4000,5000})expected.push_back(op);assert(a.calls==expected);
-        assert(a.lastPitch.high==(water?0x3fe19999u:0x3ff00000u));
+        assert(a.lastPitch==(water?AudioLevel::raw(36045):audio_level::one));
         for(unsigned failure=1;failure<=expected.size();++failure){
             SoundPlayState f;Audio b;b.resourcePlaying=playing;b.fail=failure;bool ok=true;int out=88;
             assert(!SoundPlayScript::plain(f,env,b,42,50,false,cut,out,ok)&&!ok&&out==88);

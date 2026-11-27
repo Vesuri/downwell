@@ -982,7 +982,7 @@ int main() {
         {
             struct NoAudio {
                 bool play(int,int,bool,int&){return false;}
-                bool setGain(int,downwell::MotionBinary64,int){return false;}
+                bool setGain(int,downwell::AudioLevel,int){return false;}
             } audio;
             auto shop=runtime.shopCreationOwner<1>(objects,audio);
             auto& children=shop.children();

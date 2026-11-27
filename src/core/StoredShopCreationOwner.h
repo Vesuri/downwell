@@ -84,7 +84,7 @@ public:
             bool death(bool& out){return env.death(out)&&owner.good_;}
             bool distance(MotionBinary64& out){return env.distance(real(r.preciseX),real(r.preciseY),out)&&owner.good_;}
             bool inView(bool& out){return env.inView(real(r.preciseX),real(r.preciseY),out)&&owner.good_;}
-            bool gain(MotionBinary64 value,int ms){return env.gain(p.shop->radio,value,ms)&&owner.good_;}
+            bool gain(AudioLevel value,int ms){return env.gain(p.shop->radio,value,ms)&&owner.good_;}
             bool noBgm(bool& out){return env.noBgm(out)&&owner.good_;}
             bool paused(bool& out){return env.paused(p.shop->radio,out)&&owner.good_;}
             bool resume(){return env.resume(p.shop->radio)&&owner.good_;}
@@ -203,7 +203,7 @@ public:
     bool play(int sound,int priority,bool loop,int& handle){
         return (good_&&audio_.play(sound,priority,loop,handle)&&good_)||fail();
     }
-    bool setGain(int handle,MotionBinary64 gain,int duration){
+    bool setGain(int handle,AudioLevel gain,int duration){
         return (good_&&audio_.setGain(handle,gain,duration)&&good_)||fail();
     }
     unsigned create(int object,int x,int y){return children_.create(object,x,y);}

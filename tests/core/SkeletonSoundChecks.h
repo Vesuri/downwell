@@ -12,12 +12,12 @@ struct SkeletonSoundAudio {
     bool isPlaying(int id,bool& playing){playing=true;return call(1,id);}
     bool stop(int id){return call(2,id);}
     bool play(int id,int priority,bool loop,int& voice){check(priority==50&&!loop);voice=1001;return call(3,id);}
-    bool getGain(int voice,downwell::MotionBinary64& gain){gain=downwell::MotionBinary64::fromInteger(1);return call(4,voice);}
-    bool setGain(int voice,downwell::MotionBinary64 gain,int time){
-        check(gain.high==0x3fd00000u&&!gain.low&&!time);return call(5,voice);
+    bool getGain(int voice,downwell::AudioLevel& gain){gain=downwell::audio_level::one;return call(4,voice);}
+    bool setGain(int voice,downwell::AudioLevel gain,int time){
+        check(gain==downwell::AudioLevel::raw(16384)&&!time);return call(5,voice);
     }
-    bool setPitch(int voice,downwell::MotionBinary64 pitch){
-        check(pitch.high==(wet?0x3fe19999u:0x3ff00000u)&&pitch.low==(wet?0x9999999au:0));return call(6,voice);
+    bool setPitch(int voice,downwell::AudioLevel pitch){
+        check(pitch==(wet?downwell::AudioLevel::raw(36045):downwell::audio_level::one));return call(6,voice);
     }
 };
 inline void checkSkeletonSoundContract(){
@@ -26,7 +26,7 @@ inline void checkSkeletonSoundContract(){
     // branch: even an offscreen caller replaces the previous footsteps sound.
     for(bool water:{false,true})for(unsigned failure=0;failure<=7;++failure){
         RunSession run;SoundPlayState caller;SoundPlayEnvironment env;
-        env.y=MotionBinary64::fromInteger(-1000);env.gameVolume={0x3fd00000u,0};env.inWater=water;
+        env.y=MotionBinary64::fromInteger(-1000);env.gameVolume=downwell::AudioLevel::raw(16384);env.inWater=water;
         run.overlapSounds[0]=777;SkeletonSoundAudio audio;audio.wet=water;audio.failAt=failure;
         const bool accepted=!failure;
         SkeletonSoundAudio::check(run.playSkeletonStompSound(caller,env,audio)==accepted&&
@@ -40,7 +40,7 @@ inline void checkSkeletonSoundContract(){
     for(unsigned failure=0;failure<=7;++failure){
         RunSession run;SoundPlayState caller;SoundPlayEnvironment env;
         env.y=MotionBinary64::fromInteger(y);env.viewHeight=MotionBinary64::fromInteger(100);
-        env.gameVolume={0x3fd00000u,0};env.inWater=water;run.overlapSounds[4]=777;
+        env.gameVolume=downwell::AudioLevel::raw(16384);env.inWater=water;run.overlapSounds[4]=777;
         SkeletonSoundAudio audio;audio.failAt=failure;audio.wet=water;
         const bool visible=y>=0&&y<=100;const unsigned maximum=visible?7:2;
         const bool accepted=!failure||failure>maximum;
@@ -49,8 +49,8 @@ inline void checkSkeletonSoundContract(){
             !caller.cutPrv&&caller.chanNum==4&&caller.doNotPlay==!visible&&audio.ids[0]==sound);
         if(audio.calls>=2)SkeletonSoundAudio::check(audio.events[1]==2&&audio.ids[1]==sound);
         SkeletonSoundAudio::check(run.overlapSounds[4]==(visible&&(accepted||failure>=3)?sound:777));
-        if(visible&&accepted)SkeletonSoundAudio::check(caller.sndsnd==1001&&caller.sndgain.high==0x3fd00000u&&
-            !caller.sndgain.low&&audio.events[6]==1&&audio.ids[6]==1001);
+        if(visible&&accepted)SkeletonSoundAudio::check(caller.sndsnd==1001&&caller.sndgain==downwell::AudioLevel::raw(16384)&&
+            audio.events[6]==1&&audio.ids[6]==1001);
         if(!accepted){const auto before=audio.calls;
             SkeletonSoundAudio::check(!run.playSkeletonSound(caller,sound,env,audio)&&audio.calls==before);}
     }

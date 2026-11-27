@@ -11,7 +11,7 @@
 using namespace downwell;
 namespace downwell {
 struct DamageMusicWorld {
-    bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,AudioSDL& audio){
+    bool duckMusic(MusicDuck& caller,int duration,AudioLevel amount,AudioSDL& audio){
         return caller.execute(duration,amount,[]{return 1;},[]{return 193;},audio);
     }
 };
@@ -29,7 +29,7 @@ struct AudioSDLTestAccess {
 int main(){
     {
         RunnerAudioGain ramp;
-        const auto one=MotionBinary64::fromInteger(1);
+        const auto one=audio_level::one;
         assert(ramp.set({},0,100)&&ramp.set(one,500,100));
         ramp.update(250100);assert(ramp.current.bits==0x3f000000u);
         // Retarget from the last published value, not an implicit clock update.
@@ -37,11 +37,10 @@ int main(){
         ramp.update(400100);assert(ramp.current.bits==0x3e800000u);
         assert(ramp.set(one,0,400100)&&ramp.endMicros==0);
         ramp.update(600100);assert(ramp.current.bits==0x3f800000u);
-        // At exactly the endpoint, SSE interpolation can round away the target.
-        const MotionBinary64 tiny{0x3e600000u,0}; // 2^-25
-        assert(ramp.set(tiny,1,100));ramp.update(1100);
-        assert(ramp.current.bits==0&&ramp.endMicros==1100);
-        ramp.update(1101);assert(ramp.current.bits==0x33000000u&&ramp.endMicros==0);
+        // The smallest level step (2^-16) is exact at the endpoint.
+        assert(ramp.set(AudioLevel::raw(1),1,100));ramp.update(1100);
+        assert(ramp.current.bits==0x37800000u&&ramp.endMicros==1100);
+        ramp.update(1101);assert(ramp.current.bits==0x37800000u&&ramp.endMicros==0);
         assert(!ramp.set(one,-1,0)&&!ramp.set(one,2147484,0));
     }
     assert(SDL_Init(SDL_INIT_AUDIO)==0);
@@ -53,48 +52,48 @@ int main(){
     assert(sf_writef_float(file,samples,4800)==4800);assert(sf_close(file)==0);
     {
         AudioSDL audio;assert(audio.ready());
-        const auto one=MotionBinary64::fromInteger(1);const MotionBinary64 half{0x3fe00000u,0};
+        const auto one=audio_level::one;const auto half=audio_level::half;
         assert(audio.load(349,path,one));assert(!audio.load(349,path,one));
         bool playing=true;assert(audio.isPlaying(-1,playing)&&!playing);
-        MotionBinary64 absent;assert(!audio.getGain(-1,absent));assert(!audio.setGain(-1,one,0));
+        AudioLevel absent;assert(!audio.getGain(-1,absent));assert(!audio.setGain(-1,one,0));
         int voice=-1;assert(!audio.play(350,90,false,voice)&&voice==-1);
         assert(audio.play(349,90,true,voice));assert(voice>360);
         assert(audio.isPlaying(349,playing)&&playing);
         assert(audio.isPlaying(voice,playing)&&playing);
-        MotionBinary64 gain;assert(audio.getGain(voice,gain)&&gain.high==one.high);
-        assert(audio.getGain(349,gain)&&gain.high==one.high);
-        assert(audio.setGain(349,half,0)&&audio.getGain(349,gain)&&gain.high==half.high);
-        assert(audio.getGain(voice,gain)&&gain.high==one.high); // Resource gain never overwrites voice gain.
-        assert(audio.setGain(voice,half,0));assert(audio.getGain(voice,gain)&&gain.high==half.high);
+        AudioLevel gain;assert(audio.getGain(voice,gain)&&gain==one);
+        assert(audio.getGain(349,gain)&&gain==one);
+        assert(audio.setGain(349,half,0)&&audio.getGain(349,gain)&&gain==half);
+        assert(audio.getGain(voice,gain)&&gain==one); // Resource gain never overwrites voice gain.
+        assert(audio.setGain(voice,half,0));assert(audio.getGain(voice,gain)&&gain==half);
         assert(AudioSDLTestAccess::sample(audio)==0.0625f); // .25 PCM * .5 resource * .5 voice.
         assert(audio.setMasterGain(half)&&AudioSDLTestAccess::sample(audio)==0.03125f);
-        assert(audio.getGain(voice,gain)&&gain.high==half.high&&audio.getGain(349,gain)&&gain.high==half.high);
-        assert(!audio.setMasterGain(MotionBinary64::fromInteger(2))&&
-               !audio.setMasterGain(MotionBinary64::fromInteger(-1))&&
-               !audio.setMasterGain({0x7ff00000u,0}));
+        assert(audio.getGain(voice,gain)&&gain==half&&audio.getGain(349,gain)&&gain==half);
+        assert(!audio.setMasterGain(AudioLevel::fromInteger(2))&&
+               !audio.setMasterGain(AudioLevel::fromInteger(-1))&&
+               !audio.setMasterGain(AudioLevel::raw(65537)));
         assert(AudioSDLTestAccess::sample(audio)==0.03125f); // Rejection preserves the control.
-        assert(audio.setMasterGain({0x80000000u,0})&&AudioSDLTestAccess::sample(audio)==0);
+        assert(audio.setMasterGain(AudioLevel{})&&AudioSDLTestAccess::sample(audio)==0);
         assert(audio.setMasterGain(one));
-        const MotionBinary64 sevenTenths{0x3fe66666u,0x66666666u};
-        assert(audio.setGain(349,sevenTenths,0)&&audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
-        assert(audio.getGain(voice,gain)&&gain.high==half.high);
-        assert(audio.setGain(349,MotionBinary64::fromInteger(-1),0)&&audio.getGain(349,gain)&&gain.zero());
+        const auto sevenTenths=AudioLevel::raw(45875);
+        assert(audio.setGain(349,sevenTenths,0)&&audio.getGain(349,gain)&&gain==AudioLevel::raw(45875));
+        assert(audio.getGain(voice,gain)&&gain==half);
+        assert(audio.setGain(349,AudioLevel::fromInteger(-1),0)&&audio.getGain(349,gain)&&gain.zero());
         assert(audio.setGain(349,one,0));
         assert(audio.load(348,path,half));int quiet=-1;
-        assert(audio.play(348,90,true,quiet)&&audio.getGain(quiet,gain)&&gain.high==one.high);
-        assert(audio.getGain(348,gain)&&gain.high==half.high&&audio.stop(348));
+        assert(audio.play(348,90,true,quiet)&&audio.getGain(quiet,gain)&&gain==one);
+        assert(audio.getGain(348,gain)&&gain==half&&audio.stop(348));
         assert(audio.setGain(voice,one,200));assert(!audio.setPitch(voice,{}));
         assert(audio.setPitch(voice,half));SDL_Delay(250);
-        assert(audio.getGain(voice,gain)&&gain.high==half.high); // No callback-time ramp.
-        audio.update();assert(audio.getGain(voice,gain)&&gain.high==one.high&&gain.low==0);
+        assert(audio.getGain(voice,gain)&&gain==half); // No callback-time ramp.
+        audio.update();assert(audio.getGain(voice,gain)&&gain==one);
         MusicDuck duck;
         assert(duck.execute(500,sevenTenths,[]{return 1;},[]{return 349;},audio));
-        assert(audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
+        assert(audio.getGain(349,gain)&&gain==AudioLevel::raw(45875));
         // A second hit while ducked is guarded, not a restart of the ramp.
         assert(duck.execute(500,half,[]{return 1;},[]{return 349;},audio));
-        assert(audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
+        assert(audio.getGain(349,gain)&&gain==AudioLevel::raw(45875));
         SDL_Delay(510);audio.update();
-        assert(audio.getGain(349,gain)&&gain.high==one.high&&gain.low==0);
+        assert(audio.getGain(349,gain)&&gain==one);
         assert(audio.isPlaying(voice,playing)&&playing);
         assert(audio.stop(349));assert(audio.isPlaying(voice,playing)&&!playing);
         const int old=voice;assert(audio.play(349,90,false,voice)&&voice!=old);
@@ -107,7 +106,7 @@ int main(){
     }
     {
         AudioSDL audio;assert(audio.ready());AudioSDLTestAccess::manual(audio);
-        const auto one=MotionBinary64::fromInteger(1);
+        const auto one=audio_level::one;
         assert(audio.load(193,path,one));int first,second;
         assert(audio.play(193,80,true,first)&&audio.play(193,80,true,second));
         assert(AudioSDLTestAccess::sample(audio)==0.5f);
@@ -125,8 +124,8 @@ int main(){
         assert(AudioSDLTestAccess::sample(audio)==0.25f);
         assert(audio.stop(third));
         assert(audio.setGain(first,{},0)&&audio.setGain(first,one,1));
-        SDL_Delay(5);audio.update();MotionBinary64 gain;
-        assert(audio.getGain(first,gain)&&gain.high==one.high);
+        SDL_Delay(5);audio.update();AudioLevel gain;
+        assert(audio.getGain(first,gain)&&gain==one);
         assert(AudioSDLTestAccess::cursor(audio,first)==cursor);
         assert(audio.resume(first)&&audio.isPaused(193,state)&&state); // Second remains paused.
         assert(AudioSDLTestAccess::sample(audio)==0.25f);
@@ -140,24 +139,24 @@ int main(){
         DamageMusicWorld musicWorld;ContactDamageScripts scripts;SoundPlayState sound;
         ContactDamageAudio<DamageMusicWorld,AudioSDL> damage{musicWorld,scripts.music,sound,environment,audio};
         assert(damage.sound(5,90,false,false)&&audio.isPlaying(sound.sndsnd,state)&&state);
-        assert(damage.duckMusic(500,{0x3fe66666u,0x66666666u})&&scripts.music.duckDuration==500);
-        assert(audio.getGain(193,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
+        assert(damage.duckMusic(500,AudioLevel::raw(45875))&&scripts.music.duckDuration==500);
+        assert(audio.getGain(193,gain)&&gain==AudioLevel::raw(45875));
     }
     {
         AudioSDL audio;assert(audio.ready());
         for(int id=349;id<=355;++id){
             char asset[128];std::snprintf(asset,sizeof(asset),
                 "extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
-            assert(audio.load(id,asset,MotionBinary64::fromInteger(1)));
+            assert(audio.load(id,asset,audio_level::one));
         }
         struct Random {unsigned calls=0;unsigned chooseIndexSmall(unsigned n){return calls++%n;}} random;
         TimeFieldWind wind;SoundPlayState caller;int sound=-1,channel=0;
         for(int id=349;id<=355;++id){
-            assert(wind.contact(random,sound,caller,channel,MotionBinary64::fromInteger(1),audio));
+            assert(wind.contact(random,sound,caller,channel,audio_level::one,audio));
             assert(sound==id&&channel==id&&random.calls==unsigned(id-348));
-            MotionBinary64 gain;assert(audio.getGain(wind.voice,gain)&&gain.high==0x3fe00000u&&gain.low==0);
+            AudioLevel gain;assert(audio.getGain(wind.voice,gain)&&gain==audio_level::half);
             const int voice=wind.voice;
-            assert(wind.contact(random,sound,caller,channel,MotionBinary64::fromInteger(1),audio));
+            assert(wind.contact(random,sound,caller,channel,audio_level::one,audio));
             assert(wind.voice==voice&&random.calls==unsigned(id-348));
             assert(audio.stop(voice));
         }

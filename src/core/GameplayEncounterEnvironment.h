@@ -16,7 +16,7 @@ public:
     ~GameplayEncounterEnvironment(){if(bound_)leaveUpdate();}
     EncounterSettings& settings(){return settings_;}
     bool enterUpdate(){
-        if(bound_||!owner_.boundTo(world_)||!audio_.ready()||!settings_.gameVolume.valid())return false;
+        if(bound_||!owner_.boundTo(world_)||!audio_.ready()||settings_.gameVolume.v<0)return false;
         if(!prepared_){
             for(int id=TimeFieldWind::firstSound;id<TimeFieldWind::firstSound+TimeFieldWind::soundCount;++id)
                 if(!audio_.hasResource(id))return false;

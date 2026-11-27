@@ -3410,13 +3410,13 @@ public:
         return check(native_?world_->destroyNativeTerrain(other):terrain_.requestDestroy(other));
     }
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
-        TimeFieldWind& wind,int& channel,MotionBinary64 volume,Audio& audio){
+        TimeFieldWind& wind,int& channel,AudioLevel volume,Audio& audio){
         return dispatchTimeFieldWindContact(event,[&](InstanceHandle local){
             return world_->contactGoalFieldWind(local,wind,channel,volume,audio);
         });
     }
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
-        MotionBinary64 volume,Audio& audio){
+        AudioLevel volume,Audio& audio){
         return dispatchTimeFieldWindContact(event,[&](InstanceHandle local){
             return world_->contactGoalFieldWind(local,volume,audio);
         });
@@ -5024,7 +5024,7 @@ public:
     // with no unsupported thin walls/water. No partial Step/RNG on rejection.
     template<class Math,class ViewTop,class Audio>
     bool stepCurrency(InstanceHandle shared,bool stopped,int width,MotionBinary64 playerX,MotionBinary64 playerY,
-        const SpriteMaskPack& masks,Math& math,ViewTop view,Audio& audio,MotionBinary64 volume,bool inWater){
+        const SpriteMaskPack& masks,Math& math,ViewTop view,Audio& audio,AudioLevel volume,bool inWater){
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||(native_&&!world_->nativeCurrencyQueriesReady())||!masks.valid()||
             !View::decode(shared,kind,local)||kind!=View::Kind::currency||!resolves(shared))return check(false);

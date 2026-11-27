@@ -63,7 +63,7 @@ int main() {
                 require(parent&&area!=5&&!births&&!audio&&sound==(area==3?201:192)&&priority==100&&loop,
                     "shop starts source radio before child births");handle=902;++audio;return reject!=11;
             }
-            bool setGain(int handle,downwell::MotionBinary64 gain,int duration){
+            bool setGain(int handle,downwell::AudioLevel gain,int duration){
                 require(audio==1&&!births&&handle==902&&gain.zero()&&duration==0,
                     "shop radio is muted immediately after play");++audio;return reject!=12;
             }

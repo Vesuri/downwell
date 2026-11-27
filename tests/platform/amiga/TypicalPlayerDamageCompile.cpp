@@ -4,8 +4,8 @@
 #include "core/GameplayWorld.h"
 using downwell::MotionBinary64;
 struct DuckAudio {
-    bool isPlaying(int,bool&),getGain(int,MotionBinary64&),setGain(int,MotionBinary64,int);
-    bool play(int,int,bool,int&),stop(int),setPitch(int,MotionBinary64);
+    bool isPlaying(int,bool&),getGain(int,AudioLevel&),setGain(int,AudioLevel,int);
+    bool play(int,int,bool,int&),stop(int),setPitch(int,AudioLevel);
 };
 bool nativeBoundDamage(GameplayWorld& world,downwell::ContactDamageScripts& caller,
                       bool (*select)(downwell::InstanceHandle&)){
@@ -17,7 +17,7 @@ bool nativeBoundDamage(GameplayWorld& world,downwell::ContactDamageScripts& call
     bound.state.setPlayerDamaged();return bound.state.setPlayerAlarm(1,90);
 }
 bool nativeDamageDuck(GameplayWorld& world,downwell::ContactDamageScripts& caller,DuckAudio& audio){
-    return world.duckMusic(caller.music,500,{0x3fe66666u,0x66666666u},audio);
+    return world.duckMusic(caller.music,500,downwell::AudioLevel::raw(45875),audio);
 }
 bool nativeDamageControllerWrites(downwell::RunControllerInstances<4>& controllers,
     const downwell::InstanceHandle* order,unsigned count,int& roomSpeed){
@@ -41,7 +41,7 @@ struct DamageEvents {
     bool recharge(),setGrounded(bool),setHorizontal(MotionBinary64),setVertical(MotionBinary64);
     bool playerDead(),playerHealthPositive(),timeoutOwned(),timeStopped();
     bool setDamageSourceName(),candleOwned(),subtractHealth(MotionBinary64);
-    bool damageNumber(MotionBinary64,MotionBinary64),sound(int,int,int,int),duckMusic(int,MotionBinary64);
+    bool damageNumber(MotionBinary64,MotionBinary64),sound(int,int,int,int),duckMusic(int,AudioLevel);
     void setHit(),setRoomSpeed(int),setPlayerDamaged();
     bool setPlayerAlarm(int,int);
     struct Controller {void setSlow(int);bool setAlarm(int,int);};

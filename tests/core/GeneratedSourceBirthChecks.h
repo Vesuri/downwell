@@ -36,7 +36,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         auto allocate=[&](int,unsigned& id){id=next++;return true;};
         struct Audio {
             bool play(int sound,int priority,bool loop,int& voice){voice=99;return sound==192&&priority==100&&loop;}
-            bool setGain(int voice,MotionBinary64 gain,int ticks){return voice==99&&gain.zero()&&!ticks;}
+            bool setGain(int voice,AudioLevel gain,int ticks){return voice==99&&gain.zero()&&!ticks;}
         } audio;
         auto creation=store.creation(allocate,audio);
         const char* language=shop_language::entries[0].language;
@@ -413,7 +413,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         struct Audio {
             unsigned calls=0;
             bool play(int sound,int priority,bool loop,int& voice){assert(sound==192&&priority==100&&loop);++calls;voice=88;return true;}
-            bool setGain(int voice,MotionBinary64 gain,int duration){assert(voice==88&&gain.zero()&&!duration);++calls;return true;}
+            bool setGain(int voice,AudioLevel gain,int duration){assert(voice==88&&gain.zero()&&!duration);++calls;return true;}
         } audio;
         auto creation=store->creation(allocate,audio);
         auto* shop=world->registerShopWithOwner(480,2000,creation);
@@ -473,7 +473,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool play(int sound,int priority,bool loop,int& handle){
                 assert(sound==192&&priority==100&&loop);++calls;handle=77;return failure!=1;
             }
-            bool setGain(int handle,MotionBinary64 gain,int duration){
+            bool setGain(int handle,AudioLevel gain,int duration){
                 assert(handle==77&&gain.zero()&&!duration);++calls;return failure!=2;
             }
         } audio{failure};
@@ -716,9 +716,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool isPlaying(int id,bool& v){chosen=id;v=false;++calls;return true;}
             bool stop(int){assert(false);return false;}
             bool play(int id,int priority,bool loop,int& voice){assert(id==chosen&&priority==60&&!loop);voice=1;++calls;return !reject;}
-            bool getGain(int,MotionBinary64& v){v=MotionBinary64::fromInteger(1);++calls;return true;}
-            bool setGain(int,MotionBinary64,int){++calls;return true;}
-            bool setPitch(int,MotionBinary64){++calls;return true;}
+            bool getGain(int,AudioLevel& v){v=audio_level::one;++calls;return true;}
+            bool setGain(int,AudioLevel,int){++calls;return true;}
+            bool setPitch(int,AudioLevel){++calls;return true;}
         } audio{rejectSound};
         unsigned next=890001,delays=0;
         auto allocate=[&](unsigned& id){id=next++;return true;};
@@ -916,9 +916,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool isPlaying(int id,bool& playing){sound=id;calls.push_back(1);playing=false;return true;}
             bool stop(int){assert(false);return false;}
             bool play(int id,int priority,bool loop,int& voice){assert(id==sound&&priority==50&&!loop);calls.push_back(2);voice=123;return true;}
-            bool getGain(int id,MotionBinary64& gain){assert(id==123);calls.push_back(3);gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int id,MotionBinary64 gain,int time){assert(id==123&&gain.high==0x3ff00000u&&!time);calls.push_back(4);return true;}
-            bool setPitch(int id,MotionBinary64 pitch){assert(id==123&&pitch.high==0x3ff00000u);calls.push_back(5);return true;}
+            bool getGain(int id,AudioLevel& gain){assert(id==123);calls.push_back(3);gain=audio_level::one;return true;}
+            bool setGain(int id,AudioLevel gain,int time){assert(id==123&&gain==audio_level::one&&!time);calls.push_back(4);return true;}
+            bool setPitch(int id,AudioLevel pitch){assert(id==123&&pitch==audio_level::one);calls.push_back(5);return true;}
         } audio;
         SoundPlayEnvironment environment;
         auto childId=[&](std::uint32_t& id){id=next++;return true;};

@@ -36,7 +36,7 @@ struct Events {
     bool sound(int id,int priority,int loop,int variation){
         assert(id==5 && priority==90 && loop==0 && variation==0);return record(12);
     }
-    bool duckMusic(int ms,MotionBinary64 gain){assert(ms==500 && eq(gain,{0x3fe66666u,0x66666666u}));return record(13);}
+    bool duckMusic(int ms,AudioLevel gain){assert(ms==500 && gain==AudioLevel::raw(45875));return record(13);}
     void setHit(){hit=true;record(14);}
     struct Controller {
         Events& events;int index;
@@ -99,19 +99,19 @@ int main(){
     for(unsigned failure=0;failure<=8;++failure){
         const auto check=[&](auto& actor){
             RunSession world;world.stage.area=1;world.backgroundMusicId=193;
-            Events events;SoundPlayEnvironment environment;environment.gameVolume={0x3fe00000u,0};environment.inWater=true;
+            Events events;SoundPlayEnvironment environment;environment.gameVolume=audio_level::half;environment.inWater=true;
             struct Audio {
                 unsigned calls=0,failure;
                 bool next(){return ++calls!=failure;}
                 bool play(int id,int priority,bool loop,int& voice){assert(id==5&&priority==90&&!loop);voice=700;return next();}
-                bool getGain(int id,MotionBinary64& gain){assert(id==(calls==1?700:193));gain=n(1);return next();}
-                bool setGain(int id,MotionBinary64 gain,int duration){
-                    if(calls==2)assert(id==700&&eq(gain,{0x3fe00000u,0})&&duration==0);
-                    else if(calls==6)assert(id==193&&eq(gain,{0x3fe66666u,0x66666666u})&&duration==0);
-                    else assert(calls==7&&id==193&&eq(gain,n(1))&&duration==500);
+                bool getGain(int id,AudioLevel& gain){assert(id==(calls==1?700:193));gain=audio_level::one;return next();}
+                bool setGain(int id,AudioLevel gain,int duration){
+                    if(calls==2)assert(id==700&&gain==audio_level::half&&duration==0);
+                    else if(calls==6)assert(id==193&&gain==AudioLevel::raw(45875)&&duration==0);
+                    else assert(calls==7&&id==193&&gain==audio_level::one&&duration==500);
                     return next();
                 }
-                bool setPitch(int id,MotionBinary64 pitch){assert(id==700&&eq(pitch,{0x3fe19999u,0x9999999au}));return next();}
+                bool setPitch(int id,AudioLevel pitch){assert(id==700&&pitch==AudioLevel::raw(36045));return next();}
                 bool isPlaying(int id,bool& result){assert(id==193);result=true;return next();}
                 bool stop(int){assert(false);return false;} // Damage does not cut prior sounds.
             } audio{0,failure};

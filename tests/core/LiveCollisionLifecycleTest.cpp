@@ -756,7 +756,7 @@ int main(){
                 },[](auto,int layer,auto,auto,bool& hit){hit=false;return layer==100;});
             return boxWorldEffects(*world,h,rewards,[&](int id,unsigned& frames){
                 PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;
-            },audio,MotionBinary64{0x3fd00000u,0},false);
+            },audio,AudioLevel::raw(16384),false);
         };
         unsigned steps=0,draws=0;std::uint32_t childId=0;InstanceHandle gem;
         bool birthTick=true,retainedCaller=false;
@@ -843,7 +843,7 @@ int main(){
         BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound};
         auto ops=boxWorldEffects(*world,box,rewards,[&](int id,unsigned& frames){
             PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;
-        },audio,MotionBinary64{0x3fd00000u,0},false);
+        },audio,AudioLevel::raw(16384),false);
         bool good=true;
         const bool completed=BoxDestructionScript::runRetained([&](auto& out){return owner->readBoxDestruction(box,out);},ops,good);
         require(completed==(failure==0)&&good==completed&&world->effectsSucceeded()==completed,
@@ -1182,9 +1182,9 @@ int main(){
             bool isPlaying(int id,bool& yes){++calls;yes=false;return id==166&&!fail;}
             bool stop(int){return false;}
             bool play(int id,int priority,bool loop,int& voice){++calls;voice=700;return id==166&&priority==30&&!loop;}
-            bool getGain(int id,MotionBinary64& gain){++calls;gain=MotionBinary64::fromInteger(1);return id==700;}
-            bool setGain(int id,MotionBinary64 gain,int duration){++calls;return id==700&&gain.high==0x3ff00000u&&!gain.low&&!duration;}
-            bool setPitch(int id,MotionBinary64 pitch){++calls;return id==700&&pitch.high==0x3ff00000u&&!pitch.low;}
+            bool getGain(int id,AudioLevel& gain){++calls;gain=audio_level::one;return id==700;}
+            bool setGain(int id,AudioLevel gain,int duration){++calls;return id==700&&gain==audio_level::one&&!duration;}
+            bool setPitch(int id,AudioLevel pitch){++calls;return id==700&&pitch==audio_level::one;}
         } audio{mode==2};
         RunnerImageValue image{};const auto speed=currency.find(gem)->imageSpeed;
         for(unsigned age=1;age<=16;++age){
@@ -1197,7 +1197,7 @@ int main(){
                         return true; // Motion deliberately supplied by the fixture, not claimed implemented.
                     }
                     require(phase==StartupRuntime::CurrencyPhase::alarm&&alarm==2&&age==12,"expiry alarm reaches required event adapter");
-                    ++expiry;return currency.expire(key,MotionBinary64::fromInteger(1),false,audio);
+                    ++expiry;return currency.expire(key,audio_level::one,false,audio);
                 },[&]{return world->stepWithCollisionPass({},false,[&]{
                     const auto* r=owner->resolve(gem);if(mode==0&&age==12)retained=r&&r->destroyRequested;
                     return true;
@@ -1283,16 +1283,16 @@ int main(){
             bool isPlaying(int,bool& playing){playing=false;return true;}
             bool stop(int){return true;}
             bool play(int id,int priority,bool loop,int& voice){if(id<168||id>170||priority!=30||loop)return false;voice=700+int(++sounds);return true;}
-            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int,MotionBinary64,int){return true;}
-            bool setPitch(int,MotionBinary64){return true;}
+            bool getGain(int,AudioLevel& gain){gain=audio_level::one;return true;}
+            bool setGain(int,AudioLevel,int){return true;}
+            bool setPitch(int,AudioLevel){return true;}
         } audio;
         CurrencyHomingMath math{portableAtan};bool bounced=false;
         for(unsigned tick=0;tick<32;++tick){
             require(world->withCurrencyEvents(currency,[&](auto key,auto&,auto phase,unsigned,auto& random,bool&){
                 if(phase!=StartupRuntime::CurrencyPhase::step)return false;
                 return currency.stepSource(key,random,false,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
-                    math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false);
+                    math,[](auto& top){top={};return true;},audio,audio_level::one,false);
             },[&]{return world->stepWithCollisionPass({},false,StartupRuntime::NoCollisionPass{});}),"source currency free motion through registered terrain queries");
             const auto* state=currency.find(gem);const auto* r=owner->resolve(gem);std::int32_t x,y;
             require(state&&r&&state->xx.roundPixel(x)&&state->yy.roundPixel(y)&&r->preciseX==float(x)&&r->preciseY==float(y),"free currency publishes rounded position");
@@ -1393,20 +1393,20 @@ int main(){
             bool play(int id,int priority,bool loop,int& voice){
                 require(world.overlapSound(8)==167&&priority==60&&!loop,"UI publication precedes pickup playback");
                 voice=900;return call(2000+id);}
-            bool getGain(int id,MotionBinary64& gain){require(id==900,"pickup gain voice");gain={0x3fe00000u,0};return call(3000);}
-            bool setGain(int id,MotionBinary64 gain,int duration){
-                require(id==900&&gain.high==0x3fc00000u&&gain.low==0&&!duration,"pickup source volume product");return call(4000);}
-            bool setPitch(int id,MotionBinary64 pitch){
-                require(id==900&&pitch.high==0x3ff00000u&&pitch.low==0,"UI pitch remains one");return call(5000);}
+            bool getGain(int id,AudioLevel& gain){require(id==900,"pickup gain voice");gain=audio_level::half;return call(3000);}
+            bool setGain(int id,AudioLevel gain,int duration){
+                require(id==900&&gain==AudioLevel::raw(8192)&&!duration,"pickup source volume product");return call(4000);}
+            bool setPitch(int id,AudioLevel pitch){
+                require(id==900&&pitch==audio_level::one,"UI pitch remains one");return call(5000);}
         } audio{*world,failure};
         const auto draws=world->randomDrawCount();
         const auto before=world->overlapSound(8);
-        require(world->playCurrencyPickupSound(currency,gem,{0x3fd00000u,0},audio)==(failure==0),"pickup audio failure result");
+        require(world->playCurrencyPickupSound(currency,gem,AudioLevel::raw(16384),audio)==(failure==0),"pickup audio failure result");
         const auto& sound=owner->resolve(gem)->sound;
         require(audio.calls==(failure?failure:7)&&world->effectsSucceeded()==(failure==0)&&world->randomDrawCount()==draws&&
             sound.sfxIndex==167&&sound.soundPriority==60&&!sound.cutPrv&&sound.chanNum==8&&
             world->overlapSound(8)==((!failure||failure>=3)?167:before),"pickup retains source sound and channel failure prefix");
-        if(failure)require(!world->playCurrencyPickupSound(currency,gem,{0x3fd00000u,0},audio)&&audio.calls==failure,
+        if(failure)require(!world->playCurrencyPickupSound(currency,gem,AudioLevel::raw(16384),audio)&&audio.calls==failure,
             "failed pickup audio cannot retry later operations");
         require(currency.clear(),"retire pickup sound caller");
     }
@@ -1470,7 +1470,7 @@ int main(){
                 auto chain=world->boxChainPublication(bullets,*owner,h);
                 return boxWorldEffects(*world,h,ScheduledBoxChain<decltype(chain),decltype(rest)>(chain,rest),
                     [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
-                        frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0},audio.water);
+                        frames=art.frameCount;return true;},audio,AudioLevel::raw(16384),audio.water);
             },[&]{return world->withDroneBulletEvents(bullets,
                 [&](auto&,auto&,auto,auto&,bool&){++steps;return false;},
                 [&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;},false,[&]{
@@ -1551,7 +1551,7 @@ int main(){
                 if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,[&](int id,unsigned& frames){
                     PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;},
-                    audio,MotionBinary64{0x3fd00000u,0},false);
+                    audio,AudioLevel::raw(16384),false);
             },[&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});});
             require(completed==(mode==1||mode==10),"stored scheduled source effects honor query and child failures");
             if(mode>=10){
@@ -1750,7 +1750,7 @@ int main(){
             record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
         require(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}),"hit source skeleton");
         unsigned hurts=0;SkeletonSoundAudio audio;audio.wet=true;
-        SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume={0x3fd00000u,0};
+        SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume=AudioLevel::raw(16384);
         soundEnvironment.viewY=MotionBinary64::fromInteger(10000);soundEnvironment.inWater=true;
         TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
         auto skeletonTick=[&]{return world->withSkeletonTimeStopEvents(skeletons,skeletonStop,
@@ -1846,7 +1846,7 @@ int main(){
             require(world->withSkeletonTimeStopEvents(skeletons,stop,[&](InstanceHandle,auto& actor,auto& throwing){
                 auto launch=[&](int){
                     const auto before=world->randomDrawCount();
-                    SkeletonSoundAudio audio;SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};
+                    SkeletonSoundAudio audio;SoundPlayEnvironment environment;environment.gameVolume=AudioLevel::raw(16384);
                     const bool ok=world->throwSkeletonBone(bones,actor,throwing,environment,audio);
                     require(ok&&world->randomDrawCount()==before+4&&audio.calls==7&&world->overlapSound(4)==134&&
                         throwing.myBoneSourceId&&throwing.xarc.high==0x3ff00000u&&!throwing.xarc.low,
@@ -2525,9 +2525,9 @@ int main(){
             bool isPlaying(int,bool& playing){playing=false;return true;}
             bool stop(int){return true;}
             bool play(int,int,bool,int&){return false;}
-            bool getGain(int,MotionBinary64&){return false;}
-            bool setGain(int,MotionBinary64,int){return false;}
-            bool setPitch(int,MotionBinary64){return false;}
+            bool getGain(int,AudioLevel&){return false;}
+            bool setGain(int,AudioLevel,int){return false;}
+            bool setPitch(int,AudioLevel){return false;}
         } audio;
         SoundPlayEnvironment environment;TimeStopEffects<4> stop;unsigned stomps=0,damages=0;
         const bool okay=pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,stop,
@@ -2600,9 +2600,9 @@ int main(){
             bool isPlaying(int,bool& playing){playing=false;return true;}
             bool stop(int){return true;}
             bool play(int,int,bool,int& voice){voice=1000;return true;}
-            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int,MotionBinary64,int){return true;}
-            bool setPitch(int,MotionBinary64){return true;}
+            bool getGain(int,AudioLevel& gain){gain=audio_level::one;return true;}
+            bool setGain(int,AudioLevel,int){return true;}
+            bool setPitch(int,AudioLevel){return true;}
         } audio;
         SoundPlayEnvironment environment;unsigned damage=0;TimeStopEffects<4> stop;stop.player.stopped=contact==2;
         const bool okay=pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,stop,
@@ -3020,9 +3020,9 @@ int main(){
                 bool isPlaying(int id,bool& playing){require(++calls==1&&id==29,"damage sound lookup");playing=false;return true;}
                 bool stop(int){return false;}
                 bool play(int id,int priority,bool loop,int& voice){require(++calls==2&&id==29&&priority==90&&!loop,"damage sound start");voice=123;return !fail;}
-                bool getGain(int id,MotionBinary64& gain){require(++calls==3&&id==123,"damage sound gain read");gain=MotionBinary64::fromInteger(1);return true;}
-                bool setGain(int id,MotionBinary64 gain,int duration){require(++calls==4&&id==123&&gain.high==0x3ff00000u&&!gain.low&&!duration,"damage sound gain write");return true;}
-                bool setPitch(int id,MotionBinary64 pitch){require(++calls==5&&id==123&&pitch.high==0x3ff00000u&&!pitch.low,"damage sound pitch");return true;}
+                bool getGain(int id,AudioLevel& gain){require(++calls==3&&id==123,"damage sound gain read");gain=audio_level::one;return true;}
+                bool setGain(int id,AudioLevel gain,int duration){require(++calls==4&&id==123&&gain==audio_level::one&&!duration,"damage sound gain write");return true;}
+                bool setPitch(int id,AudioLevel pitch){require(++calls==5&&id==123&&pitch==audio_level::one,"damage sound pitch");return true;}
             } audio{failSound};
             SoundPlayEnvironment environment;
             const auto effects=world->scriptEffects().size();
@@ -3201,7 +3201,7 @@ int main(){
             "source query/movement counts and synchronous muzzle birth survive destruction marking");
         {
             const auto before=world->randomDrawCount();const int previous=world->overlapSound(2);
-            SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+            SoundPlayEnvironment env;env.gameVolume=AudioLevel::raw(16384);env.inWater=true;
             BulletWallAudio audio{world->resolveInstance(shot)->sound,previous,29,true};
             require(world->playBulletWallSound(shot,env,[&](const char*& material){
                 return owner->projectileWallMaterial(box,material);
@@ -4227,9 +4227,9 @@ int main(){
             bool isPlaying(int,bool& playing){playing=false;return true;}
             bool stop(int){return true;}
             bool play(int,int,bool,int&){return false;} // No floor in this fixture.
-            bool getGain(int,MotionBinary64&){return false;}
-            bool setGain(int,MotionBinary64,int){return false;}
-            bool setPitch(int,MotionBinary64){return false;}
+            bool getGain(int,AudioLevel&){return false;}
+            bool setGain(int,AudioLevel,int){return false;}
+            bool setPitch(int,AudioLevel){return false;}
         } currencyAudio;
         CurrencyHomingMath currencyMath{portableAtan};
         unsigned currencySteps=0;
@@ -4256,7 +4256,7 @@ int main(){
                 if(phase!=StartupRuntime::CurrencyPhase::step)return false;
                 ++currencySteps;
                 return currency.stepSource(key,random,stop.player.stopped,480,pose.x.promoted(),pose.y.promoted(),
-                    currencyMath,[](auto& top){top={};return true;},currencyAudio,MotionBinary64::fromInteger(1),false);
+                    currencyMath,[](auto& top){top={};return true;},currencyAudio,audio_level::one,false);
             },[&]{return world->stepWithTimeStopBonesAndBlood(blood,bones,shards,changes,stop,Input{},frames,transition,[&]{
             ++collisions;
             const auto* actual=bones.instances().find(bone);
@@ -5140,9 +5140,9 @@ int main(){
                 require(sound>=349&&sound<=355&&priority==90&&!loop,"live wind source play arguments");
                 ++plays;playing=true;voice=900;return true;
             }
-            bool getGain(int id,MotionBinary64& gain){require(id==900,"live wind gain voice");gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int id,MotionBinary64,int duration){require(id==900&&duration==0,"live wind immediate gain");++gains;return true;}
-            bool setPitch(int id,MotionBinary64 pitch){return id==900&&pitch.high==0x3ff00000u&&pitch.low==0;}
+            bool getGain(int id,AudioLevel& gain){require(id==900,"live wind gain voice");gain=audio_level::one;return true;}
+            bool setGain(int id,AudioLevel,int duration){require(id==900&&duration==0,"live wind immediate gain");++gains;return true;}
+            bool setPitch(int id,AudioLevel pitch){return id==900&&pitch==audio_level::one;}
         } audio;
         RunnerCollisionEventContext::Frame lastWindEvent;
         auto windPass=std::make_unique<StoredDitherCollisionPass>(*productionOwner);
@@ -5261,14 +5261,14 @@ int main(){
             productionOwner->resolve(selected.handle)->windSound==-1&&productionOwner->resolve(selected.handle)->sound.sndsnd==-1,
             "inherited entrance wind respects shared playing voice without assigning windsnd or consuming RNG");
         audio.playing=false;
-        require(production->dispatchTimeFieldWind(lastWindEvent,MotionBinary64::fromInteger(1),audio)&&
+        require(production->dispatchTimeFieldWind(lastWindEvent,audio_level::one,audio)&&
             production->randomDrawCount()==entryDraws+1&&audio.plays==3&&
             productionOwner->resolve(selected.handle)->windSound==production->overlapSound(8)&&
             productionOwner->resolve(selected.handle)->sound.sfxIndex==production->overlapSound(8)&&
             productionOwner->resolve(selected.handle)->sound.sndsnd==900&&production->timeFieldWindVoice()==900,
             "expired shared voice permits inherited entrance handler to choose and store its own sound");
         ++lastWindEvent.self.generation;const auto beforeInvalid=audio.queries;
-        require(!production->dispatchTimeFieldWind(lastWindEvent,MotionBinary64::fromInteger(1),audio)&&
+        require(!production->dispatchTimeFieldWind(lastWindEvent,audio_level::one,audio)&&
             !production->effectsSucceeded()&&audio.queries==beforeInvalid&&production->randomDrawCount()==entryDraws+1,
             "stale wind event fails before audio queries or RNG");
     }

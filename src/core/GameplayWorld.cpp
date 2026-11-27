@@ -3660,9 +3660,9 @@ void GameplayWorld::playEnemySound(int sound,int roomY){soundPlayOLAt(sound,50,f
 void GameplayWorld::playShotSound(int ammoBefore){
     const int sound=currentGun().sound;
     run_.soundPlayOL(sound,80,false,true,"gunshot");
-    auto pitch=downwell::MotionBinary64::fromInteger(1); // audio_sound_get_pitch(sndsnd), dry
+    auto pitch=downwell::audio_level::one; // audio_sound_get_pitch(sndsnd), dry
     if(ammoBefore*2<=player_.ammoCapacity()){
-        pitch={0x3ffcccccu,0xcccccccdu}; // 1 + 0.8
+        pitch=downwell::AudioLevel::raw(117965); // 1 + 0.8
         run_.soundPlayOL(90,85,false,true,"UI");
     }
     run_.setSoundPitch(sound,pitch);
@@ -4730,7 +4730,7 @@ void GameplayWorld::compactLevelBeginMusic(){
     if(!downwell::RunSession::areaMusic(run_.stage.area,music))return;
     run_.backgroundMusicId=music;
     if(run_.voices.playing(music))return;
-    run_.setSoundGain(music,downwell::MotionBinary64::fromInteger(1));
+    run_.setSoundGain(music,downwell::audio_level::one);
     run_.soundPlayOL(music,100,true,true,"music");
 }
 

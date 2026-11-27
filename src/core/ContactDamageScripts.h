@@ -43,7 +43,7 @@ template<class World,class Audio> struct ContactDamageAudio {
         int voice=-1;
         return SoundPlayScript::plain(caller,environment,audio,id,priority,loop,cut,voice,succeeded);
     }
-    bool duckMusic(int duration,MotionBinary64 amount){
+    bool duckMusic(int duration,AudioLevel amount){
         return succeeded&&(succeeded=world.duckMusic(music,duration,amount,audio));
     }
 };

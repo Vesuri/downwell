@@ -59,9 +59,9 @@ bool compileLevelNumber(downwell::LevelNumber<64>& actor,LevelNumberCompileDraw&
 }
 struct CueCompileAudio {
     bool isPlaying(int,bool&);bool stop(int);
-    bool setGain(int,downwell::MotionBinary64,unsigned);
-    bool play(int,int,bool,int&);bool getGain(int,downwell::MotionBinary64&);
-    bool setPitch(int,downwell::MotionBinary64);
+    bool setGain(int,downwell::AudioLevel,unsigned);
+    bool play(int,int,bool,int&);bool getGain(int,downwell::AudioLevel&);
+    bool setPitch(int,downwell::AudioLevel);
 };
 bool compileNativeLocalizedCue(GameplayWorld& world,bool& first,int& bgm,
     bool (*allocate)(unsigned&),const downwell::LevelNumberTextContext& text,bool (*music)(int,int&),

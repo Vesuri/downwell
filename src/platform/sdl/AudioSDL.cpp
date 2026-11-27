@@ -20,15 +20,15 @@ AudioSDL::AudioSDL(){
     if(device_)SDL_PauseAudioDevice(device_,0);
 }
 AudioSDL::~AudioSDL(){if(device_)SDL_CloseAudioDevice(device_);}
-bool AudioSDL::load(int id,const char* path,MotionBinary64 gain){
-    if(!device_||id<0||id>=int(samples_.size())||!gain.valid()||real(gain)<0)return false;
+bool AudioSDL::load(int id,const char* path,AudioLevel gain){
+    if(!device_||id<0||id>=int(samples_.size())||gain.v<0)return false;
     SF_INFO info{};SNDFILE* file=sf_open(path,SFM_READ,&info);
     if(!file)return false;
     if(info.frames<=0||info.frames>48000*600||info.samplerate<=0||info.channels<1||info.channels>2){sf_close(file);return false;}
     std::vector<float> input(std::size_t(info.frames)*info.channels);
     const auto read=sf_readf_float(file,input.data(),info.frames);sf_close(file);
     if(read!=info.frames)return false;
-    RunnerImageValue storedGain;if(!storedGain.assign(gain))return false;
+    RunnerImageValue storedGain;if(!storedGain.assign(gain.binary64()))return false;
     Sample sample;sample.rate=info.samplerate;sample.gain.current=storedGain;
     sample.pcm.resize(std::size_t(info.frames)*2);
     for(std::size_t frame=0;frame<std::size_t(info.frames);++frame)
@@ -75,12 +75,12 @@ bool AudioSDL::stop(int id){Lock lock(device_);for(auto& v:voices_)if(v.id==id||
 bool AudioSDL::stopAll(){
     Lock lock(device_);for(auto& v:voices_){v.active=false;v.paused=false;}return device_!=0;
 }
-bool AudioSDL::getGain(int id,MotionBinary64& gain){
+bool AudioSDL::getGain(int id,AudioLevel& gain){
     Lock lock(device_);
-    if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty()){gain=samples_[id].gain.current.promoted();return true;}
-    auto* v=find(id);if(!v)return false;gain=v->gain.current.promoted();return true;
+    if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty()){return Fixed16::fromBinary64(samples_[id].gain.current.promoted(),gain);}
+    auto* v=find(id);return v&&Fixed16::fromBinary64(v->gain.current.promoted(),gain);
 }
-bool AudioSDL::setGain(int id,MotionBinary64 gain,int milliseconds){
+bool AudioSDL::setGain(int id,AudioLevel gain,int milliseconds){
     Lock lock(device_);
     const auto now=microseconds();
     if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty())return samples_[id].gain.set(gain,milliseconds,now);
@@ -95,11 +95,11 @@ void AudioSDL::update(){
     for(auto& sample:samples_)sample.gain.update(now);
     for(auto& voice:voices_)if(voice.active)voice.gain.update(now);
 }
-bool AudioSDL::setPitch(int id,MotionBinary64 pitch){
-    if(!pitch.valid()||real(pitch)<=0||real(pitch)>256)return false;
-    Lock lock(device_);auto* v=find(id);if(!v)return false;v->pitch=real(pitch);return true;
+bool AudioSDL::setPitch(int id,AudioLevel pitch){
+    if(pitch.v<=0||pitch.v>256*65536)return false;
+    Lock lock(device_);auto* v=find(id);if(!v)return false;v->pitch=pitch.v/65536.0;return true;
 }
-bool AudioSDL::setMasterGain(MotionBinary64 gain){
+bool AudioSDL::setMasterGain(AudioLevel gain){
     Lock lock(device_);return device_&&master_.set(gain);
 }
 void AudioSDL::callback(void* self,Uint8* bytes,int count){

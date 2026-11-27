@@ -9,6 +9,7 @@
 #include "EnemyContact.h"
 #include "ShopChildCreation.h"
 #include "MotionBinary64.h"
+#include "AudioLevel.h"
 #include "ShopRisingText.h"
 #include "ShopText.h"
 #include "ShopDrawState.h"
@@ -122,7 +123,7 @@ private:
             ++allocatedCount;++fixtureRevision;
             if(!owner.begin(shop)||!good||!shop.sourceId||shop.sourceId>0x7fffffffu){good=false;return nullptr;}
             if(area!=5&&(!owner.play(area==3?201:192,100,true,shop.radio)||!good||
-                !owner.setGain(shop.radio,MotionBinary64{},0)||!good)){
+                !owner.setGain(shop.radio,AudioLevel{},0)||!good)){
                 good=false;return nullptr;
             }
             auto create=[&](int object,int cx,int cy)->std::uint32_t{

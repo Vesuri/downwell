@@ -17,15 +17,15 @@ public:
     // missing in the mixer rather than failing the update.
     bool hasResource(int)const{return true;}
     // The volume option is the mixer's master gain (DownwellAmiga.cpp).
-    bool setMasterGain(MotionBinary64){return true;}
+    bool setMasterGain(AudioLevel){return true;}
     void update(){}
     bool play(int asset,int priority,bool loop,int& voice){return audio().play(asset,priority,loop,voice);}
     bool isPlaying(int id,bool& playing){return audio().isPlaying(id,playing);}
     bool stop(int id){return audio().stop(id);}
     bool stopAll(){return audio().stopAll();}
-    bool getGain(int id,MotionBinary64& gain){return audio().getGain(id,gain);}
-    bool setGain(int id,MotionBinary64 gain,int time){return audio().setGain(id,gain,time);}
-    bool setPitch(int id,MotionBinary64 pitch){return audio().setPitch(id,pitch);}
+    bool getGain(int id,AudioLevel& gain){return audio().getGain(id,gain);}
+    bool setGain(int id,AudioLevel gain,int time){return audio().setGain(id,gain,time);}
+    bool setPitch(int id,AudioLevel pitch){return audio().setPitch(id,pitch);}
 private:
     SoundRequestAudio audio(){return world_.runSoundAudio(SoundPlayScript::channel("UI"),true);}
     GameplayWorld& world_;

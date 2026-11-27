@@ -57,11 +57,11 @@ public:
         case 2:submit(play(overlap_[4],25,false,gainOf(overlap_[4])));break; // steals priority 10
         case 3:submit(play(overlap_[5],5,false,gainOf(overlap_[5])));break;  // dropped
         // Pitch 1.8 (the low-ammo gun), then the same at pitch 1.
-        case 60:submit(play(18,80,false,gainOf(18),{0x3ffccccdu,0xcccccccdu}));break;
+        case 60:submit(play(18,80,false,gainOf(18),downwell::AudioLevel::raw(117965)));break;
         case 90:submit(play(18,80,false,gainOf(18)));break;
         // A loop faded in from 0 over 1 s, out over 1.5 s, then stopped.
         case 120:{
-            submit(play(186,80,true,downwell::MotionBinary64{}));
+            submit(play(186,80,true,downwell::AudioLevel{}));
             R g;g.kind=R::gain;g.voice=voice_;g.gainValue=gainOf(186);g.fadeMs=1000;submit(g);
             break;
         }
@@ -85,17 +85,13 @@ private:
     static unsigned fields(const downwell::PaulaBank::Sound& s){
         return unsigned((s.bytes*std::uint32_t(s.period)+71050u)/71051u); // < 2^26
     }
-    static downwell::MotionBinary64 gain(const downwell::PaulaBank::Sound& s){
-        // The asset gain as a double, from Q15 (exact).
-        if(!s.assetGainQ15)return {};
-        unsigned e=0;std::uint32_t m=s.assetGainQ15;
-        while(!(m&0x8000u)){m<<=1;++e;}
-        const std::uint32_t exponent=1023u-e; // m/2^15 in [1,2): value = m/2^15 * 2^-e
-        return {(exponent<<20)|((m&0x7fffu)<<5),0};
+    // The asset gain, from Q15 (exact).
+    static downwell::AudioLevel gain(const downwell::PaulaBank::Sound& s){
+        return downwell::AudioLevel::raw(std::int32_t(s.assetGainQ15)*2);
     }
-    downwell::MotionBinary64 gainOf(int id)const{downwell::PaulaBank::Sound s;return bank_.find(id,s)?gain(s):downwell::MotionBinary64{};}
-    downwell::SoundRequest play(int id,std::uint8_t priority,bool loop,downwell::MotionBinary64 g,
-                                downwell::MotionBinary64 pitch={0x3ff00000u,0}){
+    downwell::AudioLevel gainOf(int id)const{downwell::PaulaBank::Sound s;return bank_.find(id,s)?gain(s):downwell::AudioLevel{};}
+    downwell::SoundRequest play(int id,std::uint8_t priority,bool loop,downwell::AudioLevel g,
+                                downwell::AudioLevel pitch=downwell::audio_level::one){
         downwell::SoundRequest r;r.kind=downwell::SoundRequest::play;r.asset=std::int16_t(id);
         r.voice=voice_=++nextVoice_;r.priority=priority;r.loop=loop;r.cut=true;r.category=8;
         r.gainValue=g;r.pitchValue=pitch;

@@ -26,10 +26,10 @@ public:
     bool isPlaying(int id,bool& playing);
     bool stop(int id);
     bool stopAll();
-    bool getGain(int id,MotionBinary64& value);
-    bool setGain(int id,MotionBinary64 value,int milliseconds);
-    bool setPitch(int id,MotionBinary64 value);
-    bool setMasterGain(MotionBinary64 value);
+    bool getGain(int id,AudioLevel& value);
+    bool setGain(int id,AudioLevel value,int milliseconds);
+    bool setPitch(int id,AudioLevel value);
+    bool setMasterGain(AudioLevel value);
     void update(){} // Device-clock completion comes from Paula, not game ticks.
 private:
     friend struct AmigaWindAudioProbe;

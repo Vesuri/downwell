@@ -102,8 +102,8 @@ struct RunSession {
         return returned?result:-1;
     }
     bool stopSound(int id){return audio().stop(id);}
-    bool setSoundGain(int id,MotionBinary64 gain,int time=0){return audio().setGain(id,gain,time);}
-    bool setSoundPitch(int id,MotionBinary64 pitch){return audio().setPitch(id,pitch);}
+    bool setSoundGain(int id,AudioLevel gain,int time=0){return audio().setGain(id,gain,time);}
+    bool setSoundPitch(int id,AudioLevel pitch){return audio().setPitch(id,pitch);}
     // W2.3: Shop Step's sounds for the compact shops, after the interaction:
     // the step's merchant and UI sounds (ShopFeedback), then the !criminal
     // branch's sfxSkInRange on entering the view (left/top in room pixels,
@@ -132,7 +132,7 @@ struct RunSession {
     }
     void playDeathSounds(){
         soundPlay(89,100,false,false);
-        setSoundGain(backgroundMusicId,MotionBinary64::fromInteger(0));
+        setSoundGain(backgroundMusicId,AudioLevel{});
         stopSound(backgroundMusicId);
     }
     // objPauseMenu Create's audio_pause_all and its Resume's audio_resume_all.
@@ -157,7 +157,7 @@ struct RunSession {
         return BulletWallSound::play(caller,environment,overlapSounds[2],random,material,audio,effectsSucceeded);
     }
     template<class Audio> bool playCurrencyPickupSound(SoundPlayState& caller,
-        MotionBinary64 volume,Audio& audio){
+        AudioLevel volume,Audio& audio){
         if(!effectsSucceeded)return false;
         SoundPlayEnvironment env;env.gameVolume=volume;
         int result=-1;bool returned=false;
@@ -166,13 +166,13 @@ struct RunSession {
             167,60,false,true,"UI",result,returned,effectsSucceeded);
     }
     template<class Audio> bool playBoxChainSound(SoundPlayState& caller,
-        MotionBinary64 volume,bool inWater,Audio& audio){
+        AudioLevel volume,bool inWater,Audio& audio){
         SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;
         int result=-1;
         return SoundPlayScript::plain(caller,env,audio,342,50,false,true,result,effectsSucceeded);
     }
     template<class Audio> bool playBoxBreakSound(SoundPlayState& caller,int sound,
-        MotionBinary64 volume,Audio& audio){
+        AudioLevel volume,Audio& audio){
         if(!effectsSucceeded)return false;
         SoundPlayEnvironment env;env.gameVolume=volume;
         int result=-1;bool returned=false;
@@ -218,7 +218,7 @@ struct RunSession {
             oxygen=MotionBinary64::fromInteger(10);
         return true;
     }
-    template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){
+    template<class Audio> bool duckMusic(MusicDuck& caller,int duration,AudioLevel amount,Audio& audio){
         if(!effectsSucceeded)return false;
         return effectsSucceeded=caller.execute(duration,amount,[&]{return stage.area;},
             [&]{return backgroundMusicId;},audio);
@@ -281,7 +281,7 @@ struct RunSession {
         if(ending)return true;
         if(!audio.isPlaying(bgm,playing)||!effectsSucceeded)return effectsSucceeded=false;
         if(playing)return true;
-        if(!audio.setGain(bgm,MotionBinary64::fromInteger(1),0)||!effectsSucceeded)return effectsSucceeded=false;
+        if(!audio.setGain(bgm,audio_level::one,0)||!effectsSucceeded)return effectsSucceeded=false;
         int result=-1;bool returned=false;
         return SoundPlayScript::overlap(caller,env,audio,[]{return false;},overlapSounds[5],
             bgm,100,true,true,"music",result,returned,effectsSucceeded);
@@ -786,14 +786,16 @@ struct RunSession {
             const int voice=soundPlayOL(328,90,false,true,"UI");
             // progBarLength / 96 = (fake - previous goal) / (next - previous)
             // with the pre-fill total (the frame's displayed total).
-            MotionBinary64 fraction,length,unit,scaled,pitch=MotionBinary64::fromInteger(1);
-            const auto ninetySix=MotionBinary64::fromInteger(96);
             const auto span=f.nextGoal-f.previousGoal,done=f.displayedTotal-f.previousGoal;
-            if(span<0x7fffffffULL&&done<0x7fffffffULL&&
-               divideBinary64(MotionBinary64::fromInteger(std::int32_t(done)),MotionBinary64::fromInteger(std::int32_t(span)),fraction)&&
-               multiplyBinary64(ninetySix,fraction,length)&&divideBinary64(length,ninetySix,unit)&&
-               multiplyBinary64(unit,{0x3ff33333u,0x33333333u},scaled)&&pitch.add(scaled))
-                setSoundPitch(voice,pitch);
+            if(span&&span<0x7fffffffULL&&done<0x7fffffffULL){
+                // Q16 done / span (32-bit long division), times 1.2
+                // (78643/65536), plus 1.
+                const std::uint32_t d=std::uint32_t(span),whole=std::uint32_t(done)/d;
+                std::uint32_t rest=std::uint32_t(done)%d,unit=whole<<16;
+                for(std::uint32_t bit=0x8000u;bit;bit>>=1){rest<<=1;if(rest>=d){rest-=d;unit|=bit;}}
+                const std::uint64_t scaled=(std::uint64_t(unit)*78643u+0x8000u)>>16;
+                if(whole<256u&&scaled<=255u*65536u)setSoundPitch(voice,AudioLevel::raw(std::int32_t(65536u+scaled)));
+            }
         }
         if(f.completedSound)soundPlayOL(330,80,false,true,"UI");
         if(f.unlockedGoal>=0)soundPlayOL(329,90,false,true,"UI");
@@ -806,8 +808,8 @@ struct RunSession {
         if(voices.isPlaying(backgroundMusicId,playing)&&playing)audio().pause(backgroundMusicId);
         levelClearWhoosh=stage.area!=3?soundPlayOL(186,80,true,true,"UI"):-1;
         if(voices.playing(levelClearWhoosh)){
-            setSoundGain(levelClearWhoosh,MotionBinary64::fromInteger(0));
-            setSoundGain(levelClearWhoosh,MotionBinary64::fromInteger(1),1000);
+            setSoundGain(levelClearWhoosh,AudioLevel{});
+            setSoundGain(levelClearWhoosh,audio_level::one,1000);
         }
     }
     // scrResult, scrGainUg/gainHp and Result Alarm 0/1 sounds.
@@ -823,7 +825,7 @@ struct RunSession {
         }
         case E::confirmSound:soundPlayOL(339,90,false,true,"UI");break;
         case E::fadeWhoosh:
-            if(voices.playing(levelClearWhoosh))setSoundGain(levelClearWhoosh,MotionBinary64::fromInteger(0),1500);
+            if(voices.playing(levelClearWhoosh))setSoundGain(levelClearWhoosh,AudioLevel{},1500);
             break;
         case E::nextLevel:stopSound(levelClearWhoosh);break;
         default:break;
@@ -918,10 +920,9 @@ struct RunSession {
                 const auto& table=steps[material()];
                 soundPlayOL(table[1+random.irandomSmall(table[0]-1u)],60,false,true,"footsteps");
                 // sndgain = audio_sound_get_gain(sndsnd) * (1 or 0.7).
-                MotionBinary64 gain,scaled;
-                if(voices.getGain(soundCaller.sndsnd,gain)&&(fullStepGain||
-                   multiplyBinary64(gain,{0x3fe66666u,0x66666666u},scaled))){
-                    soundCaller.sndgain=fullStepGain?gain:scaled;
+                AudioLevel gain;
+                if(voices.getGain(soundCaller.sndsnd,gain)){
+                    soundCaller.sndgain=fullStepGain?gain:audio_level::product(gain,AudioLevel::raw(45875));
                     setSoundGain(soundCaller.sndsnd,soundCaller.sndgain);
                 }
                 break;
@@ -966,7 +967,7 @@ struct RunSession {
     bool resultStepWind(GameMakerRandom& random){
         std::int32_t sound=0;
         auto a=audio(SoundPlayScript::channel("UI"),true);
-        if(!fieldWind.contact(random,sound,overlapSounds[8],MotionBinary64::fromInteger(1),a))
+        if(!fieldWind.contact(random,sound,overlapSounds[8],audio_level::one,a))
             return effectsSucceeded=false;
         return true;
     }

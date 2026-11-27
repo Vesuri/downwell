@@ -91,7 +91,7 @@ int main() {
         id<downwell::TimeFieldWind::firstSound+downwell::TimeFieldWind::soundCount;++id){
         char path[128];std::snprintf(path,sizeof(path),
             "extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
-        if(!audio.load(id,path,downwell::MotionBinary64::fromInteger(1)))return 20;
+        if(!audio.load(id,path,downwell::audio_level::one))return 20;
     }
     using Session=downwell::StoredEncounterSession<downwell::AudioSDL>;
     std::unique_ptr<Session> session(new(std::nothrow) Session(game,*collisionOwner,audio));

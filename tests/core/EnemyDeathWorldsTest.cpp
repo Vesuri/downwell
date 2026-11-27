@@ -58,15 +58,15 @@ template<class World> void checkCue(World& world,unsigned failure,bool ending=fa
             return op(id==186?2:id==0?7:id==900?12:5);
         }
         bool stop(int id){assert(id==186||id==10);return op(id==186?3:13);}
-        bool setGain(int id,MotionBinary64 gain,unsigned time){
-            assert((id==20||id==900)&&gain.high==0x3ff00000u&&!gain.low&&!time);
+        bool setGain(int id,AudioLevel gain,unsigned time){
+            assert((id==20||id==900)&&gain==downwell::audio_level::one&&!time);
             return op(id==20?6:10);
         }
         bool play(int id,int priority,bool loop,int& voice){
             assert(id==20&&priority==100&&loop);voice=900;return op(8);
         }
-        bool getGain(int id,MotionBinary64& gain){assert(id==900);gain=MotionBinary64::fromInteger(1);return op(9);}
-        bool setPitch(int id,MotionBinary64 pitch){assert(id==900&&pitch.high==0x3ff00000u&&!pitch.low);return op(11);}
+        bool getGain(int id,AudioLevel& gain){assert(id==900);gain=downwell::audio_level::one;return op(9);}
+        bool setPitch(int id,AudioLevel pitch){assert(id==900&&pitch==downwell::audio_level::one);return op(11);}
     } audio{operation,firstLand,ending,musicPlaying};
     SoundPlayState caller;SoundPlayEnvironment env;
     const auto x=MotionBinary64::fromInteger(241),y=MotionBinary64::fromInteger(603);
@@ -95,13 +95,13 @@ template<class World> void checkDamageDuck(World& world,unsigned failure){
         int music;unsigned failure,calls=0;
         bool call(int id){assert(id==music);return ++calls!=failure;}
         bool isPlaying(int id,bool& playing){playing=true;return call(id);}
-        bool getGain(int id,downwell::MotionBinary64& value){value=downwell::MotionBinary64::fromInteger(1);return call(id);}
-        bool setGain(int id,downwell::MotionBinary64 value,int duration){
-            assert(duration==(calls==2?0:500)&&value.high==(calls==2?0x3fe66666u:0x3ff00000u));
+        bool getGain(int id,downwell::AudioLevel& value){value=downwell::audio_level::one;return call(id);}
+        bool setGain(int id,downwell::AudioLevel value,int duration){
+            assert(duration==(calls==2?0:500)&&value==(calls==2?downwell::AudioLevel::raw(45875):downwell::audio_level::one));
             return call(id);
         }
     } audio{world.backgroundMusicId(),failure};
-    assert(world.duckMusic(caller.music,500,{0x3fe66666u,0x66666666u},audio)==!failure&&
+    assert(world.duckMusic(caller.music,500,downwell::AudioLevel::raw(45875),audio)==!failure&&
         world.effectsSucceeded()==!failure&&audio.calls==(failure?failure:4)&&caller.music.duckDuration==500);
     if(failure){const auto count=audio.calls;
         assert(!world.duckMusic(caller.music,123,{},audio)&&audio.calls==count&&caller.music.duckDuration==500);}
@@ -184,9 +184,9 @@ int main(){
             bool isPlaying(int,bool& playing){playing=false;return true;}
             bool stop(int){return true;}
             bool play(int id,int,bool,int& voice){plays.push_back(id);voice=1000+id;return true;}
-            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int,MotionBinary64,int){return true;}
-            bool setPitch(int,MotionBinary64){return true;}
+            bool getGain(int,AudioLevel& gain){gain=downwell::audio_level::one;return true;}
+            bool setGain(int,AudioLevel,int){return true;}
+            bool setPitch(int,AudioLevel){return true;}
         } storedAudio,nativeAudio;
         struct Queries {
             bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
@@ -277,7 +277,7 @@ int main(){
                 if(phase==GameplayWorld::CurrencyPhase::alarm){
                     if(alarm!=2)return false;
                     ++currencyExpiries;
-                    return owner->currency().expire(key,MotionBinary64::fromInteger(1),false,nativeAudio);
+                    return owner->currency().expire(key,downwell::audio_level::one,false,nativeAudio);
                 }
                 ++currencySteps;InstanceHandle h;MotionBinary64 px,py;
                 return GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,h)&&
@@ -285,7 +285,7 @@ int main(){
                         native->player().frameStartYFixed(),240,176,px,py)&&
                     owner->stepCurrency(h,stop.player.stopped,480,px,py,masks,math,
                         [&](auto& top){top=MotionBinary64::fromInteger(34);return true;},
-                        nativeAudio,MotionBinary64::fromInteger(1),false);
+                        nativeAudio,audio_level::one,false);
             },[&]{return owner->withEncounterSteps(*effectsPhase,[&](InstanceHandle h,int object){
                 if(object==220){++bloodSteps;return owner->stepBlood(h,stop.player.stopped,480,masks);}
                 if(object==225){++smokeSteps;return owner->stepSmoke(h);}
@@ -383,9 +383,9 @@ int main(){
             bool isPlaying(int,bool& playing){playing=false;return true;}
             bool stop(int){return true;}
             bool play(int id,int,bool,int& voice){played.push_back(id);voice=1000+id;return true;}
-            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int,MotionBinary64,int){return true;}
-            bool setPitch(int,MotionBinary64){return true;}
+            bool getGain(int,AudioLevel& gain){gain=downwell::audio_level::one;return true;}
+            bool setGain(int,AudioLevel,int){return true;}
+            bool setPitch(int,AudioLevel){return true;}
         } audio;
         struct Queries {
             bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
@@ -686,9 +686,9 @@ int main(){
             }
             bool stop(int){std::abort();}
             bool play(int id,int priority,bool loop,int& voice){assert(id==194&&priority==100&&loop);++plays;voice=900;return true;}
-            bool getGain(int id,MotionBinary64& gain){assert(id==900);gain=MotionBinary64::fromInteger(1);return true;}
-            bool setGain(int id,MotionBinary64 gain,int time){assert((id==194||id==900)&&gain.high==0x3ff00000u&&!gain.low&&!time);return true;}
-            bool setPitch(int id,MotionBinary64 pitch){assert(id==900&&pitch.high==0x3ff00000u&&!pitch.low);return true;}
+            bool getGain(int id,AudioLevel& gain){assert(id==900);gain=downwell::audio_level::one;return true;}
+            bool setGain(int id,AudioLevel gain,int time){assert((id==194||id==900)&&gain==downwell::audio_level::one&&!time);return true;}
+            bool setPitch(int id,AudioLevel pitch){assert(id==900&&pitch==downwell::audio_level::one);return true;}
         } audio{queries,musicPlaying};
         auto death=[&](SkeletonActor& actor){
             if(native)return owner->recordSkeletonDeath(actor,true,stop,
@@ -741,10 +741,10 @@ int main(){
             decltype(title)& child;decltype(firstLand)& first;unsigned& queries;
             bool isPlaying(int id,bool& playing){assert(first()&&child()&&child()->created);++queries;playing=id==194;return true;}
             bool stop(int){std::abort();}
-            bool setGain(int,MotionBinary64,unsigned){std::abort();}
+            bool setGain(int,AudioLevel,unsigned){std::abort();}
             bool play(int,int,bool,int&){std::abort();}
-            bool getGain(int,MotionBinary64&){std::abort();}
-            bool setPitch(int,MotionBinary64){std::abort();}
+            bool getGain(int,AudioLevel&){std::abort();}
+            bool setPitch(int,AudioLevel){std::abort();}
         } audio{title,firstLand,queries};
         SoundPlayState caller;SoundPlayEnvironment env;
         auto invoke=[&](bool stopped){

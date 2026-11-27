@@ -35,7 +35,7 @@ struct TimeStopAudio : MusicDuck {
                 80,false,true,result,good);
         }
         case E::duckMusic:{
-            return execute(200,{0x3fe66666u,0x66666666u},[&]{return area;},[&]{return music;},audio);
+            return execute(200,AudioLevel::raw(45875),[&]{return area;},[&]{return music;},audio);
         }
         default:return false;
         }

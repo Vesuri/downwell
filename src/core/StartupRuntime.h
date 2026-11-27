@@ -357,7 +357,7 @@ public:
     }
     MotionBinary64 oxygen()const{return run_.oxygen;}
     bool setOxygen(MotionBinary64 value){return run_.setOxygen(value);}
-    template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){
+    template<class Audio> bool duckMusic(MusicDuck& caller,int duration,AudioLevel amount,Audio& audio){
         return run_.duckMusic(caller,duration,amount,audio);
     }
     template<class Audio,class Delay,class Cue>
@@ -376,23 +376,23 @@ public:
     }
     template<unsigned Capacity,class Audio> bool playCurrencyPickupSound(
         StoredCurrencyRegistration<instanceCapacity,Capacity>& currency,InstanceHandle gem,
-        MotionBinary64 volume,Audio& audio){
+        AudioLevel volume,Audio& audio){
         auto* caller=instances_.resolve(gem);
         if(!run_.effectsSucceeded||!currency.belongsTo(instances_)||!currency.find(gem)||!caller)
             return run_.effectsSucceeded=false;
         return run_.playCurrencyPickupSound(caller->sound,volume,audio);
     }
-    template<class Audio> bool playBoxChainSound(InstanceHandle h,MotionBinary64 volume,bool inWater,Audio& audio){
+    template<class Audio> bool playBoxChainSound(InstanceHandle h,AudioLevel volume,bool inWater,Audio& audio){
         auto* box=instances_.resolve(h);
         if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;
         return run_.playBoxChainSound(box->sound,volume,inWater,audio);
     }
-    template<class Audio> bool playBoxBreakSound(InstanceHandle h,MotionBinary64 volume,Audio& audio){
+    template<class Audio> bool playBoxBreakSound(InstanceHandle h,AudioLevel volume,Audio& audio){
         auto* box=instances_.resolve(h);
         if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;
         return run_.playBoxBreakSound(box->sound,box->box.breakSound,volume,audio);
     }
-    template<class Audio> bool playBoxBreakSound(InstanceHandle h,int sound,MotionBinary64 volume,Audio& audio){
+    template<class Audio> bool playBoxBreakSound(InstanceHandle h,int sound,AudioLevel volume,Audio& audio){
         auto* box=instances_.resolve(h);
         if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;
         return run_.playBoxBreakSound(box->sound,sound,volume,audio);
@@ -2555,12 +2555,12 @@ public:
     // and synchronous; event selection must retain the inherited binding.
     int timeFieldWindVoice()const{return run_.fieldWind.voice;}
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
-        MotionBinary64 volume,Audio& audio){
+        AudioLevel volume,Audio& audio){
         return dispatchTimeFieldWind(event,run_.fieldWind,run_.overlapSounds[8],volume,audio);
     }
     // Explicit state provider retained for script/reference fixtures.
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
-        TimeFieldWind& wind,int& uiChannel,MotionBinary64 volume,Audio& audio){
+        TimeFieldWind& wind,int& uiChannel,AudioLevel volume,Audio& audio){
         if(!run_.effectsSucceeded)return false;
         auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
         PackedObjectEvent binding{};bool found=false;

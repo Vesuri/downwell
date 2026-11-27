@@ -26,7 +26,7 @@ template<class World,class Invoke>
 void checkRegisteredSkeletonStomp(World& world,downwell::SkeletonActor& actor,bool knees,int style,Invoke invoke){
     using namespace downwell;
     RegisteredStompPlayer player;player.style=style;player.expectedX=actor.x;player.expectedY=actor.y;
-    SkeletonSoundAudio audio;SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};
+    SkeletonSoundAudio audio;SoundPlayEnvironment env;env.gameVolume=downwell::AudioLevel::raw(16384);
     bool good=true;const auto draws=world.randomDrawCount();
     SkeletonSoundAudio::check(invoke(player,env,audio,good)==!knees&&good==!knees&&
         world.effectsSucceeded()==!knees&&actor.myFx&&actor.health==-40&&actor.stomped&&actor.hitPending&&
@@ -48,12 +48,12 @@ struct BoundStompAudio {
         SkeletonSoundAudio::check(!loop&&((id==122&&priority==50)||(id==explosion&&priority==60)));
         voice=1001;return call();
     }
-    bool getGain(int,downwell::MotionBinary64& gain){gain=downwell::MotionBinary64::fromInteger(1);return call();}
-    bool setGain(int,downwell::MotionBinary64 value,int time){
-        SkeletonSoundAudio::check(value.high==0x3fd00000u&&!value.low&&!time);return call();
+    bool getGain(int,downwell::AudioLevel& gain){gain=downwell::audio_level::one;return call();}
+    bool setGain(int,downwell::AudioLevel value,int time){
+        SkeletonSoundAudio::check(value==downwell::AudioLevel::raw(16384)&&!time);return call();
     }
-    bool setPitch(int,downwell::MotionBinary64 value){
-        SkeletonSoundAudio::check(value.high==0x3ff00000u&&!value.low);return call();
+    bool setPitch(int,downwell::AudioLevel value){
+        SkeletonSoundAudio::check(value==downwell::audio_level::one);return call();
     }
 };
 template<class World,class Invoke,class FindBlast,class FindSmoke>
@@ -70,7 +70,7 @@ void checkBoundExplodingStomp(World& world,downwell::SkeletonActor& actor,int st
     SmokeEffect expected[4];
     if(!rejectSound)for(auto& effect:expected)
         SkeletonSoundAudio::check(effect.create(player.playerX(),{0x40699000u,0},random)); // y+4
-    SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};bool good=true;
+    SoundPlayEnvironment env;env.gameVolume=downwell::AudioLevel::raw(16384);bool good=true;
     SkeletonSoundAudio::check(invoke(player,env,audio,good)==!rejectSound&&good==!rejectSound&&
         world.effectsSucceeded()==!rejectSound&&actor.health==-40&&actor.stomped&&actor.hitPending&&
         player.recharges==2&&player.spins==1&&!player.grounded&&!player.blasts&&

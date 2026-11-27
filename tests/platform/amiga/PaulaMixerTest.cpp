@@ -52,9 +52,7 @@ std::vector<std::uint8_t> pack(const std::vector<Spec>& specs) {
     out.insert(out.end(), data.begin(), data.end());
     return out;
 }
-MotionBinary64 real(double d) {
-    std::uint64_t bits; std::memcpy(&bits, &d, 8); return {std::uint32_t(bits >> 32), std::uint32_t(bits)};
-}
+downwell::AudioLevel real(double d) { return downwell::AudioLevel::raw(std::int32_t(std::lround(d * 65536.0))); }
 SoundRequest play(int asset, int voice, unsigned priority, double gain = 1, double pitch = 1, int category = 8) {
     SoundRequest r; r.kind = SoundRequest::play; r.asset = std::int16_t(asset); r.voice = voice;
     r.priority = std::uint8_t(priority); r.category = std::int8_t(category); r.gainValue = real(gain); r.pitchValue = real(pitch);
@@ -82,9 +80,9 @@ void testBank() {
     require(!bank.bind(bad.data(), bad.size()), "an odd sample length is rejected");
     require(!bank.bind(bytes.data(), bytes.size() - 2), "a short file is rejected");
     require(PaulaVoicePlan::q16(real(1)) == 65536 && PaulaVoicePlan::q16(real(0.5)) == 32768 &&
-            PaulaVoicePlan::q16(real(1.8)) == 117964 && PaulaVoicePlan::q16(real(0)) == 0 &&
+            PaulaVoicePlan::q16(real(1.8)) == 117965 && PaulaVoicePlan::q16(real(0)) == 0 &&
             PaulaVoicePlan::q16(real(-1)) == 0 && PaulaVoicePlan::q16(real(1000)) == 0xffffff,
-            "binary64 to Q16");
+            "levels clamp to unsigned Q16");
 }
 
 void testPlan() {

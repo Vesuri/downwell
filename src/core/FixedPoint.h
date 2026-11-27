@@ -117,6 +117,8 @@ struct Fixed16 {
     bool operator<(Fixed16 o) const { return v < o.v; }
     bool operator>(Fixed16 o) const { return v > o.v; }
     bool operator==(Fixed16 o) const { return v == o.v; }
+    bool operator!=(Fixed16 o) const { return v != o.v; }
+    bool zero() const { return !v; }
     // 68020 muls.l: 32 x 32 -> 64.
     static Fixed16 multiply(Fixed16 a, Fixed16 b) {
         return Fixed16{std::int32_t((std::int64_t(a.v) * b.v) >> 16)};

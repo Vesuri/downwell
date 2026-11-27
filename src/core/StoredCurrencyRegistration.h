@@ -105,7 +105,7 @@ public:
         auto* e=entry(h);auto* r=e?record(*e):nullptr;
         if(!good_||!r||!lifecycle_.markDestroyed(h,*r))return fail();r->destroyRequested=true;return true;
     }
-    template<class Audio> bool expire(InstanceHandle h,MotionBinary64 volume,bool inWater,Audio& audio){
+    template<class Audio> bool expire(InstanceHandle h,AudioLevel volume,bool inWater,Audio& audio){
         auto* e=entry(h);auto* r=e?record(*e):nullptr;
         if(!good_||!r)return fail();
         if(e->state.attracted)return true;
@@ -147,10 +147,10 @@ public:
     }
     template<class Random,class Math,class View,class Audio>
     bool stepSource(InstanceHandle h,Random& random,bool stopped,int width,MotionBinary64 playerX,MotionBinary64 playerY,
-        Math& math,View view,Audio& audio,MotionBinary64 volume,bool inWater){
+        Math& math,View view,Audio& audio,AudioLevel volume,bool inWater){
         auto* e=entry(h);if(!good_||!e||!record(*e))return fail();
         struct Ops {
-            StoredCurrencyRegistration& owner;Entry& e;Math& math;View& view;Audio& audio;MotionBinary64 volume;bool inWater;
+            StoredCurrencyRegistration& owner;Entry& e;Math& math;View& view;Audio& audio;AudioLevel volume;bool inWater;
             bool meeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
                 auto* r=owner.record(e);return r&&owner.lifecycle_.placeMeeting(e.key,*r,object,x,y,hit);
             }

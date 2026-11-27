@@ -20,7 +20,7 @@ public:
     bool hasResource(int resource) const {
         return ready()&&resource>=0&&resource<int(samples_.size())&&!samples_[resource].pcm.empty();
     }
-    bool load(int resource,const char* path,MotionBinary64 gain);
+    bool load(int resource,const char* path,AudioLevel gain);
     bool play(int resource,int priority,bool loop,int& voice);
     bool isPlaying(int id,bool& playing);
     bool isPaused(int id,bool& paused);
@@ -28,10 +28,10 @@ public:
     bool resume(int id);
     bool stop(int id);
     bool stopAll();
-    bool getGain(int id,MotionBinary64& gain);
-    bool setGain(int id,MotionBinary64 gain,int milliseconds);
-    bool setPitch(int id,MotionBinary64 pitch);
-    bool setMasterGain(MotionBinary64 gain);
+    bool getGain(int id,AudioLevel& gain);
+    bool setGain(int id,AudioLevel gain,int milliseconds);
+    bool setPitch(int id,AudioLevel pitch);
+    bool setMasterGain(AudioLevel gain);
     void update();
 private:
     friend struct AudioSDLTestAccess;
