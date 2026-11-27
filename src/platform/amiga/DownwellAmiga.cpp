@@ -2912,6 +2912,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #else
             downwell::Input liveInput = AmigaInput::sample();
             liveInput.cancel=keyboard.cancel()||liveInput.cancel;
+            keyboard.controls(liveInput);
 #ifdef DOWNWELL_PROFILE_AUTORUN
             static unsigned profileMenuFrames = 0;
             liveInput = downwell::Input();

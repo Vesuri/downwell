@@ -69,7 +69,8 @@ own files. See [the release ReadMe](release/ReadMe) for the full instructions.
 
 Joystick in port 2: left and right move, fire jumps and shoots (hold it to keep
 shooting while you fall), and the second button cancels in the menus. On the
-keyboard, X cancels, Escape or P pauses during play, and Escape quits elsewhere.
+keyboard, A and D move, right Shift jumps and shoots, X cancels, Escape or P
+pauses during play, and Escape quits elsewhere.
 
 ## Building
 

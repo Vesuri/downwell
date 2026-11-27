@@ -49,5 +49,20 @@ int main(){
     assert(keys.samplePause()==3&&!keys.quit&&!keys.samplePause()); // P earlier, then Escape
     keys.receive(serial(0x19));assert(keys.samplePause()==2&&!keys.samplePause());
     keys.receive(serial(0x99));assert(!keys.samplePause()); // P release
-    std::puts("CIA keyboard ownership, rollback, restoration, X taps/holds, Escape and pause edges passed");
+    // A, D and right Shift hold; a Shift tap within one sample still fires.
+    {downwell::Input in;keys.sampleControls(in);assert(!in.left&&!in.right&&!in.fire);}
+    keys.receive(serial(0x20));keys.receive(serial(0x22));keys.receive(serial(0x61));
+    {downwell::Input in;keys.sampleControls(in);assert(in.left&&in.right&&in.fire);}
+    {downwell::Input in;keys.sampleControls(in);assert(in.left&&in.right&&in.fire);}
+    keys.receive(serial(0xa0));keys.receive(serial(0xa2));keys.receive(serial(0xe1));
+    {downwell::Input in;keys.sampleControls(in);assert(!in.left&&!in.right&&!in.fire);}
+    keys.receive(serial(0x61));keys.receive(serial(0xe1));
+    {downwell::Input in;keys.sampleControls(in);assert(in.fire&&!in.left);}
+    {downwell::Input in;keys.sampleControls(in);assert(!in.fire);}
+    keys.receive(serial(0x60)); // left Shift is not fire
+    {downwell::Input in;keys.sampleControls(in);assert(!in.fire);}
+    // The joystick sample is kept.
+    {downwell::Input in;in.right=true;in.fire=true;keys.sampleControls(in);assert(in.right&&in.fire&&!in.left);}
+    assert(!keys.sampleCancel()&&!keys.samplePause());
+    std::puts("CIA keyboard ownership, rollback, restoration, X taps/holds, Escape and pause edges, A/D/right Shift controls passed");
 }

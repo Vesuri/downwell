@@ -30,6 +30,7 @@ bool AmigaKeyboard::acquire(){
     base=static_cast<Library*>(OpenResource((CONST_STRPTR)CIAANAME));
     if(!base)return false;
     keys.held=false;keys.pressed=false;keys.quit=false;keys.escape=false;keys.pause=false;
+    keys.left=false;keys.right=false;keys.fire=false;keys.firePressed=false;
     vector.is_Node.ln_Type=NT_INTERRUPT;
     vector.is_Node.ln_Pri=0;
     vector.is_Node.ln_Name=(char*)"Downwell keyboard";
@@ -58,6 +59,10 @@ void AmigaKeyboard::release(){
 }
 bool AmigaKeyboard::cancel(){
     Disable();const bool value=keys.sampleCancel();Enable();return value;
+}
+void AmigaKeyboard::controls(downwell::Input& input){
+    if(!owned_)return;
+    Disable();keys.sampleControls(input);Enable();
 }
 bool AmigaKeyboard::quit()const{return owned_&&keys.quit;}
 unsigned AmigaKeyboard::pause(){
