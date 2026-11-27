@@ -5,10 +5,11 @@
 namespace downwell {
 // The compact corpse owner's object 263 with Q16 motion (W3 fixed point).
 // CorpseAnimation, its VM form and oracle, still runs on the registered
-// skeleton corpses. Create and scrDeadBody's speed writes stay binary64;
-// the first Step converts xx, yy, xsp and ysp once and they are not
-// maintained after it. The published x/y stay whole-pixel builtins and
-// health stays binary64 (it changes only on shots and blasts).
+// skeleton corpses. createWhole is Create on whole pixels and setSpeedsQ16
+// scrDeadBody's speed writes (CorpseEffects::createDeathQ16); the binary64
+// create remains for the tests, and its first Step converts xx, yy, xsp and
+// ysp once. The published x/y stay whole-pixel builtins and health stays
+// binary64 (it changes only on shots and blasts).
 // Events: meeting(x16, y16, hit) against sParentSolid with Q16
 // coordinates, area(), restInPieces(), create(object, px, py) in whole
 // pixels and destroy().
@@ -31,6 +32,50 @@ struct CorpseParticle : CorpseAnimation {
         fixed=false;x16=y16=xspUnits=yspUnits=0;
         return CorpseAnimation::create(px,py,rip,random,queries);
     }
+    // Object 263 and inherited 90 Create (CorpseBirth) at whole pixels: the
+    // same RNG draws in order and the same relocation. Its random speeds are
+    // drawn but never read: scrDeadBody overwrites both (setSpeedsQ16).
+    // Queries: wall(x, y, blocked) and tile(x, y, hit) at whole pixels, and
+    // publish(x, y) after each builtin coordinate write.
+    template<class Random,class Queries>
+    bool createWhole(std::int32_t px,std::int32_t py,bool rip,Random& random,Queries& queries){
+        *this=CorpseParticle{};
+        if(px< -100000||px>100000||py< -100000||py>100000||!x.assignInteger(px)||!y.assignInteger(py))
+            return valid=false;
+        random.nextU32();random.nextU32(); // xsp = random(6) - 3, ysp = random(4) - 2
+        if(rip)hitEffect=true;else health={};
+        alarms.set(3,8);
+        // -0.5, -0.3, 0, 0.3, 0.5 narrowed to binary32.
+        static constexpr std::uint32_t rates[]={0xbf000000u,0xbe99999au,0,0x3e99999au,0x3f000000u};
+        imageSpeed.bits=rates[random.chooseIndexSmall(5)];
+        alarms.set(0,180);alarms.set(1,120);
+        bool blocked;
+        if(!queries.wall(px,py,blocked)||(!blocked&&!queries.tile(px,py,blocked)))return valid=false;
+        if(blocked){
+            // move_snap(16, 16): round(x / 16) * 16, halves to even.
+            const std::int32_t gx=Fixed16::roundQ16(px*4096)*16,gy=Fixed16::roundQ16(py*4096)*16;
+            if(!x.assignInteger(gx)||!queries.publish(x,y)||!y.assignInteger(gy)||!queries.publish(x,y))return valid=false;
+            radius=4;maxRadius=32;
+            for(;;){
+                rx=int(random.irandomSmall(unsigned(radius*2)))-radius;
+                ry=int(random.irandomSmall(unsigned(radius*2)))-radius;
+                if(!queries.wall(gx+rx,gy+ry,blocked))return valid=false;
+                // Source deliberately checks the snapped origin for tiles,
+                // NOT the random candidate tested against walls.
+                if(!blocked&&!queries.tile(gx,gy,blocked))return valid=false;
+                if(!blocked)break;
+                if(radius<=32)radius+=4; // Reaches 36, despite rrmax=32.
+                if(++attempts>32)break; // Applies even the last blocked candidate.
+            }
+            px=gx+rx;py=gy+ry;
+            if(!x.assignInteger(px)||!queries.publish(x,y)||!y.assignInteger(py)||!queries.publish(x,y))return valid=false;
+        }
+        x16=px*65536;y16=py*65536;fixed=true;
+        return true;
+    }
+    // scrDeadBody's hspeed and vspeed writes, Q16.
+    void setSpeedsQ16(std::int32_t xsp16,std::int32_t ysp16){xspUnits=units(xsp16);yspUnits=units(ysp16);}
+    static std::int32_t speedUnits(std::int32_t q16){return units(q16);}
     template<class Events> bool step(bool stopped,Events& events){
         if(!valid)return false;
         if(destroyRequested)return true;

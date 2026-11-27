@@ -3278,7 +3278,7 @@ private:
     const downwell::AreaTitle* compactAreaTitles_=nullptr;
     unsigned compactAreaTitleCount_=0;
     const char* compactLanguage_="english";
-    bool compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool compactCorpseMeeting(int x,int y,bool platforms,bool& hit); // maskDead 599, whole pixels
     bool compactCorpseContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit);
     bool stepCompactCorpses(decltype(compactCorpses_.beginPhase()) phase);
     bool advanceCompactCorpseAlarm(unsigned alarm);
@@ -3408,6 +3408,8 @@ private:
     bool attractCompactGem(int slot);
     bool spawnCompactDebris(downwell::Fixed16 x,downwell::Fixed16 y,std::uint32_t& handle);
     bool solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
+    bool solidMeetingQ16(int mask,std::int32_t x,std::int32_t y,bool platforms,bool& hit);
+    bool solidMeetingPixel(int mask,int x,int y,bool platforms,bool& hit);
     bool solidContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit);
     downwell::MaskBoundsMemo maskBounds_;
     bool segmentSolid(const downwell::ProjectileSegment& path)const;

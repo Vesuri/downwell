@@ -3055,6 +3055,17 @@ bool GameplayWorld::solidMeeting(int mask,downwell::MotionBinary64 x,downwell::M
     return solidContact(bounds,platforms,hit);
 }
 
+bool GameplayWorld::solidMeetingQ16(int mask,std::int32_t x,std::int32_t y,bool platforms,bool& hit){
+    downwell::ContactBounds bounds;
+    if(!run_.effectsSucceeded||!downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,x,y,bounds))
+        return run_.effectsSucceeded=false;
+    return solidContact(bounds,platforms,hit);
+}
+bool GameplayWorld::solidMeetingPixel(int mask,int x,int y,bool platforms,bool& hit){
+    if(x< -32767||x>32767||y< -32767||y>32767)return run_.effectsSucceeded=false;
+    return solidMeetingQ16(mask,x*65536,y*65536,platforms,hit);
+}
+
 bool GameplayWorld::solidContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit){
     bool found=false;
     if(wallContactResolver_&&(!platforms||platformContactResolver_)){
@@ -3128,8 +3139,8 @@ struct GameplayWorld::SceneryOps {
     bool explodingKnees(bool& knees){knees=world.run_.upgrades.levels[0]!=0;return true;}
     bool createBlast(){return world.createCompactBlast(276,x,y);}
     // Torch: place_meeting with its own sprite mask.
-    bool solid(int px,int py,bool& hit){return world.solidMeeting(568,Real::fromInteger(px),Real::fromInteger(py),true,hit);}
-    bool wall(int px,int py,bool& hit){return world.solidMeeting(568,Real::fromInteger(px),Real::fromInteger(py),false,hit);}
+    bool solid(int px,int py,bool& hit){return world.solidMeetingPixel(568,px,py,true,hit);}
+    bool wall(int px,int py,bool& hit){return world.solidMeetingPixel(568,px,py,false,hit);}
     bool destroy(){destroyed=true;return true;}
     bool createFire(int px,int py){
         auto* fire=downwell::CompactScenery::append(world.scenery_.fires,world.scenery_.fireEnd);
@@ -4003,12 +4014,12 @@ bool GameplayWorld::stepGunModules(){
             const int sign=m.ysp>0?1:-1;
             const long step=((m.ysp>0?m.ysp:-m.ysp)+65535)>>16;
             bool hit=false;
-            if(!solidMeeting(m.sprite(),GunReal::fromInteger(m.x),GunReal::fromInteger(int(rounded+(sign>0?step:-step))),true,hit))return false;
+            if(!solidMeetingPixel(m.sprite(),m.x,int(rounded+(sign>0?step:-step)),true,hit))return false;
             if(hit){
                 long move=0;const long limit=m.ysp>0?m.ysp:-m.ysp;
                 for(;;){
                     bool next=false;
-                    if(!solidMeeting(m.sprite(),GunReal::fromInteger(m.x),GunReal::fromInteger(int(rounded+move+sign)),true,next))return false;
+                    if(!solidMeetingPixel(m.sprite(),m.x,int(rounded+move+sign),true,next))return false;
                     if(next)break;
                     move+=sign;
                     if((move<0?-move:move)<<16>=limit){move=0;break;}
@@ -4046,8 +4057,7 @@ bool GameplayWorld::stepCasings(){
         if(!c.live||c.birth==tick_)continue;
         c.beginStep();
         bool wall=false;
-        if(!solidMeeting(c.sprite(),GunReal::fromInteger(int((c.x+c.xsp+(1L<<15))>>16)),
-                         GunReal::fromInteger(int((c.y+(1L<<15))>>16)),false,wall))return false;
+        if(!solidMeetingPixel(c.sprite(),int((c.x+c.xsp+(1L<<15))>>16),int((c.y+(1L<<15))>>16),false,wall))return false;
         if(wall)c.xsp=-(c.xsp*7)/10;
         if(c.xsp>-3277&&c.xsp<3277)c.xsp=c.xsp>0?3277:c.xsp<0?-3277:0; // 0.05
         // scrBulCheckSolid with bdmg 0: any wall or shootable on the line
@@ -4445,7 +4455,6 @@ bool GameplayWorld::compactBulletImpact(EnemyState& enemy,downwell::Fixed16 x,do
 // first runs scrEnemyStomped's scrBloodfx. The compact families die at the
 // contact rather than in their next Step, so the chain runs there.
 bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
-    using Real=downwell::MotionBinary64;
     int sprite;
     switch(enemy.objectId){
         case 111:sprite=165;break;case 112:sprite=337;break;case 113:sprite=172;break;
@@ -4457,7 +4466,6 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
     run_.stopSound(run_.overlapSounds[1]);
     compactMomentDelay();
     compactLevelBeginCue();
-    const Real x=Real::fromInteger(enemy.x+240),y=Real::fromInteger(enemy.y+176);
     const auto px=downwell::Fixed16::fromInteger(enemy.x+240),py=downwell::Fixed16::fromInteger(enemy.y+176);
     // The eyefish's smoke and flash take its private xx/yy; it has no sound.
     const bool eyefish=enemy.objectId==114;
@@ -4481,20 +4489,14 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
     if(!compactBloodfx(px,py)||!emitBoxSmoke(fx,fy)||!run_.emitFlash<1,0,0>(fx,fy,enemyRandom_))return false;
     spawnReward(enemy,stomped);
     if(!run_.effectsSucceeded)return false;
-    downwell::DeadBodySource source;
-    source.x=x;source.y=y;source.xsp=exactQ8(enemy.speedX);
-    source.imageXscale=Real::fromInteger(enemy.objectId==117?enemy.motionState:enemy.facing);
-    Real impact;
-    if(!downwell::divideBinary64(Real::fromInteger(enemy.takenImpactDamage),Real::fromInteger(5),impact))
-        return run_.effectsSucceeded=false;
     struct Queries {
         GameplayWorld& world;
         // place_meeting(parentWall) with maskDead 599 at the birth position.
-        bool wall(Real px,Real py,bool& blocked){return world.compactCorpseMeeting(px,py,false,blocked);}
+        bool wall(int px,int py,bool& blocked){return world.compactCorpseMeeting(px,py,false,blocked);}
         // Compact walls are never replaced by depth-100 tiles (see the
         // spawner's tile query): where the original finds a tile, this world
         // still has the wall.
-        bool tile(Real,Real,bool& hit){hit=false;return true;}
+        bool tile(int,int,bool& hit){hit=false;return true;}
         bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
     };
     struct Hooks {
@@ -4505,16 +4507,19 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         bool facing(std::uint32_t,const downwell::CorpseAnimation&){return true;}
     } hooks{*this};
     // global.pugRip (Rest in Pieces): the corpse takes objHp 1 once active.
-    return compactCorpses_.createFromDeath(source,sprite,impact,102,run_.upgrades.levels[3]!=0,enemyRandom_,hooks)||
+    // scrDeadBody(dead sprite, takenImpact / 5, 102) with the enemy's xsp
+    // (Q8 speedX) and image_xscale.
+    return compactCorpses_.createDeathQ16(enemy.x+240,enemy.y+176,sprite,enemy.takenImpactDamage,enemy.speedX*256,
+        enemy.objectId==117?enemy.motionState:enemy.facing,102,run_.upgrades.levels[3]!=0,enemyRandom_,hooks)||
         (run_.effectsSucceeded=false);
 }
 
 // maskDead 599 against walls (and, for sParentSolid, platforms). The mask
 // is symmetric about the origin, so image_xscale does not move its edges.
-bool GameplayWorld::compactCorpseMeeting(downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit){
-    if(wallContactResolver_&&(!platforms||platformContactResolver_))return solidMeeting(599,x,y,platforms,hit);
+bool GameplayWorld::compactCorpseMeeting(int x,int y,bool platforms,bool& hit){
     downwell::ContactBounds bounds;
-    if(!downwell::CurrencyCollisionBounds::calculateMask(599,x,y,bounds))return run_.effectsSucceeded=false;
+    if(x< -32767||x>32767||y< -32767||y>32767||
+       !downwell::CurrencyCollisionBounds::calculateMaskQ16(599,x*65536,y*65536,bounds))return run_.effectsSucceeded=false;
     return compactCorpseContact(bounds,platforms,hit);
 }
 

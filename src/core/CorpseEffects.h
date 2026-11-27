@@ -49,6 +49,50 @@ public:
         if(!slot.effect.create(x,y,rip,random,queries)){good_=false;return 0;}
         return slot.handle;
     }
+    // scrDeadBody for the compact Q16 corpses (CorpseParticle), at the dying
+    // enemy's whole-pixel builtins: impactSp = min(damage / 5, 4); a source
+    // xsp (Q16) slower than 0.5 becomes image_xscale * 1.5; hspeed is
+    // xsp * impactSp, or +-0.5 for no impact. Each speed is the nearest Q16
+    // of the VM's. createDeadBody's order: Create, sprite, vspeed, facing,
+    // explosion, hspeed.
+    template<class Random,class Hooks>
+    bool createDeathQ16(std::int32_t x,std::int32_t y,int sprite,int damage,std::int32_t sourceXsp,
+                        int facing,int explosion,bool rip,Random& random,Hooks& hooks){
+        if(!good_)return false;
+        if(!next_||count_==Capacity||damage<0||damage>100000||facing< -8||facing>8||
+           sourceXsp< -(32<<16)||sourceXsp>(32<<16)){good_=false;return false;}
+        unsigned index=0;while(index<Capacity&&slots_[index].handle)++index;
+        if(index==Capacity){good_=false;return false;}
+        auto& slot=slots_[index];slot.effect={};
+        if(!slot.effect.x.assignInteger(x)||!slot.effect.y.assignInteger(y)){good_=false;return false;}
+        const Handle handle=slot.handle=next_++;
+        for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
+        order_[0]=index;++count_;
+        if(!hooks.birth(handle,static_cast<const CorpseAnimation&>(slot.effect))){good_=false;return false;}
+        auto&& queries=hooks.queries(handle,slot.effect);
+        if(!slot.effect.createWhole(x,y,rip,random,queries)){good_=false;return false;}
+        auto& corpse=slot.effect;
+        if(!corpse.setSprite(sprite,[&](const auto& state){return hooks.sprite(handle,state);})){good_=false;return false;}
+        // nearest(v * n / 5), no exact halves; |v| <= 2^21 and n <= 20 keep
+        // v * n * 2 inside 32 bits (no 64-bit division on the target).
+        const auto fifths=[](std::int32_t v,int n){
+            const std::int32_t t=v*n*2;return (t+(t<0?-5:5))/10;
+        };
+        const std::int32_t impact=damage>20?4*65536:fifths(65536,damage);
+        RunnerImageValue scale;
+        if(!scale.assignInteger(facing)){good_=false;return false;}
+        const auto old=corpse.imageXscale.bits;
+        if(scale.bits!=old&&((scale.bits|old)&0x7fffffffu)){
+            corpse.imageXscale=scale;
+            if(!hooks.facing(handle,corpse)){good_=false;return false;}
+        }
+        corpse.explosionFx=explosion;
+        std::int32_t xsp=sourceXsp;
+        if(xsp> -32768&&xsp<32768)xsp=facing*98304;
+        const std::int32_t speed=!damage?(xsp>0?32768:xsp<0?-32768:0):damage>20?xsp*4:fifths(xsp,damage);
+        corpse.setSpeedsQ16(speed,impact);
+        return true;
+    }
     // Shared scrDeadBody entry point. Custom fields stay in the owned corpse;
     // sprite/facing writes publish through the external collision adapter.
     // Caller mutations in source must be applied to the dying enemy by its
