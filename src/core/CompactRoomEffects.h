@@ -124,7 +124,7 @@ public:
                 e.x16+=e.xsp16;e.y16+=e.ysp16;
                 if(e.x16>=range||e.x16<=-range||e.y16>=range||e.y16<=-range)return fail();
             }
-            e.y=Fixed16::roundPixel(e.y16);e.x=Fixed16::roundPixel(e.x16);
+            e.y=Fixed16::roundQ16(e.y16);e.x=Fixed16::roundQ16(e.x16);
         }
         return true;
     }

@@ -23,8 +23,8 @@ struct DebrisParticle {
     // and the 0.05 minimum horizontal speed.
     static constexpr std::int32_t gravity=5243,hardGravity=6554,fall=-65536,bounce=45875,creep=3277;
 
-    std::int32_t pixelX()const{return Fixed16::roundPixel(x16);}
-    std::int32_t pixelY()const{return Fixed16::roundPixel(y16);}
+    std::int32_t pixelX()const{return Fixed16::roundQ16(x16);}
+    std::int32_t pixelY()const{return Fixed16::roundQ16(y16);}
     template<class Random> bool create(MotionBinary64 px,MotionBinary64 py,int area,Random& random){
         DebrisBirth birth;RunnerImageValue bx,by;Fixed16 fx,fy,vx,vy;
         // Builtin x/y narrow to binary32 first, as the VM form.

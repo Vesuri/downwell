@@ -40,15 +40,15 @@ struct CurrencyCollisionBounds {
             const int whole=int((x+0x8000)>>16);
             next.left=whole+local.left;next.right=whole+local.right;
         }else{
-            next.left=int(Fixed16::roundPixel(x+local.left*65536));
-            next.right=int(Fixed16::roundPixel(x+local.right*65536));
+            next.left=int(Fixed16::roundQ16(x+local.left*65536));
+            next.right=int(Fixed16::roundQ16(x+local.right*65536));
         }
         if((y&0xffff)!=0x8000){
             const int whole=int((y+0x8000)>>16);
             next.top=whole+local.top;next.bottom=whole+local.bottom;
         }else{
-            next.top=int(Fixed16::roundPixel(y+local.top*65536));
-            next.bottom=int(Fixed16::roundPixel(y+local.bottom*65536));
+            next.top=int(Fixed16::roundQ16(y+local.top*65536));
+            next.bottom=int(Fixed16::roundQ16(y+local.bottom*65536));
         }
         out=next;return true;
     }

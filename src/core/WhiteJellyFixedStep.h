@@ -79,9 +79,9 @@ struct WhiteJellyFixedStep : WhiteJellyBirth, CheckCollisionFixed {
                 if(!hitStun&&!steer(ops))return false;
             }
             RunnerImageValue wanted,accepted2;
-            if(!wanted.assignInteger(Fixed16::roundPixel(x16))||!ops.position(false,wanted,accepted2))return false;
+            if(!wanted.assignInteger(Fixed16::roundQ16(x16))||!ops.position(false,wanted,accepted2))return false;
             x=accepted2;
-            if(!wanted.assignInteger(Fixed16::roundPixel(y16))||!ops.position(true,wanted,accepted2))return false;
+            if(!wanted.assignInteger(Fixed16::roundQ16(y16))||!ops.position(true,wanted,accepted2))return false;
             y=accepted2;
         }else{
             RunnerImageValue accepted;

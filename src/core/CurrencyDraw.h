@@ -14,7 +14,7 @@ struct CurrencyDraw {
         out=exponent<127?0:((magnitude&0x7fffffu)|0x800000u)>>(150-exponent);
         return true;
     }
-    static bool prepare(unsigned sprite,RunnerImageValue index,MotionBinary64 x,MotionBinary64 y,
+    static bool prepare(unsigned sprite,RunnerImageValue index,Fixed16 x,Fixed16 y,
         const EffectSurfacePlacement::View& view,bool death,bool lowSpec,bool exists,Command& out){
         if(sprite!=133&&sprite!=134)return false;
         return EffectSpriteDraw::prepare(true,sprite,index,x,y,{0x3f800000u},view,death,lowSpec,exists,out);

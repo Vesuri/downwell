@@ -20,41 +20,40 @@ static void titleSurface(){
         bool present=true;unsigned begins=0,ends=0,views=0;
         bool exists(bool& out){out=present;return true;}
         bool begin(){++begins;return true;}bool end(){++ends;return true;}
-        bool view(unsigned axis,MotionBinary64& out){++views;out=MotionBinary64::fromInteger(axis?30000:1000000);return true;}
+        bool view(unsigned axis,Fixed16& out){++views;out=Fixed16::fromInteger(axis?3000:10000);return true;}
     };
     struct PositionEmit {
         int expectedX,expectedY;unsigned calls=0;
-        bool atSurface(const EffectMaskAssets::Asset&,MotionBinary64 x,MotionBinary64 y){
-            std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
-            assert(px==expectedX&&py==expectedY);++calls;return true;
+        bool atSurface(const EffectMaskAssets::Asset&,Fixed16 x,Fixed16 y){
+            assert(x==Fixed16::fromInteger(expectedX)&&y==Fixed16::fromInteger(expectedY));++calls;return true;
         }
     };
     for(unsigned token:{unsigned('A'),unsigned('.'),unsigned('1')})for(unsigned align=0;align<3;++align)for(unsigned vertical=0;vertical<3;++vertical){
         int width;assert(title_glyphs::bank.width(2,token,width));
         int height;assert(title_glyphs::bank.lineHeight(2,height)&&height==10);
         EffectMaskAssets::Asset glyph;bool ink;assert(title_glyphs::bank.resolve(2,token,0xffffff,glyph,ink)&&ink);
-        const float aligned=float(16777216-(align==1?width/2:align==2?width:0));
-        PositionEmit emit{int(aligned-float(glyph.originX)),16777220-(vertical==1?5:vertical==2?10:0)};
-        Target target;LevelNumberTextDrawState state{2,align,vertical,0xffffff,MotionBinary64::fromInteger(1)};
+        // Whole pixels: alignment and the glyph bearing are exact (W3.20).
+        PositionEmit emit{10017-(align==1?width/2:align==2?width:0)-glyph.originX,10019-(vertical==1?5:vertical==2?10:0)};
+        Target target;LevelNumberTextDrawState state{2,align,vertical,0xffffff,Fixed16::fromInteger(1)};
         LevelNumberSurfaceDraw<Target,PositionEmit> draw(title_glyphs::bank,state,target,emit);
-        assert(draw.character(token,MotionBinary64::fromInteger(16777217),MotionBinary64::fromInteger(16777219))&&emit.calls==1);
+        assert(draw.character(token,Fixed16::fromInteger(10017),Fixed16::fromInteger(10019))&&emit.calls==1);
     }
     {
         struct BearingEmit {
-            bool atSurface(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64){
-                assert(asset.originX==0&&x.high==0x3ff80000u&&x.low==0); // 0.5 + bearing 1 = 1.5
-                std::int32_t pixel;assert(x.roundPixel(pixel)&&pixel==2); // Old round(0.5)+1 gave 1.
+            bool atSurface(const EffectMaskAssets::Asset& asset,Fixed16 x,Fixed16){
+                assert(asset.originX==0&&x==Fixed16::raw(98304)); // 0.5 + bearing 1 = 1.5
+                assert(Fixed16::roundQ16(x.v)==2); // Old round(0.5)+1 gave 1.
                 return true;
             }
         } emit;
-        Target target;LevelNumberTextDrawState state{2,0,0,0xffffff,MotionBinary64::fromInteger(1)};
+        Target target;LevelNumberTextDrawState state{2,0,0,0xffffff,Fixed16::fromInteger(1)};
         LevelNumberSurfaceDraw<Target,BearingEmit> draw(title_glyphs::bank,state,target,emit);
-        assert(draw.character('1',{0x3fe00000u,0},{}));
+        assert(draw.character('1',Fixed16::raw(32768),{}));
     }
     SmokeEffects<1> smoke;EffectMaskAssets assets;
     auto composition=std::make_unique<CurrencySmokeComposition>();
-    const EffectSurfacePlacement::View view{MotionBinary64::fromInteger(1000000),
-        MotionBinary64::fromInteger(30000),MotionBinary64::fromInteger(160),MotionBinary64::fromInteger(284)};
+    const EffectSurfacePlacement::View view{Fixed16::fromInteger(10000),
+        Fixed16::fromInteger(3000),Fixed16::fromInteger(160),Fixed16::fromInteger(284)};
     const unsigned tokens[]={'A','#','B'};
     std::vector<unsigned char> expected(160*284);
     for(unsigned letter:{0u,2u})for(unsigned pass=0;pass<5;++pass){
@@ -68,15 +67,15 @@ static void titleSurface(){
     }
     for(unsigned mode=0;mode<4;++mode){
         Target target;target.present=mode!=3;
-        LevelNumber<3> title;assert(title.create(3,MotionBinary64::fromInteger(24),
+        LevelNumber<3> title;assert(title.create(3,Fixed16::fromInteger(24),
             [&](unsigned i,unsigned& out){out=tokens[i-1];return true;}));title.shown=3;
-        LevelNumberTextDrawState state{2,0,0,123,MotionBinary64::fromInteger(1)};
+        LevelNumberTextDrawState state{2,0,0,123,Fixed16::fromInteger(1)};
         CurrencySmokeComposition::Settings settings;settings.death=mode==1;settings.lowSpec=mode==2;
         assert(composition->prepareWithSurfaceProducers([](auto){},smoke,assets,view,settings,
             [](auto){return true;},[&](auto emit){
                 LevelNumberSurfaceDraw<Target,decltype(emit)> draw(title_glyphs::bank,state,target,emit);
                 return title.draw(draw);
-            },[](auto){},[](MotionBinary64 value,std::int32_t& out){return value.roundPixel(out);}));
+            },[](auto){},[](Fixed16 value,std::int32_t& out){out=Fixed16::roundQ16(value.v);return true;}));
         std::vector<unsigned char> actual(160*284);
         composition->surface().visit([&](unsigned x,unsigned y,std::uint16_t alpha,std::uint16_t lo,std::uint16_t hi){
             for(unsigned b=0;b<16;++b)if(alpha&(0x8000>>b))actual[y*160+x+b]=((lo>>(15-b))&1)|(((hi>>(15-b))&1)<<1);
@@ -90,14 +89,14 @@ static void titleSurface(){
     // defaults. A rejected draw retains the source's partial mutation prefix.
     for(unsigned mode=0;mode<4;++mode){
         Target target;LevelNumber<1> title;
-        assert(title.create(1,MotionBinary64::fromInteger(8),[](unsigned,unsigned& c){c='A';return true;}));
+        assert(title.create(1,Fixed16::fromInteger(8),[](unsigned,unsigned& c){c='A';return true;}));
         LevelNumberTextDrawState state{mode==0?0u:2u,mode==1?3u:0u,mode==2?3u:0u,123,
-            MotionBinary64::fromInteger(mode==3?0:1)};
+            Fixed16::fromInteger(mode==3?0:1)};
         assert(!composition->prepareWithSurfaceProducers([](auto){},smoke,assets,view,{},
             [](auto){return true;},[&](auto emit){
                 LevelNumberSurfaceDraw<Target,decltype(emit)> draw(title_glyphs::bank,state,target,emit);
                 return title.draw(draw);
-            },[](auto){},[](MotionBinary64 value,std::int32_t& out){return value.roundPixel(out);}));
+            },[](auto){},[](Fixed16 value,std::int32_t& out){out=Fixed16::roundQ16(value.v);return true;}));
         assert(!composition->visible()&&target.begins==1&&!target.ends&&state.color==0&&title.characters[1].offset==-2);
     }
 }
@@ -158,12 +157,12 @@ struct Draw {
     bool color(unsigned value){colors.push_back(value);return colors.size()!=failColor;}
     bool exists(bool& result){result=surface;return true;}
     bool begin(){return true;}
-    bool view(unsigned axis,MotionBinary64& value){
+    bool view(unsigned axis,Fixed16& value){
         assert(axis==unsigned(views>=2));
-        const int positions[]={100,101,200,202};value=MotionBinary64::fromInteger(positions[views++]);return true;
+        const int positions[]={100,101,200,202};value=Fixed16::fromInteger(positions[views++]);return true;
     }
-    bool character(unsigned token,MotionBinary64 x,MotionBinary64 y){
-        std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
+    bool character(unsigned token,Fixed16 x,Fixed16 y){
+        const std::int32_t px=Fixed16::roundQ16(x.v),py=Fixed16::roundQ16(y.v);
         tokens.push_back(token);xs.push_back(px);ys.push_back(py);return tokens.size()!=failCharacter;
     }
     bool end(){++ends;return true;}
@@ -192,20 +191,20 @@ int main(){
     for(const auto& area:area_titles::entries)for(bool hard:{false,true}){
         LevelNumberText<64> text;LevelNumber<64> state;unsigned measures=0;
         assert(text.create(state,area_titles::entries,area_titles::count,area.language,area.area,3,hard,
-            [&](unsigned count,auto at,MotionBinary64& width){
+            [&](unsigned count,auto at,Fixed16& width){
                 ++measures;assert(count==area.length+(hard?3u:2u));
                 for(unsigned i=0;i<area.length;++i){unsigned c;assert(at(i,c)&&c==area.characters[i]);}
-                width=MotionBinary64::fromInteger(37);return true;
+                width=Fixed16::fromInteger(37);return true;
             }));
-        assert(measures==1&&state.length==area.length+(hard?3u:2u)&&state.width.high==MotionBinary64::fromInteger(37).high);
+        assert(measures==1&&state.length==area.length+(hard?3u:2u)&&state.width==Fixed16::fromInteger(37));
         for(unsigned i=0;i<area.length;++i)assert(state.characters[i+1].token==area.characters[i]);
         assert(state.characters[area.length+1].token=='-'&&state.characters[state.length].token=='3');
         if(hard)assert(state.characters[area.length+2].token=='H');
         LevelNumberText<64> measuredText;LevelNumber<64> measured;
         assert(measuredText.create(measured,area_titles::entries,area_titles::count,area.language,area.area,3,hard,
-            [&](unsigned count,auto at,MotionBinary64& width){
+            [&](unsigned count,auto at,Fixed16& width){
                 std::int32_t pixels;if(!fonts.stringWidth(2,count,at,pixels))return false;
-                width=MotionBinary64::fromInteger(pixels);return true;
+                width=Fixed16::fromInteger(pixels);return true;
             }));
         PackedFont font;assert(fonts.font(2,font));int expected=0;
         for(unsigned i=1;i<=measured.length;++i){
@@ -243,14 +242,14 @@ int main(){
         const unsigned tokens[]={0x0410,'*',0x30a2};const AreaTitle area{"test",1,tokens,3};
         LevelNumberText<32> text;LevelNumber<32> state;
         assert(text.create(state,&area,1,"test",1,-2147483647-1,true,
-            [](unsigned count,auto at,MotionBinary64& width){
+            [](unsigned count,auto at,Fixed16& width){
                 unsigned c;assert(count==16&&at(1,c)&&c=='\n');width={};return true;
             }));
         assert(state.characters[1].token==0x0410&&state.characters[2].token=='#'&&state.characters[3].token==0x30a2&&
             state.characters[6].token=='-'&&state.characters[16].token=='8');
         LevelNumberText<8> missing;LevelNumber<8> fallback;
         assert(missing.create(fallback,nullptr,0,"missing",9,0,false,
-            [](unsigned count,auto,MotionBinary64& width){assert(count==3);width={};return true;})&&fallback.characters[1].token==' ');
+            [](unsigned count,auto,Fixed16& width){assert(count==3);width={};return true;})&&fallback.characters[1].token==' ');
         LevelNumberText<2> shortText;LevelNumber<2> shortState;
         assert(!shortText.create(shortState,&area,1,"test",1,1,false,[](auto...){std::abort();return false;})&&!shortState.created);
         LevelNumberText<32> bad;LevelNumber<32> badState;
@@ -262,14 +261,14 @@ int main(){
         Numbers native(Numbers::Binding::bindPositionedDestruction(life));
         InstanceHandle key;
         assert(native.create(1000,MotionBinary64::fromInteger(241),MotionBinary64::fromInteger(603),
-            [&](auto h,auto& state){assert(native.find(h)&&!state.created);return state.create(3,MotionBinary64::fromInteger(5),read);},key));
+            [&](auto h,auto& state){assert(native.find(h)&&!state.created);return state.create(3,Fixed16::fromInteger(5),read);},key));
         assert(native.size()==1&&life.births==1);
         assert(native.activate(key,false));
         Draw inactive;
         assert(native.draw(key,inactive)&&inactive.tokens.empty());
         for(unsigned slot=0;slot<12;++slot)assert(native.advanceAlarm(key,slot));
         assert(native.find(key)->state.alarms.get(0)==4&&native.activate(key,true));
-        LevelNumber<8> oracle;assert(oracle.create(3,MotionBinary64::fromInteger(5),read));
+        LevelNumber<8> oracle;assert(oracle.create(3,Fixed16::fromInteger(5),read));
         for(unsigned tick=1;tick<=142;++tick){
             for(unsigned alarm=0;alarm<12;++alarm){
                 const bool okay=native.advanceAlarm(key,alarm);
@@ -302,7 +301,7 @@ int main(){
             native.find(native.sourceHandle(1000))->state.alarms.get(0)==-1);
     }
     LevelNumber<8> title;
-    assert(title.create(3,MotionBinary64::fromInteger(5),read));
+    assert(title.create(3,Fixed16::fromInteger(5),read));
     assert(title.shown==1&&title.i==4&&title.alarms.get(0)==4);
     Draw absent;absent.surface=false;
     assert(title.draw(absent)&&!absent.views&&!absent.ends&&title.characters[1].offset==-2);
@@ -324,7 +323,7 @@ int main(){
         assert(destroyed==unsigned(tick==142));
     }
     assert(title.destroyRequested);
-    LevelNumber<8> exiting;assert(exiting.create(3,MotionBinary64::fromInteger(5),read));
+    LevelNumber<8> exiting;assert(exiting.create(3,Fixed16::fromInteger(5),read));
     exiting.exit=1;exiting.characters[1].offset=3;
     Draw exitDraw;assert(exiting.draw(exitDraw)&&exiting.characters[1].offset==4&&
         exitDraw.tokens==std::vector<int>({102,102,102,102,102,103,103,103,103,103}));
@@ -333,7 +332,7 @@ int main(){
     assert(!failed.draw(rejected)&&!failed.good&&failed.characters[1].offset==-1&&
         failed.characters[2].offset==-2&&!rejected.ends&&failed.i==2);
     for(unsigned failure=1;failure<=7;++failure){
-        LevelNumber<8> interrupted;assert(interrupted.create(1,MotionBinary64::fromInteger(5),read));
+        LevelNumber<8> interrupted;assert(interrupted.create(1,Fixed16::fromInteger(5),read));
         Draw ops;
         if(failure<=5)ops.failCharacter=failure;
         else ops.failColor=failure-5;

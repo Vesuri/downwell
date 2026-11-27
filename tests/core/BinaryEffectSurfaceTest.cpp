@@ -36,7 +36,7 @@ int main(int argc,char**argv){
     downwell::EffectMaskAssets shared;
     check(shared.bind(pack.data(),pack.size()));
     {
-        using Real=downwell::MotionBinary64;
+        using Real=downwell::Fixed16;
         const downwell::EffectSurfacePlacement::View view{Real::fromInteger(160),Real::fromInteger(34),
             Real::fromInteger(160),Real::fromInteger(284)};
         for(unsigned sprite:{172u,206u})for(bool mirrored:{false,true}){
@@ -59,7 +59,7 @@ int main(int argc,char**argv){
                 std::int32_t rx,ry;
                 check(corpse.x.promoted().roundPixel(rx)&&corpse.y.promoted().roundPixel(ry));
                 const Real ex=Real::fromInteger(rx),ey=Real::fromInteger(ry);
-                check(x.high==ex.high&&x.low==ex.low&&y.high==ey.high&&y.low==ey.low);
+                check(x==ex&&y==ey);
                 ++emitted;return true;
             };
             check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);

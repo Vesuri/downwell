@@ -2072,7 +2072,8 @@ public:
             if((record.objectId!=115&&record.objectId!=269&&record.objectId!=120)||!record.active||record.destroyRequested)return true;
             RunnerImageValue x,y;
             std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
-            return visit(x.promoted(),y.promoted());
+            Fixed16 fx,fy;
+            return Fixed16::fromBinary32(x.bits,fx)&&Fixed16::fromBinary32(y.bits,fy)&&visit(fx,fy);
         });
     }
     template<unsigned Capacity> bool boneInView(

@@ -43,7 +43,7 @@ struct CorpseParticle : CorpseAnimation {
         if(!valid)return false;
         if(destroyRequested)return true;
         long yq8;
-        if(fixed)yq8=long(Fixed16::roundPixel(y16))*256;
+        if(fixed)yq8=long(Fixed16::roundQ16(y16))*256;
         else{
             Fixed16 v;if(!Fixed16::fromBinary64(y.promoted(),v)){valid=false;return false;}
             yq8=long(v.v>>8);
@@ -117,7 +117,7 @@ private:
             std::int32_t dx=xspUnits,dy=yspUnits;
             if(events.area()==3){dx=ratio(dx,1,4);dy=ratio(dy,1,4);}
             x16+=q16(dx);y16+=q16(dy);
-            const std::int32_t px=Fixed16::roundPixel(x16),py=Fixed16::roundPixel(y16);
+            const std::int32_t px=Fixed16::roundQ16(x16),py=Fixed16::roundQ16(y16);
             if(!y.assignInteger(py)||!x.assignInteger(px))return false;
             checkRange=4;
             if(events.restInPieces()){

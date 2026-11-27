@@ -36,7 +36,7 @@ public:
         int viewX,int viewY,int width,int screenX):glyphs_(glyphs),state_(state),renderer_(renderer),
         viewX_(viewX),viewY_(viewY),width_(width),screenX_(screenX){}
     bool widthHashText(const char* text,MotionBinary64& result){
-        if(!convert(text)||state_.valign||state_.halign>2||state_.alpha.high!=0x3ff00000u||state_.alpha.low)return false;
+        if(!convert(text)||state_.valign||state_.halign>2||state_.alpha!=Fixed16::fromInteger(1))return false;
         int width=0,maximum=0;
         for(unsigned i=0;converted_[i];++i){
             const unsigned c=static_cast<unsigned char>(converted_[i]);

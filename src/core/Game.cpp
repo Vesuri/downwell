@@ -313,7 +313,7 @@ void Game::renderMain(Renderer& renderer) const {
     const float viewY = static_cast<float>(startup_.mainCameraRenderViewY());
     const bool composite = effectAssets_ && !startup_.mainDeathSequence().active;
     if (effectAssets_) {
-        using Real = MotionBinary64;
+        using Real = Fixed16;
         const EffectSurfacePlacement::View view{Real::fromInteger(int(viewX)),Real::fromInteger(int(viewY)),
             Real::fromInteger(160),Real::fromInteger(284)};
         CurrencySmokeComposition::Settings settings;
@@ -354,9 +354,9 @@ void Game::renderMain(Renderer& renderer) const {
                         const StartupRuntime& world;
                         bool exists(bool& present){present=true;return true;}
                         bool begin(){return true;}bool end(){return true;}
-                        bool view(unsigned axis,MotionBinary64& value){
+                        bool view(unsigned axis,Fixed16& value){
                             if(axis>1)return false;
-                            value=MotionBinary64::fromInteger(axis?world.mainCameraRenderViewY():world.mainCameraRenderViewX());
+                            value=Fixed16::fromInteger(axis?world.mainCameraRenderViewY():world.mainCameraRenderViewX());
                             return true;
                         }
                     } target{startup_};
@@ -380,7 +380,7 @@ void Game::renderMain(Renderer& renderer) const {
                     emit(Real::fromInteger(instance.x),Real::fromInteger(instance.y));
             }
             shadesSucceeded=startup_.visitRegisteredEnemyShades([&](Real x,Real y){emit(x,y);return true;});
-        }, [](Real n,std::int32_t& out){return n.roundPixel(out);});
+        }, [](Real n,std::int32_t& out){out=Fixed16::roundQ16(n.v);return true;});
         renderingSucceeded_=renderingSucceeded_&&shadesSucceeded;
         if (!renderingSucceeded_) return;
     }

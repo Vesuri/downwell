@@ -53,7 +53,7 @@ int main(){
                 const std::int32_t v=whole*65536+fraction;
                 downwell::ContactBounds b;if(!downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,v,v-3*65536,b))continue;
                 const auto l=downwell::contactSpriteBounds(mask);
-                const auto r=[](std::int32_t q){return int(downwell::Fixed16::roundPixel(q));};
+                const auto r=[](std::int32_t q){return int(downwell::Fixed16::roundQ16(q));};
                 check(b.left==r(v+l.left*65536)&&b.right==r(v+l.right*65536)&&
                       b.top==r(v-3*65536+l.top*65536)&&b.bottom==r(v-3*65536+l.bottom*65536));++checked;
             }

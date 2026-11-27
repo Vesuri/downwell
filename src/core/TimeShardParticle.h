@@ -214,7 +214,7 @@ struct TimeShardParticle {
         bool retire=false;
         if(!outside(*this,retire))return false;
         if(retire&&!requestDestroy())return false;
-        x.v=Fixed16::roundPixel(x16);y.v=Fixed16::roundPixel(y16);
+        x.v=Fixed16::roundQ16(x16);y.v=Fixed16::roundQ16(y16);
         return true;
     }
 private:

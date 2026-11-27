@@ -5,13 +5,14 @@
 #include <cstdio>
 using namespace downwell;
 static MotionBinary64 integer(int n){return MotionBinary64::fromInteger(n);}
+static Fixed16 q16(int n){return Fixed16::fromInteger(n);}
 int main(){
     GameMakerRandom random(42);
     DebrisAnimation effect;
     assert(effect.create(integer(12),integer(24),1,random));
     // No conversion to an integer sprite frame is allowed in draw routing.
     effect.imageIndex.bits=0x40d80000u; // 6.75, including a pre-animation write.
-    const EffectSurfacePlacement::View view{integer(10),integer(20),integer(160),integer(284)};
+    const EffectSurfacePlacement::View view{q16(10),q16(20),q16(160),q16(284)};
     unsigned cases=0;
     for(unsigned sprite:{91u,115u,116u})for(unsigned quarter=0;quarter<=28;++quarter){
         RunnerImageValue index;auto n=integer(quarter);n.high-=2u<<20; // quarter/4, except zero
@@ -39,8 +40,7 @@ int main(){
         assert(body.placement.target==command.placement.target);
         if(body.placement.target!=EffectSurfacePlacement::hidden){
             assert(body.sprite==206&&body.imageIndex.bits==0x3f400000u&&body.scaleX.bits==0xbf800000u);
-            assert(body.placement.x.high==command.placement.x.high&&body.placement.x.low==command.placement.x.low);
-            assert(body.placement.y.high==command.placement.y.high&&body.placement.y.low==command.placement.y.low);
+            assert(body.placement.x==command.placement.x&&body.placement.y==command.placement.y);
         }
         const bool draw=!destroyed&&flash<=0;
         const auto target=!draw?EffectSurfacePlacement::hidden:
@@ -50,19 +50,19 @@ int main(){
         assert(command.placement.target==target);
         if(target!=EffectSurfacePlacement::hidden){
             assert(command.sprite==unsigned(effect.spriteId)&&command.imageIndex.bits==0x40d80000u);
-            const auto px=integer(target==EffectSurfacePlacement::direct?x:x-10);
-            const auto py=integer(target==EffectSurfacePlacement::direct?y:y-20);
-            assert(command.placement.x.high==px.high&&command.placement.x.low==px.low);
-            assert(command.placement.y.high==py.high&&command.placement.y.low==py.low);
+            const auto px=q16(target==EffectSurfacePlacement::direct?x:x-10);
+            const auto py=q16(target==EffectSurfacePlacement::direct?y:y-20);
+            assert(command.placement.x==px&&command.placement.y==py);
         }else assert(command.sprite==0&&command.imageIndex.bits==0);
         assert(random.drawCount()==before.drawCount());
         ++cases;
     }
     // Failed arithmetic must not publish a partially changed command.
     effect.destroyRequested=false;effect.flash=-1;
-    auto invalid=view;invalid.width={0x7ff00000u,0};
+    const auto savedX=effect.x;effect.x.bits=0x7fc00000u; // NaN has no Q16 value.
     DebrisDraw::Command unchanged;unchanged.sprite=123;
-    assert(!DebrisDraw::prepare(effect,invalid,false,false,true,unchanged));
+    assert(!DebrisDraw::prepare(effect,view,false,false,true,unchanged));
+    effect.x=savedX;
     assert(unchanged.sprite==123);
     assert(DebrisDraw::sourceDepth==-1000);
     assert(CorpseDraw::sourceDepth==1000);
@@ -71,10 +71,10 @@ int main(){
     assert(!CorpseDraw::prepare(invalidCorpse,view,false,false,true,preserved)&&preserved.sprite==123);
     effect.x.bits=0x41440000u;effect.y.bits=0x41c40000u; // 12.25, 24.5
     assert(DebrisDraw::prepare(effect,view,false,false,true,unchanged));
-    assert(unchanged.placement.x.high==0x40020000u&&unchanged.placement.x.low==0); // 2.25
-    assert(unchanged.placement.y.high==0x40120000u&&unchanged.placement.y.low==0); // 4.5
+    assert(unchanged.placement.x==Fixed16::raw(147456)); // 2.25
+    assert(unchanged.placement.y==Fixed16::raw(294912)); // 4.5
     assert(DebrisDraw::prepare(effect,view,true,false,false,unchanged));
-    assert(unchanged.placement.x.high==0x40288000u&&unchanged.placement.x.low==0);
-    assert(unchanged.placement.y.high==0x40388000u&&unchanged.placement.y.low==0);
+    assert(unchanged.placement.x==Fixed16::raw(802816)); // 12.25
+    assert(unchanged.placement.y==Fixed16::raw(1605632)); // 24.5
     std::printf("Debris Draw: %u visibility/route/flash cases retain source subimage and coordinates\n",cases);
 }

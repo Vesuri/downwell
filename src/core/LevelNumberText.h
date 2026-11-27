@@ -34,13 +34,13 @@ template<unsigned Capacity> struct LevelNumberText {
         do{digits[n++]=magnitude%10;magnitude/=10;}while(magnitude);
         if(negative&&!append('-'))return false;
         while(n)if(!append('0'+digits[--n]))return false;
-        MotionBinary64 width;
+        Fixed16 width;
         // string_width receives hash-converted text, while string_char_at
         // receives the original title. Do not replace stored hashes by LF.
         auto measuredCharacter=[&](unsigned i,unsigned& c){
             if(i>=length)return false;c=characters[i]=='#'?'\n':characters[i];return true;
         };
-        if(!measure(length,measuredCharacter,width)||!width.valid())return good=false;
+        if(!measure(length,measuredCharacter,width))return good=false;
         return good=state.create(length,width,[&](unsigned i,unsigned& c){
             if(!i||i>length)return false;c=characters[i-1];return true;
         });
@@ -64,9 +64,10 @@ struct LevelNumberTextContext {
     template<unsigned Capacity> bool initialize(LevelNumber<Capacity>& state,const RunStage& stage)const{
         LevelNumberText<Capacity> text;
         return text.create(state,titles,titleCount,language,stage.area,stage.level,hardMode,
-            [&](unsigned length,auto read,MotionBinary64& width){
+            [&](unsigned length,auto read,Fixed16& width){
                 std::int32_t pixels;if(!fonts.stringWidth(fontId,length,read,pixels))return false;
-                width=MotionBinary64::fromInteger(pixels);return true;
+                if(pixels<0||pixels>32767)return false;
+                width=Fixed16::fromInteger(pixels);return true;
             });
     }
 };

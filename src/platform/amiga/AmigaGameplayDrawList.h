@@ -43,7 +43,7 @@ public:
             const downwell::EffectSurfacePlacement::View& camera;
             bool exists(bool& present){present=true;return true;}
             bool begin(){return true;}bool end(){return true;}
-            bool view(unsigned axis,downwell::MotionBinary64& value){
+            bool view(unsigned axis,downwell::Fixed16& value){
                 if(axis>1)return false;
                 value=axis?camera.y:camera.x;return true;
             }

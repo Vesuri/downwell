@@ -37,7 +37,7 @@ struct DebrisDraw {
         if(!prepare(effect,view,false,false,true,command))return false;
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
         return frame(command.sprite,command.imageIndex,subimage)&&assets.debris(command.sprite,subimage,asset)&&
-            emit(asset,effect.x.promoted(),effect.y.promoted());
+            EffectSpriteDraw::emitAt(emit,asset,effect.x,effect.y);
     }
     // The compact world's Q16 debris: drawFx at its rounded pixel.
     template<class Emit>
@@ -52,7 +52,7 @@ struct DebrisDraw {
                 assets.debris(effect.spriteId,subimage,asset)&&emit(asset,px,py);
         }
         Command command;
-        const auto x=MotionBinary64::fromInteger(px),y=MotionBinary64::fromInteger(py);
+        const auto x=Fixed16::fromInteger(px),y=Fixed16::fromInteger(py);
         if(!EffectSpriteDraw::prepare(true,effect.spriteId,effect.imageIndex,x,y,{0x3f800000u},
             view,false,false,true,command))return false;
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
@@ -63,7 +63,7 @@ struct DebrisDraw {
                         const EffectSurfacePlacement::View& view,
                         bool death,bool lowSpec,bool surfaceExists,Command& out){
         return EffectSpriteDraw::prepare(!effect.destroyRequested&&effect.flash<=0,
-            effect.spriteId,effect.imageIndex,effect.x.promoted(),effect.y.promoted(),
+            effect.spriteId,effect.imageIndex,effect.x,effect.y,
             {0x3f800000u},view,death,lowSpec,surfaceExists,out);
     }
 };

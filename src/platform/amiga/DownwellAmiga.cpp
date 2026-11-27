@@ -4410,7 +4410,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     !fieldShape.visible&&!gameplayFields[back].present())
                 gameplayRows.queue(gameDisplay[back], gameBitmap, back);
             DW_CENSUS_PART(censusPartComposition);
-            using Real = downwell::MotionBinary64;
+            using Real = downwell::Fixed16;
             bool hardwareEntryCover=false;
             // Immutable cover DMA cannot reproduce shade-subtracted alpha.
             if(!actorList.entryCoverHardwareEligible(port,worldViewX,worldViewY,hardwareEntryCover)){
@@ -4467,7 +4467,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                             emit(std::int32_t(240+enemy.x),std::int32_t(176+enemy.y));
                     }
                     shadesSucceeded=port.visitRegisteredEnemyShades([&](Real x,Real y){emit(x,y);return true;});
-                },[](Real n,std::int32_t& out){return n.roundPixel(out);})||!shadesSucceeded){
+                },[](Real n,std::int32_t& out){out=Real::roundQ16(n.v);return true;})||!shadesSucceeded){
                     exitCode=downwellGameplayFailed(__LINE__);break;
                 }
             }

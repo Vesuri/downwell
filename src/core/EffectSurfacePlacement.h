@@ -1,112 +1,67 @@
 #ifndef DOWNWELL_CORE_EFFECT_SURFACE_PLACEMENT_H
 #define DOWNWELL_CORE_EFFECT_SURFACE_PLACEMENT_H
-#include "RunnerRealComparison.h"
-#include "MultiplyBinary64.h"
+#include "FixedPoint.h"
 namespace downwell {
 // drawFx/drawShade placement only. Surface lifetime, draw ordering and GPU
 // subtract/alpha composition remain the renderer's responsibility.
+// W3.20: coordinates are Q16. The runner compares reals with a 1e-5
+// equality band; a Q16 step (1/65536) is wider than the band, so strict
+// Q16 comparisons are that comparison exactly for Q16 inputs.
 struct EffectSurfacePlacement {
+    using Real=Fixed16;
     enum Target { hidden, direct, effects, shade };
-    struct View { MotionBinary64 x,y,width,height; };
-    struct Draw { Target target=hidden; MotionBinary64 x{},y{}; };
-    static bool inView(MotionBinary64 x,MotionBinary64 y,const View& view,bool& visible) {
-        std::int32_t ix,iy,vx,vy,w,h;
-        if(smallInteger(x,ix) && smallInteger(y,iy) &&
-           smallInteger(view.x,vx) && smallInteger(view.y,vy) &&
-           smallInteger(view.width,w) && smallInteger(view.height,h)){
-            // Each input is an exact integer with magnitude below 2^21.
-            // Sums/differences are exact in binary64 and fit signed 32 bits.
-            // A nonzero integer is outside the runner's 1e-5 equality band;
-            // strict integer comparisons therefore preserve all four tests.
-            visible=ix>vx && ix<vx+w && iy>vy && iy<vy+h;
-            return true;
-        }
-        auto right=view.x,bottom=view.y;int l,r,t,b;
-        if(!right.add(view.width) || !bottom.add(view.height) ||
-           !compareRunnerReal(x,view.x,l) || !compareRunnerReal(x,right,r) ||
-           !compareRunnerReal(y,view.y,t) || !compareRunnerReal(y,bottom,b))return false;
-        visible=l>0 && r<0 && t>0 && b<0;return true;
+    struct View { Real x,y,width,height; };
+    struct Draw { Target target=hidden; Real x{},y{}; };
+    static bool inView(Real x,Real y,const View& view,bool& visible) {
+        visible=x>view.x && x<view.x+view.width && y>view.y && y<view.y+view.height;
+        return true;
     }
-    static bool relative(MotionBinary64 world,MotionBinary64 camera,MotionBinary64& out) {
-        std::int32_t a,b;
-        if(smallInteger(world,a) && smallInteger(camera,b)){
-            out=MotionBinary64::fromInteger(a-b);
-            // Exact cancellation yields +0, except -0 minus +0 yields -0.
-            if(!a && !b)out.high=(world.high&~camera.high)&0x80000000u;
-            return true;
-        }
-        camera.high^=0x80000000u;
-        if(!world.add(camera))return false;
-        out=world;return true;
+    static bool relative(Real world,Real camera,Real& out) {out=world-camera;return true;}
+    // round(world / 2) * 2, halves to even: odd whole pixels go to the
+    // multiple of four (an even half), not always up or down.
+    static Real snapShade(Real world) {
+        std::int32_t half=(world.v+0x10000)>>17;
+        if((world.v&0x1ffff)==0x10000 && (half&1))--half;
+        return Real::fromInteger(half*2);
     }
-    static bool snapShade(MotionBinary64 world,MotionBinary64& out) {
-        std::int32_t integer;
-        if(smallInteger(world,integer)){
-            unsigned magnitude=static_cast<unsigned>(integer<0?-integer:integer);
-            // Odd integers are exactly halfway between even pixels. Select
-            // the multiple of four (an even half), not always up or down.
-            if(magnitude&1u)magnitude=(magnitude+1u)&~3u;
-            out=MotionBinary64::fromInteger(integer<0?-static_cast<std::int32_t>(magnitude):
-                                                        static_cast<std::int32_t>(magnitude));
-            return true;
-        }
-        MotionBinary64 half;std::int32_t rounded;
-        if(!multiplyBinary64(world,{0x3fe00000u,0},half) || !half.roundPixel(rounded) ||
-           rounded < -1073741824 || rounded > 1073741823)return false;
-        out=MotionBinary64::fromInteger(rounded*2);return true;
-    }
-    static bool fx(MotionBinary64 x,MotionBinary64 y,const View& view,
+    static bool snapShade(Real world,Real& out) {out=snapShade(world);return true;}
+    static bool fx(Real x,Real y,const View& view,
                    bool death,bool lowSpec,bool surfaceExists,Draw& out) {
         Draw next;
         if(death || lowSpec)next={direct,x,y};
         else {
-            bool visible;
-            if(!inView(x,y,view,visible))return false;
-            if(visible && surfaceExists){
-                next.target=effects;
-                if(!relative(x,view.x,next.x) || !relative(y,view.y,next.y))return false;
-            }
+            bool visible;inView(x,y,view,visible);
+            if(visible && surfaceExists)next={effects,x-view.x,y-view.y};
         }
         out=next;return true;
     }
     // drawOnSurface: unlike drawFx, no origin visibility or death/lowSpec gate.
     // A missing surface produces no draw, not a direct-render fallback.
-    static bool onSurface(MotionBinary64 x,MotionBinary64 y,const View& view,
+    static bool onSurface(Real x,Real y,const View& view,
                           bool surfaceExists,Draw& out){
         Draw next;
-        if(surfaceExists){
-            next.target=effects;
-            // VM computes the Y argument before X.
-            if(!relative(y,view.y,next.y)||!relative(x,view.x,next.x))return false;
-        }
+        if(surfaceExists)next={effects,x-view.x,y-view.y};
         out=next;return true;
     }
-    static bool enemyShade(MotionBinary64 x,MotionBinary64 y,const View& view,
+    static bool enemyShade(Real x,Real y,const View& view,
                            bool lowSpec,bool noControl,bool surfaceExists,Draw& out) {
         Draw next;
         if(!lowSpec){
-            bool visible;
-            if(!inView(x,y,view,visible))return false;
-            if(visible && !noControl && surfaceExists){
-                MotionBinary64 sx,sy;
-                next.target=shade;
-                if(!snapShade(x,sx) || !snapShade(y,sy) ||
-                   !relative(sx,view.x,next.x) || !relative(sy,view.y,next.y))return false;
-            }
+            bool visible;inView(x,y,view,visible);
+            if(visible && !noControl && surfaceExists)
+                next={shade,snapShade(x)-view.x,snapShade(y)-view.y};
         }
         out=next;return true;
     }
-    // Whole-pixel producers (gem and enemy positions). With the view and both
-    // coordinates inside smallPixel, fx and enemyShade take only their
-    // smallInteger branches, which these reproduce without binary64 values:
-    // the result is the pixel their placement would round to. Any input
-    // outside that range must use the binary64 entry points.
+    // Whole-pixel producers (gem and enemy positions): the same placement
+    // without Q16 values, for whole pixels inside smallPixel.
     struct PixelView { std::int32_t x,y,width,height; };
     static bool pixelView(const View& view,PixelView& out){
-        return smallInteger(view.x,out.x)&&smallInteger(view.y,out.y)&&
-               smallInteger(view.width,out.width)&&smallInteger(view.height,out.height);
+        if((view.x.v|view.y.v|view.width.v|view.height.v)&0xffff)return false;
+        out={view.x.v>>16,view.y.v>>16,view.width.v>>16,view.height.v>>16};
+        return true;
     }
-    static bool smallPixel(std::int32_t n){return n>-(1<<21)&&n<(1<<21);}
+    static bool smallPixel(std::int32_t n){return n>-(1<<14)&&n<(1<<14);}
     static bool pixelInView(std::int32_t x,std::int32_t y,const PixelView& v){
         return x>v.x && x<v.x+v.width && y>v.y && y<v.y+v.height;
     }
@@ -114,20 +69,6 @@ struct EffectSurfacePlacement {
         unsigned magnitude=static_cast<unsigned>(integer<0?-integer:integer);
         if(magnitude&1u)magnitude=(magnitude+1u)&~3u;
         return integer<0?-static_cast<std::int32_t>(magnitude):static_cast<std::int32_t>(magnitude);
-    }
-private:
-    static bool smallInteger(MotionBinary64 value,std::int32_t& out){
-        if(value.low)return false;
-        const unsigned magnitude=value.high&0x7fffffffu;
-        if(!magnitude){out=0;return true;}
-        const unsigned exponent=magnitude>>20;
-        if(exponent<1023 || exponent>1043)return false;
-        const unsigned shift=1043-exponent;
-        const unsigned significand=(magnitude&0xfffffu)|0x100000u;
-        if(significand&((1u<<shift)-1u))return false;
-        out=static_cast<std::int32_t>(significand>>shift);
-        if(value.high&0x80000000u)out=-out;
-        return true;
     }
 };
 }

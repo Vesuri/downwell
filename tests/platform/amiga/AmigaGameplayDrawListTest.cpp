@@ -14,12 +14,13 @@
 #include <vector>
 static bool boundsOK=true;
 // drawFx emits each effect's nearest pixel (W3 fixed point).
-static downwell::MotionBinary64 nearestPixel(downwell::MotionBinary64 v){
-    std::int32_t r;assert(v.roundPixel(r));return downwell::MotionBinary64::fromInteger(r);
+static downwell::Fixed16 nearestPixel(downwell::MotionBinary64 v){
+    std::int32_t r;assert(v.roundPixel(r));return downwell::Fixed16::fromInteger(r);
 }
+static downwell::Fixed16 q(int v){return downwell::Fixed16::fromInteger(v);}
 static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell::EffectMaskAssets& assets,
     const downwell::EffectSurfacePlacement::View& view){
-    struct Draw {downwell::EffectMaskAssets::Asset art;downwell::MotionBinary64 x,y;};
+    struct Draw {downwell::EffectMaskAssets::Asset art;downwell::Fixed16 x,y;};
     std::vector<Draw> reference;
     assert(world.visitRegisteredEffectSurfaces<false>(assets,view,[&](const auto& art,auto x,auto y){
         reference.push_back({art,downwell::EffectSpriteDraw::real(x),downwell::EffectSpriteDraw::real(y)});return true;
@@ -35,8 +36,7 @@ static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell:
             assert(count<reference.size());const auto& r=reference[count++];const auto& b=r.art;
             assert(a.mask.data==b.mask.data&&a.mask.bytes==b.mask.bytes&&a.mask.width==b.mask.width&&
                 a.mask.height==b.mask.height&&a.mask.stride==b.mask.stride&&a.low==b.low&&a.high==b.high&&
-                a.originX==b.originX&&a.originY==b.originY&&x.high==r.x.high&&x.low==r.x.low&&
-                y.high==r.y.high&&y.low==r.y.low);
+                a.originX==b.originX&&a.originY==b.originY&&x==r.x&&y==r.y);
             return !stop||count<stop;
         });
         assert(okay==(!stop||stop>reference.size()));
@@ -192,15 +192,15 @@ int main() {
                 auto list=std::make_unique<AmigaGameplayDrawList>();UBYTE pack[8]{};
                 downwell::InstanceHandle title;
                 assert(owner->levelNumbers().create(105190,{}, {},[](auto,auto& state){
-                    return state.create(1,downwell::MotionBinary64::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});
+                    return state.create(1,downwell::Fixed16::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});
                 },title));
                 assert(!list->collect(*world,pack,pack+sizeof(pack),0,0,true));
-                downwell::LevelNumberTextDrawState text{2,0,0,123,downwell::MotionBinary64::fromInteger(1)};
+                downwell::LevelNumberTextDrawState text{2,0,0,123,downwell::Fixed16::fromInteger(1)};
                 assert(list->bindLevelNumberText(&downwell::title_glyphs::bank,&text));
                 assert(list->collect(*world,pack,pack+sizeof(pack),0,0,true));
                 assert(owner->levelNumbers().find(title)->state.characters[1].offset==-2); // Collection is read-only.
                 auto surface=std::make_unique<downwell::CurrencySmokeComposition>();downwell::EffectMaskAssets art;
-                using Real=downwell::MotionBinary64;
+                using Real=downwell::Fixed16;
                 const downwell::EffectSurfacePlacement::View camera{Real::fromInteger(1234),Real::fromInteger(5678),Real::fromInteger(160),Real::fromInteger(284)};
                 downwell::CurrencySmokeComposition::Settings settings;settings.death=true;
                 assert(surface->prepareWithSurfaceProducers([](auto){},world->smokeEffects(),art,camera,settings,
@@ -298,13 +298,11 @@ int main() {
             const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets art;
             assert(art.bind(pixels.data(),pixels.size()));downwell::EffectMaskAssets::Asset expected;
             assert(art.corpse(206,true,expected));unsigned surfaces=0;
-            const downwell::EffectSurfacePlacement::View effectView{downwell::MotionBinary64::fromInteger(160),
-                downwell::MotionBinary64::fromInteger(34),downwell::MotionBinary64::fromInteger(160),
-                downwell::MotionBinary64::fromInteger(284)};
+            const downwell::EffectSurfacePlacement::View effectView{q(160),q(34),q(160),q(284)};
             assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto ex,auto ey){
                 const auto px=downwell::EffectSpriteDraw::real(ex),py=downwell::EffectSpriteDraw::real(ey);
                 const auto rx=nearestPixel(x),ry=nearestPixel(y);
-                assert(asset.mask.data==expected.mask.data&&px.high==rx.high&&px.low==rx.low&&py.high==ry.high&&py.low==ry.low);
+                assert(asset.mask.data==expected.mask.data&&px==rx&&py==ry);
                 ++surfaces;return true;
             })&&surfaces==1);
             assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
@@ -389,9 +387,7 @@ int main() {
             assert(smoke.create(105190,x,y,random,smokeKey));
             const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets art;
             assert(art.bind(pixels.data(),pixels.size()));
-            const downwell::EffectSurfacePlacement::View effectView{downwell::MotionBinary64::fromInteger(160),
-                downwell::MotionBinary64::fromInteger(34),downwell::MotionBinary64::fromInteger(160),
-                downwell::MotionBinary64::fromInteger(284)};
+            const downwell::EffectSurfacePlacement::View effectView{q(160),q(34),q(160),q(284)};
             unsigned frames=0,frameMask=0;
             while(!smoke.find(smokeKey)->destroyRequested){
                 const auto& state=smoke.find(smokeKey)->state;const unsigned frame=state.drawFrame();frameMask|=1u<<frame;
@@ -406,8 +402,7 @@ int main() {
                 assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto ex,auto ey){
                     const auto px=downwell::EffectSpriteDraw::real(ex),py=downwell::EffectSpriteDraw::real(ey);
                     const auto rx=nearestPixel(x),ry=nearestPixel(y);
-                    assert(asset.mask.data==art.smoke(frame)->mask.data&&px.high==rx.high&&px.low==rx.low&&
-                        py.high==ry.high&&py.low==ry.low);++surfaces;return true;
+                    assert(asset.mask.data==art.smoke(frame)->mask.data&&px==rx&&py==ry);++surfaces;return true;
                 })&&surfaces==1);
                 assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
                 assert(compareEffectSurfaces(*world,art,effectView)==1);
@@ -481,7 +476,7 @@ int main() {
             assert(entries.clear()&&list.collect(*world,pack,pack+8,160,34)&&!list.entryCoverVisible);
             downwell::EntryDitherPlacement untouched{17,23};
             assert(!downwell::EntryDitherPlacement::resolve({0x43708000u},{0},
-                downwell::MotionBinary64::fromInteger(160),{},untouched));
+                downwell::Fixed16::fromInteger(160),{},untouched));
             assert(untouched.y==17&&untouched.offset==23); // x=240.5 is not 240.
         }
         {
@@ -691,7 +686,7 @@ int main() {
             const auto before=scene->randomDrawCount();
             const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets art;
             assert(art.bind(pixels.data(),pixels.size()));
-            const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
+            const downwell::EffectSurfacePlacement::View view{q(160),q(34),q(160),q(284)};
             for(int flash:{-1,0,1})for(unsigned frame=0;frame<8;++frame){
                 shard->dflash=flash;assert(shard->imageIndex.assignInteger(frame));
                 // Create admits [0,7); use 6.75 for its upper fractional case.
@@ -747,8 +742,8 @@ int main() {
             assert(skeletonShade?scene->createSkeletonWithSourceId(405199,240,112,shadeBone):
                 scene->createBoneWithSourceId(405198,240,112,shadeBone));
             downwell::CurrencySmokeComposition shaded,unshaded;
-            const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
-            const auto currency=[&](auto emit){emit(false,0,n(240),n(112));};
+            const downwell::EffectSurfacePlacement::View view{q(160),q(34),q(160),q(284)};
+            const auto currency=[&](auto emit){emit(false,0,q(240),q(112));};
             const auto raster=[](auto value,std::int32_t& out){return value.roundPixel(out);};
             bool enumerated=false;
             assert(unshaded.prepare(currency,scene->smokeEffects(),assets,view,{},[](auto){},raster)&&
@@ -765,7 +760,7 @@ int main() {
             assert((skeletonShade?owner->skeletons().markDestroyed(shadeBone):owner->bones().markDestroyed(shadeBone))&&owner->prepareDraw());
         }
         downwell::CurrencySmokeComposition composed;
-        const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
+        const downwell::EffectSurfacePlacement::View view{q(160),q(34),q(160),q(284)};
         auto compose=[&](){return composed.prepareWithLateEffects([](auto){},scene->smokeEffects(),assets,view,{},
             [&](auto emit){return scene->visitDebrisDraw([&](const auto& effect){
                 return downwell::DebrisDraw::surface(effect,assets,view,emit);

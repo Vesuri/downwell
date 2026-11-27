@@ -1489,11 +1489,16 @@ public:
     enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall, blast, scattered, whiteJelly, movingFx, redBall, shop };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size())&&(!whiteJellies_||!whiteJellies_->size())&&(!redBalls_||!redBalls_->size()))return true;
+        // The published binary32 positions as Q16.
+        const auto at=[&](const auto* r){
+            downwell::Fixed16 x,y;
+            return r&&downwell::Fixed16::fromBinary32(r->x.bits,x)&&downwell::Fixed16::fromBinary32(r->y.bits,y)&&visit(x,y);
+        };
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
-            if(kind==DrawActor::bone){const auto* r=bones_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
-            if(kind==DrawActor::skeleton){const auto* r=skeletons_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
-            if(kind==DrawActor::whiteJelly){const auto* r=whiteJellies_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
-            if(kind==DrawActor::redBall){const auto* r=redBalls_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
+            if(kind==DrawActor::bone)return at(bones_->find(key));
+            if(kind==DrawActor::skeleton)return at(skeletons_->find(key));
+            if(kind==DrawActor::whiteJelly)return at(whiteJellies_->find(key));
+            if(kind==DrawActor::redBall)return at(redBalls_->find(key));
             return true;
         });
     }
@@ -1577,8 +1582,8 @@ public:
         // 10000) precedes them; explosionSmall (0) and bulletExplosion1
         // (-60000) follow.
         if(ok&&drone_.live){
-            const auto x=downwell::MotionBinary64::fromInteger(int((drone_.x+0x8000)>>16));
-            const auto y=downwell::MotionBinary64::fromInteger(int((drone_.y+0x8000)>>16));
+            const auto x=downwell::Fixed16::fromInteger(int((drone_.x+0x8000)>>16));
+            const auto y=downwell::Fixed16::fromInteger(int((drone_.y+0x8000)>>16));
             downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
             if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
             if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
@@ -1595,7 +1600,7 @@ public:
         static const int explosionObjects[]={274,272};
         for(int object:explosionObjects){
           if(ok&&object==272&&balloon_.live){
-            const auto x=downwell::MotionBinary64::fromInteger(balloon_.x),y=downwell::MotionBinary64::fromInteger(balloon_.y);
+            const auto x=downwell::Fixed16::fromInteger(balloon_.x),y=downwell::Fixed16::fromInteger(balloon_.y);
             downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
             if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
             if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
@@ -1606,8 +1611,8 @@ public:
           if(ok&&object==272&&player_.jetpacking()&&!goalStopped()){
             const unsigned third=player_.jetHalves()/60;
             const unsigned sprite=third==0?21:third==1?22:23;
-            const auto x=downwell::MotionBinary64::fromInteger(240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())));
-            const auto y=downwell::MotionBinary64::fromInteger(176+16+int(downwell::roundGameMakerQ8(player_.offsetYFixed())));
+            const auto x=downwell::Fixed16::fromInteger(240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())));
+            const auto y=downwell::Fixed16::fromInteger(176+16+int(downwell::roundGameMakerQ8(player_.offsetYFixed())));
             downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
             if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
             if(placement.target!=downwell::EffectSurfacePlacement::hidden&&
@@ -1616,7 +1621,7 @@ public:
           for(unsigned i=blastEnd_;ok&&i-->0;){
             const auto& b=blasts_[i];
             if(!b.live||b.object!=object)continue;
-            const auto x=downwell::MotionBinary64::fromInteger(b.x),y=downwell::MotionBinary64::fromInteger(b.y);
+            const auto x=downwell::Fixed16::fromInteger(b.x),y=downwell::Fixed16::fromInteger(b.y);
             downwell::EffectSurfacePlacement::Draw placement;downwell::EffectMaskAssets::Asset asset;
             if(!downwell::EffectSurfacePlacement::fx(x,y,view,false,false,true,placement))return false;
             if(placement.target==downwell::EffectSurfacePlacement::hidden)continue;

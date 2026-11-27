@@ -1169,8 +1169,8 @@ int main(){
             unsigned shades=0;
             assert(world->visitRegisteredEnemyShades([&](auto x,auto y){
                 const auto* actor=balls.find(local);assert(actor);int order;
-                assert(compareRunnerReal(x,actor->x.promoted(),order)&&order==0&&
-                    compareRunnerReal(y,actor->y.promoted(),order)&&order==0);
+                Fixed16 ax,ay;
+                assert(Fixed16::fromBinary32(actor->x.bits,ax)&&Fixed16::fromBinary32(actor->y.bits,ay)&&x==ax&&y==ay);(void)order;
                 ++shades;return true;
             })&&shades==unsigned(present));
         };
@@ -2068,7 +2068,7 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));auto& numbers=owner->levelNumbers();InstanceHandle local,shared;
-        auto init=[](auto,auto& state){return state.create(3,MotionBinary64::fromInteger(24),
+        auto init=[](auto,auto& state){return state.create(3,Fixed16::fromInteger(24),
             [](unsigned i,unsigned& token){token=i;return true;});};
         assert(numbers.create(105187,MotionBinary64::fromInteger(241),MotionBinary64::fromInteger(603),init,local)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::levelNumber,local,shared));
@@ -2087,8 +2087,8 @@ int main(){
         struct NoTitleSurface {
             bool exists(bool& value){value=false;return true;}
             bool begin(){std::abort();}bool end(){std::abort();}bool color(unsigned){std::abort();}
-            bool view(unsigned,MotionBinary64&){std::abort();}
-            bool character(unsigned,MotionBinary64,MotionBinary64){std::abort();}
+            bool view(unsigned,Fixed16&){std::abort();}
+            bool character(unsigned,Fixed16,Fixed16){std::abort();}
         } noSurface;
         EffectMaskAssets emptyAssets;EffectSurfacePlacement::View emptyView{};
         auto emit=[](const EffectMaskAssets::Asset&,auto,auto){return true;};
@@ -2102,8 +2102,8 @@ int main(){
             unsigned glyphs=0;
             bool exists(bool& value){value=true;return true;}
             bool begin(){return true;}bool end(){return true;}bool color(unsigned){return true;}
-            bool view(unsigned,MotionBinary64& value){value={};return true;}
-            bool character(unsigned,MotionBinary64,MotionBinary64){++glyphs;return true;}
+            bool view(unsigned,Fixed16& value){value={};return true;}
+            bool character(unsigned,Fixed16,Fixed16){++glyphs;return true;}
         } titleSurface;
         auto composition=std::make_unique<CurrencySmokeComposition>();
         for(unsigned setting=0;setting<4;++setting){
@@ -2116,7 +2116,7 @@ int main(){
                     return world->visitUnconditionalSurfaceDraw([&](auto kind,auto key,auto){
                         return kind==GameplayWorld::DrawActor::levelNumber&&world->drawLevelNumber(key,titleSurface);
                     });
-                },[](auto){},[](MotionBinary64 value,std::int32_t& out){return value.roundPixel(out);}));
+                },[](auto){},[](Fixed16 value,std::int32_t& out){return value.roundPixel(out);}));
             assert(conditionalCalls==(setting==0?1u:0u)&&unconditionalCalls==(setting!=3?1u:0u));
             assert(titleSurface.glyphs==5*(setting<3?setting+1:3));
             assert(numbers.find(local)->state.characters[1].offset==(setting<3?int(setting)-1:1));

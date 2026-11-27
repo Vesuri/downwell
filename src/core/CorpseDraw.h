@@ -28,13 +28,13 @@ struct CorpseDraw {
         if(magnitude>=0x3f800000u||((index>>31)&&magnitude))return false;
         EffectMaskAssets::Asset asset;
         if(!assets.corpse(command.sprite,(scale>>31)!=0,asset))return false;
-        return whole?emit(asset,px,py):emit(asset,corpse.x.promoted(),corpse.y.promoted());
+        return whole?emit(asset,px,py):EffectSpriteDraw::emitAt(emit,asset,corpse.x,corpse.y);
     }
     static bool prepare(const CorpseAnimation& corpse,const EffectSurfacePlacement::View& view,
                         bool death,bool lowSpec,bool surfaceExists,Command& out){
         if(!corpse.valid)return false;
         return EffectSpriteDraw::prepare(!corpse.destroyRequested&&corpse.flash<=0,
-            corpse.spriteId,corpse.imageIndex,corpse.x.promoted(),corpse.y.promoted(),
+            corpse.spriteId,corpse.imageIndex,corpse.x,corpse.y,
             corpse.imageXscale,view,death,lowSpec,surfaceExists,out);
     }
 };

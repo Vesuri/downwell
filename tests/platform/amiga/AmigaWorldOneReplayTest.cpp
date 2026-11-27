@@ -98,7 +98,7 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
             *draws<<' '<<a.sprite<<':'<<a.frame<<':'<<a.x<<':'<<a.y<<':'<<a.flip;}
         {
             // The controller effect-surface producers DownwellAmiga.cpp uses.
-            using Real=downwell::MotionBinary64;
+            using Real=downwell::Fixed16;
             const downwell::EffectSurfacePlacement::View view{Real::fromInteger(vx),Real::fromInteger(vy),
                 Real::fromInteger(160),Real::fromInteger(284)};
             *draws<<" S";
@@ -109,11 +109,11 @@ static void replayWorldOne(const char* roomPath, const char* objectPath, const c
             const bool good=game.visitRegisteredEffectSurfaces(effects,view,[&](const downwell::EffectMaskAssets::Asset& a,auto px,auto py){
                 // Whole-pixel emissions print as the reals they stand for.
                 const Real x=real(px),y=real(py);
-                *draws<<' '<<(a.low?a.low-art.data():-1)<<':'<<a.originX<<':'<<a.originY<<':'<<x.high<<'.'<<x.low<<':'<<y.high<<'.'<<y.low;return true;});
+                *draws<<' '<<(a.low?a.low-art.data():-1)<<':'<<a.originX<<':'<<a.originY<<':'<<x.v<<':'<<y.v;return true;});
             *draws<<(good?" ok":" FAIL")<<" H";
             for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
                 if(e.active&&e.awake)*draws<<' '<<240+e.x<<','<<176+e.y;}
-            const bool shades=game.visitRegisteredEnemyShades([&](Real x,Real y){*draws<<" r"<<x.high<<'.'<<x.low<<','<<y.high<<'.'<<y.low;return true;});
+            const bool shades=game.visitRegisteredEnemyShades([&](Real x,Real y){*draws<<" r"<<x.v<<','<<y.v;return true;});
             *draws<<(shades?" ok":" FAIL")<<" T"<<(game.levelNumbers()?int(game.levelNumbers()->size()):-1)
                 <<" C"<<game.compactCorpses().size()<<" D"<<game.compactDebris().size()<<" M"<<game.smokeEffects().size()
                 <<" R"<<(game.registeredSmoke()?int(game.registeredSmoke()->size()):-1)<<'/'<<(game.registeredCorpses()?int(game.registeredCorpses()->size()):-1)

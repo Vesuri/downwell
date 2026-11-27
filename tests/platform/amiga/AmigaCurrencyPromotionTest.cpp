@@ -226,7 +226,7 @@ int main(int argc,char** argv){
                 "partition preserves actor prefix and complete-promotion painter order");
         }
         require(game.checkpoint()==checkpoint,"promotion is read-only, including fallback");
-        using Real=downwell::MotionBinary64;
+        using Real=downwell::Fixed16;
         const downwell::EffectSurfacePlacement::View view{Real::fromInteger(vx),Real::fromInteger(vy),
             Real::fromInteger(160),Real::fromInteger(284)};
         downwell::CurrencySmokeComposition::Settings settings;settings.noControl=game.shops().noControl;
@@ -239,7 +239,7 @@ int main(int argc,char** argv){
             return downwell::DebrisDraw::surface(d,assets,view,emit);});
         },[&](auto emit){for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
             if(e.active&&e.awake)emit(std::int32_t(240+e.x),std::int32_t(176+e.y));}
-        },[](Real n,std::int32_t& out){return n.roundPixel(out);}),"compositor oracle");
+        },[](Real n,std::int32_t& out){out=Real::roundQ16(n.v);return true;}),"compositor oracle");
         };
         compose(oracle,0);
         // Independently compose the currency before shade subtraction. Only

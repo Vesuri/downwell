@@ -23,11 +23,11 @@ public:
     template<class Raster> struct SurfaceEmitter {
         CurrencySmokeComposition& owner;const EffectSurfacePlacement::View& view;
         Raster& raster;bool& okay;bool& added;
-        bool atSurface(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+        bool atSurface(const EffectMaskAssets::Asset& asset,Fixed16 x,Fixed16 y){
             if(!okay)return false;
             okay=owner.stamp(asset,x,y,false,raster);added|=okay;return okay;
         }
-        bool operator()(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+        bool operator()(const EffectMaskAssets::Asset& asset,Fixed16 x,Fixed16 y){
             if(!okay)return false;
             EffectSurfacePlacement::Draw draw;
             okay=EffectSurfacePlacement::onSurface(x,y,view,true,draw);
@@ -73,7 +73,7 @@ public:
         using Placement=EffectSurfacePlacement;
         Placement::PixelView pixels;
         const bool pixelView=Placement::pixelView(view,pixels);
-        auto addReal=[&](const EffectMaskAssets::Asset* asset,MotionBinary64 x,MotionBinary64 y){
+        auto addReal=[&](const EffectMaskAssets::Asset* asset,Fixed16 x,Fixed16 y){
             if(!okay)return;
             Placement::Draw draw;
             { DW_PROFILE_SCOPE(profileEffectPlacement);
@@ -88,7 +88,7 @@ public:
             if constexpr(pixel(decltype(x){})){
                 if(!okay)return;
                 if(!pixelView||!Placement::smallPixel(x)||!Placement::smallPixel(y))
-                    return addReal(asset,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y));
+                    return addReal(asset,Fixed16::fromInteger(x),Fixed16::fromInteger(y));
                 if(!Placement::pixelInView(x,y,pixels))return;
                 okay=asset && stampPixel(*asset,x-pixels.x,y-pixels.y,false);
                 added|=okay;
@@ -148,12 +148,12 @@ private:
     static bool smokePixels(const SmokeEffect& e,std::int32_t& x,std::int32_t& y){
         return EffectSpriteDraw::pixel(e.x,x)&&EffectSpriteDraw::pixel(e.y,y);
     }
-    static constexpr bool pixel(MotionBinary64){return false;}
+    static constexpr bool pixel(Fixed16){return false;}
     static constexpr bool pixel(std::int32_t){return true;}
-    static MotionBinary64 real(MotionBinary64 n){return n;}
-    static MotionBinary64 real(std::int32_t n){return MotionBinary64::fromInteger(n);}
+    static Fixed16 real(Fixed16 n){return n;}
+    static Fixed16 real(std::int32_t n){return Fixed16::fromInteger(n);}
     template<class Raster>
-    bool stamp(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y,
+    bool stamp(const EffectMaskAssets::Asset& asset,Fixed16 x,Fixed16 y,
                bool subtract,Raster raster){
         std::int32_t px,py;
         { DW_PROFILE_SCOPE(profileEffectRaster);

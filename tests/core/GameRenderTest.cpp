@@ -938,9 +938,9 @@ int main() {
         {
             auto titles=runtime.levelNumberRegistration<1>();downwell::InstanceHandle key;
             require(titles.create({}, {},[](auto,auto& state){
-                return state.create(1,downwell::MotionBinary64::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});
+                return state.create(1,downwell::Fixed16::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});
             },key),"register title for actual SDL render path");
-            downwell::LevelNumberTextDrawState text{2,0,0,123,downwell::MotionBinary64::fromInteger(1)};
+            downwell::LevelNumberTextDrawState text{2,0,0,123,downwell::Fixed16::fromInteger(1)};
             RecordingRenderer title;title.effectPixels.assign(160*284,-1);
             require(runtime.withLevelNumberDraw(titles,[&]{
                 return effectGame.withLevelNumberText(downwell::title_glyphs::bank,text,[&]{
@@ -988,7 +988,7 @@ int main() {
             auto& children=shop.children();
             const auto id=children.create(212,runtime.mainCameraRenderViewX()+80,runtime.mainCameraRenderViewY()+60);
             const auto key=children.sourceHandle(id);require(id,"registered rising text Draw fixture");
-            downwell::LevelNumberTextDrawState state{2,0,0,123,downwell::MotionBinary64::fromInteger(1)};
+            downwell::LevelNumberTextDrawState state{2,0,0,123,downwell::Fixed16::fromInteger(1)};
             RecordingRenderer text;
             downwell::RisingTextRenderer ops(downwell::title_glyphs::bank,state,text,
                 runtime.mainCameraRenderViewX(),runtime.mainCameraRenderViewY(),160,downwell::Game::playfieldX);

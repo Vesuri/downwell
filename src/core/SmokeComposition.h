@@ -6,11 +6,12 @@
 #include "SmokeParticle.h"
 
 namespace downwell {
-// A smoke effect's published position as reals.
-inline MotionBinary64 smokeRealX(const SmokeEffect& e){return e.x.promoted();}
-inline MotionBinary64 smokeRealY(const SmokeEffect& e){return e.y.promoted();}
-inline MotionBinary64 smokeRealX(const SmokeParticle& e){return MotionBinary64::fromInteger(e.x);}
-inline MotionBinary64 smokeRealY(const SmokeParticle& e){return MotionBinary64::fromInteger(e.y);}
+// A smoke effect's published position as Q16 (binary32 positions are
+// whole or fractional pixels well inside the Q16 range).
+inline Fixed16 smokeRealX(const SmokeEffect& e){Fixed16 r;Fixed16::fromBinary32(e.x.bits,r);return r;}
+inline Fixed16 smokeRealY(const SmokeEffect& e){Fixed16 r;Fixed16::fromBinary32(e.y.bits,r);return r;}
+inline Fixed16 smokeRealX(const SmokeParticle& e){return Fixed16::fromInteger(e.x);}
+inline Fixed16 smokeRealY(const SmokeParticle& e){return Fixed16::fromInteger(e.y);}
 // Shared logical Draw preparation. The owner publishes the result at the
 // returned boundary, never treating direct fallback as a controller overlay.
 // Raster must implement the backend's verified coordinate sampling policy.
@@ -55,7 +56,7 @@ public:
         // Draws into surfaceShade are combined only at controller Draw, after
         // ALL smoke additions. Neither death nor lowSpec direct draws use it.
         if(okay && !direct && settings.effectsExist && settings.shadeExists && !settings.noControl){
-            shades([&](MotionBinary64 x,MotionBinary64 y){
+            shades([&](Fixed16 x,Fixed16 y){
                 if(!okay)return;
                 EffectSurfacePlacement::Draw draw;
                 okay=EffectSurfacePlacement::enemyShade(x,y,view,settings.lowSpec,
@@ -71,7 +72,7 @@ public:
     }
 private:
     template<class Raster>
-    bool stamp(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y,
+    bool stamp(const EffectMaskAssets::Asset& asset,Fixed16 x,Fixed16 y,
                bool subtract,Raster raster){
         // Pass the exact camera-relative anchor to sampling. Subtract the
         // integer crop origin afterwards, with checked signed arithmetic.

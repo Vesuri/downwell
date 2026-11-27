@@ -21,6 +21,8 @@ unsigned downwellProfileEnter(unsigned phase){
 void downwellProfilePhase(unsigned phase){activePhase=phase;}
 #endif
 static MotionBinary64 number(double d){std::uint64_t n;std::memcpy(&n,&d,8);return {std::uint32_t(n>>32),std::uint32_t(n)};}
+static Fixed16 q(double d){return Fixed16::raw(std::int32_t(std::lround(d*65536.0)));}
+static double value(Fixed16 n){return n.v/65536.0;}
 static double value(MotionBinary64 n){const std::uint64_t bits=(std::uint64_t(n.high)<<32)|n.low;double d;std::memcpy(&d,&bits,8);return d;}
 int main(int argc,char**argv){
     assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
@@ -28,8 +30,8 @@ int main(int argc,char**argv){
     EffectMaskAssets assets;assert(assets.bind(pack.data(),pack.size()));
     for(unsigned sprite:{133u,134u})for(unsigned frame=0;frame<4;++frame)for(unsigned flags=0;flags<8;++flags){
         CurrencyDraw::Command command;RunnerImageValue index;assert(index.assign(number(frame+0.5)));
-        EffectSurfacePlacement::View view{number(160),number(400),number(160),number(284)};
-        assert(CurrencyDraw::prepare(sprite,index,number(240.25),number(512.5),view,flags&1,flags&2,flags&4,command));
+        EffectSurfacePlacement::View view{q(160),q(400),q(160),q(284)};
+        assert(CurrencyDraw::prepare(sprite,index,q(240.25),q(512.5),view,flags&1,flags&2,flags&4,command));
         const auto target=(flags&3)?EffectSurfacePlacement::direct:(flags&4)?EffectSurfacePlacement::effects:EffectSurfacePlacement::hidden;
         assert(command.placement.target==target);unsigned emitted=0;
         const bool ok=CurrencyDraw::surface(command,assets,[&](const auto& asset,auto x,auto y){
@@ -58,19 +60,19 @@ int main(int argc,char**argv){
     const std::array<std::array<double,2>,4> lights{{{3,1},{63,77},{121,151},{159,283}}};
     // Sampling is intentionally supplied by the test, not claimed to establish
     // Windows raster semantics. Fractional route/snap arithmetic is independent.
-    auto raster=[](MotionBinary64 n,std::int32_t& out){out=int(std::floor(value(n)));return true;};
+    auto raster=[](Fixed16 n,std::int32_t& out){out=int(std::floor(value(n)));return true;};
     for(unsigned tick=0;tick<100;++tick){
         for(unsigned flags=0;flags<32;++flags){
             SmokeComposition::Settings settings{bool(flags&1),bool(flags&2),bool(flags&4),bool(flags&8),bool(flags&16)};
             const double vx=double(int(tick%9)-4)*0.25,vy=double(int(tick%7)-3)*0.5;
-            EffectSurfacePlacement::View view{number(vx),number(vy),number(160),number(284)};
+            EffectSurfacePlacement::View view{q(vx),q(vy),q(160),q(284)};
             const auto saved=random;
             assert(composition.prepare(smoke,assets,view,settings,[&](auto emit){
-                ++shadeVisits;for(auto light:lights)emit(number(light[0]),number(light[1]));
+                ++shadeVisits;for(auto light:lights)emit(q(light[0]),q(light[1]));
             },raster));
             auto gems=[&](auto emit){
                 for(unsigned i=0;i<12;++i)
-                    emit(bool(i&1),(tick+i)%4,number(int(i%6)*29-3),number(int(i/6)*75+1));
+                    emit(bool(i&1),(tick+i)%4,q(int(i%6)*29-3),q(int(i/6)*75+1));
             };
             // Overlapping frames exercise masked replacement, including black
             // pixels, followed by shade subtraction. Fractional anchors must
@@ -79,12 +81,12 @@ int main(int argc,char**argv){
                 for(unsigned sprite:{91u,115u,116u})
                     for(unsigned frame=0;frame<(sprite==91?6u:4u);++frame){
                         EffectMaskAssets::Asset asset;assert(assets.debris(sprite,frame,asset));
-                        if(!emit(asset,number(62.25+frame),number(77.5)))return false;
+                        if(!emit(asset,q(62.25+frame),q(77.5)))return false;
                     }
                 return true;
             };
             assert(colored.prepareWithLateEffects(gems,smoke,assets,view,settings,debris,[&](auto emit){
-                for(auto light:lights)emit(number(light[0]),number(light[1]));
+                for(auto light:lights)emit(q(light[0]),q(light[1]));
             },raster));
             assert(random.drawCount()==saved.drawCount() && random.stateIndex()==saved.stateIndex());
             for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==saved.stateWord(i));
@@ -113,7 +115,7 @@ int main(int argc,char**argv){
                 }
             };
             if(!direct && settings.effectsExist){
-                gems([&](bool large,unsigned frame,MotionBinary64 x,MotionBinary64 y){
+                gems([&](bool large,unsigned frame,Fixed16 x,Fixed16 y){
                     if(visible(value(x),value(y)))paint(*assets.currency(large,frame),value(x)-vx,value(y)-vy,false);
                 });
                 smoke.visitNewest([&](auto,const auto& e){
@@ -159,7 +161,7 @@ int main(int argc,char**argv){
     }
     assert(smoke.size()==0 && directFrames && controllerFrames && hiddenFrames && shadeVisits);
     assert(smoke.create(number(80),number(140),random));
-    const EffectSurfacePlacement::View view{{},{},number(160),number(284)};
+    const EffectSurfacePlacement::View view{{},{},q(160),q(284)};
     auto noShades=[](auto){};
     assert(composition.prepare(smoke,assets,view,{},noShades,raster) && composition.visible());
     assert(!composition.prepare(smoke,assets,view,{},noShades,[](auto,std::int32_t&){return false;}));
@@ -169,7 +171,7 @@ int main(int argc,char**argv){
     assert(composition.prepare(smoke,missing,view,{},[](auto){assert(false);},raster));
     assert(smoke.create(number(80),number(140),random));
     assert(!composition.prepare(smoke,missing,view,{},noShades,raster));
-    auto oneGem=[](auto emit){emit(false,0,number(80),number(140));};
+    auto oneGem=[](auto emit){emit(false,0,q(80),q(140));};
     assert(colored.prepare(oneGem,smoke,assets,view,{},noShades,raster) && colored.visible());
     assert(!colored.prepare(oneGem,smoke,assets,view,{},noShades,[](auto,std::int32_t&){return false;}));
     assert(!colored.visible());
@@ -178,7 +180,7 @@ int main(int argc,char**argv){
     unsigned lateVisits=0;
     auto failingLate=[&](auto emit){
         ++lateVisits;EffectMaskAssets::Asset asset;assert(assets.debris(115,0,asset));
-        assert(emit(asset,number(80.25),number(140.5)));return false;
+        assert(emit(asset,q(80.25),q(140.5)));return false;
     };
     assert(!colored.prepareWithLateEffects(oneGem,smoke,assets,view,{},failingLate,noShades,raster));
     assert(lateVisits==1&&!colored.visible());
@@ -202,8 +204,8 @@ int main(int argc,char**argv){
         settings.death=mode==1;settings.lowSpec=mode==2;settings.effectsExist=mode!=3;
         settings.shadeExists=false;
         unsigned surfaceCalls=0;
-        auto ordinary=[&](auto emit){return emit(whiteAsset,number(80),number(1));};
-        auto cover=[&](auto emit){++surfaceCalls;return emit(blackAsset,number(80),number(301));};
+        auto ordinary=[&](auto emit){return emit(whiteAsset,q(80),q(1));};
+        auto cover=[&](auto emit){++surfaceCalls;return emit(blackAsset,q(80),q(301));};
         assert(colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,settings,
             ordinary,cover,noShades,raster));
         assert(surfaceCalls==(mode==3?0u:1u));
@@ -223,38 +225,38 @@ int main(int argc,char**argv){
         const auto* shade=assets.shade();assert(shade);
         auto blackCover=*shade;blackCover.low=blackCover.high=shade->mask.data;
         assert(colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,settings,
-            [](auto){return true;},[&](auto emit){return emit(blackCover,number(80),number(140));},
-            [&](auto emit){emit(number(80),number(140));},raster));
+            [](auto){return true;},[&](auto emit){return emit(blackCover,q(80),q(140));},
+            [&](auto emit){emit(q(80),q(140));},raster));
         assert(colored.visible()==(mode==1));
     }
     assert(!colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,{},
-        [](auto){return true;},[&](auto emit){assert(emit(blackAsset,number(80),number(301)));return false;},
+        [](auto){return true;},[&](auto emit){assert(emit(blackAsset,q(80),q(301)));return false;},
         noShades,raster));
     assert(!colored.visible());
     colored.surface().visit([](auto,auto,auto,auto,auto){assert(false);});
     // Whole-pixel producers bypass binary64 placement and the raster. They
     // must compose exactly as the same positions emitted as binary64 with the
     // Amiga's round-to-nearest raster: view edges, odd shade snaps, fractional
-    // views and magnitudes beyond the pixel range (taken through binary64).
+    // views and magnitudes beyond the pixel range (taken through Q16).
     unsigned pixelChecks=0,pixelStamps=0;
     {
         CurrencySmokeComposition pixel;
-        auto rounded=[](MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);};
+        auto rounded=[](Fixed16 n,std::int32_t& out){return n.roundPixel(out);};
         std::uint32_t seed=0x2545f491u;
         auto next=[&]{seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return seed;};
         smoke.clear();
         for(unsigned trial=0;trial<4000;++trial){
             const bool fractional=trial%8==7,far=trial%16==3;
-            const int vx=far?(1<<21)+int(next()%8):int(next()%64)-32;
-            const int vy=far?-(1<<21)-int(next()%8):int(next()%64)-32;
-            const EffectSurfacePlacement::View pixelView{number(vx+(fractional?0.5:0)),number(vy),number(160),number(284)};
+            const int vx=far?(1<<14)+int(next()%8):int(next()%64)-32;
+            const int vy=far?-(1<<14)-int(next()%8):int(next()%64)-32;
+            const EffectSurfacePlacement::View pixelView{q(vx+(fractional?0.5:0)),q(vy),q(160),q(284)};
             auto pick=[&](int origin,int size){
                 switch(next()%8){
                 case 0:return std::int32_t(origin);
                 case 1:return std::int32_t(origin+size);
                 case 2:return std::int32_t(origin+1+int(next()%2));
                 case 3:return std::int32_t(origin+size-1-int(next()%2));
-                case 4:return std::int32_t((next()&1?1:-1)*((1<<21)-2+int(next()%5)));
+                case 4:return std::int32_t((next()&1?1:-1)*((1<<14)-2+int(next()%5)));
                 default:return std::int32_t(origin-24+int(next()%unsigned(size+48)));
                 }
             };
@@ -264,10 +266,10 @@ int main(int argc,char**argv){
             const unsigned phase=trial%4;
             auto gemsPixel=[&](auto emit){for(unsigned i=0;i<6;++i)emit(bool(i&1),(phase+i)%4,gx[i],gy[i]);};
             auto gemsReal=[&](auto emit){for(unsigned i=0;i<6;++i)
-                emit(bool(i&1),(phase+i)%4,MotionBinary64::fromInteger(gx[i]),MotionBinary64::fromInteger(gy[i]));};
+                emit(bool(i&1),(phase+i)%4,Fixed16::fromInteger(gx[i]),Fixed16::fromInteger(gy[i]));};
             auto shadesPixel=[&](auto emit){for(unsigned i=0;i<4;++i)emit(sx[i],sy[i]);};
             auto shadesReal=[&](auto emit){for(unsigned i=0;i<4;++i)
-                emit(MotionBinary64::fromInteger(sx[i]),MotionBinary64::fromInteger(sy[i]));};
+                emit(Fixed16::fromInteger(sx[i]),Fixed16::fromInteger(sy[i]));};
             assert(pixel.prepare(gemsPixel,smoke,assets,pixelView,{},shadesPixel,rounded));
             assert(colored.prepare(gemsReal,smoke,assets,pixelView,{},shadesReal,rounded));
             assert(pixel.surface().samePixels(colored.surface())&&pixel.visible()==colored.visible());

@@ -760,7 +760,7 @@ int main(){
         if(badFont){assert(!title()->created);continue;}
         LevelNumber<64> expected;
         assert(text.initialize(expected,native?world->runStage():stored->runStage())&&title()->length==expected.length&&
-            title()->width.high==expected.width.high&&title()->width.low==expected.width.low);
+            title()->width==expected.width);
         for(unsigned i=1;i<=expected.length;++i)assert(title()->characters[i].token==expected.characters[i].token);
         assert(invoke(false)&&queries==2); // No second child/audio after firstLand.
         if(native){
@@ -784,7 +784,7 @@ int main(){
                 assert(live.generation&&stored->instance(id)&&stored->instance(id)->objectId==372&&
                     stored->instance(id)->x==241&&stored->instance(id)->alarms.get(0)==-1);
                 if(incomplete)return true; // A successful placeholder is not a completed Create.
-                return state.create(3,downwell::MotionBinary64::fromInteger(24),[](unsigned i,unsigned& token){token=i;return true;});
+                return state.create(3,downwell::Fixed16::fromInteger(24),[](unsigned i,unsigned& token){token=i;return true;});
             },key);
         assert(stored->nextRuntimeInstanceId()==id+1&&created==!incomplete);
         if(incomplete){assert(!stored->effectsSucceeded()&&!key.generation&&stored->instance(id)->alarms.get(0)==-1);continue;}
@@ -793,8 +793,8 @@ int main(){
             bool color(unsigned){std::abort();}
             bool exists(bool& present){present=false;return true;}
             bool begin(){std::abort();}bool end(){std::abort();}
-            bool view(unsigned,downwell::MotionBinary64&){std::abort();}
-            bool character(unsigned,downwell::MotionBinary64,downwell::MotionBinary64){std::abort();}
+            bool view(unsigned,downwell::Fixed16&){std::abort();}
+            bool character(unsigned,downwell::Fixed16,downwell::Fixed16){std::abort();}
         } surface;
         for(unsigned tick=1;tick<=142;++tick){
             assert(stored->withLevelNumberEvents(numbers,[&]{stored->step({});return stored->effectsSucceeded();}));
@@ -823,8 +823,8 @@ int main(){
                     bool exists(bool& value){value=true;return true;}bool begin(){return true;}
                     bool end(){++ends;return true;}
                     bool color(unsigned value){++colors;colorValue=value;return true;}
-                    bool view(unsigned,downwell::MotionBinary64& value){++views;value={};return true;}
-                    bool character(unsigned token,downwell::MotionBinary64,downwell::MotionBinary64){
+                    bool view(unsigned,downwell::Fixed16& value){++views;value={};return true;}
+                    bool character(unsigned token,downwell::Fixed16,downwell::Fixed16){
                         assert(token==1&&colorValue==(glyphs==4?0xffffffu:0u));++glyphs;return true;
                     }
                 } present;

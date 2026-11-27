@@ -41,7 +41,7 @@ struct EffectSpriteDraw {
         if(value.bits>>31)out=-out;
         return true;
     }
-    // fx without binary64 values, for an integer view: false when the view
+    // fx without Q16 values, for an integer view: false when the view
     // or a coordinate is outside smallPixel (use prepare). Otherwise
     // `shown` is the effects target. Whole pixels match fx exactly
     // (its smallInteger branch); fractional coordinates are rounded first
@@ -54,11 +54,13 @@ struct EffectSpriteDraw {
         shown=EffectSurfacePlacement::pixelInView(px,py,pixels);
         return true;
     }
-    // Emitted coordinates as reals, for consumers that need them.
-    static MotionBinary64 real(MotionBinary64 n){return n;}
-    static MotionBinary64 real(std::int32_t n){return MotionBinary64::fromInteger(n);}
+    // Emitted coordinates as Q16, for consumers that need them.
+    static Fixed16 real(Fixed16 n){return n;}
+    static Fixed16 real(std::int32_t n){return Fixed16::fromInteger(n);}
+    // A binary32 coordinate as Q16 (false for NaN, infinity or out of range).
+    static bool real(RunnerImageValue n,Fixed16& out){return Fixed16::fromBinary32(n.bits,out);}
     static bool prepare(bool visible,unsigned sprite,RunnerImageValue index,
-                        MotionBinary64 x,MotionBinary64 y,RunnerImageValue scaleX,
+                        Fixed16 x,Fixed16 y,RunnerImageValue scaleX,
                         const EffectSurfacePlacement::View& view,
                         bool death,bool lowSpec,bool surfaceExists,Command& out){
         Command next;
@@ -69,6 +71,17 @@ struct EffectSpriteDraw {
             }
         }
         out=next;return true;
+    }
+    static bool prepare(bool visible,unsigned sprite,RunnerImageValue index,
+                        RunnerImageValue x,RunnerImageValue y,RunnerImageValue scaleX,
+                        const EffectSurfacePlacement::View& view,
+                        bool death,bool lowSpec,bool surfaceExists,Command& out){
+        Fixed16 fx,fy;
+        return real(x,fx)&&real(y,fy)&&prepare(visible,sprite,index,fx,fy,scaleX,view,death,lowSpec,surfaceExists,out);
+    }
+    // emit(asset,x,y) at a binary32 position as Q16.
+    template<class Emit,class Asset> static bool emitAt(Emit& emit,const Asset& asset,RunnerImageValue x,RunnerImageValue y){
+        Fixed16 fx,fy;return real(x,fx)&&real(y,fy)&&emit(asset,fx,fy);
     }
 };
 }

@@ -90,6 +90,26 @@ struct Fixed16 {
         out.v = (value.high & 0x80000000u) ? -std::int32_t(magnitude) : std::int32_t(magnitude);
         return true;
     }
+    // Nearest Q16 (halves away from zero) of binary32 bits; false for
+    // NaN, infinity or a value outside the range.
+    static bool fromBinary32(std::uint32_t bits, Fixed16& out) {
+        const std::uint32_t magnitudeBits = bits & 0x7fffffffu;
+        const int exponent = int(magnitudeBits >> 23) - 127;
+        if (exponent == 128) return false;
+        if (!magnitudeBits || exponent < -17) { out.v = 0; return true; }
+        if (exponent > 14) return false;
+        // significand m (24 bits) * 2^(exponent - 23) * 2^16
+        const std::uint32_t m = (magnitudeBits & 0x7fffffu) | 0x800000u;
+        std::uint32_t magnitude;
+        if (exponent >= 7) magnitude = m << (exponent - 7);
+        else {
+            const unsigned shift = unsigned(7 - exponent); // 1..24
+            magnitude = (m >> shift) + ((m >> (shift - 1)) & 1u);
+        }
+        if (magnitude > 0x7fffffffu) return false;
+        out.v = (bits & 0x80000000u) ? -std::int32_t(magnitude) : std::int32_t(magnitude);
+        return true;
+    }
     // Exact: every Q16 value is a binary64.
     MotionBinary64 binary64() const {
         if (!v) return {};
@@ -98,7 +118,7 @@ struct Fixed16 {
         return r;
     }
     // GameMaker round (halves to even) of a Q16 value, as a whole number.
-    static std::int32_t roundPixel(std::int32_t q16) {
+    static std::int32_t roundQ16(std::int32_t q16) {
         std::int32_t whole = (q16 + 0x8000) >> 16;
         if ((q16 & 0xffff) == 0x8000 && (whole & 1)) --whole;
         return whole;
@@ -111,6 +131,9 @@ struct Fixed16 {
         const std::int32_t r = std::int32_t((m >> 16) * factor + (((m & 0xffffu) * factor + 0x8000u) >> 16));
         return v < 0 ? -r : r;
     }
+    // The same as a member, shaped like MotionBinary64::roundPixel so that
+    // generic raster code takes either (always true).
+    bool roundPixel(std::int32_t& out) const { out = roundQ16(v); return true; }
     Fixed16 operator+(Fixed16 o) const { return Fixed16{v + o.v}; }
     Fixed16 operator-(Fixed16 o) const { return Fixed16{v - o.v}; }
     Fixed16 operator-() const { return Fixed16{-v}; }

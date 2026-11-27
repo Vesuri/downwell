@@ -20,10 +20,17 @@ extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFail
 #endif
 
 namespace {
+// A world coordinate relative to an integer view, rounded to its pixel.
+bool viewPixel(downwell::Fixed16 v,int view,std::int32_t& out){
+    out=downwell::Fixed16::roundQ16((v-downwell::Fixed16::fromInteger(view)).v);return true;
+}
+bool viewPixel(downwell::RunnerImageValue v,int view,std::int32_t& out){
+    downwell::Fixed16 q;return downwell::Fixed16::fromBinary32(v.bits,q)&&viewPixel(q,view,out);
+}
 bool registeredEnemyShadePresent(const GameplayWorld& world,int viewX,int viewY,bool& present){
     present=false;
     if(world.shops().noControl)return true;
-    using Real=downwell::MotionBinary64;
+    using Real=downwell::Fixed16;
     const downwell::EffectSurfacePlacement::View view{Real::fromInteger(viewX),Real::fromInteger(viewY),
         Real::fromInteger(160),Real::fromInteger(284)};
     return world.visitRegisteredEnemyShades([&](Real x,Real y){
@@ -228,7 +235,7 @@ bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& worl
     bool shade;
     if(!registeredEnemyShadePresent(world,viewX,viewY,shade))return false;
     if(shade)return true;
-    using Real=downwell::MotionBinary64;
+    using Real=downwell::Fixed16;
     const downwell::EffectSurfacePlacement::View view{Real::fromInteger(viewX),Real::fromInteger(viewY),
         Real::fromInteger(160),Real::fromInteger(284)};
     if(!world.shops().noControl)for(unsigned i=0;i<world.enemyCount();++i){
@@ -676,10 +683,11 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                         // Validate its placement here; do not paint the shade
                         // as a visible body sprite or duplicate the surface.
                         downwell::EffectSurfacePlacement::Draw placement;
-                        const downwell::EffectSurfacePlacement::View view{N::fromInteger(viewX),N::fromInteger(viewY),
-                            N::fromInteger(160),N::fromInteger(284)};
-                        return downwell::EffectSurfacePlacement::enemyShade(actor.x.promoted(),actor.y.promoted(),
-                            view,false,noControl,true,placement);
+                        const downwell::EffectSurfacePlacement::View view{downwell::Fixed16::fromInteger(viewX),downwell::Fixed16::fromInteger(viewY),
+                            downwell::Fixed16::fromInteger(160),downwell::Fixed16::fromInteger(284)};
+                        downwell::Fixed16 x,y;
+                        return downwell::Fixed16::fromBinary32(actor.x.bits,x)&&downwell::Fixed16::fromBinary32(actor.y.bits,y)&&
+                            downwell::EffectSurfacePlacement::enemyShade(x,y,view,false,noControl,true,placement);
                     }
                     bool drawSelf(){
                         std::int32_t x,y,scale;unsigned frame;
@@ -726,8 +734,8 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 std::int32_t sourceDepth;
                 if(!record||entryCoverVisible||!depth.roundPixel(sourceDepth)||sourceDepth!=-200000||
                    !downwell::EntryDitherPlacement::resolve(record->x,record->y,
-                       downwell::MotionBinary64::fromInteger(worldViewX),
-                       downwell::MotionBinary64::fromInteger(worldViewY),entryCover))return false;
+                       downwell::Fixed16::fromInteger(worldViewX),
+                       downwell::Fixed16::fromInteger(worldViewY),entryCover))return false;
                 entryCoverVisible=true;return true; // Immutable cover, never a BOB.
             }
             if(kind==GameplayWorld::DrawActor::enemy){
@@ -789,21 +797,16 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 if(!effect||!downwell::TimeShardDraw::prepare(*effect,{},true,false,false,command))return false;
                 if(command.placement.target==downwell::EffectSurfacePlacement::hidden)return true;
                 failedSprite=91;
-                using Real=downwell::MotionBinary64;
                 if(!downwell::DebrisDraw::frame(91,command.imageIndex,frame)||
-                   !downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
-                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
-                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                   !viewPixel(command.placement.x,worldViewX,x)||!viewPixel(command.placement.y,worldViewY,y))return false;
                 failedSprite=0;return append(91,frame,downwellPlayfieldX+x,y,0);
             }
             if(kind==GameplayWorld::DrawActor::corpseExpiry){
                 const auto* record=port.registeredExpiry()?port.registeredExpiry()->find(key):nullptr;
                 if(!record||!record->state.valid)return false;
                 const auto& effect=record->state;
-                auto x=record->x.promoted(),y=record->y.promoted();std::int32_t px,py;
-                if(!downwell::EffectSurfacePlacement::relative(x,downwell::MotionBinary64::fromInteger(worldViewX),x)||
-                   !downwell::EffectSurfacePlacement::relative(y,downwell::MotionBinary64::fromInteger(worldViewY),y)||
-                   !x.roundPixel(px)||!y.roundPixel(py))return false;
+                std::int32_t px,py;
+                if(!viewPixel(record->x,worldViewX,px)||!viewPixel(record->y,worldViewY,py))return false;
                 return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+px,py,0);
             }
             // Mutable title Draw belongs to the unconditional surface pass,
@@ -815,23 +818,17 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 downwell::CorpseDraw::Command command;std::int32_t x,y;
                 if(!r||!downwell::CorpseDraw::prepare(r->state,{},true,false,false,command))return false;
                 if(command.placement.target==downwell::EffectSurfacePlacement::hidden)return true;
-                using Real=downwell::MotionBinary64;
                 const auto scale=command.scaleX.bits;
                 if(!(scale&0x7fffffffu))return true;
                 if((scale&0x7fffffffu)!=0x3f800000u||command.imageIndex.bits&0x7fffffffu)return false;
-                if(!downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
-                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
-                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                if(!viewPixel(command.placement.x,worldViewX,x)||!viewPixel(command.placement.y,worldViewY,y))return false;
                 return append(command.sprite,0,downwellPlayfieldX+x,y,scale>>31);
             }
             if(kind==GameplayWorld::DrawActor::consumptionBlood){
                 const auto* r=port.consumptionParticles()?port.consumptionParticles()->find(key):nullptr;
                 unsigned frame;std::int32_t x,y;
                 if(!r||!r->state.drawFrame(frame))return false;
-                auto px=r->x.promoted(),py=r->y.promoted();using Real=downwell::MotionBinary64;
-                if(!downwell::EffectSurfacePlacement::relative(px,Real::fromInteger(worldViewX),px)||
-                   !downwell::EffectSurfacePlacement::relative(py,Real::fromInteger(worldViewY),py)||
-                   !px.roundPixel(x)||!py.roundPixel(y))return false;
+                                if(!viewPixel(r->x,worldViewX,x)||!viewPixel(r->y,worldViewY,y))return false;
                 return append(92,frame,downwellPlayfieldX+x,y,0); // Default Draw, never surfaceFx.
             }
             if(kind==GameplayWorld::DrawActor::limboShard){
@@ -840,30 +837,21 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 if(!r->state.drawsSelf())return true;
                 unsigned frame;std::int32_t x,y;
                 if(!downwell::DebrisDraw::frame(91,r->state.imageIndex,frame))return false;
-                auto px=r->x.promoted(),py=r->y.promoted();using Real=downwell::MotionBinary64;
-                if(!downwell::EffectSurfacePlacement::relative(px,Real::fromInteger(worldViewX),px)||
-                   !downwell::EffectSurfacePlacement::relative(py,Real::fromInteger(worldViewY),py)||
-                   !px.roundPixel(x)||!py.roundPixel(y))return false;
+                                if(!viewPixel(r->x,worldViewX,x)||!viewPixel(r->y,worldViewY,y))return false;
                 return append(91,frame,downwellPlayfieldX+x,y,0);
             }
             if(kind==GameplayWorld::DrawActor::blast){
                 const auto* r=port.registeredBlasts()?port.registeredBlasts()->find(key):nullptr;
                 unsigned frame;std::int32_t x,y;
                 if(!r||!r->state.drawFrame(frame))return false;
-                auto px=r->x.promoted(),py=r->y.promoted();using Real=downwell::MotionBinary64;
-                if(!downwell::EffectSurfacePlacement::relative(px,Real::fromInteger(worldViewX),px)||
-                   !downwell::EffectSurfacePlacement::relative(py,Real::fromInteger(worldViewY),py)||
-                   !px.roundPixel(x)||!py.roundPixel(y))return false;
+                                if(!viewPixel(r->x,worldViewX,x)||!viewPixel(r->y,worldViewY,y))return false;
                 return append(471,frame,downwellPlayfieldX+x,y,r->publishedScale.bits>>31);
             }
             if(kind==GameplayWorld::DrawActor::flashBall){
                 const auto* r=port.registeredFlash()?port.registeredFlash()->find(key):nullptr;
                 if(!r)return false;
-                auto px=r->x.promoted(),py=r->y.promoted();using Real=downwell::MotionBinary64;
-                std::int32_t x,y;
-                if(!downwell::EffectSurfacePlacement::relative(px,Real::fromInteger(worldViewX),px)||
-                   !downwell::EffectSurfacePlacement::relative(py,Real::fromInteger(worldViewY),py)||
-                   !px.roundPixel(x)||!py.roundPixel(y))return false;
+                                std::int32_t x,y;
+                if(!viewPixel(r->x,worldViewX,x)||!viewPixel(r->y,worldViewY,y))return false;
                 return append(96,r->state.drawFrame(),downwellPlayfieldX+x,y,0);
             }
             if(kind==GameplayWorld::DrawActor::smoke){
@@ -872,25 +860,19 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 downwell::SmokeDraw::Command command;unsigned frame;std::int32_t x,y;
                 if(!r||!downwell::SmokeDraw::prepare(r->state.imageIndex,r->x,r->y,{},true,false,false,command)||
                    !downwell::SmokeDraw::frame(command.imageIndex,frame))return false;
-                using Real=downwell::MotionBinary64;
-                if(!downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
-                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
-                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                if(!viewPixel(command.placement.x,worldViewX,x)||!viewPixel(command.placement.y,worldViewY,y))return false;
                 return append(84,frame,downwellPlayfieldX+x,y,0);
             }
             if(kind==GameplayWorld::DrawActor::debris){
                 if(compositeCurrency)return true; // Published by surfaceFx, not a second world draw.
                 const auto* record=port.debrisInstances()?port.debrisInstances()->find(key):nullptr;
                 downwell::DebrisDraw::Command command;unsigned frame;std::int32_t x,y;
-                using Real=downwell::MotionBinary64;
                 const downwell::EffectSurfacePlacement::View view{};
                 if(!record||!record->effect||!downwell::DebrisDraw::prepare(*record->effect,view,true,false,false,command))return false;
                 if(command.placement.target==downwell::EffectSurfacePlacement::hidden)return true;
                 failedSprite=command.sprite;
                 if(!downwell::DebrisDraw::frame(command.sprite,command.imageIndex,frame)||
-                   !downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
-                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
-                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                   !viewPixel(command.placement.x,worldViewX,x)||!viewPixel(command.placement.y,worldViewY,y))return false;
                 failedSprite=0;
                 return append(command.sprite,frame,downwellPlayfieldX+x,y,0);
             }

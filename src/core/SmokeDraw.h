@@ -14,7 +14,7 @@ struct SmokeDraw {
     }
     static bool prepare(RunnerImageValue index,RunnerImageValue x,RunnerImageValue y,
         const EffectSurfacePlacement::View& view,bool death,bool lowSpec,bool surfaceExists,Command& out){
-        return EffectSpriteDraw::prepare(true,84,index,x.promoted(),y.promoted(),{0x3f800000u},
+        return EffectSpriteDraw::prepare(true,84,index,x,y,{0x3f800000u},
             view,death,lowSpec,surfaceExists,out);
     }
     template<class Emit> static bool surface(RunnerImageValue index,RunnerImageValue x,RunnerImageValue y,
@@ -30,7 +30,7 @@ struct SmokeDraw {
         if(command.placement.target==EffectSurfacePlacement::hidden)return true;
         if(!frame(index,subimage))return false;
         const auto* asset=assets.smoke(subimage);
-        return asset&&emit(*asset,x.promoted(),y.promoted());
+        return asset&&EffectSpriteDraw::emitAt(emit,*asset,x,y);
     }
 };
 }
