@@ -1,0 +1,243 @@
+diff --git a/src/platform/amiga/AmigaGemStreakHud.h b/src/platform/amiga/AmigaGemStreakHud.h
+index c758442e..e835cc8c 100644
+--- a/src/platform/amiga/AmigaGemStreakHud.h
++++ b/src/platform/amiga/AmigaGemStreakHud.h
+@@ -59,13 +59,25 @@ struct AmigaGemStreakHud {
+             amigaRendererPrepareHudArt(&capRight_, game, gameEnd, 393, 0) &&
+             amigaRendererPrepareHudArt(&capLeft_, game, gameEnd, 393, 2);
+     }
+-    void release() { game_ = nullptr; valid_ = false; composed_ = false; owner_.invalidate(); }
++    void release() { game_ = nullptr; valid_ = false; composed_ = false; owner_.invalidate(); high_shown_ = false; }
+     // The HUD layer was repainted by another writer: forget what is shown.
+-    void invalidate() { owner_.invalidate(); }
++    void invalidate() { owner_.invalidate(); high_shown_ = false; }
++    // false: every view takes the staged path (the test oracle for the
++    // gem-high publish below).
++    bool directHigh = true;
+     // Publish v, erasing what the previous publish set and v does not.
+     bool draw(AmigaRenderer* renderer, const View& v) {
+         if (!valid_ || !renderer || !renderer->hud) return false;
+-        if (!v.visible) { owner_.hide(renderer); return true; }
++        if (!v.visible) { owner_.hide(renderer); hideHigh(renderer); return true; }
++        if (v.high && directHigh) {
++            Layout layout;
++            if (lay(v, layout)) {
++                owner_.hide(renderer);
++                publishHigh(renderer, v, layout);
++                return true;
++            }
++        }
++        hideHigh(renderer);
+         if (!stage(v)) return false;
+         owner_.publish(renderer);
+         return true;
+@@ -73,6 +85,7 @@ struct AmigaGemStreakHud {
+     // Content only, for a writer that has just repainted the region.
+     bool compose(AmigaRenderer* renderer, const View& v) {
+         if (!valid_ || !renderer || !renderer->hud) return false;
++        high_shown_ = false; // repainted: nothing of the direct publish remains
+         if (!v.visible) { owner_.invalidate(); return true; }
+         if (!stage(v)) return false;
+         owner_.publish(renderer, true);
+@@ -80,6 +93,150 @@ struct AmigaGemStreakHud {
+     }
+ 
+ private:
++    // The gem-high block changes every update (the cap frame is time % 3)
++    // and moves a row at a time while the streak rises, so it is published
++    // directly: each word of the union of its new and previous boxes is
++    // computed from the geometry (bar pens by row and column range, then the
++    // caps' and motion's shifted rows, in source order), the previously set
++    // pixels it no longer covers are folded in as erasures, and the word is
++    // written once. The staged path's result, without the stage.
++    enum { shownRows = 112, firstWord = stageX / 16 };
++    struct Art {
++        int top = 0, rows = 0, base = 0;
++        UWORD low[14][4], high[14][4], mask[14][4];
++    };
++    struct Layout { int top, bottom, left, right; };
++    static UWORD artWord(const UBYTE* p) {
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        return *(const UWORD*)p;
++#else
++        return UWORD((p[0] << 8) | p[1]);
++#endif
++    }
++    static void layerWord(UBYTE* p, UWORD value) {
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        *(UWORD*)p = value;
++#else
++        p[0] = UBYTE(value >> 8); p[1] = UBYTE(value);
++#endif
++    }
++    // art anchored at (x, y), shifted into destination words base..base+3.
++    static void shift(const AmigaHudArt& art, int x, int y, Art& out) {
++        const int left = x + art.left;
++        const unsigned s = unsigned(left) & 15, words = art.planeBytes >> 1;
++        const unsigned plane = art.planeBytes * art.height;
++        out.top = y + art.top; out.rows = int(art.height); out.base = left >> 4;
++        for (unsigned r = 0; r < art.height; ++r) {
++            UWORD* low = out.low[r]; UWORD* high = out.high[r]; UWORD* mask = out.mask[r];
++            for (unsigned k = 0; k < 4; ++k) low[k] = high[k] = mask[k] = 0;
++            const UBYTE* source = art.data + r * art.planeBytes;
++            for (unsigned k = 0; k < words; ++k) {
++                ULONG l = artWord(source + k * 2), h = artWord(source + plane + k * 2);
++                if (k * 16 + 16 > art.width) {
++                    const unsigned visible = art.width > k * 16 ? art.width - k * 16 : 0;
++                    const UWORD clip = visible ? UWORD(0xffffu << (16 - visible)) : 0;
++                    l &= clip; h &= clip;
++                }
++                const ULONG m = (l | h) << (16 - s);
++                l <<= 16 - s; h <<= 16 - s;
++                low[k] |= UWORD(l >> 16); high[k] |= UWORD(h >> 16); mask[k] |= UWORD(m >> 16);
++                low[k + 1] |= UWORD(l); high[k + 1] |= UWORD(h); mask[k + 1] |= UWORD(m);
++            }
++        }
++    }
++    // Draw art's word over (low, high, mask) at layer row r, word w.
++    static void over(const Art& art, int r, int w, UWORD& low, UWORD& high, UWORD& mask) {
++        const int row = r - art.top, k = w - art.base;
++        if (row < 0 || row >= art.rows || k < 0 || k > 3) return;
++        const UWORD m = art.mask[row][k];
++        low = UWORD((low & ~m) | art.low[row][k]); high = UWORD((high & ~m) | art.high[row][k]);
++        mask |= m;
++    }
++    Art right_art_, left_art_, motion_art_;
++    UWORD shown_high_[shownRows][words] = {};
++    Layout shown_layout_{};
++    bool high_shown_ = false;
++    // The block's box; false when it leaves the direct publish's rows/words.
++    bool lay(const View& v, Layout& layout) {
++        const int x = drawX, y = v.drawY, columns = int(v.line >> 16);
++        const auto& motion = v.sick ? sick_[v.motion] : high_[v.motion];
++        const int right = x + downwell::CompactGemStreakHud::anchor(v.line);
++        const int left = x + downwell::CompactGemStreakHud::anchor(-v.line);
++        const AmigaHudArt* const checked[3] = {&right_[v.cap], &left_[v.cap], &motion};
++        for (const AmigaHudArt* art : checked)
++            if (art->height > 14 || art->planeBytes > 6) return false;
++        shift(right_[v.cap], right, y, right_art_);
++        shift(left_[v.cap], left, y, left_art_);
++        shift(motion, x, y + 5, motion_art_);
++        int top = y + 1, bottom = y + 9, l = x - columns - 2, r = x + columns + 2;
++        const AmigaHudArt* arts[3] = {&right_[v.cap], &left_[v.cap], &motion};
++        const int ax[3] = {right, left, x}, ay[3] = {y, y, y + 5};
++        for (unsigned i = 0; i < 3; ++i) {
++            const int t = ay[i] + arts[i]->top, le = ax[i] + arts[i]->left;
++            if (t < top) top = t;
++            if (t + int(arts[i]->height) > bottom) bottom = t + int(arts[i]->height);
++            if (le < l) l = le;
++            if (le + int(arts[i]->width) > r) r = le + int(arts[i]->width);
++        }
++        layout = {top, bottom, l >> 4, (r - 1) >> 4};
++        return top >= 0 && bottom <= shownRows && l >= stageX && r <= stageX + 16 * words;
++    }
++    void publishHigh(AmigaRenderer* renderer, const View& v, const Layout& now) {
++        amigaRendererClearClipRect(renderer);
++        static const unsigned char pens[8] = {3, 2, 1, 1, 1, 1, 2, 3};
++        const int x = drawX, y = v.drawY, columns = int(v.line >> 16);
++        const int x0 = x - columns - 2, x1 = x + columns + 1;
++        const Layout was = high_shown_ ? shown_layout_ : now;
++        const int top = was.top < now.top ? was.top : now.top;
++        const int bottom = was.bottom > now.bottom ? was.bottom : now.bottom;
++        const int first = was.left < now.left ? was.left : now.left;
++        const int last = was.right > now.right ? was.right : now.right;
++        UBYTE* row = renderer->hud + top * downwellBytesPerPlaneLine;
++        for (int r = top; r < bottom; ++r, row += downwellBytesPerPlaneLine) {
++            const bool rowNow = r >= now.top && r < now.bottom, rowWas = high_shown_ && r >= was.top && r < was.bottom;
++            const int bar = r - (y + 1);
++            for (int w = first; w <= last; ++w) {
++                UWORD low = 0, high = 0, mask = 0;
++                if (rowNow && w >= now.left && w <= now.right) {
++                    if (bar >= 0 && bar < 8) {
++                        const int a = x0 > 16 * w ? x0 : 16 * w, b = x1 < 16 * w + 15 ? x1 : 16 * w + 15;
++                        if (a <= b) {
++                            mask = UWORD((0xffffu >> (a - 16 * w)) & (0xffffu << (15 - (b - 16 * w))));
++                            low = pens[bar] & 1 ? mask : 0; high = pens[bar] & 2 ? mask : 0;
++                        }
++                    }
++                    over(right_art_, r, w, low, high, mask);
++                    over(left_art_, r, w, low, high, mask);
++                    over(motion_art_, r, w, low, high, mask);
++                }
++                UWORD& shown = shown_high_[r][w - firstWord];
++                const UWORD old = rowWas && w >= was.left && w <= was.right ? UWORD(shown & ~mask) : 0;
++                shown = UWORD(mask & (low | high));
++                mask |= old;
++                if (!mask) continue;
++                UBYTE* target = row + w * 2;
++                layerWord(target, UWORD((artWord(target) & ~mask) | (low & ~old)));
++                layerWord(target + downwellPlaneBytes,
++                          UWORD((artWord(target + downwellPlaneBytes) & ~mask) | (high & ~old)));
++            }
++        }
++        shown_layout_ = now; high_shown_ = true;
++    }
++    void hideHigh(AmigaRenderer* renderer) {
++        if (!high_shown_) return;
++        amigaRendererClearClipRect(renderer);
++        const Layout& was = shown_layout_;
++        UBYTE* row = renderer->hud + was.top * downwellBytesPerPlaneLine;
++        for (int r = was.top; r < was.bottom; ++r, row += downwellBytesPerPlaneLine)
++            for (int w = was.left; w <= was.right; ++w) {
++                const UWORD clear = shown_high_[r][w - firstWord];
++                if (!clear) continue;
++                UBYTE* target = row + w * 2;
++                layerWord(target, UWORD(artWord(target) & ~clear));
++                layerWord(target + downwellPlaneBytes, UWORD(artWord(target + downwellPlaneBytes) & ~clear));
++            }
++        high_shown_ = false;
++    }
+     // A block that only moved (the camera scrolled) keeps its composed stage.
+     bool stage(const View& v) {
+         if (composed_ && v.sameContent(content_) && owner_.move(v.drawY - rowsAbove)) return true;
+diff --git a/tests/platform/amiga/AmigaGemStreakHudTest.cpp b/tests/platform/amiga/AmigaGemStreakHudTest.cpp
+index 1633d626..27e65766 100644
+--- a/tests/platform/amiga/AmigaGemStreakHudTest.cpp
++++ b/tests/platform/amiga/AmigaGemStreakHudTest.cpp
+@@ -93,14 +93,10 @@ int main(int argc, char** argv) {
+             const struct { int y; unsigned streak; } steps[] = {
+                 {40, 37}, {40, 37}, {37, 37}, {30, 37}, {30, 38}, {31, 38}, {52, 38}, {12, 38},
+                 {12, 9}, {60, 9}, {60, 99}, {59, 99}, {59, 100}, {58, 100}};
+-            for (int high = 0; high < 2; ++high)
+-                for (const auto& step : steps) {
+-                    AmigaGemStreakHud::View v;
+-                    v.visible = true; v.high = high; v.streak = step.streak; v.drawY = step.y;
+-                    v.line = long(high ? 70 : 20 + int(step.streak % 7)) << 16;
+-                    v.cap = high ? int(step.streak % 3) : 1; v.motion = high ? int(step.streak % 14) : 5;
++            auto modelled = [&](const AmigaGemStreakHud::View& v) {
+                     track(v);
+                     AmigaGemStreakHud fresh;
++                    fresh.directHigh = false;
+                     assert(fresh.bind(pack.data(), pack.data() + pack.size()));
+                     std::fill(freshLayer.begin(), freshLayer.end(), UBYTE(0));
+                     assert(fresh.draw(&freshRenderer, v));
+@@ -113,7 +109,29 @@ int main(int argc, char** argv) {
+                         previous[i] = block;
+                     }
+                     assert(expected == hud);
++            };
++            for (int high = 0; high < 2; ++high)
++                for (const auto& step : steps) {
++                    AmigaGemStreakHud::View v;
++                    v.visible = true; v.high = high; v.streak = step.streak; v.drawY = step.y;
++                    v.line = long(high ? 70 : 20 + int(step.streak % 7)) << 16;
++                    v.cap = high ? int(step.streak % 3) : 1; v.motion = high ? int(step.streak % 14) : 5;
++                    modelled(v);
+                 }
++            // Gem high as the game shows it: the cap frame changes every
++            // update, the motion every few, the line shrinks a quarter column
++            // at a time (through overlapping caps and motion) and the block
++            // moves a row now and then. Each update keeps or replaces the
++            // cached bar and motion and publishes only changed words.
++            for (int t = 0; t < 420; ++t) {
++                AmigaGemStreakHud::View v;
++                v.visible = true; v.high = true; v.streak = 100 + unsigned(t);
++                v.sick = t >= 300; v.drawY = 30 + (t / 9) % 3 - (t / 50) % 2;
++                v.line = (93L << 16) - (long(t) << 14) * 3 / 2;
++                if (v.line < 0) v.line = 0;
++                v.cap = t % 3; v.motion = (t / 4) % 14;
++                modelled(v);
++            }
+             assert(owner.draw(&renderer, AmigaGemStreakHud::View{}));
+             for (unsigned i = 0; i < downwellLayerBytes; ++i) {
+                 // Per pixel (both planes): a pixel the block drew and erased

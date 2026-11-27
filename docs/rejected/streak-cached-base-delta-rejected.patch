@@ -1,0 +1,360 @@
+diff --git a/src/platform/amiga/AmigaGemStreakHud.h b/src/platform/amiga/AmigaGemStreakHud.h
+index c758442e..44a7022b 100644
+--- a/src/platform/amiga/AmigaGemStreakHud.h
++++ b/src/platform/amiga/AmigaGemStreakHud.h
+@@ -46,7 +46,7 @@ struct AmigaGemStreakHud {
+     }
+     bool bind(const UBYTE* game, const UBYTE* gameEnd) {
+         if (game == game_) return valid_;
+-        game_ = game; valid_ = false; composed_ = false; owner_.invalidate();
++        game_ = game; valid_ = false; composed_ = false; baseValid_ = false; owner_.invalidate();
+         for (unsigned d = 0; d < 10; ++d)
+             if (!amigaRendererPrepareHudArt(&digits_[d], game, gameEnd, UWORD(65100 + d), 0)) return false;
+         for (unsigned f = 0; f < 3; ++f)
+@@ -59,7 +59,9 @@ struct AmigaGemStreakHud {
+             amigaRendererPrepareHudArt(&capRight_, game, gameEnd, 393, 0) &&
+             amigaRendererPrepareHudArt(&capLeft_, game, gameEnd, 393, 2);
+     }
+-    void release() { game_ = nullptr; valid_ = false; composed_ = false; owner_.invalidate(); }
++    // false: compose every gem-high stage in source order (the test oracle).
++    bool cacheBase = true;
++    void release() { game_ = nullptr; valid_ = false; composed_ = false; baseValid_ = false; owner_.invalidate(); }
+     // The HUD layer was repainted by another writer: forget what is shown.
+     void invalidate() { owner_.invalidate(); }
+     // Publish v, erasing what the previous publish set and v does not.
+@@ -81,12 +83,57 @@ struct AmigaGemStreakHud {
+ 
+ private:
+     // A block that only moved (the camera scrolled) keeps its composed stage.
++    // The gem-high block changes its cap frame every update (time % 3) and
++    // its motion frame every few: the bar and motion stay composed in base_
++    // and only the caps are placed on a copy of it. The caps come before the
++    // motion in source order, so this holds only while they do not overlap.
+     bool stage(const View& v) {
+         if (composed_ && v.sameContent(content_) && owner_.move(v.drawY - rowsAbove)) return true;
+-        composed_ = owner_.begin(stageX, v.drawY - rowsAbove, words, rows) && compose(v);
+         content_ = v;
++        if (v.high && cacheBase && capsApart(v)) {
++            if (!baseValid_ || !sameBase(v, baseContent_)) {
++                baseValid_ = amigaHudStageBegin(&base_, stageX, v.drawY - rowsAbove, words, rows) &&
++                    composeBar(base_, v) && placeMotion(base_, v);
++                baseContent_ = v;
++                if (!baseValid_) return composed_ = false;
++            }
++            const int dy = v.drawY - baseContent_.drawY;
++            return composed_ = owner_.beginCopy(base_, base_.y + dy) && placeCaps(*owner_.stage(), v);
++        }
++        composed_ = owner_.begin(stageX, v.drawY - rowsAbove, words, rows) && compose(v);
+         return composed_;
+     }
++    static bool sameBase(const View& a, const View& b) {
++        return a.sick == b.sick && a.line == b.line && a.motion == b.motion;
++    }
++    static bool apart(const AmigaHudArt& a, int ax, int ay, const AmigaHudArt& b, int bx, int by) {
++        const int a0 = ax + a.left, b0 = bx + b.left, a1 = ay + a.top, b1 = by + b.top;
++        return a0 + int(a.width) <= b0 || b0 + int(b.width) <= a0 ||
++            a1 + int(a.height) <= b1 || b1 + int(b.height) <= a1;
++    }
++    bool capsApart(const View& v) const {
++        const int x = drawX, y = v.drawY;
++        const auto& motion = v.sick ? sick_[v.motion] : high_[v.motion];
++        return apart(right_[v.cap], x + downwell::CompactGemStreakHud::anchor(v.line), y, motion, x, y + 5) &&
++            apart(left_[v.cap], x + downwell::CompactGemStreakHud::anchor(-v.line), y, motion, x, y + 5);
++    }
++    bool composeBar(AmigaHudStage& stage, const View& v) {
++        const int x = drawX, y = v.drawY, columns = int(v.line >> 16);
++        // sprGemBar frame 4 at y - 1 (origin y -2): K R W W W W R K.
++        static const unsigned char pens[8] = {3, 2, 1, 1, 1, 1, 2, 3};
++        for (int row = 0; row < 8; ++row)
++            if (!amigaHudStageFill(&stage, x - columns - 2, y + 1 + row, 2 * columns + 4, 1, pens[row])) return false;
++        return true;
++    }
++    bool placeCaps(AmigaHudStage& stage, const View& v) {
++        const int x = drawX, y = v.drawY;
++        return amigaHudStagePlace(&stage, &right_[v.cap], x + downwell::CompactGemStreakHud::anchor(v.line), y, -1) &&
++            amigaHudStagePlace(&stage, &left_[v.cap], x + downwell::CompactGemStreakHud::anchor(-v.line), y, -1);
++    }
++    bool placeMotion(AmigaHudStage& stage, const View& v) {
++        const auto& motion = v.sick ? sick_[v.motion] : high_[v.motion];
++        return amigaHudStagePlace(&stage, &motion, drawX, v.drawY + 5, -1) != 0;
++    }
+     bool fill(int x0, int x1, int y, unsigned pen) {
+         return amigaHudStageFill(owner_.stage(), x0, y, x1 - x0 + 1, 1, pen) != 0;
+     }
+@@ -96,16 +143,8 @@ private:
+         const int x0 = x - columns - 2, x1 = x + columns + 1;
+         const int right = x + downwell::CompactGemStreakHud::anchor(v.line);
+         const int left = x + downwell::CompactGemStreakHud::anchor(-v.line);
+-        if (v.high) {
+-            // sprGemBar frame 4 at y - 1 (origin y -2): K R W W W W R K.
+-            static const unsigned char pens[8] = {3, 2, 1, 1, 1, 1, 2, 3};
+-            for (int row = 0; row < 8; ++row)
+-                if (!fill(x0, x1, y + 1 + row, pens[row])) return false;
+-            const auto& motion = v.sick ? sick_[v.motion] : high_[v.motion];
+-            return amigaHudStagePlace(owner_.stage(), &right_[v.cap], right, y, -1) &&
+-                amigaHudStagePlace(owner_.stage(), &left_[v.cap], left, y, -1) &&
+-                amigaHudStagePlace(owner_.stage(), &motion, x, y + 5, -1);
+-        }
++        if (v.high)
++            return composeBar(*owner_.stage(), v) && placeCaps(*owner_.stage(), v) && placeMotion(*owner_.stage(), v);
+         // sprGemBar frame 1 at y: K R R R R K; then caps 0 (right), 2 (left).
+         static const unsigned char pens[6] = {3, 2, 2, 2, 2, 3};
+         for (int row = 0; row < 6; ++row)
+@@ -125,8 +164,9 @@ private:
+     }
+ 
+     const UBYTE* game_ = nullptr;
+-    bool valid_ = false, composed_ = false;
+-    View content_;
++    bool valid_ = false, composed_ = false, baseValid_ = false;
++    View content_, baseContent_;
++    AmigaHudStage base_;
+     AmigaHudMaskedOwner owner_;
+     AmigaHudArt digits_[10], right_[3], left_[3], high_[14], sick_[14], icon_, capRight_, capLeft_;
+ };
+diff --git a/src/platform/amiga/AmigaHudMaskedOwner.h b/src/platform/amiga/AmigaHudMaskedOwner.h
+index 31961b1b..06ea52af 100644
+--- a/src/platform/amiga/AmigaHudMaskedOwner.h
++++ b/src/platform/amiga/AmigaHudMaskedOwner.h
+@@ -1,36 +1,68 @@
+ #ifndef DOWNWELL_AMIGA_HUD_MASKED_OWNER_H
+ #define DOWNWELL_AMIGA_HUD_MASKED_OWNER_H
+ #include "AmigaRenderer.h"
++#include <cstring>
+ 
+ // A fixed-HUD writer that shares its region with others: each publish erases
+ // exactly the pixels its previous publish set (never a rectangle), folded
+-// into the same masked pass when the region is unchanged. Compose into
+-// stage() between begin() and publish(). Every composed pixel must have a
+-// non-zero pen; HUD art masks already exclude pen 0.
++// into the same masked pass. Compose into stage() between begin() and
++// publish(). Every composed pixel must have a non-zero pen; HUD art masks
++// already exclude pen 0.
++//
++// Two stages alternate, so the previous publish stays readable: a new stage
++// at the same x and width (any y) writes only the words whose pixels change
++// (amigaRendererPublishHudStageDelta). Other writers of the region must call
++// invalidate() after repainting it, as before.
+ struct AmigaHudMaskedOwner {
+     bool begin(int x, int y, unsigned words, unsigned rows) {
+-        composed_ = amigaHudStageBegin(&stage_, x, y, words, rows) != 0;
++        select();
++        composed_ = amigaHudStageBegin(&stages_[current_], x, y, words, rows) != 0;
+         return composed_;
+     }
++    // begin() with source's first rows instead of an empty stage (source
++    // composed at the same x and words; its placements are stage-relative).
++    bool beginCopy(const AmigaHudStage& source, int y) {
++        select();
++        AmigaHudStage& s = stages_[current_];
++        s.x = source.x; s.y = y; s.words = source.words; s.rows = source.rows;
++        const unsigned bytes = source.rows * amigaHudStageWords * sizeof(UWORD);
++        std::memcpy(s.low, source.low, bytes);
++        std::memcpy(s.high, source.high, bytes);
++        std::memcpy(s.mask, source.mask, bytes);
++        return composed_ = true;
++    }
+     // Republish the last composed stage at row y without composing it
+-    // again: false once a publish folded an erase into it (mergeErase), or
+-    // before anything was composed.
++    // again: false once a publish folded an erase into it, or before
++    // anything was composed.
+     bool move(int y) {
+         if (!composed_) return false;
+-        stage_.y = y;
++        stages_[current_].y = y;
+         return true;
+     }
+-    AmigaHudStage* stage() { return &stage_; }
++    AmigaHudStage* stage() { return &stages_[current_]; }
+     // Publish the composed stage. fresh: the region was just repainted by
+     // another writer, so nothing of ours remains to erase.
+     void publish(AmigaRenderer* renderer, bool fresh = false) {
++        AmigaHudStage& s = stages_[current_];
+         amigaRendererClearClipRect(renderer);
+         if (published_ && !fresh) {
+-            if (stage_.x != x_ || stage_.y != y_ || stage_.words != words_ || stage_.rows != rows_) eraseSeparately(renderer);
++            const AmigaHudStage& was = stages_[published_stage_];
++            if (published_stage_ != current_) {
++                if (s.x == was.x && s.words == was.words) {
++                    composed_ = false;
++                    amigaRendererPublishHudStageDelta(renderer, &s, &was, shown_[published_stage_], shown_[current_]);
++                    published_stage_ = current_; y_ = s.y;
++                    return;
++                }
++                eraseSeparately(renderer);
++            }
++            // The same stage again (move): erase where it was, unless it
++            // has not moved, when its own mask covers what it set.
++            else if (s.y != y_) eraseSeparately(renderer);
+             else mergeErase();
+         }
+-        amigaRendererPublishHudStageShown(renderer, &stage_, shown_);
+-        published_ = true; x_ = stage_.x; y_ = stage_.y; words_ = stage_.words; rows_ = stage_.rows;
++        amigaRendererPublishHudStageShown(renderer, &s, shown_[current_]);
++        published_ = true; published_stage_ = current_; y_ = s.y;
+     }
+     void hide(AmigaRenderer* renderer) {
+         if (published_) { amigaRendererClearClipRect(renderer); eraseSeparately(renderer); }
+@@ -41,24 +73,28 @@ struct AmigaHudMaskedOwner {
+     bool published() const { return published_; }
+ 
+ private:
++    // Compose into the stage that is not on screen.
++    void select() { if (published_ && published_stage_ == current_) current_ ^= 1; }
+     void eraseSeparately(AmigaRenderer* renderer) {
+-        amigaRendererEraseHudMask(renderer, x_, y_, words_, rows_, shown_);
++        const AmigaHudStage& was = stages_[published_stage_];
++        amigaRendererEraseHudMask(renderer, was.x, y_, was.words, was.rows, shown_[published_stage_]);
+     }
+     void mergeErase() {
++        AmigaHudStage& s = stages_[current_];
+         composed_ = false;
+-        for (unsigned r = 0; r < rows_; ++r)
+-            for (unsigned w = 0; w < words_; ++w) {
+-                const UWORD old = UWORD(shown_[r][w] & ~stage_.mask[r][w]);
++        for (unsigned r = 0; r < s.rows; ++r)
++            for (unsigned w = 0; w < s.words; ++w) {
++                const UWORD old = UWORD(shown_[current_][r][w] & ~s.mask[r][w]);
+                 if (!old) continue;
+-                stage_.low[r][w] = UWORD(stage_.low[r][w] & ~old);
+-                stage_.high[r][w] = UWORD(stage_.high[r][w] & ~old);
+-                stage_.mask[r][w] |= old;
++                s.low[r][w] = UWORD(s.low[r][w] & ~old);
++                s.high[r][w] = UWORD(s.high[r][w] & ~old);
++                s.mask[r][w] |= old;
+             }
+     }
+-    AmigaHudStage stage_;
+-    UWORD shown_[amigaHudStageRows][amigaHudStageWords] = {};
++    AmigaHudStage stages_[2];
++    UWORD shown_[2][amigaHudStageRows][amigaHudStageWords] = {};
+     bool published_ = false, composed_ = false;
+-    int x_ = 0, y_ = 0;
+-    unsigned words_ = 0, rows_ = 0;
++    unsigned current_ = 0, published_stage_ = 0;
++    int y_ = 0;
+ };
+ #endif
+diff --git a/src/platform/amiga/AmigaRenderer.c b/src/platform/amiga/AmigaRenderer.c
+index 290913d2..95a3fcfc 100644
+--- a/src/platform/amiga/AmigaRenderer.c
++++ b/src/platform/amiga/AmigaRenderer.c
+@@ -1415,6 +1415,47 @@ void amigaRendererPublishHudStageShown(AmigaRenderer* renderer, const AmigaHudSt
+         }
+ }
+ 
++void amigaRendererPublishHudStageDelta(AmigaRenderer* renderer, AmigaHudStage* stage,
++                                       const AmigaHudStage* previous,
++                                       const UWORD previousShown[amigaHudStageRows][amigaHudStageWords],
++                                       UWORD shown[amigaHudStageRows][amigaHudStageWords]) {
++    const int top = stage->y < previous->y ? stage->y : previous->y;
++    const int end = stage->y + (int)stage->rows > previous->y + (int)previous->rows ?
++        stage->y + (int)stage->rows : previous->y + (int)previous->rows;
++    UBYTE* row = renderer->hud + top * downwellBytesPerPlaneLine + (stage->x >> 3);
++    int line;
++    unsigned word;
++    for (line = top; line < end; ++line, row += downwellBytesPerPlaneLine) {
++        const int now = line - stage->y, before = line - previous->y;
++        const int inNow = now >= 0 && now < (int)stage->rows;
++        const int inBefore = before >= 0 && before < (int)previous->rows;
++        for (word = 0; word < stage->words; ++word) {
++            UWORD mask = 0, low = 0, high = 0, wasMask = 0, wasLow = 0, wasHigh = 0, old = 0;
++            UBYTE* target;
++            if (inNow) { mask = stage->mask[now][word]; low = stage->low[now][word]; high = stage->high[now][word]; }
++            if (inBefore) {
++                wasMask = previous->mask[before][word];
++                wasLow = (UWORD)(previous->low[before][word] & wasMask);
++                wasHigh = (UWORD)(previous->high[before][word] & wasMask);
++                old = (UWORD)(previousShown[before][word] & ~mask);
++            }
++            if (old) { low = (UWORD)(low & ~old); high = (UWORD)(high & ~old); mask = (UWORD)(mask | old); }
++            if (inNow) {
++                stage->low[now][word] = low; stage->high[now][word] = high; stage->mask[now][word] = mask;
++                shown[now][word] = (UWORD)(mask & (low | high));
++            }
++            /* The layer already holds exactly this word's pixels under the
++               same mask: the previous publish wrote them. */
++            if (!mask || (mask == wasMask && (UWORD)(low & mask) == wasLow && (UWORD)(high & mask) == wasHigh))
++                continue;
++            target = row + word*2;
++            writeWord(target, (UWORD)((readWord(target) & ~mask) | (low & mask)));
++            writeWord(target + downwellPlaneBytes,
++                (UWORD)((readWord(target + downwellPlaneBytes) & ~mask) | (high & mask)));
++        }
++    }
++}
++
+ void amigaRendererEraseHudMask(AmigaRenderer* renderer, int x, int y, unsigned words, unsigned rows,
+                                const UWORD mask[amigaHudStageRows][amigaHudStageWords]) {
+     UBYTE* row = renderer->hud + y * downwellBytesPerPlaneLine + (x >> 3);
+diff --git a/src/platform/amiga/AmigaRenderer.h b/src/platform/amiga/AmigaRenderer.h
+index af5655d3..51a8b64c 100644
+--- a/src/platform/amiga/AmigaRenderer.h
++++ b/src/platform/amiga/AmigaRenderer.h
+@@ -150,6 +150,14 @@ void amigaRendererPublishHudStage(AmigaRenderer*, const AmigaHudStage*, const Am
+    word's non-zero published pixels, mask & (low | high), in shown. */
+ void amigaRendererPublishHudStageShown(AmigaRenderer*, const AmigaHudStage*,
+                                        UWORD shown[amigaHudStageRows][amigaHudStageWords]);
++/* Publish stage over the region previous (same x and words, any y) left,
++   as erasing previousShown's pixels and publishing stage, but writing only
++   the words whose pixels change. Folds the erase into stage (as published)
++   and records stage's set pixels in shown. Exact while nothing else has
++   written the region since previous was published. */
++void amigaRendererPublishHudStageDelta(AmigaRenderer*, AmigaHudStage* stage, const AmigaHudStage* previous,
++                                       const UWORD previousShown[amigaHudStageRows][amigaHudStageWords],
++                                       UWORD shown[amigaHudStageRows][amigaHudStageWords]);
+ /* Clear (pen 0) the pixels set in mask over a words x rows region at x, y
+    (x word aligned), as publishing a stage of that mask with no pixels. */
+ void amigaRendererEraseHudMask(AmigaRenderer*, int x, int y, unsigned words, unsigned rows,
+diff --git a/tests/platform/amiga/AmigaGemStreakHudTest.cpp b/tests/platform/amiga/AmigaGemStreakHudTest.cpp
+index 1633d626..329811a4 100644
+--- a/tests/platform/amiga/AmigaGemStreakHudTest.cpp
++++ b/tests/platform/amiga/AmigaGemStreakHudTest.cpp
+@@ -93,14 +93,10 @@ int main(int argc, char** argv) {
+             const struct { int y; unsigned streak; } steps[] = {
+                 {40, 37}, {40, 37}, {37, 37}, {30, 37}, {30, 38}, {31, 38}, {52, 38}, {12, 38},
+                 {12, 9}, {60, 9}, {60, 99}, {59, 99}, {59, 100}, {58, 100}};
+-            for (int high = 0; high < 2; ++high)
+-                for (const auto& step : steps) {
+-                    AmigaGemStreakHud::View v;
+-                    v.visible = true; v.high = high; v.streak = step.streak; v.drawY = step.y;
+-                    v.line = long(high ? 70 : 20 + int(step.streak % 7)) << 16;
+-                    v.cap = high ? int(step.streak % 3) : 1; v.motion = high ? int(step.streak % 14) : 5;
++            auto modelled = [&](const AmigaGemStreakHud::View& v) {
+                     track(v);
+                     AmigaGemStreakHud fresh;
++                    fresh.cacheBase = false;
+                     assert(fresh.bind(pack.data(), pack.data() + pack.size()));
+                     std::fill(freshLayer.begin(), freshLayer.end(), UBYTE(0));
+                     assert(fresh.draw(&freshRenderer, v));
+@@ -113,7 +109,29 @@ int main(int argc, char** argv) {
+                         previous[i] = block;
+                     }
+                     assert(expected == hud);
++            };
++            for (int high = 0; high < 2; ++high)
++                for (const auto& step : steps) {
++                    AmigaGemStreakHud::View v;
++                    v.visible = true; v.high = high; v.streak = step.streak; v.drawY = step.y;
++                    v.line = long(high ? 70 : 20 + int(step.streak % 7)) << 16;
++                    v.cap = high ? int(step.streak % 3) : 1; v.motion = high ? int(step.streak % 14) : 5;
++                    modelled(v);
+                 }
++            // Gem high as the game shows it: the cap frame changes every
++            // update, the motion every few, the line shrinks a quarter column
++            // at a time (through overlapping caps and motion) and the block
++            // moves a row now and then. Each update keeps or replaces the
++            // cached bar and motion and publishes only changed words.
++            for (int t = 0; t < 420; ++t) {
++                AmigaGemStreakHud::View v;
++                v.visible = true; v.high = true; v.streak = 100 + unsigned(t);
++                v.sick = t >= 300; v.drawY = 30 + (t / 9) % 3 - (t / 50) % 2;
++                v.line = (93L << 16) - (long(t) << 14) * 3 / 2;
++                if (v.line < 0) v.line = 0;
++                v.cap = t % 3; v.motion = (t / 4) % 14;
++                modelled(v);
++            }
+             assert(owner.draw(&renderer, AmigaGemStreakHud::View{}));
+             for (unsigned i = 0; i < downwellLayerBytes; ++i) {
+                 // Per pixel (both planes): a pixel the block drew and erased

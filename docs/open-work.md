@@ -302,15 +302,29 @@ to 20–34 ms through 1-2, and from 17 ms to 24–42 ms through 1-3; the medians
 go from 7 to 22–37, 20 to 31–47 and 23 to 33–58 ms. Each level change
 resets it.
 
+**Owners (W3.7, 27.11.2026).** The floor does not rise from accumulated
+objects: each level's later stretches carry more per-update owners at
+once (gem high from mid 1-1 onwards, corpses, jellies and red balls,
+torches, time shards in side rooms). `CENSUS_PARTS=1` with the normal-run
+census above splits the gameplay class (mean 31.9 ms, excess 82.5 s) by
+loop stage, mean ms / share of excess: step 13.2 / 34.2 s, BOBs 5.2 /
+14.1, effect composition 3.0 / 8.5, HUD 3.0 / 7.9 (almost all the gem
+streak block), collect 2.0 / 5.6, overlays 1.3 / 3.2, rows 1.0 / 2.1,
+assign 0.8 / 2.1; the side-room camera and slowdown classes rank the
+same. Eight route traces at typical over-budget updates (800, 2019, 3442,
+4431, 5228, 6649, 7236, 7528) give, per update: `GameplayWorld::step`
+15.0 ms (steering 1.8: jelly steer, red ball, steering draw's binary64;
+enemy room effects 1.7: bats, walkers, frogs; time shards 1.6, nearly all
+their `sParentSolid` meetings; player 1.1; gem-high afterimages 0.9, all
+RNG draws; enemy alarms 0.8; corpses 0.7; currency collection 0.4; a long
+tail under 0.3), BOBs 6.3 (the CPU word compositor 2.7 at about 3,100
+cycles a BOB, 35 BOBs at the 1-3 combo reward), composition 3.9 (corpses
+on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
+(4.4 whenever gem high shows), collect 2.4 (torch fire 0.4). Compiling
+`AmigaRenderer.c` at -O2 did not help (BOBs at 7236 13.3 → 15.4 ms).
+
 **Items**
 
-7. **W3.7 Owners and ranking.** Find what makes the floor rise within a
-   level, on the shortest workload that shows it (the route to about frame
-   700 of 1-2 or 1-3; `ROUTE_END_TICK` ends the route driver early, and it
-   can run `monitor profile` at a tick, as its screenshots do). Trace the
-   worst updates (6847, 5796, 6692, 3662). Rank owners by their total
-   excess across the workloads, then review the order of W3.10–W3.14 with
-   the user.
 10. **W3.10 The fall's two overruns, 136 and 163.** Both are generation
     bursts inside `GameplayWorld::step` (the builder's next pattern and its
     event cells). First make event cells cheaper: breakables as source
@@ -454,6 +468,9 @@ the git log.
 - Quiet frames: enemy alarm-order variants, roster insertion, pinning,
   snapshot caching, merge loops, negative counter dispatch, the borrowed
   Step snapshot and generic temporary alarm-array layouts.
+- HUD: the gem-high streak block's cached base with a delta publish and
+  its direct per-word publish (W3.7, two attempts; a third must visit
+  only the words that change).
 - Drawing: converting to fixed point only at the drawFx placement
   boundary (cost as much as it saved); the two-word asset path (0.07 ms).
 - The ammo gauge's runtime classifiers; bounded clean-style raster
