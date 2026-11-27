@@ -3207,7 +3207,7 @@ private:
     bool advanceSteeringAlarm(EnemyState& enemy,unsigned alarm);
     bool hitSteeringEnemy(EnemyState& enemy,std::uint32_t directionTurns,int damage);
     bool collideSteeringEnemies();
-    bool steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit);
+    bool steeringWallMeetingQ16(int mask,std::int32_t x,std::int32_t y,bool& hit);
     bool steeringWallMeeting(int mask,int x,int y,bool& hit); // whole room pixels
     bool steeringWallContact(const downwell::ContactBounds& bounds,bool& hit);
     bool steeringEnemyMeeting(int mask,int x,int y,bool& hit);

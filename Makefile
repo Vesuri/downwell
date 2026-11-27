@@ -950,6 +950,14 @@ verify-time-shard-particle: build/time-shard-particle-test
 build/time-shard-particle-test: tests/core/TimeShardParticleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardParticleTest.cpp src/core/GameMakerRandom.cpp
+.PHONY: verify-eyefish-motion
+test: verify-eyefish-motion
+verify-eyefish-motion: build/eyefish-motion-test
+	./build/eyefish-motion-test
+build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-spawner-fixed
 test: verify-spawner-fixed
 verify-spawner-fixed: build/spawner-fixed-test

@@ -2611,9 +2611,9 @@ bool GameplayWorld::createCompactSpawner(int y){
     return true;
 }
 
-bool GameplayWorld::steeringWallMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+bool GameplayWorld::steeringWallMeetingQ16(int mask,std::int32_t x,std::int32_t y,bool& hit){
     downwell::ContactBounds bounds;
-    if(!downwell::CurrencyCollisionBounds::calculateMask(mask,x,y,bounds))return run_.effectsSucceeded=false;
+    if(!downwell::CurrencyCollisionBounds::calculateMaskQ16(mask,x,y,bounds))return run_.effectsSucceeded=false;
     return steeringWallContact(bounds,hit);
 }
 
@@ -2779,8 +2779,8 @@ bool GameplayWorld::stepEyefish(EnemyState& enemy){
     enemy.frozen=frozen;
     if(!frozen){
         std::int32_t px;
-        if(!enemy.eyefish.step([this](downwell::MotionBinary64 x,downwell::MotionBinary64 y,int,bool& hit){
-               return steeringWallMeeting(289,x,y,hit);},px)||!run_.effectsSucceeded)
+        if(!enemy.eyefish.step([this](std::int32_t x,std::int32_t y,bool& hit){
+               return steeringWallMeetingQ16(289,x,y,hit);},px)||!run_.effectsSucceeded)
             return run_.effectsSucceeded=false;
         const int scale=enemy.eyefish.left()?-1:1; // xscaleXsp
         enemy.speedX=scale*128;
@@ -4458,9 +4458,10 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
     compactMomentDelay();
     compactLevelBeginCue();
     const Real x=Real::fromInteger(enemy.x+240),y=Real::fromInteger(enemy.y+176);
+    const auto px=downwell::Fixed16::fromInteger(enemy.x+240),py=downwell::Fixed16::fromInteger(enemy.y+176);
     // The eyefish's smoke and flash take its private xx/yy; it has no sound.
     const bool eyefish=enemy.objectId==114;
-    const Real fx=eyefish?enemy.eyefish.xx:x,fy=eyefish?enemy.eyefish.yy:y;
+    const auto fx=eyefish?downwell::Fixed16::raw(enemy.eyefish.xx):px,fy=eyefish?downwell::Fixed16::raw(enemy.eyefish.yy):py;
     int deathSound;
     switch(enemy.objectId){
         case 111:deathSound=121;break;case 112:deathSound=123;break;case 113:deathSound=114;break;
@@ -4472,14 +4473,12 @@ bool GameplayWorld::compactEnemyDeath(EnemyState& enemy,bool stomped){
         lastAct{*this,deathSound,enemy.y+176};
     // scrEnemyStomped: scrBloodfx(3, 0), then pugExplodingKnees; the death
     // the compact world runs at the contact follows.
-    const auto px=downwell::Fixed16::fromInteger(enemy.x+240),py=downwell::Fixed16::fromInteger(enemy.y+176);
     if(stomped&&compactDamageEffectsAdmitted&&!compactBloodfx(px,py))return false;
     if(stomped&&run_.upgrades.levels[0]&&!compactExplodingKnees(enemy.x+240,enemy.y+176,
         240+int(downwell::roundGameMakerQ8(player_.frameStartXFixed())),
         176+int(downwell::roundGameMakerQ8(player_.frameStartYFixed())),true))return false;
     if(!compactDamageEffectsAdmitted){spawnReward(enemy,stomped);return run_.effectsSucceeded;}
-    downwell::Fixed16 qx,qy;
-    if(!compactBloodfx(px,py)||!q16(fx,qx)||!q16(fy,qy)||!emitBoxSmoke(qx,qy)||!run_.emitFlash<1,0,0>(qx,qy,enemyRandom_))return false;
+    if(!compactBloodfx(px,py)||!emitBoxSmoke(fx,fy)||!run_.emitFlash<1,0,0>(fx,fy,enemyRandom_))return false;
     spawnReward(enemy,stomped);
     if(!run_.effectsSucceeded)return false;
     downwell::DeadBodySource source;
