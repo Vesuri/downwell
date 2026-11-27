@@ -240,7 +240,9 @@ below.
   quoting it. Use the shortest workload that shows the owner.
 - No tuning of code under 1 ms in the updates it runs in (loop rewrites,
   types, unrolling, inline assembly, compiler flags, helper substitutions).
-  Take an owner only with at least 3 ms in a budget update.
+  Take an owner only with at least 3 ms in a budget update. Both limits
+  hold until the algorithmic items are done; hand tuning of the hot spots
+  is then W3.22 (decided 27.11.2026).
 - Accept when the targeted cost falls, no worst update gets slower by more
   than 0.5 ms and no mean the change runs in gets worse; another update may
   rise by about 1 ms when the change saves several times that elsewhere
@@ -378,8 +380,7 @@ on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
     update, no caller over 0.1 ms: casings' `fromInteger`, smoke
     wall-contact scaling, the spawner countdown, mask bounds' binary32
     narrowing, steering and corpse pixel publication, flash-ball animation.
-    Convert those with their owners' next change, and the upgrade,
-    hard-mode and red-ball owners when those workloads are profiled.
+    The rest goes too (decided 27.11.2026): W3.20.
 13. **W3.13 Scene handoffs,** judged by total latency through the first
     interactive frame and by visible stalls: gameplay entry (1,406 ms),
     level transitions (1,091–1,116 ms) and shop re-entry, the clear and
@@ -431,6 +432,23 @@ on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
     cycle-exactly, and compare constant fire and the normal run (mean,
     fields, worst update, blitter waits). Keep it only if it is faster and
     the ECS path still passes the display checks on an ECS machine preset.
+20. **W3.20 No binary64 in core (decided 27.11.2026).** Convert every
+    remaining software binary64 owner to `FixedPoint.h`, whatever its
+    cost: the owners listed under the fixed-point paragraph above, the red
+    ball, torch fire, the steering draw, and the upgrade and hard-mode
+    owners. The motion may change slightly; keep each VM form as its
+    `...Reference` oracle in `make test-fixed-point` and re-search the
+    routes whose autopilot no longer survives. Done when the shipping
+    executable links no binary64 arithmetic (no `MotionBinary64` or
+    `MultiplyBinary64` callers, no hooks) and the 68020 hooks are removed.
+21. **W3.21 Structural options (approved 27.11.2026, not a priority).**
+    Resting corpses kept outside the rebuilt effect surface (2.0 ms of
+    composition at 5228), and a third gem-high streak design that visits
+    only the words that change (the caps and the motion sprite).
+22. **W3.22 Hand tuning (approved 27.11.2026),** once the algorithmic
+    items are done: every hot spot, the working rules' 1 ms and 3 ms limits
+    lifted. First the BOB word compositor (`drawAssetNormal`, about 3,100
+    cycles a BOB, 6.3 ms at the pooled over-budget updates).
 18. **W3.18 Re-audit and lock in.** Repeat the census on the target, with
     every active-gameplay update within 20 ms. Commit the results to the
     audit, and turn the cadences into regression ceilings: the quiet fall
