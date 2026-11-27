@@ -4,6 +4,7 @@
 #include "EffectSequenceAnimation.h"
 namespace downwell {
 struct DebrisAnimation : DebrisMotion {
+    using Position=MotionBinary64;
     RunnerImageValue timeline{};
     template<class Random> bool create(MotionBinary64 x,MotionBinary64 py,int area,Random& random){
         if(!DebrisMotion::create(x,py,area,random))return false;

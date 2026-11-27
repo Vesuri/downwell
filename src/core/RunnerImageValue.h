@@ -90,6 +90,31 @@ struct RunnerImageValue {
         bits = sign | (std::uint32_t(e) << 23) | (mantissa & 0x7fffffu);
         return true;
     }
+    // random(7) narrowed to image_index: round-to-nearest-even binary32 of
+    // 7 * word / 2^32 (exact in binary64), on 32-bit words
+    // (the product has at most three bits above the low word).
+    static std::uint32_t randomSevenths(std::uint32_t word){
+        if(!word)return 0;
+        const std::uint32_t low=word*7u;
+        const std::uint32_t high=((word>>16)*7u+(((word&0xffffu)*7u)>>16))>>16;
+        int top;std::uint32_t mantissa,rest=0,half=0;
+        if(high){
+            top=high>=4?34:high>=2?33:32;
+            const int shift=top-23; // 9..11
+            mantissa=(high<<(32-shift))|(low>>shift);
+            rest=low&((1u<<shift)-1u);half=1u<<(shift-1);
+        }else{
+            top=31;while(!(low>>top))--top;
+            if(top<=23)mantissa=low<<(23-top);
+            else{
+                const int shift=top-23; // 1..8
+                mantissa=low>>shift;rest=low&((1u<<shift)-1u);half=1u<<(shift-1);
+            }
+        }
+        if(half&&(rest>half||(rest==half&&(mantissa&1u))))++mantissa;
+        if(mantissa>>24){mantissa>>=1;++top;}
+        return (std::uint32_t(top-32+127)<<23)|(mantissa&0x7fffffu);
+    }
     MotionBinary64 promoted() const {
         const auto sign = bits & 0x80000000u;
         const auto e = (bits >> 23) & 255u;

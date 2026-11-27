@@ -759,7 +759,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         bool currency(int n){assert(n==2);return op(2);}
         bool attractGem(){return op(3);}
         bool createDebris(){return op(4);}
-        bool debrisYSpeed(MotionBinary64 v){assert(v.high==0xbfe00000u&&!v.low);return op(5);}
+        bool debrisYSpeed(downwell::Fixed16 v){assert(v.v==-32768);return op(5);}
         bool sound(int s,int volume,int pan,int pitch){
             assert(!pan&&pitch==1&&((s==174&&volume==50)||(s==93&&volume==60)));return op(6);
         }

@@ -27,11 +27,19 @@ int main(){
     unsigned timed=0,births=0,steps=0,pixelDifferences=0,streamsParted=0,meetings=0,hits=0;
     for(unsigned seed=0;seed<512;++seed){
         downwell::GameMakerRandom referenceRandom(seed),fixedRandom(seed),place(seed+7000);
-        const N x=N::fromInteger(60+int(place.irandomSmall(200))),y=N::fromInteger(160+int(place.irandomSmall(30)));
+        const int ix=60+int(place.irandomSmall(200)),iy=160+int(place.irandomSmall(30));
+        const N x=N::fromInteger(ix),y=N::fromInteger(iy);
         downwell::DebrisAnimation reference;downwell::DebrisParticle fixed;
         const int area=1+int(seed%5);
-        check(reference.create(x,y,area,referenceRandom)&&fixed.create(x,y,area,fixedRandom));
+        check(reference.create(x,y,area,referenceRandom)&&
+              fixed.create(downwell::Fixed16::fromInteger(ix),downwell::Fixed16::fromInteger(iy),area,fixedRandom));
         check(referenceRandom.drawCount()==fixedRandom.drawCount()&&reference.spriteId==fixed.spriteId);
+        // The Q16 birth is the nearest Q16 of the VM's samples; the frame
+        // and rate are its binary32 values.
+        {downwell::Fixed16 vx,vy;
+         check(downwell::Fixed16::fromBinary64(reference.xsp,vx)&&downwell::Fixed16::fromBinary64(reference.ysp,vy)&&
+               vx.v==fixed.xsp&&vy.v==fixed.ysp&&reference.imageSpeed.bits==fixed.imageSpeed.bits&&
+               reference.imageIndex.bits==fixed.imageIndex.bits);}
         ++births;
         for(unsigned tick=0;tick<60&&!reference.destroyRequested;++tick){
             check(reference.advanceImage()&&fixed.advanceImage());

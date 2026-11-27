@@ -38,7 +38,7 @@ int main(){
         const auto one=[&](std::uint32_t word){
             N index;check(downwell::randomBinary64(word,N::fromInteger(7),index));
             downwell::RunnerImageValue reference;check(reference.assign(index));
-            check(downwell::TimeShardParticle::seventhsBinary32(word)==reference.bits);++checked;
+            check(downwell::RunnerImageValue::randomSevenths(word)==reference.bits);++checked;
         };
         for(std::uint32_t w=0;w<4096;++w){one(w);one(0xffffffffu-w);one(0x80000000u+w-2048);}
         for(std::uint64_t w=0;w<=0xffffffffu;w+=65521)one(std::uint32_t(w));

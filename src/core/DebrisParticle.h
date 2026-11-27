@@ -1,17 +1,20 @@
 #ifndef DOWNWELL_CORE_DEBRIS_PARTICLE_H
 #define DOWNWELL_CORE_DEBRIS_PARTICLE_H
-#include "DebrisBirth.h"
+#include "AlarmBank.h"
 #include "EffectSequenceAnimation.h"
 #include "FixedPoint.h"
 #include "Binary32Timeline.h"
 namespace downwell {
 // The compact debris owner's object 370 with Q16 position and velocity (W3
 // fixed point): DebrisAnimation, its VM form and oracle, still runs on the
-// registered room paths. Create's RNG samples and the animation stay the
-// VM's; the sParentSolid queries take Q16 positions (Meeting(x, y, hit)
+// registered room paths. Create's draws are the VM's, in order, sampled as
+// the nearest Q16 (the VM's binary64 samples' nearest Q16 but for exact
+// halves) and the binary32 frame and rate; the animation stays the VM's.
+// The sParentSolid queries take Q16 positions (Meeting(x, y, hit)
 // with std::int32_t coordinates) and every draw of a hit is kept, so a hit
 // moved by a Q16 rounding is the only way this can shift the RNG stream.
 struct DebrisParticle {
+    using Position=Fixed16;
     std::int32_t x16=0,y16=0,xsp=0,ysp=0; // Q16
     RunnerImageValue imageSpeed{},imageIndex{},timeline{},rate{};
     std::int32_t frame27=0; // the timeline once timed (Q27)
@@ -25,22 +28,27 @@ struct DebrisParticle {
 
     std::int32_t pixelX()const{return Fixed16::roundQ16(x16);}
     std::int32_t pixelY()const{return Fixed16::roundQ16(y16);}
-    template<class Random> bool create(MotionBinary64 px,MotionBinary64 py,int area,Random& random){
-        DebrisBirth birth;RunnerImageValue bx,by;Fixed16 fx,fy,vx,vy;
-        // Builtin x/y narrow to binary32 first, as the VM form.
-        if(!bx.assign(px)||!by.assign(py)||!birth.create(area,random)||
-           !Fixed16::fromBinary64(bx.promoted(),fx)||!Fixed16::fromBinary64(by.promoted(),fy)||
-           !Fixed16::fromBinary64(birth.xsp,vx)||!Fixed16::fromBinary64(birth.ysp,vy))return false;
+    // DebrisBirth::create: xsp random(4) - 2, ysp random(1.5) - 0.5, the
+    // area's sprite, image_speed choose(-0.5, -0.3, 0, 0.3, 0.5) and
+    // image_index random(7), then the three alarms.
+    template<class Random> bool create(Fixed16 px,Fixed16 py,int area,Random& random){
         DebrisParticle next;
-        next.x16=fx.v;next.y16=fy.v;next.xsp=vx.v;next.ysp=vy.v;
-        next.imageSpeed=next.rate=birth.imageSpeed;next.imageIndex=birth.imageIndex;
-        next.alarms=birth.alarms;next.spriteId=birth.spriteId;
+        next.x16=px.v;next.y16=py.v;
+        next.xsp=Fixed16::random(random.nextU32(),Fixed16::fromInteger(4)).v-2*65536;
+        next.ysp=Fixed16::random(random.nextU32(),Fixed16::raw(98304)).v-32768;
+        if(area==1||area==3||area==5)next.spriteId=115;
+        else if(area==2)next.spriteId=116;
+        // Area 4 explicitly assigns 91; other areas retain the resource default.
+        static constexpr std::uint32_t rates[]={0xbf000000u,0xbe99999au,0,0x3e99999au,0x3f000000u};
+        next.imageSpeed=next.rate=RunnerImageValue{rates[random.chooseIndexSmall(5)]};
+        next.imageIndex=RunnerImageValue{RunnerImageValue::randomSevenths(random.nextU32())};
+        next.alarms.set(0,30);next.alarms.set(1,15);next.alarms.set(2,7);
         *this=next;return true;
     }
     // The scenery's breakablesDebris.ysp write.
-    bool setYSpeed(MotionBinary64 value){
-        Fixed16 v;if(!Fixed16::fromBinary64(value,v)||v.v< -8*65536||v.v>8*65536)return false;
-        ysp=v.v;return true;
+    bool setYSpeed(Fixed16 value){
+        if(value.v< -8*65536||value.v>8*65536)return false;
+        ysp=value.v;return true;
     }
     // The first advance reconciles Create's random(7) image_index write
     // through EffectSequenceAnimation; nothing writes image_index after

@@ -275,7 +275,7 @@ bool nativeStoredSpawnerStep(downwell::StoredSpawnerStates<2,1>& states,downwell
     downwell::GameMakerRandom& random,NativeSpawnerOps& ops){return states.step(key,random,ops);}
 struct NativeScatteredEffects {
     bool outOfView();bool currency(int);bool attractGem();bool createDebris();
-    bool debrisYSpeed(downwell::MotionBinary64);bool sound(int,int,int,int);bool sprite(int);
+    bool debrisYSpeed(downwell::Fixed16);bool sound(int,int,int,int);bool sprite(int);
     bool playerYSpeed(downwell::MotionBinary64&);bool playStyle(int&);
     bool jump(int,downwell::MotionBinary64);bool shake(int,int);bool explodingKnees(bool&);bool createBlast();
 };

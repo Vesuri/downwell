@@ -3089,7 +3089,7 @@ bool GameplayWorld::attractCompactGem(int slot){
     gems_[slot].motion.attracted=true;gems_[slot].attracted=true;return true;
 }
 
-bool GameplayWorld::spawnCompactDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& handle){
+bool GameplayWorld::spawnCompactDebris(downwell::Fixed16 x,downwell::Fixed16 y,std::uint32_t& handle){
     if(!run_.effectsSucceeded)return run_.effectsSucceeded=false;
     handle=compactDebris_.create(x,y,run_.stage.area,enemyRandom_);
     return run_.effectsSucceeded=handle!=0;
@@ -3178,8 +3178,8 @@ struct GameplayWorld::SceneryOps {
     bool currency(int amount){gem=world.spawnCompactCurrency(amount,x-240,y-176,false);return gem>=0;}
     bool currency(int amount,int){return currency(amount);}
     bool attractGem(){return world.attractCompactGem(gem);}
-    bool createDebris(){return world.spawnCompactDebris(Real::fromInteger(x),Real::fromInteger(y),debris);}
-    bool debrisYSpeed(Real value){
+    bool createDebris(){return world.spawnCompactDebris(downwell::Fixed16::fromInteger(x),downwell::Fixed16::fromInteger(y),debris);}
+    bool debrisYSpeed(downwell::Fixed16 value){
         auto* effect=world.compactDebris_.get(debris);
         if(!effect||!effect->setYSpeed(value))return fail();
         return true;
@@ -3478,7 +3478,8 @@ struct GameplayWorld::BoxOps {
     bool chainReaction(){return world.run_.upgrades.levels[5]!=0;}
     GameplayWorld::BulletState* shot=nullptr;
     bool create(int object,Real x,Real y,Handle& child){
-        if(object==370)return world.spawnCompactDebris(x,y,child);
+        downwell::Fixed16 qx,qy;
+        if(object==370)return q16(x,qx)&&q16(y,qy)&&world.spawnCompactDebris(qx,qy,child);
         std::int32_t px,py;
         if(object!=266||!x.roundPixel(px)||!y.roundPixel(py))return fail();
         shot=world.createDroneBullet(px,py,270,4);

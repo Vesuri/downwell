@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_SCATTERED_EVENTS_H
 #define DOWNWELL_CORE_SCATTERED_EVENTS_H
 #include "RunnerRealComparison.h"
+#include "FixedPoint.h"
 #include "ForcedPlayerJump.h"
 #include "ScreenShakeCaller.h"
 namespace downwell {
@@ -23,7 +24,7 @@ struct ScatteredEvents {
         if(s.stomped&&!effects.attractGem())return false;
         for(unsigned i=0;i<2;++i){
             if(!effects.createDebris())return false;
-            if(!effects.debrisYSpeed(MotionBinary64{0xbfe00000u,0}))return false;
+            if(!effects.debrisYSpeed(Fixed16::raw(-32768)))return false; // -0.5
         }
         s.breakSound=171+int(random.chooseIndexSmall(4));
         if(!effects.sound(s.breakSound,50,0,1))return false;

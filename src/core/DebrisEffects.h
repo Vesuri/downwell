@@ -59,13 +59,16 @@ public:
         }
         count_=0;good_=true;return true; // Never rewind lifetime keys.
     }
+    // Positions are the effect's: Fixed16 for DebrisParticle, binary64 for
+    // the VM form.
+    using Position=typename Effect::Position;
     template<class Random,class Lifecycle=NoLifecycle>
-    Handle create(MotionBinary64 x,MotionBinary64 y,int area,Random& random,Lifecycle&& lifecycle={}){
+    Handle create(Position x,Position y,int area,Random& random,Lifecycle&& lifecycle={}){
         if(!good_||!retireRequested(lifecycle))return 0;
         return createRegistered(x,y,area,random,lifecycle);
     }
     template<class Random,class Lifecycle>
-    Handle createRegistered(MotionBinary64 x,MotionBinary64 y,int area,Random& random,Lifecycle& lifecycle){
+    Handle createRegistered(Position x,Position y,int area,Random& random,Lifecycle& lifecycle){
         if(!good_||!next_||count_==Capacity)return 0;
         for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
             auto& s=slots_[index];s.markPublished=false;

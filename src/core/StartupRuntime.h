@@ -2774,7 +2774,7 @@ public:
             bool attractGem(){const auto* r=caller();const auto* child=r?w.instances_.find(r->boxReward.myGem):nullptr;
                 return child&&gems.attracted(gems.handle(*child),true);}
             bool createDebris(){MotionBinary64 x,y;return position(key,x,y)&&w.spawnDebris(x,y,w.run_.stage.area,debris);}
-            bool debrisYSpeed(MotionBinary64 v){return w.ownedDebrisRegistration_.setYSpeed(debris,w.ownedDebrisEffects_,v);}
+            bool debrisYSpeed(Fixed16 v){return w.ownedDebrisRegistration_.setYSpeed(debris,w.ownedDebrisEffects_,v.binary64());}
             bool sound(int id,int priority,int loop,int cut){auto* r=caller();int voice;
                 return r&&SoundPlayScript::plain(r->sound,environment,audio,id,priority,loop!=0,cut!=0,voice,w.run_.effectsSucceeded);}
             bool sprite(int id){auto* r=caller();if(!r||!w.lifecycle_.sprite(key,*r,id))return false;r->spriteId=id;return true;}

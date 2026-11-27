@@ -666,11 +666,11 @@ public:
                 const auto* r=store.find(key);
                 return r&&world.spawnDebrisWithSourceId(id,r->x.promoted(),r->y.promoted(),world.run_.stage.area,debris);
             }
-            bool debrisYSpeed(downwell::MotionBinary64 value){
+            bool debrisYSpeed(downwell::Fixed16 value){
                 const auto* r=world.debrisInstances_?world.debrisInstances_->find(debris):nullptr;
                 auto* effect=r?world.ownedDebrisEffects_.get(r->lifetimeId):nullptr;
-                if(!effect||r->effect!=effect||!value.valid())return false;
-                effect->ysp=value;return true;
+                if(!effect||r->effect!=effect)return false;
+                effect->ysp=value.binary64();return true;
             }
             bool sound(int id,int priority,int loop,int cut){
                 return store.dispatch(key,[&](auto& r){
@@ -3403,7 +3403,7 @@ private:
     int spawnCompactCurrency(int amount,int x,int y,bool attracted);
     int spawnCompactBurstGem(int x,int y,long xRange,long xLow,long yRange,long yLow,int amount,bool large);
     bool attractCompactGem(int slot);
-    bool spawnCompactDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& handle);
+    bool spawnCompactDebris(downwell::Fixed16 x,downwell::Fixed16 y,std::uint32_t& handle);
     bool solidMeeting(int mask,downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool platforms,bool& hit);
     bool solidContact(const downwell::ContactBounds& bounds,bool platforms,bool& hit);
     downwell::MaskBoundsMemo maskBounds_;
