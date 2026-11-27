@@ -98,9 +98,7 @@ bool GameplayWorld::createCompactBlast(int object,int x,int y,int sprite){
     if(object==276){
         b.imageSpeed={0x3f000000u};
     }else{
-        UpgradeReal speed;
-        if(!downwell::randomBinary64(enemyRandom_.nextU32(),{0x3fc33333u,0x33333334u},speed)||
-           !speed.add({0x3fd00000u,0})||!b.speed.assign(speed))return run_.effectsSucceeded=false;
+        b.speed=downwell::CompactBlastRecord::explosionSpeed(enemyRandom_.nextU32());
         b.imageSpeed=b.speed;
     }
     b.xscale=enemyRandom_.chooseIndexSmall(2)?-1:1;

@@ -4,7 +4,7 @@
 #include "LevelClearTrig.h"
 #include "MachineGunTrajectory.h"
 #include "NarrowArithmetic.h"
-#include "RandomBinary64.h"
+#include "RandomRangeBinary32.h"
 #include "UnitSequenceFrames.h"
 #include <cstdint>
 namespace downwell {
@@ -55,11 +55,9 @@ struct RangedShot {
         x = {px, 0}; y = {py, 0};
         direction = degreesToTurns(degrees);
         accuracyHalves = gun.accuracyHalves;
-        const MotionBinary64 low{0x3fd99999u, 0x9999999au}, high{0x3fe33333u, 0x33333333u};
-        MotionBinary64 width = high, negativeLow = low, rate;
-        negativeLow.high ^= 0x80000000u;
-        if (!width.add(negativeLow) || !randomBinary64(random.nextU32(), width, rate) ||
-            !rate.add(low) || !imageSpeed.assign(rate)) return false;
+        // image_speed = random_range(0.4, 0.6): width 0.6 - 0.4 is the
+        // binary64 0x3fc9999999999998, low 0x3fd999999999999a.
+        imageSpeed = RandomRangeBinary32::value(random.nextU32(), 0x19999999999998u, 0x1999999999999au);
         const std::uint32_t word = random.nextU32();
         const std::uint32_t range = static_cast<std::uint32_t>(gun.rangeRandom);
         // floor(word * range / 2^12): bSpeed - rangeRandom + u * rangeRandom.

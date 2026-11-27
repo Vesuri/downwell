@@ -958,6 +958,14 @@ build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-random-range-binary32
+test: verify-random-range-binary32
+verify-random-range-binary32: build/random-range-binary32-test
+	./build/random-range-binary32-test
+build/random-range-binary32-test: tests/core/RandomRangeBinary32Test.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RandomRangeBinary32Test.cpp
+
 .PHONY: verify-compact-blood
 test: verify-compact-blood
 verify-compact-blood: build/compact-blood-test

@@ -5,6 +5,7 @@
 #include "RunnerImageValue.h"
 #include "UnitSequenceFrames.h"
 #include "FixedPoint.h"
+#include "RandomRangeBinary32.h"
 #include <cstdint>
 namespace downwell {
 // Compact owners for the world-one upgrades' own objects (W1.9). Room pixel
@@ -20,6 +21,11 @@ struct CompactBlastRecord {
     bool live = false;
     int object = 276, sprite = 471, x = 0, y = 0, xscale = 1, turn = 0; // turn = image_angle / 90
     RunnerImageValue imageIndex{}, imageSpeed{}, speed{}; // speed: bulletExplosion1's imgSp
+    // random_range(0.25, 0.4): the VM's width 0.4 - 0.25 is the binary64
+    // 0x3fc3333333333334, one ulp above 0.15.
+    static RunnerImageValue explosionSpeed(std::uint32_t word) {
+        return RandomRangeBinary32::value(word, 0x13333333333334u, 0x10000000000000u);
+    }
     bool damageStart = false, damageEnd = false;
     std::uint32_t serial = 0;
     // hitIgnoreCheck's hitMem: tagged keys (kind << 28 | identity).
