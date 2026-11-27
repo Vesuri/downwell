@@ -443,7 +443,10 @@ on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
     `MultiplyBinary64` callers, no hooks) and the 68020 hooks are removed.
     Inventory (27.11.2026, shipping ELF): 92 functions take or return
     `MotionBinary64`, about 2,850 source lines in 331 files (the SDL
-    reference owners included). Audio is Q16 (`AudioLevel`). In order:
+    reference owners included). Audio is Q16 (`AudioLevel`). The SDL
+    host's reference (`StartupRuntime`, the `Stored*` owners) is deleted,
+    not converted (decided 27.11.2026); the stages convert the shipping
+    owners and the tests that share them. In order:
     1. effect drawing and placement: `EffectSurfacePlacement`,
        `EffectSpriteDraw`, the smoke, debris, corpse and level-number
        draws, entry dithers and dither-above, `CompactRoomEffects`,
@@ -946,8 +949,10 @@ Reference: [area-two recovery](area-two-recovery.md).
   For currency, integrate registered active-room membership, pending activation
   semantics and time-stop speed writes; see the currency animation audit.
   The standalone pre-Step animation pass does not close these ownership gaps.
-- Bring the host reference (`StartupRuntime`, which the SDL build runs) up
-  to the native world-1 shot and goal. Its player shot is still the pre-W1.4
+- Run the SDL host on `GameplayWorld` and delete the host reference
+  (`StartupRuntime` and the `Stored*` owners) rather than bringing it up to
+  the native world 1 (decided 27.11.2026; the clean-up after W3.20). The
+  reference's gaps, which the tests below stop at: its player shot is still the pre-W1.4
   `MachineGunTrajectory`: no `bulletRanged` Create draws (`random_range` for
   imgSp and bSpeed), muzzle effect, gun shake or `bulletCasing` (walls, Hot
   Casing); `GameplayWorld::firePlayerGun` is the native model. And it starts
