@@ -40,7 +40,7 @@ class Debugger(Gdb):
         self.p=subprocess.Popen(['m68k-amiga-elf-gdb','-q','-nx',elf],
             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,bufsize=0)
         for command in ('set pagination off','set confirm off','set height 0',
-                        'set width 0','set remotetimeout 30'):
+                        'set width 0','set remotetimeout 30','set language c++'):
             self.cmd(command)
         self.cmd(f'target remote 127.0.0.1:{port}',timeout=60)
 
@@ -97,7 +97,7 @@ def main():
         def checked(command):
             out=g.cmd(command,timeout=60)
             out='\n'.join(line for line in out.splitlines() if not line.startswith('warning:'))
-            if any(word in out for word in ('No symbol','not defined','Cannot','Error','error:')):
+            if any(word in out for word in ('No symbol','not defined','Cannot','Error','error:','syntax error')):
                 raise RuntimeError(command+'\n'+out)
             return out
         # LTO renames file-local statics (.lto_priv.N) from link to link.
@@ -177,8 +177,84 @@ def main():
                 raise RuntimeError('Chip use exceeds downwellChipRequirement')
             if use['chip']+use['other']>chipNeed+publicNeed:
                 raise RuntimeError('memory use exceeds the declared requirements')
+        # DOWNWELL_MEMORY_LEDGER=1: every exec AllocMem/FreeMem, attributed
+        # to the game function that asked (operator new's caller for new),
+        # with the live set at the route's Chip and public peaks. Calls from
+        # ROM (dos buffers, LoadSeg) are not attributed; the low-water marks
+        # of DOWNWELL_MEMORY_SAMPLE=1 include them.
+        ledger=os.environ.get('DOWNWELL_MEMORY_LEDGER')=='1'
+        ledgerLive={};ledgerPeak={'chip':(0,{}, ''),'public':(0,{}, '')}
+        ledgerScene=['boot'];ledgerBreaks={}
+        def breakNumber(out):
+            return int(re.search(r'Breakpoint (\d+) at',out)[1])
+        if ledger:
+            execBase=int(checked('printf "%lu\\n", *(unsigned long*)4').split()[-1])
+            allocEntry=int(checked(f'printf "%lu\\n", *(unsigned long*)({execBase}-198+2)').split()[-1])
+            freeEntry=int(checked(f'printf "%lu\\n", *(unsigned long*)({execBase}-210+2)').split()[-1])
+            ledgerBreaks[breakNumber(checked(f'break *{allocEntry}'))]='alloc'
+            ledgerBreaks[breakNumber(checked(f'break *{freeEntry}'))]='free'
+            ledgerBreaks[breakNumber(checked("break *'_Znwm'"))]='new'
+        pendingNew=[None]
+        def symbolAt(address):
+            out=g.cmd(f'info symbol {address}')
+            m=re.search(r'^(.*?) in section',out,re.M)
+            return m[1].strip() if m else None
+        def ledgerTotals():
+            totals={'chip':0,'public':0}
+            for size,flags,caller in ledgerLive.values():
+                totals['chip' if flags&2 else 'public']+=size
+            return totals
+        def ledgerStop(stop):
+            m=re.search(r'Breakpoint (\d+),',stop)
+            kind=ledgerBreaks.get(int(m[1])) if m else None
+            if kind is None: return False
+            ret=int(checked('printf "%lu\\n", *(unsigned long*)$sp').split()[-1])
+            if kind=='new':
+                pendingNew[0]=symbolAt(ret) or f'{ret:#x}'
+                return True
+            caller=symbolAt(ret)
+            if caller is None: return True
+            if kind=='free':
+                address=int(checked('printf "%lu\\n", $a1').split()[-1])
+                ledgerLive.pop(address,None)
+                return True
+            size,flags=(int(x) for x in checked('printf "%lu %lu\\n", $d0, $d1').split()[-2:])
+            if caller.startswith('operator new') or caller=='_Znwm':
+                caller='new: '+(pendingNew[0] or '?')
+                pendingNew[0]=None
+            out=checked(f'tbreak *{ret}')
+            done=checked('continue')
+            if 'Temporary breakpoint' not in done: raise RuntimeError('ledger lost AllocMem return: '+done)
+            address=int(checked('printf "%lu\\n", $d0').split()[-1])
+            if address:
+                ledgerLive[address]=(size,flags,caller)
+                totals=ledgerTotals()
+                for key in ('chip','public'):
+                    if totals[key]>ledgerPeak[key][0]:
+                        ledgerPeak[key]=(totals[key],dict(ledgerLive),ledgerScene[0])
+            return True
+        def resume():
+            while True:
+                stop=checked('continue')
+                if not ledger or not ledgerStop(stop): return stop
+        def reportLedger():
+            if not ledger: return
+            for key in ('chip','public'):
+                total,live,where=ledgerPeak[key]
+                groups={}
+                for size,flags,caller in live.values():
+                    k=('chip' if flags&2 else 'public',caller)
+                    n,b=groups.get(k,(0,0));groups[k]=(n+1,b+size)
+                print(f'LEDGER peak {key}={total} at {where}',flush=True)
+                for (kind,caller),(n,b) in sorted(groups.items(),key=lambda kv:-kv[1][1]):
+                    print(f'LEDGER {key}-peak {kind} {b} x{n} {caller}',flush=True)
+            for size,flags,caller in sorted(ledgerLive.values(),key=lambda v:-v[0]):
+                print(f'LEDGER end {"chip" if flags&2 else "public"} {size} {caller}',flush=True)
         def sampleVoices(tick):
-            v=list(map(int,re.search(r'VOICES ([\d -]+)',checked(voiceFormat))[1].split()))
+            out=checked(voiceFormat)
+            m=re.search(r'VOICES ([\d -]+)',out)
+            if not m: raise RuntimeError('voice table read: '+repr(out))
+            v=list(map(int,m[1].split()))
             for c in range(4):
                 active,asset,serial=v[3*c:3*c+3]
                 if active and serial not in seenSerials:
@@ -235,12 +311,13 @@ def main():
             for frame in range(20000):
                 if time.monotonic()>deadline:
                     raise TimeoutError('bounded world-one route')
-                stop=checked('continue')
+                stop=resume()
                 if 'downwellWorldOneComplete' in stop:
                     dumpCensus()
                     state=checked('printf "END %d %d %u %d %u\\n", $w->run_.stage.area,$w->run_.stage.level,$w->tick_,$w->health_,(unsigned)$w->enemyRandom_.drawCount_')
                     print(state,flush=True)
                     reportMemory()
+                    reportLedger()
                     checkSounds()
                     if not re.search(r'END 2 1 '+str(len(tape))+r' [1-9]\d* \d+',state):
                         raise RuntimeError('wrong slice destination or route length')
@@ -264,6 +341,7 @@ def main():
                 # sounds; skip the voice table's round trip at every sample.
                 if not traceFrame and shotTick<0: sampleVoices(tick)
                 sampleMemory(tick,scene)
+                ledgerScene[0]=f'scene={scene} tick={tick} level={area}-{level}'
                 if scene!=oldScene:
                     # W1.14: the garden's own sounds (jump, hop, landings and
                     # footsteps by surface) start before the run's first tick.
@@ -322,7 +400,7 @@ def main():
                         dumpCensus()
                         reportMemory()
                         checkSounds()
-                        for _ in range(20): checked('continue')
+                        for _ in range(20): resume()
                         checked('delete breakpoints')
                         shot('world-one-unlock')
                         print(notice,flush=True)
@@ -385,6 +463,8 @@ def main():
                             covered=[int(n) for n in re.findall(r'\d+',coverage.split('COVERAGE',1)[1])[:2]]
                             if counts[0]==0 or counts[1] or covered[0]==0 or covered[1]:
                                 raise RuntimeError('effect clear oracle failed: '+oracle+'; '+coverage)
+                        reportMemory()
+                        reportLedger()
                         # Evidence mode ends here: the capture runs the
                         # emulator past the following samples.
                         checked('delete breakpoints')

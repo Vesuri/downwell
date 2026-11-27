@@ -12,18 +12,26 @@ at `$C00000` `MEMF_FAST` as well, although its bus timing differs.
 
 ## Target budget
 
-Measured 2026-11-21 on the shipping build (`-Os` with hot paths at `-O2`).
+Measured 2026-11-27 on the shipping build (`-Os` with hot paths at `-O2`):
+the hunks from `tools/amiga-size-report.py`, the allocations live at the
+world-one route's peak (the first gameplay update of 1-1; nothing later
+goes higher) from `DOWNWELL_MEMORY_LEDGER=1`. The route's Chip low-water
+mark agrees with the ledger to 8 bytes; Fast agrees to within the census
+build's larger BSS, so dos and LoadSeg add nothing that stays resident.
 The A1200 with 4 MB Fast booted to a shell has 2,074,232 bytes of Chip and
 4,082,896 of Fast free (`FreeMemoryProbe`, `amiga/probe_free_memory.gdb`);
 the unexpanded A1200 has 1,963,176 in all.
 
 | Part | Bytes | Where | Largest items |
 | --- | ---: | --- | --- |
-| Loaded code and data | ~1,062,000 | Fast | `.text` 667,336, `.rodata` 321,068 (factored ammo tables about 100 KB), `.data` 73,970 |
-| BSS | 727,816 | Fast | `portRuntimeStorage` (`GameplayWorld`) 221,388, `nativeTerrainStorage` 145,888, `terrainIndex` 76,814, `actorFrames` 46,932, `ammoHud` 42,404, `clearStorage` 32,198, `blitterQueueBuffer` 24,002 |
-| Public allocations (peak) | 676,672 | Fast | cavern CPU bank + entry mask 399,902, terrain raster 135,168, field columns 70,816, builder patterns 70,779 |
-| Chip allocations (gameplay) | ~961,000 | Chip | run sound bank 410,262, cavern plane atlas 175,094, effect surface + shared scene bank (front art, then gameplay field bands) 167,266, menu planes 76,800 (reused as HUD, results and clear storage), scene cache 66,704, game ring 30,720, HUD 27,264 |
-| Total | ~3,427,000 | | Fast about 2.47 MB of 4.08; Chip about 0.96 MB of 2.07 |
+| Code (`.text`) | 710,608 | Fast | `GameplayWorld` 256,560, free functions 94,014, draw list 31,426, `RunSession` 24,444, generation 15,694 |
+| Constant and initialised data | 125,432 | Fast | `.data` 73,992 (`terrainRaster` 30,788, `actorList` 21,028, `wallDamage` 16,390), `.rodata` 51,440 |
+| State (BSS) | 753,816 | Fast | `portRuntimeStorage` (`GameplayWorld`) 241,768; terrain 253,450 (`nativeTerrainStorage` 145,888, `terrainIndex` 76,814, `terrainTiles` 18,436, `roomTerrainPlan` 12,312); `actorFrames` 55,528; `ammoHud` 42,404; `clearStorage` 32,198; `blitterQueueBuffer` 24,002 |
+| Graphics, Fast | 748,382 | Fast | cavern CPU art bank 511,294 + entry mask 31,104 (`acquireGameCatalogue`), terrain raster 135,168, field columns 70,816 |
+| Graphics, Chip | 583,634 | Chip | cavern plane atlas 200,592, effect surface + shared scene bank 174,562, menu planes 76,800 (reused as HUD, results and clear storage), scene cache 66,704, game ring 30,720, HUD 27,264, copper 4,800, sprites 2,192 |
+| Audio | 409,294 | Chip | run sound bank (`Downwell.sndrun`) |
+| Tables | 350,547 | Fast | converter tables (`Downwell.tables`) 279,768, builder patterns 70,779 |
+| Total | 3,681,849 | | with 136 bytes of palettes; Fast 2,688,921 of 4,082,896 free (66%); Chip 992,928 of 2,074,232 (48%) |
 
 End to end on the A500 route build, shell free minus the route's low-water
 marks is about 3.74 MB; that build carries 282 KB more BSS and 26 KB more
@@ -37,6 +45,9 @@ painter clamps), `GameplayWorld` record widths (the 32-byte
 cells; native peak 950 runs). Lower a capacity only with a bound covering
 every world-1 level: overflow fails the run.
 
+`DOWNWELL_MEMORY_LEDGER=1` on `tools/verify-world-one-native.py` keeps the
+live allocations by calling function over a whole route and prints the set
+at its Chip and public peaks (`LEDGER` lines in `capture.log`).
 `amiga/probe_allocations.gdb` lists every exec `AllocMem`/`FreeMem` with its
 caller; `DOWNWELL_MEMORY_SAMPLE=1` on `tools/verify-world-one-native.py`
 reports the route's low-water marks; `tools/amiga-size-report.py` attributes
