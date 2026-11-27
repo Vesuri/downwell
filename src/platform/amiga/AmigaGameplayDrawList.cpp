@@ -271,10 +271,8 @@ template<class Append> bool AmigaGameplayDrawList::drawCompactRoomEffects(const 
         unsigned end=0;const auto* blood=port.compactBlood(end);
         for(unsigned i=0;i<end;++i){const auto& b=blood[i];unsigned frame;
             if(!b.live)continue;
-            if(!b.effect.drawFrame(frame))return false;
-            std::int32_t x,y;
-            if(!b.effect.x.roundPixel(x)||!b.effect.y.roundPixel(y)){failedSprite=92;failedFrame=UWORD(frame);return false;}
-            if(!place(x,y,92,frame))return false;
+            if(!b.drawFrame(frame))return false;
+            if(!place(b.pixelX(),b.pixelY(),92,frame))return false;
         }
     }
     for(unsigned i=0;i<fx.movingCount();++i){

@@ -958,6 +958,14 @@ build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-compact-blood
+test: verify-compact-blood
+verify-compact-blood: build/compact-blood-test
+	./build/compact-blood-test
+build/compact-blood-test: tests/core/CompactBloodTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/CompactBloodTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-compact-balloon
 test: verify-compact-balloon
 verify-compact-balloon: build/compact-balloon-test

@@ -3316,7 +3316,7 @@ private:
     // fxBlood 223: Knife and Fork's drops at the player (sprWaterSplash 92).
     downwell::CompactBloodRecord bloods_[downwell::gameplayCompactBloodCapacity];
     unsigned bloodEnd_=0;
-    bool createCompactBlood(downwell::MotionBinary64 x,downwell::MotionBinary64 y);
+    bool createCompactBlood(int x,int y);
     bool eatCompactCorpses();
     bool advanceCompactBloodAnimation();
     bool stepCompactBlood();

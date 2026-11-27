@@ -1,6 +1,5 @@
 #ifndef DOWNWELL_CORE_COMPACT_UPGRADES_H
 #define DOWNWELL_CORE_COMPACT_UPGRADES_H
-#include "ConsumptionBloodEffect.h"
 #include "EnemyContact.h"
 #include "RandomBinary64.h"
 #include "RunnerImageValue.h"
@@ -153,19 +152,55 @@ struct CompactBalloonRecord {
 // sprWaterSplash 92. Alarm 0 (120) and any parentWall contact destroy it.
 struct CompactBloodRecord {
     bool live = false;
-    ConsumptionBloodEffect effect;
+    // Q16 (W3.20). The VM keeps x/y as binary32 builtins; Q16 is finer than
+    // binary32 below 32768 pixels, so the drops stay within a pixel of it.
+    // ysp is ysp0 plus the nearest Q16 of falls * 0.2 (global.grav), not a
+    // sum of rounded steps.
+    std::int32_t x = 0, y = 0, xsp = 0, ysp0 = 0;
+    int alarm0 = -1, falls = 0;
+    RunnerImageValue imageSpeed{0x3e99999au}, imageIndex{}, timeline{}; // imgSp 0.3
     std::uint32_t birth = 0;
-    struct Publish {
-        bool gravity(MotionBinary64) { return true; }
-        bool imageSpeed(RunnerImageValue) { return true; }
-        bool imageIndex(RunnerImageValue) { return true; }
-        bool destroy() { return true; }
-    };
-    struct Environment {
-        bool position(RunnerImageValue, RunnerImageValue) { return true; }
-        MotionBinary64 gravity() { return {0x3fc99999u, 0x9999999au}; } // global.grav 0.2
-        MotionBinary64 fallSpeed() { return {}; } // global.fallspeed stays 0
-    };
+    // Create: ysp = random(3) - 2, xsp = random(1) * choose(1, -1), alarm 0
+    // 120, image_index irandom(6). Gravity and image_speed are fixed.
+    template<class Random> bool create(int px, int py, Random& random) {
+        x = px * 65536; y = py * 65536;
+        ysp0 = Fixed16::random(random.nextU32(), Fixed16::fromInteger(3)).v - 131072;
+        xsp = Fixed16::random(random.nextU32(), Fixed16::fromInteger(1)).v;
+        if (random.chooseIndexSmall(2)) xsp = -xsp;
+        alarm0 = 120; falls = 0;
+        return imageIndex.assignInteger(int(random.irandomSmall(7)));
+    }
+    std::int32_t ysp() const { return ysp0 + (falls * 131072 + 5) / 10; }
+    // Step: x += xsp, y += ysp, xsp /= 1.01, ysp += grav; global.fallspeed
+    // stays 0. Alarm 0 runs out before falls can leave the range.
+    bool step() {
+        constexpr std::int32_t range = std::int32_t(1) << 30;
+        const std::int32_t vy = ysp();
+        if (x <= -range || x >= range || y <= -range || y >= range || falls >= 1000) return false;
+        x += xsp; y += vy;
+        const std::int32_t m = (xsp < 0 ? -xsp : xsp) * 100, q = (m + 50) / 101;
+        xsp = xsp < 0 ? -q : q;
+        ++falls;
+        return true;
+    }
+    bool advanceImage() {
+        RunnerImageValue evaluated; bool reconcile = false, crossed = false;
+        if (!UnitSequenceFrames::evaluate(timeline, 8, evaluated) ||
+            !UnitSequenceFrames::needsReconcile(imageIndex, evaluated, reconcile)) return false;
+        auto next = reconcile ? imageIndex : timeline;
+        if (!UnitSequenceFrames::advance(next, imageSpeed, 8, evaluated, crossed)) return false;
+        timeline = next; imageIndex = evaluated;
+        return true; // No Animation End handler.
+    }
+    bool drawFrame(unsigned& frame) const {
+        const unsigned magnitude = imageIndex.bits & 0x7fffffffu;
+        if (magnitude >= 0x41000000u || ((imageIndex.bits >> 31) && magnitude)) return false;
+        const unsigned exponent = (imageIndex.bits >> 23) & 255u;
+        frame = exponent < 127 ? 0 : ((imageIndex.bits & 0x7fffffu) | 0x800000u) >> (150u - exponent);
+        return true;
+    }
+    int pixelX() const { return Fixed16::roundQ16(x); }
+    int pixelY() const { return Fixed16::roundQ16(y); }
 };
 }
 #endif

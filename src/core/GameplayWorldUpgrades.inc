@@ -284,63 +284,52 @@ bool GameplayWorld::collideCompactBlasts(){
 // Knife and Fork (upgrade 11, global.pugKnifefork).
 
 // fxBlood Create at the player; a full store drops the cosmetic drop.
-bool GameplayWorld::createCompactBlood(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+bool GameplayWorld::createCompactBlood(int x,int y){
     unsigned slot=0;
     while(slot<bloodEnd_&&bloods_[slot].live)++slot;
     if(slot==downwell::gameplayCompactBloodCapacity)return true;
     if(slot==bloodEnd_)++bloodEnd_;
     auto& b=bloods_[slot];
     b={};b.live=true;b.birth=tick_;
-    downwell::CompactBloodRecord::Publish publish;
-    return b.effect.create(x,y,enemyRandom_,publish)||(run_.effectsSucceeded=false);
+    return b.create(x,y,enemyRandom_)||(run_.effectsSucceeded=false);
 }
 
 // objDeadBody's objPlayer_n collision: an active body is eaten (sfx 83 on
-// the UI group, five fxBlood at plx/ply) and destroyed.
+// the UI group, five fxBlood at plx/ply) and destroyed. plx/ply are whole
+// pixels, re-read per child but unchanged by the Creates.
 bool GameplayWorld::eatCompactCorpses(){
     if(!run_.upgrades.levels[11]||!compactCorpses_.size())return true;
     const auto player=downwell::contactWorldBounds({240L*256+player_.offsetXFixed(),176L*256+player_.offsetYFixed(),1,1,31});
-    struct Effects {
-        GameplayWorld& world;
-        bool incrementBodiesEaten(){++world.run_.bodiesEaten;return true;}
-        void eatSound(int sound,int priority,int,int){world.run_.soundPlayOL(sound,priority,false,true,"UI");}
-        downwell::MotionBinary64 playerX(){
-            return downwell::MotionBinary64::fromInteger(240+int(downwell::roundGameMakerQ8(world.player_.offsetXFixed())));
-        }
-        downwell::MotionBinary64 playerY(){
-            return downwell::MotionBinary64::fromInteger(176+int(downwell::roundGameMakerQ8(world.player_.offsetYFixed())));
-        }
-        bool create(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& child){
-            if(object!=223||!world.createCompactBlood(x,y))return false;
-            child=1;return true;
-        }
-    } effects{*this};
-    struct Publish{bool destroy(){return true;}} publish;
+    const int px=240+int(downwell::roundGameMakerQ8(player_.offsetXFixed()));
+    const int py=176+int(downwell::roundGameMakerQ8(player_.offsetYFixed()));
     struct Hooks{} hooks;
     const bool playerDead=dead();
     return compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
         std::int32_t cx,cy;
         if(!corpse.x.roundPixel(cx)||!corpse.y.roundPixel(cy))return false;
         if(!downwell::contactBoundsOverlap(player,downwell::contactPixelBounds(cx,cy,1,1,599)))return true;
-        bool okay=true;
-        return corpse.collidePlayerPublished(true,playerDead,publish,effects,okay)&&okay&&run_.effectsSucceeded;
+        if(!corpse.valid)return false;
+        if(corpse.destroyRequested||playerDead||!corpse.active)return true;
+        ++run_.bodiesEaten;
+        run_.soundPlayOL(83,80,false,true,"UI");
+        for(unsigned i=0;i<5;++i)if(!createCompactBlood(px,py))return corpse.valid=false;
+        corpse.destroyRequested=true;
+        return run_.effectsSucceeded;
     },hooks)||(run_.effectsSucceeded=false);
 }
 
 bool GameplayWorld::advanceCompactBloodAnimation(){
-    downwell::CompactBloodRecord::Publish publish;
     for(unsigned i=0;i<bloodEnd_;++i)
-        if(bloods_[i].live&&!bloods_[i].effect.advanceImage(publish))return run_.effectsSucceeded=false;
+        if(bloods_[i].live&&!bloods_[i].advanceImage())return run_.effectsSucceeded=false;
     return true;
 }
 
 // fxBlood Step (gravity 0.2, global.fallspeed 0) and Alarm 0 (120).
 bool GameplayWorld::stepCompactBlood(){
-    downwell::CompactBloodRecord::Environment env;
     for(unsigned i=0;i<bloodEnd_;++i){auto& b=bloods_[i];
         if(!b.live)continue;
-        if(b.effect.alarm0>0&&--b.effect.alarm0==0){b.live=false;continue;}
-        if(!b.effect.step(env))return run_.effectsSucceeded=false;
+        if(b.alarm0>0&&--b.alarm0==0){b.live=false;continue;}
+        if(!b.step())return run_.effectsSucceeded=false;
     }
     while(bloodEnd_&&!bloods_[bloodEnd_-1].live)--bloodEnd_;
     return true;
@@ -350,8 +339,7 @@ bool GameplayWorld::stepCompactBlood(){
 bool GameplayWorld::collideCompactBlood(){
     for(unsigned i=0;i<bloodEnd_;++i){auto& b=bloods_[i];
         if(!b.live)continue;
-        std::int32_t px,py;
-        if(!b.effect.x.roundPixel(px)||!b.effect.y.roundPixel(py))return run_.effectsSucceeded=false;
+        const int px=b.pixelX(),py=b.pixelY();
         if(solidResolver_&&solidResolver_(solidResolverContext_,px-240,py-176))b.live=false;
     }
     return true;
