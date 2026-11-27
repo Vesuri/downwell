@@ -203,6 +203,30 @@ route (Makefile `UPGRADE_ROUTES`; [upgrade coverage](upgrade-coverage.md)).
     passes. Find why the voice format no longer prints, so the route runs to
     the hand-off with its witnesses and sounds checked.
 
+Reported from a play session on the Amiga (27.11.2026; the user's screen
+recording `Screen Recording 2026-11-27 at 15.05.49.mov`, times in it):
+
+22. **A white rectangle after a T heart (0:40).** Picking up a heart with
+    a T, a white rectangle rises from it before the TRIPLE text appears.
+    Check the original's pickup (the T marker's and the text's draws).
+23. **Stuck inside a wall without a jump (1:56).** The player can end up
+    inside a wall and then cannot jump. Probably item 15's truncated
+    horizontal test; check that first.
+24. **The laser sight may cost too much (2:19).** Play felt slower with the
+    laser sight, though the host was under load. Measure the laser route
+    (`upgrade-12-v155`, W3.14) before changing anything.
+25. **The shop selector gem is cut off at the top (2:44).**
+26. **Garbage or torn frames over the shop's item preview (2:47).** Either
+    stale data is drawn over the preview or it takes long enough to show
+    torn frames; look for unnecessary clears.
+27. **The GAME OVER fade (4:22).** The dither-pattern fade misbehaves and
+    leaves the bottom of the screen stale.
+28. **The results screen flickers (4:25–4:43).** The statistics flicker
+    (static items apparently redrawn), the PROGRESS indicator flickers when
+    redrawn and again at 1000 for an unlock, and moving between RETRY,
+    STYLE SELECT and SURFACE flickers and draws garbage.
+29. **SURFACE shows a corrupted garden (4:48),** like a wrong modulo.
+
 ### WM. Music (deferred)
 
 The songs (`bgmOverworld` 193, `bgmArea1` 194, `bgmShopCave` 192 for the
