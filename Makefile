@@ -958,6 +958,14 @@ build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-effect-sequence-inverse
+test: verify-effect-sequence-inverse
+verify-effect-sequence-inverse: build/effect-sequence-inverse-test
+	./build/effect-sequence-inverse-test
+build/effect-sequence-inverse-test: tests/core/EffectSequenceInverseTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EffectSequenceInverseTest.cpp
+
 .PHONY: verify-random-range-binary32
 test: verify-random-range-binary32
 verify-random-range-binary32: build/random-range-binary32-test
