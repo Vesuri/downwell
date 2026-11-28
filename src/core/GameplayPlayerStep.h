@@ -17,8 +17,8 @@ struct NoPlayerTimeTransition { bool operator()(const PlayerMotion&,int,int)cons
 // right after its motion so their RNG draws precede shops and later objects.
 struct NoPlayerSounds { bool operator()(PlayerMotion&)const{return true;} };
 struct UnindexedPlayerGoalContact {
-    bool operator()(RunSession& run,MotionBinary64 x,MotionBinary64 y,int facing,bool& hit)const{
-        return run.playerGoalContact(x,y,facing,hit);
+    bool operator()(RunSession& run,int x,int y,int facing,bool& hit)const{
+        return run.playerGoalContactPixels(x,y,facing,hit);
     }
 };
 
@@ -82,8 +82,8 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     // It queries the old published x/y before shop/interactable processing.
     bool inGoalField=false;
     if(!run.goalStopped && !death.active && !goalContact(run,
-        MotionBinary64::fromInteger(originX + roundGameMakerQ8(player.frameStartXFixed())),
-        MotionBinary64::fromInteger(originY + roundGameMakerQ8(player.frameStartYFixed())),
+        int(originX + roundGameMakerQ8(player.frameStartXFixed())),
+        int(originY + roundGameMakerQ8(player.frameStartYFixed())),
         player.facing(),inGoalField)){run.effectsSucceeded=false;return motion;}
     // Boss completion is outside the implemented area-one scope.
     run.clock.advance(true, death.active, run.goalStopped, false, inGoalField);

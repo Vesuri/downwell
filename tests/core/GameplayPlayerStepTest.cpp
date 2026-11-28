@@ -163,6 +163,9 @@ int main() {
             require(contacts.playerGoalContact(downwell::MotionBinary64::fromInteger(240+dx),
                 downwell::MotionBinary64::fromInteger(4000+dy),facing,actual) && actual==expected,
                 "live field adapter preserves integral clock contacts in both directions");
+            bool pixels=!expected;
+            require(contacts.playerGoalContactPixels(240+dx,4000+dy,facing,pixels) && pixels==expected,
+                "whole-pixel goal contact equals the binary64 query");
         }
     }
     unsigned differentPositions=0;

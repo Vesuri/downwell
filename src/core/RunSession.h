@@ -740,6 +740,25 @@ struct RunSession {
         hit=found;
         return true;
     }
+    // playerGoalContact at whole published pixels. Within +/-2^20 (player and
+    // fields) each coordinate narrows exactly, so the query is each field's
+    // rectangle test; farther positions take the transformed sampling path,
+    // which world one does not link.
+    bool playerGoalContactPixels(int x,int y,int facing,bool& hit){
+        if(!effectsSucceeded)return false;
+        if(!levelExitPresent&&!startFieldPresent){hit=false;return true;}
+        const auto near=[](int px,int py){return px>=-1048576&&px<=1048576&&py>=-1048576&&py<=1048576;};
+        if(near(x,y)&&(!levelExitPresent||near(goalField.x,goalField.y))&&
+           (!startFieldPresent||near(startField.x,startField.y))){
+            hit=(levelExitPresent&&goalField.meetsPlayer(x,y))||(startFieldPresent&&startField.meetsPlayer(x,y));
+            return true;
+        }
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+        (void)facing;return effectsSucceeded=false;
+#else
+        return playerGoalContact(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),facing,hit);
+#endif
+    }
     bool goalStopped = false, exitControlsLocked = false;
     // global.pTimeStop as published by a compact world's player Begin Step.
     // The registered SDL owner keeps its own TimeStopEffects and leaves it false.
@@ -953,12 +972,7 @@ struct RunSession {
         if(!effectsSucceeded)return false;
         if(!goalWindPossible())return true;
         bool hit=false;
-        if(x>=-1048576&&x<=1048576&&y>=-1048576&&y<=1048576){
-            // playerGoalContact's integral path: published pixels with unit
-            // scales are exactly each field's rectangle test.
-            hit=(levelExitPresent&&goalField.meetsPlayer(x,y))||(startFieldPresent&&startField.meetsPlayer(x,y));
-        }else if(!playerGoalContact(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),facing,hit))
-            return effectsSucceeded=false;
+        if(!playerGoalContactPixels(x,y,facing,hit))return effectsSucceeded=false;
         return !hit||resultStepWind(random);
     }
     // Result Step after scrResult, and the goal fields' contact.
