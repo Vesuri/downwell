@@ -3129,7 +3129,7 @@ struct GameplayWorld::SceneryOps {
     }
     bool sprite(int){changed=true;return true;}
     // Collision with objPlayer_n: objPlayer_n.ysp > 0, then scrFjump/scrSShake.
-    bool playerYSpeed(Real& value){value=Real::fromInteger(int(world.player_.speedYFifths()));return true;}
+    bool playerYSpeed(int& fifths){fifths=int(world.player_.speedYFifths());return true;}
     bool playStyle(int& style){style=int(world.run_.playStyle);return true;}
     bool jump(int,Real){world.player_.stompBounce();return true;}
     bool shake(int amount,int duration){return world.requestCameraShake(amount,duration);}

@@ -35,14 +35,25 @@ struct ScatteredEvents {
         s.scriptActive=0;
         return true;
     }
+    // objPlayer_n.ysp > 0 under the runner's real comparison. The compact
+    // player supplies its speed in whole fifths, where that is exactly > 0.
+    static bool falling(MotionBinary64 speed,bool& out){
+        int order;
+        if(!speed.valid()||!compareRunnerReal(speed,{},order))return false;
+        out=order>0;return true;
+    }
+    static bool falling(int fifths,bool& out){out=fifths>0;return true;}
+    template<class Effects,class Speed>
+    static bool playerFalling(Effects& effects,bool (Effects::*read)(Speed&),bool& out){
+        Speed speed{};
+        return (effects.*read)(speed)&&falling(speed,out);
+    }
     template<class State,class Random,class Effects>
     static bool playerContact(State& s,Random& random,Effects& effects){
         if(!s.scriptActive)return true;
-        MotionBinary64 speed;
-        if(!effects.playerYSpeed(speed)||!speed.valid())return false;
-        int order;
-        if(!compareRunnerReal(speed,{},order))return false;
-        if(order<=0)return true;
+        bool down;
+        if(!playerFalling(effects,&Effects::playerYSpeed,down))return false;
+        if(!down)return true;
         s.objHp=0;s.stomped=1;
         int style;
         if(!effects.playStyle(style))return false;
