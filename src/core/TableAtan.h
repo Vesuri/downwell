@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_TABLE_ATAN_H
 #define DOWNWELL_TABLE_ATAN_H
+#include "BitCount.h"
 #include "PortableAtan.h"
 #include "RunnerImageValue.h"
 #include "NarrowArithmetic.h"
@@ -13,7 +14,7 @@ namespace table_atan_detail {
 #include "../../generated/atan-q16.inc"
 inline std::uint32_t rounded(std::uint32_t value){
     if(!value)return 0;
-    const unsigned top=31-MotionBinary64::Words::leadingZeros32(value);
+    const unsigned top=31-leadingZeros32(value);
     std::uint32_t mantissa;
     unsigned exponent=top+97; // unsigned Q30 -> binary32
     if(top<=23)mantissa=value<<(23-top);

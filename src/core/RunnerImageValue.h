@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_RUNNER_IMAGE_VALUE_H
 #define DOWNWELL_CORE_RUNNER_IMAGE_VALUE_H
+#include "BitCount.h"
 #include "MotionBinary64.h"
 #include "NarrowArithmetic.h"
 namespace downwell {
@@ -15,7 +16,7 @@ struct RunnerImageValue {
     bool assignFixed(std::uint64_t magnitude,unsigned fractionBits,bool negative,std::uint64_t margin){
         const auto top=std::uint32_t(magnitude>>32);
         if(!top)return false;
-        const unsigned zeros=MotionBinary64::Words::leadingZeros32(top);
+        const unsigned zeros=leadingZeros32(top);
         const auto normal=shiftLeft64(magnitude,zeros); // top bit 63
         auto mantissa=std::uint32_t(normal>>40);
         const std::uint64_t remainder=normal&((std::uint64_t(1)<<40)-1),half=std::uint64_t(1)<<39;
@@ -52,7 +53,7 @@ struct RunnerImageValue {
         if(!value){bits=0;return true;}
         const std::uint32_t sign=value<0?0x80000000u:0u;
         const std::uint32_t magnitude=value<0?0u-std::uint32_t(value):std::uint32_t(value);
-        unsigned top=31-MotionBinary64::Words::leadingZeros32(magnitude);
+        unsigned top=31-leadingZeros32(magnitude);
         std::uint32_t mantissa;
         if(top<=23)mantissa=magnitude<<(23-top);
         else {

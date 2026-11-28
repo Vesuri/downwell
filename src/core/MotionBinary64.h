@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_MOTION_BINARY64_H
 #define DOWNWELL_CORE_MOTION_BINARY64_H
+#include "BitCount.h"
 #include <cstdint>
 
 namespace downwell {
@@ -19,16 +20,7 @@ struct MotionBinary64 {
     struct Words {
         std::uint32_t high, low;
         bool nonzero() const { return high || low; }
-        static unsigned leadingZeros32(std::uint32_t value) {
-            if (!value) return 32;
-            unsigned count=0;
-            if (!(value&0xffff0000u)) {value<<=16;count+=16;}
-            if (!(value&0xff000000u)) {value<<=8;count+=8;}
-            if (!(value&0xf0000000u)) {value<<=4;count+=4;}
-            if (!(value&0xc0000000u)) {value<<=2;count+=2;}
-            if (!(value&0x80000000u)) ++count;
-            return count;
-        }
+        static unsigned leadingZeros32(std::uint32_t value) { return downwell::leadingZeros32(value); }
         Words left(unsigned count) const {
             if (!count) return *this;
             if (count>=64) return {0,0};

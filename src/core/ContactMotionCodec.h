@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CONTACT_MOTION_CODEC_H
 #define DOWNWELL_CONTACT_MOTION_CODEC_H
+#include "BitCount.h"
 #include "SmokeDirection.h"
 namespace downwell {
 // Lossless decoding of an offline-certified finite domain, NOT a general
@@ -26,8 +27,8 @@ struct ContactMotionCodec {
         const bool negative=fixed<0;
         std::uint64_t magnitude=negative?-fixed:fixed;
         const unsigned hi=unsigned(magnitude>>32);
-        const unsigned top=hi?63-MotionBinary64::Words::leadingZeros32(hi):
-            31-MotionBinary64::Words::leadingZeros32(unsigned(magnitude));
+        const unsigned top=hi?63-leadingZeros32(hi):
+            31-leadingZeros32(unsigned(magnitude));
         const auto shifted=MotionBinary64::Words{hi,unsigned(magnitude)}.left(52-top);
         return {(negative?0x80000000u:0u)|((1023+top-46)<<20)|
             (shifted.high&0xfffffu),shifted.low};

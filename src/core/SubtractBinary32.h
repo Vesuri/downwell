@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_SUBTRACT_BINARY32_H
 #define DOWNWELL_CORE_SUBTRACT_BINARY32_H
+#include "BitCount.h"
 #include "RunnerImageValue.h"
 namespace downwell {
 // Nearest-even subtraction using a 24-bit significand and guard/round/sticky
@@ -30,7 +31,7 @@ inline bool subtractBinary32(RunnerImageValue left,RunnerImageValue right,Runner
     if((a^b)&0x80000000u){
         major-=minor;
         if(!major){out.bits=0;return true;}
-        const unsigned shift=MotionBinary64::Words::leadingZeros32(major)-5;
+        const unsigned shift=leadingZeros32(major)-5;
         major<<=shift;exponent-=int(shift);
     }else{
         major+=minor;

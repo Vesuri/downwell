@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPRITE_BOUNDS_H
 #define DOWNWELL_CORE_RUNNER_SPRITE_BOUNDS_H
+#include "BitCount.h"
 #include "RunnerSpatialSplit.h"
 namespace downwell {
 // Ordinary sprite bounds: 0x46616d..0x46669c. Not the skeletal-sprite
@@ -116,8 +117,8 @@ struct RunnerSpriteBounds {
         if(!magnitude){out={};return true;} // exact cancellation: +0
         const auto high=std::uint32_t(magnitude>>32),low=std::uint32_t(magnitude);
         // Bit length at most 54 (2^53 + 2^24), so a shift below 31 suffices.
-        const unsigned length=high?64u-MotionBinary64::Words::leadingZeros32(high):
-                                   32u-MotionBinary64::Words::leadingZeros32(low);
+        const unsigned length=high?64u-leadingZeros32(high):
+                                   32u-leadingZeros32(low);
         int exponent=int(length)-1-int(k)+127;
         std::uint32_t rounded;
         if(length<=24)rounded=low<<(24u-length);
@@ -166,7 +167,7 @@ private:
     static Real unitReal(std::int32_t value){
         if(!value)return {};
         const auto magnitude=value<0?0u-std::uint32_t(value):std::uint32_t(value);
-        const unsigned top=31-MotionBinary64::Words::leadingZeros32(magnitude);
+        const unsigned top=31-leadingZeros32(magnitude);
         return {(value<0?0x80000000u:0u)|((top+127u)<<23)|((magnitude<<(23-top))&0x7fffffu)};
     }
     template<class Round> static bool unitAxis(int low,int high,int origin,std::int32_t position,

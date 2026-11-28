@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_PROJECTILE_PUBLICATION_H
 #define DOWNWELL_PROJECTILE_PUBLICATION_H
+#include "BitCount.h"
 #include "MachineGunTrajectory.h"
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
@@ -22,8 +23,8 @@ struct ProjectilePublication {
         // The retained binary64 addition is exact throughout this domain.
         const std::uint32_t high=whole>>12,low=(whole<<20)|fraction;
         if(!high&&!low){out.bits=0;return true;}
-        unsigned top=high?63-MotionBinary64::Words::leadingZeros32(high):
-            31-MotionBinary64::Words::leadingZeros32(low);
+        unsigned top=high?63-leadingZeros32(high):
+            31-leadingZeros32(low);
         std::uint32_t mantissa;
         if(top<=23)mantissa=low<<(23-top);
         else{
