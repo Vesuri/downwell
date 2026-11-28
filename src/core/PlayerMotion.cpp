@@ -4,7 +4,6 @@
 #include "core/SolidCollision.h"
 #include "core/StateDigest.h"
 #include "core/MachineGunProfile.h"
-#include "core/ForcedPlayerJump.h"
 #include "core/PlayerBoxContact.h"
 #include "core/GameMakerRounding.h"
 #include <cstdint>
@@ -187,24 +186,15 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
     const long impulseX = distance == 0
                   ? (dx == 0 && dy == 0 ? 3L * fixedOne : 0)
                   : (long)dx * (3L * fixedOne) / (long)distance;
-    // Keep the existing Q8 motion adapter until the general player's numeric
-    // migration is complete, but share scrFjump's mutation/recharge ordering.
+    // scrFjump(impulse, 2) in ForcedPlayerJump's order: spin, recharge,
+    // airborne, xsp only for a nonzero impulse, then ysp = -2. Both arguments
+    // are finite here, so its validity checks always pass.
     // Coincident points have direction zero, hence lengthdir_x(3,0)=+3.
-    auto horizontal=downwell::MotionBinary64::fromInteger(impulseX);
-    if(!horizontal.zero())horizontal.high-=8u<<20;
-    downwell::ForcedPlayerJump jump;
-    struct Events {
-        PlayerMotion& player;long impulse;
-        void setSpinJumping(){player.beginSpin();}
-        bool recharge(){player.recharge();return true;}
-        bool setGrounded(bool value){player.grounded_=value;return true;}
-        bool setHorizontal(downwell::MotionBinary64){player.speedX_=impulse;return true;}
-        bool setVertical(downwell::MotionBinary64){
-            // This adapter supplies exactly +2 as vertical argument below.
-            player.speedY_=-2*fixedOne;player.gravityRemainder_=0;return true;
-        }
-    } events{*this,impulseX};
-    jump.execute(horizontal,downwell::MotionBinary64::fromInteger(2),events);
+    beginSpin();
+    recharge();
+    grounded_=false;
+    if(impulseX)speedX_=impulseX;
+    speedY_=-2*fixedOne;gravityRemainder_=0;
 }
 
 PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead,
