@@ -49,6 +49,21 @@ int main(){
         visible=true;
         check(!boneInPublishedView(n(240),n(990),n(160),n(850),invalid,n(284),visible)&&visible);
     }
+    {   // The Q8 form (whole x/y/left, Q8 top) against the binary64 one,
+        // edges included: every view top fraction and positions around it.
+        unsigned cases=0,inside=0;
+        for(int left:{-40,0,160,1000})for(std::int32_t top=-600*256;top<=-598*256;++top)
+            for(int dx=-2;dx<=162;++dx)for(int y:{-602,-601,-600,-599,-598,-317,-316,-315,-314}){
+                auto ref=MotionBinary64::fromInteger(top);if(!ref.zero())ref.high-=8u<<20; // top / 256
+                bool a=false,b=false;const int x=left+dx;
+                check(boneInPublishedView(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),
+                    MotionBinary64::fromInteger(left),ref,MotionBinary64::fromInteger(160),MotionBinary64::fromInteger(284),a));
+                check(boneInPublishedViewQ8(x,y,left,top,160,284,b)&&a==b);
+                ++cases;inside+=a;
+            }
+        check(inside>0&&inside<cases);
+        std::printf("Bone view Q8: %u cases equal to the binary64 test (%u inside)\n",cases,inside);
+    }
     unsigned comparisons=0;
     for(unsigned seed=0;seed<256;++seed){
         GameMakerRandom random(seed);BoneProjectile b;check(b.create(240,990,random));

@@ -3089,11 +3089,7 @@ bool GameplayWorld::solidContact(const downwell::ContactBounds& bounds,bool plat
 
 // scrInView(0,0,0) against the published view of this Step.
 bool GameplayWorld::compactInView(int x,int y,bool& visible)const{
-    auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
-    if(!top.zero())top.high-=8u<<20;
-    return downwell::boneInPublishedView(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),
-        downwell::MotionBinary64::fromInteger(boneViewLeft_),top,
-        downwell::MotionBinary64::fromInteger(160),downwell::MotionBinary64::fromInteger(284),visible);
+    return downwell::boneInPublishedViewQ8(x,y,boneViewLeft_,std::int32_t(boneViewTopQ8_),160,284,visible);
 }
 
 struct GameplayWorld::SceneryOps {
