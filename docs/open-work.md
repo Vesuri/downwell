@@ -458,9 +458,13 @@ on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
     the ECS path still passes the display checks on an ECS machine preset.
 20. **W3.20 No binary64 in core (decided 27.11.2026).** Convert every
     remaining software binary64 owner to `FixedPoint.h`, whatever its
-    cost. Left: the player step (`stepGameplayPlayer`, its solid and box
-    contacts) and the shop's, the goal contact, the damage numbers (with
-    the player damage that feeds them), and the primitives they use. Where
+    cost. Left (28.11.2026, 8 kept `MotionBinary64` symbols): the damage
+    numbers (`PlayerDamageNumber`: the contact birth's direction, the
+    step's lengthdir and 0.8 damping, the Amiga draw list's text
+    position) with the player damage that feeds them through
+    `stepGameplayPlayer`, then the primitives only they use
+    (`SmokeDirection::component`, `RunnerPointDirection::fromDifferences`,
+    `TimeShardBirth`'s vertical, `compareRunnerReal`, `divideBinary64`). Where
     the owned reference or StartupRuntime shares a type, the shipping world
     gets its own and binary64 stays only at a boundary the world-one build
     does not link (decided 27.11.2026). The motion may change slightly; keep each VM form as its
