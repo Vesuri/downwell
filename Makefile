@@ -2094,14 +2094,14 @@ build/skeleton-animation-test: tests/core/SkeletonAnimationTest.cpp src/core/Run
 verify-unit-sequence-frames: build/unit-sequence-frames-test
 	./build/unit-sequence-frames-test
 
-build/unit-sequence-frames-test: tests/core/UnitSequenceFramesTest.cpp src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
+build/unit-sequence-frames-test: tests/core/UnitSequenceFramesTest.cpp src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/SubtractBinary32.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
 	@mkdir -p build
 	$(CXX_LINK) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/UnitSequenceFramesTest.cpp
 
 verify-sequence-timeline: build/sequence-timeline-test
 	./build/sequence-timeline-test
 
-build/sequence-timeline-test: tests/core/SequenceTimelineTest.cpp src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
+build/sequence-timeline-test: tests/core/SequenceTimelineTest.cpp src/core/SequenceTimeline.h src/core/SubtractBinary32.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
 	@mkdir -p build
 	$(CXX_LINK) $(CXXFLAGS) -Isrc -o $@ tests/core/SequenceTimelineTest.cpp
 

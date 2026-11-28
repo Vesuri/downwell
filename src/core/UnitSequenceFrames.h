@@ -20,15 +20,12 @@ struct UnitSequenceFrames {
     }
     static bool needsReconcile(RunnerImageValue written, RunnerImageValue evaluated, bool& needed) {
         if (!SequenceTimeline::valid(written) || !SequenceTimeline::valid(evaluated)) return false;
-        auto difference = written.promoted();
-        auto subtract = evaluated.promoted(); subtract.high ^= 0x80000000u;
+        // float(double(written) - double(evaluated)): one rounding.
         RunnerImageValue rounded;
-        if (!difference.add(subtract) || !rounded.assign(difference)) return false;
-        rounded.bits &= 0x7fffffffu;
-        const auto magnitude = rounded.promoted();
-        // Original runner double at 0x8a6c28, after single-rounded difference.
-        needed = magnitude.high > 0x3ee4f8b5u ||
-            (magnitude.high == 0x3ee4f8b5u && magnitude.low > 0x88e368f1u);
+        if (!subtractBinary32(written, evaluated, rounded)) return false;
+        // Original runner double at 0x8a6c28 (0x3ee4f8b588e368f1, 1e-5) is
+        // between binary32 0x3727c5ac and its successor.
+        needed = (rounded.bits & 0x7fffffffu) > 0x3727c5acu;
         return true;
     }
     static bool advance(RunnerImageValue& timeline, RunnerImageValue speed, unsigned frames,

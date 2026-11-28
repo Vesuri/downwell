@@ -70,6 +70,26 @@ int main() {
         ++cases;
     }
     check(fast > 1000000);
+    // Exponent gaps beyond sumBinary32's reach, up to past binary32 precision.
+    for (unsigned n = 0; n < 4000000; ++n) {
+        rng = rng * 1664525u + 1013904223u; const auto r1 = rng;
+        rng = rng * 1664525u + 1013904223u; const auto r2 = rng;
+        rng = rng * 1664525u + 1013904223u; const auto r3 = rng;
+        const int ea = int(1 + r3 % 254), eb = ea - int(8 + (r3 >> 8) % 40);
+        if (eb < 1) continue;
+        std::uint32_t ma = r1 & 0x7fffffu, mb = r2 & 0x7fffffu;
+        if ((r3 >> 16) & 1) ma = 0;                 // powers of two: borrow below a
+        if ((r3 >> 17) & 1) mb &= ~0xffffu;
+        downwell::RunnerImageValue a{(r1 & 0x80000000u) | (std::uint32_t(ea) << 23) | ma};
+        downwell::RunnerImageValue b{(r2 & 0x80000000u) | (std::uint32_t(eb) << 23) | mb};
+        if ((r3 >> 22) & 1) { const auto t = a; a = b; b = t; }
+        downwell::RunnerImageValue reference, result;
+        auto sum = a.promoted();
+        const bool referenceOk = sum.add(b.promoted()) && reference.assign(sum);
+        check(SequenceTimeline::add(a,b,result) == referenceOk);
+        if (referenceOk) check(result.bits == reference.bits);
+        ++cases;
+    }
     for (unsigned n = 1; n <= 65535; ++n) check(SequenceTimeline::integerBits(n) == stored(float(n)).bits);
     for (unsigned length : {1u,4u,6u,8u}) for (float speed : {-20.0f,-0.45f,-0.3f,-0.05f,0.0f,0.2f,0.3f,20.0f}) {
         float expected = 0;

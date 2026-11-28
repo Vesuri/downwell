@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_SEQUENCE_TIMELINE_H
 #define DOWNWELL_CORE_SEQUENCE_TIMELINE_H
 #include "RunnerImageValue.h"
+#include "SubtractBinary32.h"
 namespace downwell {
 // Integer-only timeline arithmetic for looping, unit-rate sprite sequences.
 // Track evaluation and GML image_index synchronization are separate operations.
@@ -23,7 +24,8 @@ struct SequenceTimeline {
     // The runner's float(double(a)+double(b)) for valid operands. When the
     // exponents differ by at most 7, the exact sum fits in 32 bits, so the
     // binary64 sum is exact and one nearest-even rounding gives the result.
-    // Other operands (and subnormal or overflowing results) take binary64.
+    // Other operands take subtractBinary32 (one rounding, which binary64
+    // followed by narrowing equals) and reject subnormal or overflowing results.
     static bool sumBinary32(std::uint32_t a, std::uint32_t b, std::uint32_t& out) {
         if (!(a & 0x7fffffffu) || !(b & 0x7fffffffu)) {
             if (a & 0x7fffffffu) out = a;
@@ -54,8 +56,7 @@ struct SequenceTimeline {
     }
     static bool add(RunnerImageValue a, RunnerImageValue b, RunnerImageValue& out) {
         if (sumBinary32(a.bits, b.bits, out.bits)) return true;
-        auto sum = a.promoted();
-        return sum.add(b.promoted()) && out.assign(sum);
+        return subtractBinary32(a, RunnerImageValue{b.bits ^ 0x80000000u}, out);
     }
     static std::uint32_t reduce(std::uint32_t value, std::uint32_t divisor) {
         if (value < divisor) return value;

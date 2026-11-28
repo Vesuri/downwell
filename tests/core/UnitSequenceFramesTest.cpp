@@ -39,5 +39,37 @@ int main() {
     check(!UnitSequenceFrames::evaluate(stored(-0.3f),4,image));
     check(!UnitSequenceFrames::evaluate(stored(4),4,image));
     check(UnitSequenceFrames::evaluate(stored(-0.0f),4,image) && image.bits == 0);
+    // needsReconcile against its binary64 form over valid operand pairs
+    // near and far apart, including the 1e-5 boundary.
+    for (unsigned n = 0, rng = 11; n < 4000000; ++n) {
+        rng = rng * 1664525u + 1013904223u; const auto r1 = rng;
+        rng = rng * 1664525u + 1013904223u; const auto r2 = rng;
+        downwell::RunnerImageValue w{r1 & 0x7fffffffu}, e{};
+        const unsigned mode = r2 & 3;
+        if (mode == 0) e.bits = r2 >> 2 & 0x7fffffffu;
+        else e.bits = w.bits + ((r2 >> 4) & 0xffffu) - 0x8000u; // nearby values
+        if (mode == 3) w.bits = (r1 & 0x7fffffu) | (112u << 23), e.bits = w.bits ^ ((r2 >> 3) & 0x3ffu);
+        if (!downwell::SequenceTimeline::valid(w) || !downwell::SequenceTimeline::valid(e)) continue;
+        auto difference = w.promoted();
+        auto subtract = e.promoted(); subtract.high ^= 0x80000000u;
+        downwell::RunnerImageValue rounded;
+        const bool ok = difference.add(subtract) && rounded.assign(difference);
+        bool expected = false;
+        if (ok) {
+            rounded.bits &= 0x7fffffffu;
+            const auto magnitude = rounded.promoted();
+            expected = magnitude.high > 0x3ee4f8b5u ||
+                (magnitude.high == 0x3ee4f8b5u && magnitude.low > 0x88e368f1u);
+        }
+        bool needed = !expected;
+        check(UnitSequenceFrames::needsReconcile(w, e, needed) == ok);
+        if (ok) check(needed == expected);
+        ++cases;
+    }
+    for (std::uint32_t bits : {0x3727c5acu, 0x3727c5adu}) {
+        bool needed = false;
+        check(UnitSequenceFrames::needsReconcile(downwell::RunnerImageValue{bits}, {}, needed) &&
+            needed == (bits == 0x3727c5adu));
+    }
     std::printf("Unit sequence frames: %u interpolation/reconciliation comparisons and reverse advance passed\n",cases);
 }
