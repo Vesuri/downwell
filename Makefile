@@ -958,6 +958,13 @@ build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-projectile-angle
+test: verify-projectile-angle
+verify-projectile-angle: build/projectile-angle-test
+	./build/projectile-angle-test
+build/projectile-angle-test: tests/core/ProjectileAngleTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/ProjectileAngleTest.cpp
 .PHONY: verify-effect-sequence-inverse
 test: verify-effect-sequence-inverse
 verify-effect-sequence-inverse: build/effect-sequence-inverse-test

@@ -46,7 +46,33 @@ struct ProjectilePublication {
         if(!fraction.zero())fraction.high-=20u<<20;
         return result.add(fraction)&&out.assign(result);
     }
+    // turns/2^32 and its product by 360 are exact in binary64 (41 bits), so
+    // the runner's degrees are one nearest-even rounding of turns*360/2^32.
     static bool angle(std::uint32_t turns,RunnerImageValue& out){
+        if(!turns){out.bits=0;return true;}
+        // turns*360 = turns*(256+64+32+8) as a 41-bit high:low word pair.
+        std::uint32_t low=0,high=0;
+        static const unsigned shifts[4]={8,6,5,3};
+        for(unsigned i=0;i<4;++i){
+            const unsigned shift=shifts[i];
+            const std::uint32_t part=turns<<shift,next=low+part;
+            high+=(turns>>(32-shift))+(next<part?1u:0u);low=next;
+        }
+        unsigned top=high?63-leadingZeros32(high):31-leadingZeros32(low);
+        std::uint32_t mantissa;
+        if(top<=23)mantissa=low<<(23-top);
+        else{
+            const unsigned shift=top-23; // 1..17
+            mantissa=(high<<(32-shift))|(low>>shift);
+            const std::uint32_t tail=low&((1u<<shift)-1),half=1u<<(shift-1);
+            if(tail>half||(tail==half&&(mantissa&1u)))++mantissa;
+            if(mantissa==0x1000000u){mantissa>>=1;++top;}
+        }
+        out.bits=((top+95u)<<23)|(mantissa&0x7fffffu);
+        return true;
+    }
+    // Portable reference for tests; not used by the live publication path.
+    static bool angleBinary64(std::uint32_t turns,RunnerImageValue& out){
         auto half=MotionBinary64::fromInteger(int(turns>>1));
         if((turns&1u)&&!half.add({0x3fe00000u,0}))return false;
         if(!half.zero())half.high-=31u<<20;
