@@ -2,7 +2,6 @@
 #include "../../../generated/amiga-game-planes.h"
 #include "../../../generated/amiga-scene-banks.h"
 #include "platform/amiga/AmigaActorFrames.h"
-#include "platform/amiga/AmigaWallBackground.h"
 #include "platform/amiga/AmigaAmmoHud.h"
 #ifdef DOWNWELL_AMMO_FACTORED
 volatile unsigned amigaAmmoFactoredMode=DOWNWELL_AMMO_FACTORED;
@@ -187,25 +186,6 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
-    {
-        downwell::WallBackgroundTiles<1> tiles;
-        require(tiles.append(downwell::MotionBinary64::fromInteger(108),
-            downwell::MotionBinary64::fromInteger(508)),"retained tile fixture");
-        for(unsigned origin:{0u,319u}){
-            std::vector<UBYTE> game(downwellGameRingBytes,255),hud(downwellLayerBytes,255);
-            AmigaRenderer renderer;amigaRendererInit(&renderer,game.data(),hud.data());
-            amigaRendererSetGameOrigin(&renderer,origin);
-            amigaRendererSetClipRect(&renderer,110,0,160,284);
-            require(amigaPaintWallBackground(&renderer,tiles,100,500,110,12,160,4),"paint only exposed wall-tile strip");
-            for(unsigned p=0;p<2;++p)for(unsigned y=0;y<320;++y)for(unsigned x=0;x<384;++x){
-                const unsigned logical=(y+320-origin)%320;
-                const bool black=x>=118&&x<134&&logical>=12&&logical<16;
-                const auto byte=game[p*downwellGameRingPlaneBytes+y*48+x/8];
-                require(bool(byte&(128u>>(x%8)))==!black,"native patch clears both planes only inside strip across ring wrap");
-            }
-            for(auto byte:hud)require(byte==255,"wall tile cannot touch static HUD");
-        }
-    }
     {
         unsigned lines=0;
         for(int x0=-8;x0<=8;++x0)for(int y0=-8;y0<=8;++y0)

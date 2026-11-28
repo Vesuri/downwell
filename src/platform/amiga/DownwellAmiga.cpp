@@ -2821,7 +2821,6 @@ __attribute__((noinline)) static int runDownwell(void) {
         int scrollDelta = 0;
         bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
-        const unsigned oldWallTileCount=port.wallBackgroundTiles().size();
         int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
         DW_PROFILE_PHASE(profileWait);
@@ -4069,12 +4068,8 @@ __attribute__((noinline)) static int runDownwell(void) {
             worldViewY += scrollDelta;
             // Retained wall patches use sparse debts, not the min/max span of
             // unrelated generation work. Preserve clean rows between bands.
-            const auto& wallTiles=port.wallBackgroundTiles();
-            for(unsigned i=oldWallTileCount;i<wallTiles.size();++i){
-                std::int32_t y;
-                if(!wallTiles.at(i)->y.roundPixel(y)||y>2147483647-16){terrainPaintSucceeded=false;break;}
-                if(!wallDamage.mark(y,y+16)){terrainPaintSucceeded=false;break;}
-            }
+            // (Wall background tiles come only from the host's StartupRuntime;
+            // a freestanding world never has any.)
             if(!wallDamage.visit([&](int first,int end){
                 terrainRaster.invalidate(first,end);
                 gameplayScene.invalidateStage();

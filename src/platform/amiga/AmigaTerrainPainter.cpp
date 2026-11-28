@@ -1,5 +1,4 @@
 #include "AmigaTerrainPainter.h"
-#include "AmigaWallBackground.h"
 #include "AmigaTerrainRunSurface.h"
 #include "AmigaTerrainRaster.h"
 #include "core/GameplayWorld.h"
@@ -407,12 +406,6 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
         }else amigaRendererBeginTerrainBatch(&terrainBatch,renderer,viewX,viewY);
     }
 #endif
-    // A fresh direct-cache span is already black. All wall-background
-    // rectangles are black and precede every wall/tile/decoration.
-    if(!directSurface&&runtime&&!amigaPaintWallBackground(renderer,runtime->wallBackgroundTiles(),
-        viewX,viewY,clipX,clipY,clipWidth,clipHeight)){
-        amigaRendererClearClipRect(renderer);return false;
-    }
     {
     DW_PROFILE_SCOPE(profileTerrainWalls);
     const auto* records=runtime?runtime->terrainInstances():nullptr;
