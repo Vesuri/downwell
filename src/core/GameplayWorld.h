@@ -781,10 +781,17 @@ public:
             if(meter)return run_.effectsSucceeded=false;
             meter=r;
         }
+        if(!meter)return run_.effectsSucceeded=false;
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+        // global.falldepth's only reader is the spawner, which world one
+        // does not link; the meter checks above stay.
+        return true;
+#else
         downwell::MotionBinary64 x,y;
-        if(!meter||!downwell::ContactCoordinates::playerGlobals(player_.offsetXFixed(),player_.offsetYFixed(),240,176,x,y))
+        if(!downwell::ContactCoordinates::playerGlobals(player_.offsetXFixed(),player_.offsetYFixed(),240,176,x,y))
             return run_.effectsSucceeded=false;
         return run_.publishFallDepth(y,meter->y);
+#endif
     }
     // Borrow the enclosing source-ID stream only for this room load. Children
     // execute synchronously at the authored player birth, not after the room.
@@ -2074,8 +2081,8 @@ public:
         return run_.playBulletWallSound(caller->sound,environment,enemyRandom_,material,audio);
     }
     bool noKillAchievement()const{return run_.noKill;}
-    downwell::MotionBinary64 oxygen()const{return run_.oxygen;}
-    bool setOxygen(downwell::MotionBinary64 value){return run_.setOxygen(value);}
+    downwell::Fixed16 oxygen()const{return run_.oxygen;}
+    bool setOxygen(downwell::Fixed16 value){return run_.setOxygen(value);}
     bool firstLand()const{return run_.firstLand;}
     int backgroundMusicId()const{return run_.backgroundMusicId;}
     template<class Audio,class Delay,class Cue>

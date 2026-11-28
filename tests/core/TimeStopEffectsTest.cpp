@@ -68,15 +68,15 @@ static void checkedAudioTransitions(){
     }
 }
 int main(){
-    for(auto value:{MotionBinary64::fromInteger(-2),MotionBinary64{},
-                   MotionBinary64{0x4023ffffu,0xffffffffu},MotionBinary64::fromInteger(10),
-                   MotionBinary64{0x40240000u,1},MotionBinary64::fromInteger(100)}){
+    for(auto value:{Fixed16::fromInteger(-2),Fixed16{},
+                   Fixed16::raw(10*65536-1),Fixed16::fromInteger(10),
+                   Fixed16::raw(10*65536+1),Fixed16::fromInteger(100)}){
         RunSession run;assert(run.setOxygen(value)&&run.floorTimeStopOxygen());
-        const auto expected=((value.high&0x80000000u)||value.high<0x40240000u)?MotionBinary64::fromInteger(10):value;
-        assert(run.oxygen.high==expected.high&&run.oxygen.low==expected.low);
-        run.playerCreated();assert(run.oxygen.high==MotionBinary64::fromInteger(100).high);
+        const auto expected=value.v<10*65536?Fixed16::fromInteger(10):value;
+        assert(run.oxygen.v==expected.v);
+        run.playerCreated();assert(run.oxygen.v==100*65536);
         assert(run.setOxygen(value));
-        run.reset();assert(run.oxygen.high==MotionBinary64::fromInteger(100).high);
+        run.reset();assert(run.oxygen.v==100*65536);
     }
     checkedAudioTransitions();
     for(unsigned failure=0;failure<=4;++failure){

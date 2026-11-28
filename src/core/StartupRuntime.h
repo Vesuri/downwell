@@ -356,8 +356,8 @@ public:
         if(!player||player->objectId!=35)return run_.effectsSucceeded=false;
         player->alarms.set(1,ticks);return true;
     }
-    MotionBinary64 oxygen()const{return run_.oxygen;}
-    bool setOxygen(MotionBinary64 value){return run_.setOxygen(value);}
+    Fixed16 oxygen()const{return run_.oxygen;}
+    bool setOxygen(Fixed16 value){return run_.setOxygen(value);}
     template<class Audio> bool duckMusic(MusicDuck& caller,int duration,AudioLevel amount,Audio& audio){
         return run_.duckMusic(caller,duration,amount,audio);
     }

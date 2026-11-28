@@ -2929,7 +2929,7 @@ int main(){
         }
         assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
         world->setPlayerHit();assert(world->playerHit()==1);
-        assert(world->setOxygen({0x40230000u,0}));
+        assert(world->setOxygen(Fixed16::raw(0x98000))); // 9.5
         unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
         auto encounterPhase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
         unsigned shardSteps=0;
@@ -2947,7 +2947,7 @@ int main(){
         assert(shardSteps==6);
         assert(owner->timeShards().find(owner->timeShards().handle(1))->imageSpeed.bits==0);
         assert(world->playerDamaged()&&world->playerHit()==2);
-        assert(world->oxygen().high==0x40240000u&&!world->oxygen().low);
+        assert(world->oxygen().v==10*65536);
         assert(next==830007&&owner->timeShards().size()==6&&owner->timeChanges().size()==1);
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::shake,
             PlayerTimeStop::Effect::change,PlayerTimeStop::Effect::pauseMusic,

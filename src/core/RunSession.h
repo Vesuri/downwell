@@ -197,25 +197,21 @@ struct RunSession {
     void playerDamageEndStep(){if(playerHit)playerHit=playerHit>1?0:playerHit+1;}
     bool firstLand=false;
     int backgroundMusicId=193; // scrInitialize; survives ordinary run/room reset.
-    MotionBinary64 oxygen=MotionBinary64::fromInteger(100); // scrPlayerGlobalStat.
+    // scrPlayerGlobalStat. Only reset to 100 and floored at 10 (whole values).
+    Fixed16 oxygen=Fixed16::fromInteger(100);
     MotionBinary64 fallDepth{}; // scrPlayerGlobalStat; player ordinary Step writes yy - objDepthMeter.y.
     bool publishFallDepth(MotionBinary64 privateY,RunnerImageValue meterY){
         auto negative=meterY.promoted();negative.high^=0x80000000u;
         if(!effectsSucceeded||!privateY.add(negative))return effectsSucceeded=false;
         fallDepth=privateY;return true;
     }
-    bool setOxygen(MotionBinary64 value){
+    bool setOxygen(Fixed16 value){
         if(!effectsSucceeded)return false;
-        if(!value.valid())return effectsSucceeded=false;
         oxygen=value;return true;
     }
     bool floorTimeStopOxygen(){
         if(!effectsSucceeded)return false;
-        if(!oxygen.valid())return effectsSucceeded=false;
-        // Positive finite binary64 bit order is numeric order; all negatives
-        // and signed zero are below ten. Preserve values above the floor.
-        if((oxygen.high&0x80000000u)||oxygen.high<0x40240000u)
-            oxygen=MotionBinary64::fromInteger(10);
+        if(oxygen.v<Fixed16::fromInteger(10).v)oxygen=Fixed16::fromInteger(10);
         return true;
     }
     template<class Audio> bool duckMusic(MusicDuck& caller,int duration,AudioLevel amount,Audio& audio){
@@ -227,7 +223,7 @@ struct RunSession {
         if(area<1||area>5)return false;
         sound=193+area;return true;
     }
-    void playerCreated(){noKill=true;noDamage=true;areaNoDamage=true;firstLand=false;oxygen=MotionBinary64::fromInteger(100);fallDepth={};playerDamaged=false;}
+    void playerCreated(){noKill=true;noDamage=true;areaNoDamage=true;firstLand=false;oxygen=Fixed16::fromInteger(100);fallDepth={};playerDamaged=false;}
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
         return recordEnemyDeath(cutGunshot,audio,[&]{noKill=false;return true;},delay,cue);
@@ -1063,7 +1059,7 @@ struct RunSession {
     }
     void reset(const RunRecords& saved = {}) {
         fallDepth={};
-        oxygen=MotionBinary64::fromInteger(100);
+        oxygen=Fixed16::fromInteger(100);
         for(auto& sound:overlapSounds)sound=0;
         fieldWind={};
         audio().stopAll();
