@@ -116,6 +116,29 @@ struct HudReal {
         return rounded((mantissa << 3) + shiftJam(other.mantissa << 3,
             static_cast<unsigned>(exponent - other.exponent)), exponent);
     }
+    // round(): ties to even, as the VM stores into a builtin coordinate.
+    // False when the result leaves int32 (the value is at least 2^31 - 0.5).
+    bool roundEven(std::int32_t& result) const {
+        if (!mantissa || exponent < -1) { result = 0; return true; }
+        if (exponent > 30) return false;
+        const auto high = static_cast<std::uint32_t>(mantissa >> 32);
+        const auto low = static_cast<std::uint32_t>(mantissa);
+        // twice = floor(2 * value), sticky = any lower bit; t is 21..52.
+        const unsigned t = static_cast<unsigned>(51 - exponent);
+        std::uint32_t twice; bool sticky;
+        if (t >= 32) {
+            twice = high >> (t - 32);
+            sticky = low || (high & ((std::uint32_t{1} << (t - 32)) - 1));
+        } else {
+            twice = (low >> t) | (high << (32 - t));
+            sticky = (low & ((std::uint32_t{1} << t) - 1)) != 0;
+        }
+        std::uint32_t value = twice >> 1;
+        if ((twice & 1) && (sticky || (value & 1))) ++value;
+        if (value > 0x7fffffffu) return false;
+        result = static_cast<std::int32_t>(value);
+        return true;
+    }
     unsigned floor() const {
         if (!mantissa || exponent < 0) return 0;
         const auto high = static_cast<std::uint32_t>(mantissa >> 32);

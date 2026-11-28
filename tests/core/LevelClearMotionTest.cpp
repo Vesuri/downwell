@@ -92,6 +92,33 @@ int main() {
                 "option coordinates retain source addition rounding");
         }
     }
+    {
+        // HudReal::roundEven against nearbyint for every exponent in reach of
+        // int32, with ties, neighbours and random mantissas.
+        std::uint64_t state = 0x9e3779b97f4a7c15ULL; unsigned checked = 0;
+        for (int exponent = -60; exponent <= 34; ++exponent)
+            for (unsigned n = 0; n < 4000; ++n) {
+                state ^= state << 13; state ^= state >> 7; state ^= state << 17;
+                std::uint64_t m = (state & 0xfffffffffffffULL) | (1ULL << 52);
+                const int shift = 52 - exponent;
+                if (n < 64 && shift > 0 && shift < 53) {
+                    const std::uint64_t half = 1ULL << (shift - 1), ulp = 1ULL << shift;
+                    m = ((m & ~(ulp - 1)) | half) + (std::uint64_t(n & 3) - 1) * (n & 4 ? 1 : 0);
+                    if (m < (1ULL << 52) || m >= (1ULL << 53)) continue;
+                }
+                const downwell::HudReal value{m, exponent};
+                const double real = std::ldexp(double(m), exponent - 52);
+                const double rounded = std::nearbyint(real);
+                std::int32_t y = 7; const bool ok = value.roundEven(y);
+                const bool fits = rounded <= 2147483647.0;
+                require(ok == fits && (!fits || y == std::int32_t(rounded)),
+                    "HudReal round matches binary64 round ties-to-even");
+                ++checked;
+            }
+        std::int32_t y = 7;
+        require(downwell::HudReal{}.roundEven(y) && y == 0, "zero rounds to zero");
+        std::printf("%u HudReal rounds match binary64 nearbyint\n", checked);
+    }
     std::puts("20000 divisions and 10000 level-clear motion updates match binary64");
     std::puts("20000 signed carousel updates and option coordinates match binary64");
     std::puts("315000 prepared/fallback motion updates match binary64, including stable tails and mutated inputs");

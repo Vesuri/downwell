@@ -1,7 +1,6 @@
 #ifndef DOWNWELL_CORE_LEVEL_CLEAR_MOTION_H
 #define DOWNWELL_CORE_LEVEL_CLEAR_MOTION_H
 #include "HudReal.h"
-#include "MotionBinary64.h"
 namespace downwell {
 #ifndef DOWNWELL_REFERENCE_CLEAR_MOTION
 namespace clear_motion_detail {
@@ -51,15 +50,7 @@ struct LevelClearMotion {
     int viewY() const { return static_cast<int>(cameraY.add({0x10000000000000ULL, -1}).floor()) - 142; }
     // scrResult stores round(yy) in the Result instance's y builtin. yy is
     // cameraY, not the independently eased global.ply. Preserve ties-to-even.
-    bool instanceY(std::int32_t& y)const{
-        if(!cameraY.mantissa){y=0;return true;}
-        if(cameraY.exponent < -1022 || cameraY.exponent > 30 ||
-           cameraY.mantissa < (std::uint64_t{1}<<52) ||
-           cameraY.mantissa >= (std::uint64_t{1}<<53))return false;
-        const MotionBinary64 value{(unsigned(cameraY.exponent+1023)<<20)|
-            (std::uint32_t(cameraY.mantissa>>32)&0xfffffu),std::uint32_t(cameraY.mantissa)};
-        return value.roundPixel(y);
-    }
+    bool instanceY(std::int32_t& y)const{return cameraY.roundEven(y);}
 #ifndef DOWNWELL_REFERENCE_CLEAR_MOTION
 private:
     // Canonical Create -> 59 Steps -> Alarm 4/choices. These are exact full
