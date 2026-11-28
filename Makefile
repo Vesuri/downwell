@@ -958,6 +958,13 @@ build/eyefish-motion-test: tests/core/EyefishMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EyefishMotionTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-player-box-coordinate
+test: verify-player-box-coordinate
+verify-player-box-coordinate: build/player-box-coordinate-test
+	./build/player-box-coordinate-test
+build/player-box-coordinate-test: tests/core/PlayerBoxCoordinateTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX_LINK) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerBoxCoordinateTest.cpp
 .PHONY: verify-projectile-angle
 test: verify-projectile-angle
 verify-projectile-angle: build/projectile-angle-test

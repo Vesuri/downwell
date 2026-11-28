@@ -55,10 +55,8 @@ struct PlayerBoxContact {
         // are exactly representable in binary32. Avoid general mask arithmetic
         // for ordinary terrain, retaining it outside the proven range.
         if(boxX>=-8388592&&boxX<=8388592&&boxY>=-8388592&&boxY<=8388592){
-            if(!b.left.assign(MotionBinary64::fromInteger(boxX-8))||
-               !b.right.assign(MotionBinary64::fromInteger(boxX+7))||
-               !b.top.assign(MotionBinary64::fromInteger(boxY-8))||
-               !b.bottom.assign(MotionBinary64::fromInteger(boxY+7)))return false;
+            if(!b.left.assignInteger(boxX-8)||!b.right.assignInteger(boxX+7)||
+               !b.top.assignInteger(boxY-8)||!b.bottom.assignInteger(boxY+7))return false;
         }else if(!boxBounds(boxX,boxY,b))return false;
         using Math=RunnerSpatialSplit;
         const RunnerImageValue near[]={b.left,a.left,b.top,a.top};
@@ -79,6 +77,57 @@ struct PlayerBoxContact {
             !Math::less(a.bottom,b.top)&&!Math::less(b.bottom,a.top);
         return true;
     }
+    // Public for the full-range test (verify-player-box-coordinate).
+    // float(double(value)/1280 + origin) is the nearest-even binary32 of
+    // N/1280, N = value + 1280*origin. A multiple of 5 makes every binary64
+    // step exact. Otherwise N/1280 repeats 0011 in binary, so neither
+    // binary64 rounding can reach a binary32 midpoint and only the final
+    // rounding is visible: with |origin| <= 16384 the binary64 errors (about
+    // 2^-52*|origin|) stay below a non-dyadic quotient's distance from any
+    // binary32 midpoint (at least 2^(e-24)/5, e >= -11), even when value/1280
+    // nearly cancels the origin. Larger origins keep the binary64 form.
+    static bool coordinate(long value,int origin,RunnerImageValue& result){
+        if(value<(-2147483647L-1)||value>2147483647L)return false;
+        if(origin< -16384||origin>16384){
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+            return false; // world one's origins are 240 and 176
+#else
+            return coordinateBinary64(value,origin,result);
+#endif
+        }
+        const long long n=static_cast<long long>(value)+static_cast<long long>(origin*1280);
+        if(!n){result.bits=0;return true;}
+        const std::uint32_t magnitude=static_cast<std::uint32_t>(n<0?-n:n);
+        const std::uint32_t whole=magnitude/5,rest=magnitude%5; // N/1280 = (whole+rest/5)/256
+        // x = floor(N/1280 * 2^(8+s)) with at least 25 significant bits.
+        unsigned s=0;
+        std::uint32_t x=whole;bool sticky=rest!=0;
+        if(whole<(1u<<24)){
+            s=whole?31-(32-leadingZeros32(whole)):29;
+            if(s>29)s=29; // rest<<s < 2^32
+            const std::uint32_t scaled=rest<<s;
+            x=(whole<<s)+scaled/5;sticky=scaled%5!=0;
+        }
+        unsigned top=31-leadingZeros32(x);
+        std::uint32_t mantissa;
+        if(top<=23)mantissa=x<<(23-top);
+        else{
+            const unsigned shift=top-23;
+            mantissa=x>>shift;
+            const std::uint32_t tail=x&((1u<<shift)-1),half=1u<<(shift-1);
+            if(tail>half||(tail==half&&(sticky||(mantissa&1u))))++mantissa;
+            if(mantissa==0x1000000u){mantissa>>=1;++top;}
+        }
+        result.bits=(n<0?0x80000000u:0u)|((127u+top-8u-s)<<23)|(mantissa&0x7fffffu);
+        return true;
+    }
+    // Portable binary64 reference for tests.
+    static bool coordinateBinary64(long value,int origin,RunnerImageValue& result){
+        if(value<(-2147483647L-1)||value>2147483647L)return false;
+        MotionBinary64 n;
+        return divideBinary64(MotionBinary64::fromInteger(static_cast<std::int32_t>(value)),
+            MotionBinary64::fromInteger(1280),n)&&n.add(MotionBinary64::fromInteger(origin))&&result.assign(n);
+    }
 private:
     static bool boxBounds(int boxX,int boxY,Bounds& b){
         RunnerImageValue bx,by;
@@ -87,12 +136,6 @@ private:
         auto round=[](RunnerImageValue n,std::int32_t& pixel){return n.roundPixel(pixel);};
         const RunnerImageValue one{0x3f800000};
         return RunnerSpriteBounds::fromSprite(box,bx,by,one,one,false,one,{},true,round,b);
-    }
-    static bool coordinate(long value,int origin,RunnerImageValue& result){
-        if(value<(-2147483647L-1)||value>2147483647L)return false;
-        MotionBinary64 n;
-        return divideBinary64(MotionBinary64::fromInteger(static_cast<std::int32_t>(value)),
-            MotionBinary64::fromInteger(1280),n)&&n.add(MotionBinary64::fromInteger(origin))&&result.assign(n);
     }
 };
 }
