@@ -458,9 +458,12 @@ on the surface 2.0 at 5228, shade subtraction), the streak block 2.9
     the ECS path still passes the display checks on an ECS machine preset.
 20. **W3.20 No binary64 in core (decided 27.11.2026).** Convert every
     remaining software binary64 owner to `FixedPoint.h`, whatever its
-    cost: the owners listed under the fixed-point paragraph above, the red
-    ball, torch fire, the steering draw, and the upgrade and hard-mode
-    owners. The motion may change slightly; keep each VM form as its
+    cost. Left: the player step (`stepGameplayPlayer`, its solid and box
+    contacts) and the shop's, the goal contact, the damage numbers (with
+    the player damage that feeds them), and the primitives they use. Where
+    the owned reference or StartupRuntime shares a type, the shipping world
+    gets its own and binary64 stays only at a boundary the world-one build
+    does not link (decided 27.11.2026). The motion may change slightly; keep each VM form as its
     `...Reference` oracle in `make test-fixed-point` and re-search the
     routes whose autopilot no longer survives. Done when the shipping
     executable links no binary64 arithmetic (no `MotionBinary64` or
