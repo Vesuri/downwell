@@ -9,12 +9,10 @@ namespace downwell {
 inline bool subtractBinary32(RunnerImageValue left,RunnerImageValue right,RunnerImageValue& out){
     auto a=left.bits,b=right.bits^0x80000000u;
     const unsigned ae=(a>>23)&255u,be=(b>>23)&255u;
-    if(ae==255||be==255||(!ae&&(a&0x7fffffu))||(!be&&(b&0x7fffffu))){
-        // Keep existing behavior outside the normal/zero domain. In particular
-        // promoted() is not a general IEEE conversion of NaNs or subnormals.
-        auto wide=left.promoted();
-        return wide.add(RunnerImageValue{b}.promoted())&&out.assign(wide);
-    }
+    // Infinities, NaNs and subnormals are rejected (W3.20). The callers'
+    // bounds and areas are finite normals or zero; the former binary64
+    // fallback here was not an IEEE conversion of them either.
+    if(ae==255||be==255||(!ae&&(a&0x7fffffu))||(!be&&(b&0x7fffffu)))return false;
     if(!(a&0x7fffffffu)){
         out.bits=(b&0x7fffffffu)?b:(a&b);return true;
     }

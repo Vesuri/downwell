@@ -201,7 +201,10 @@ int main(){
     auto subtractCheck=[](std::uint32_t a,std::uint32_t b){
         Split::Real left{a},right{b},actual{0x12345678},expected=actual;
         auto wide=left.promoted();
-        const bool ok=wide.add(Split::negate(right).promoted())&&expected.assign(wide);
+        // Infinities, NaNs and subnormals are rejected; the binary64 route
+        // stays the oracle for finite normals and zeros.
+        const bool ok=Split::valid(left)&&Split::valid(right)&&
+            wide.add(Split::negate(right).promoted())&&expected.assign(wide);
         assert(Split::sub(left,right,actual)==ok&&actual.bits==expected.bits);
         auto aliasLeft=left,aliasRight=right;
         assert(Split::sub(aliasLeft,right,aliasLeft)==ok);
