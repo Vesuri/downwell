@@ -26,8 +26,8 @@ int main(){
     for(bool cut:{false,true})for(bool playing:{false,true})for(int y:{9,10,30,31}){
         const int ch=c==10?0:c;assert(SoundPlayScript::channel(names[c])==ch);
         SoundPlayState s;SoundPlayEnvironment env;env.inWater=water;env.noBgm=muted;
-        env.gameVolume=AudioLevel::raw(16384);env.y=MotionBinary64::fromInteger(y);
-        env.viewY=MotionBinary64::fromInteger(10);env.viewHeight=MotionBinary64::fromInteger(20);
+        env.gameVolume=AudioLevel::raw(16384);env.y=downwell::Fixed16::fromInteger(y);
+        env.viewY=downwell::Fixed16::fromInteger(10);env.viewHeight=downwell::Fixed16::fromInteger(20);
         Audio audio;audio.resourcePlaying=playing;bool good=true,returned=true;int channel=73,result=88;
         assert(SoundPlayScript::overlap(s,env,audio,[&]{return audio.call(6000);},channel,
             42,50,false,cut,names[c],result,returned,good));

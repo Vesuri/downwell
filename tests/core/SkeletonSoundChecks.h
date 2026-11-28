@@ -26,7 +26,7 @@ inline void checkSkeletonSoundContract(){
     // branch: even an offscreen caller replaces the previous footsteps sound.
     for(bool water:{false,true})for(unsigned failure=0;failure<=7;++failure){
         RunSession run;SoundPlayState caller;SoundPlayEnvironment env;
-        env.y=MotionBinary64::fromInteger(-1000);env.gameVolume=downwell::AudioLevel::raw(16384);env.inWater=water;
+        env.y=downwell::Fixed16::fromInteger(-1000);env.gameVolume=downwell::AudioLevel::raw(16384);env.inWater=water;
         run.overlapSounds[0]=777;SkeletonSoundAudio audio;audio.wet=water;audio.failAt=failure;
         const bool accepted=!failure;
         SkeletonSoundAudio::check(run.playSkeletonStompSound(caller,env,audio)==accepted&&
@@ -39,7 +39,7 @@ inline void checkSkeletonSoundContract(){
     for(int sound=132;sound<=134;++sound)for(int y:{-1,0,100,101})for(bool water:{false,true})
     for(unsigned failure=0;failure<=7;++failure){
         RunSession run;SoundPlayState caller;SoundPlayEnvironment env;
-        env.y=MotionBinary64::fromInteger(y);env.viewHeight=MotionBinary64::fromInteger(100);
+        env.y=downwell::Fixed16::fromInteger(y);env.viewHeight=downwell::Fixed16::fromInteger(100);
         env.gameVolume=downwell::AudioLevel::raw(16384);env.inWater=water;run.overlapSounds[4]=777;
         SkeletonSoundAudio audio;audio.failAt=failure;audio.wet=water;
         const bool visible=y>=0&&y<=100;const unsigned maximum=visible?7:2;

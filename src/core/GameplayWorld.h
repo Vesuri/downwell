@@ -676,7 +676,7 @@ public:
             }
             bool sound(int id,int priority,int loop,int cut){
                 return store.dispatch(key,[&](auto& r){
-                    int voice;environment.y=r.y.promoted();
+                    int voice; // plain() reads no position
                     return downwell::SoundPlayScript::plain(r.sound,environment,audio,id,priority,loop!=0,cut!=0,
                         voice,world.run_.effectsSucceeded);
                 });
@@ -2062,11 +2062,9 @@ public:
     template<class Audio> bool playSkeletonSound(downwell::SkeletonActor& actor,int sound,
         downwell::SoundPlayEnvironment& environment,Audio& audio){
         if(!run_.effectsSucceeded)return false;
-        auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
-        if(!top.zero())top.high-=8u<<20;
-        environment.viewY=top;
-        environment.viewHeight=downwell::MotionBinary64::fromInteger(284);
-        environment.y=downwell::MotionBinary64::fromInteger(actor.y);
+        environment.viewY=boneViewTopQ16();
+        environment.viewHeight=downwell::Fixed16::fromInteger(284);
+        environment.y=downwell::Fixed16::fromInteger(actor.y);
         return run_.playSkeletonSound(actor.sound,sound,environment,audio);
     }
     template<class Material,class Audio> bool playBulletWallSound(downwell::InstanceHandle shot,
@@ -3064,6 +3062,8 @@ private:
     // target being updated later in this tick. Normal following is pixelized.
     int boneViewLeft_=160;
     long boneViewTopQ8_=34L*256;
+    // The view top in Q16 for the sound scripts; room views stay far inside it.
+    downwell::Fixed16 boneViewTopQ16()const{return downwell::Fixed16::raw(std::int32_t(boneViewTopQ8_)*256);}
     int activationY_;
     BulletState bullets_[bulletCapacity];
     bool bulletIdentitySlots_[bulletCapacity]{};

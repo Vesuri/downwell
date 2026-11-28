@@ -90,7 +90,7 @@ struct RunSession {
         SoundPlayEnvironment env;return soundPlayOL(asset,priority,loop,cut,channel,env);
     }
     int soundPlayOL(int asset,int priority,bool loop,bool cut,const char* channel,
-        MotionBinary64 y,MotionBinary64 viewY,MotionBinary64 viewHeight){
+        Fixed16 y,Fixed16 viewY,Fixed16 viewHeight){
         SoundPlayEnvironment env;env.y=y;env.viewY=viewY;env.viewHeight=viewHeight;
         return soundPlayOL(asset,priority,loop,cut,channel,env);
     }

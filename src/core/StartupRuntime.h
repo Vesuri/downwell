@@ -289,10 +289,11 @@ public:
             return run_.effectsSucceeded=false;
         // Ordinary Step reads the previous Draw's published view, not the
         // followed camera instance after its own Step has moved it.
-        if(!multiplyBinary64(MotionBinary64::fromInteger(ordinaryStepViewTopQ12_),{0x3f300000u,0},
-            environment.viewY))return run_.effectsSucceeded=false;
-        environment.viewHeight=MotionBinary64::fromInteger(cameraViewHeight_);
-        environment.y=MotionBinary64::fromInteger(actor.y);
+        // viewTopQ12 / 4096 in Q16.
+        if(ordinaryStepViewTopQ12_< -(1L<<26)||ordinaryStepViewTopQ12_>=(1L<<26))return run_.effectsSucceeded=false;
+        environment.viewY=Fixed16::raw(std::int32_t(ordinaryStepViewTopQ12_)*16);
+        environment.viewHeight=Fixed16::fromInteger(cameraViewHeight_);
+        environment.y=Fixed16::fromInteger(actor.y);
         return run_.playSkeletonSound(actor.sound,sound,environment,audio);
     }
     template<class Material,class Audio> bool playBulletWallSound(InstanceHandle shot,

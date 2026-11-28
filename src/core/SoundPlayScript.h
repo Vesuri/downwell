@@ -1,7 +1,7 @@
 #ifndef DOWNWELL_CORE_SOUND_PLAY_SCRIPT_H
 #define DOWNWELL_CORE_SOUND_PLAY_SCRIPT_H
 #include "AudioLevel.h"
-#include "PlayerHorizontalBinary64.h"
+#include "FixedPoint.h"
 namespace downwell {
 // Caller-visible script fields, not backend voice state. Preserve each write
 // before the next synchronous audio operation; failures do not roll it back.
@@ -13,7 +13,9 @@ struct SoundPlayState {
 };
 struct SoundPlayEnvironment {
     AudioLevel gameVolume=audio_level::one;
-    MotionBinary64 y{},viewY{},viewHeight{};
+    // The caller's y and the room view, for the offscreen test (W3.20: Q16;
+    // every caller supplies whole pixels or a Q8/Q12 view top).
+    Fixed16 y{},viewY{},viewHeight{};
     bool inWater=false,noBgm=false;
 };
 struct SoundPlayScript {
@@ -47,10 +49,11 @@ struct SoundPlayScript {
         if(selected==1&&!check(duck(),good))return false;
         s.chanNum=selected;s.doNotPlay=false;hasResult=false;
         if(selected==4||selected==6){
-            auto bottom=env.viewY;
-            if(!check(env.y.valid()&&env.viewY.valid()&&bottom.add(env.viewHeight),good))return false;
-            s.doNotPlay=PlayerHorizontalBinary64::less(bottom,env.y)||
-                PlayerHorizontalBinary64::less(env.y,env.viewY);
+            constexpr std::int32_t range=std::int32_t(1)<<30;
+            if(!check(env.viewY.v>-range&&env.viewY.v<range&&env.viewHeight.v>=0&&env.viewHeight.v<range,good))
+                return false;
+            const std::int32_t bottom=env.viewY.v+env.viewHeight.v;
+            s.doNotPlay=bottom<env.y.v||env.y.v<env.viewY.v;
             s.cutPrv=false;
             if(!stopPlaying(s.sfxIndex,audio,good))return false;
         }

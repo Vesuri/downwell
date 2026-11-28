@@ -1751,7 +1751,7 @@ int main(){
         require(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}),"hit source skeleton");
         unsigned hurts=0;SkeletonSoundAudio audio;audio.wet=true;
         SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume=AudioLevel::raw(16384);
-        soundEnvironment.viewY=MotionBinary64::fromInteger(10000);soundEnvironment.inWater=true;
+        soundEnvironment.viewY=downwell::Fixed16::fromInteger(10000);soundEnvironment.inWater=true;
         TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
         auto skeletonTick=[&]{return world->withSkeletonTimeStopEvents(skeletons,skeletonStop,
             [&](auto,auto& actor,auto&){return soundingSkeletonEffects(hurts,[&actor,&world,&soundEnvironment,&audio](int id){
@@ -1764,8 +1764,8 @@ int main(){
             record->spriteId==205&&record->imageSpeed==0&&record->alarms.get(1)==4&&record->alarms.get(3)==30&&
             actor->state.hitStun&&!actor->state.hitPending,"checked hit Step executes in the stored room scheduler");
         require(audio.calls==7&&world->overlapSound(4)==133&&actor->state.sound.sndsnd==1001&&
-            soundEnvironment.viewHeight.high==MotionBinary64::fromInteger(284).high&&
-            soundEnvironment.viewY.high!=MotionBinary64::fromInteger(10000).high,
+            soundEnvironment.viewHeight.v==284*65536&&
+            soundEnvironment.viewY.v!=10000*65536,
             "stored hit Step runs source enemymove sound with retained caller and global channel");
         require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool&){
             if(phase!=StartupRuntime::SkeletonPhase::step)return true;

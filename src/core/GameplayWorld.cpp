@@ -3583,10 +3583,8 @@ bool GameplayWorld::compactTimeoutField(){
 // soundPlayOL from a caller at room y against the published view (top,
 // height 284): enemymove and waterEnemy calls outside it are silent.
 void GameplayWorld::soundPlayOLAt(int sound,int priority,bool loop,bool cut,const char* channel,int roomY){
-    auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
-    if(!top.zero())top.high-=8u<<20;
-    run_.soundPlayOL(sound,priority,loop,cut,channel,downwell::MotionBinary64::fromInteger(roomY),
-        top,downwell::MotionBinary64::fromInteger(284));
+    run_.soundPlayOL(sound,priority,loop,cut,channel,downwell::Fixed16::fromInteger(roomY),
+        boneViewTopQ16(),downwell::Fixed16::fromInteger(284));
 }
 void GameplayWorld::playEnemySound(int sound,int roomY){soundPlayOLAt(sound,50,false,true,"enemymove",roomY);}
 
