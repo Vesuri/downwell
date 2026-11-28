@@ -3343,16 +3343,15 @@ bool GameplayWorld::hitCompactShootable(const downwell::ProjectileSegment& path,
     if(!run_.upgrades.levels[3]||!compactCorpses_.size())return true;
     bool met=false,ok=true;
     struct Hooks{} hooks;
-    if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseAnimation& corpse){
+    if(!compactCorpses_.dispatch(compactCorpses_.beginPhase(),[&](auto,downwell::CorpseParticle& corpse){
         if(met)return true;
         std::int32_t cx,cy;
         if(!corpse.x.roundPixel(cx)||!corpse.y.roundPixel(cy))return false;
         if(!downwell::contactBoundsOverlap(shot,downwell::contactPixelBounds(cx,cy,1,1,599)))return true;
         met=true;
-        int order;
-        if(!downwell::compareRunnerReal(corpse.health,{},order))return false;
-        if(order<=0)return true;
-        if(!corpse.health.add(downwell::MotionBinary64::fromInteger(-damage)))return false;
+        bool applied;
+        if(!corpse.damage(damage,applied))return false;
+        if(!applied)return true;
         downwell::RunnerImageValue angle;downwell::Fixed16 qx,qy,qa;
         ok=downwell::ProjectilePublication::angle(bulletDirection(bullet),angle)&&
            downwell::Fixed16::fromBinary32(bx.bits,qx)&&downwell::Fixed16::fromBinary32(by.bits,qy)&&

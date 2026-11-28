@@ -8,8 +8,9 @@ namespace downwell {
 // skeleton corpses. createWhole is Create on whole pixels and setSpeedsQ16
 // scrDeadBody's speed writes (CorpseEffects::createDeathQ16); the binary64
 // create remains for the tests, and its first Step converts xx, yy, xsp and
-// ysp once. The published x/y stay whole-pixel builtins and health stays
-// binary64 (it changes only on shots and blasts).
+// ysp once. The published x/y stay whole-pixel builtins. objHp is the whole
+// hp (1 with Rest in Pieces, else 0, back to 1 while inactive, less each
+// shot's and blast's whole bdmg); the inherited binary64 health is unused.
 // Events: meeting(x16, y16, hit) against sParentSolid with Q16
 // coordinates, area(), restInPieces(), create(object, px, py) in whole
 // pixels and destroy().
@@ -20,6 +21,7 @@ struct CorpseParticle : CorpseAnimation {
     // outcomes. A Q16 speed would not: its rounding bias flips sign at each
     // floor bounce and moves the -1 gravity switch by a tick.
     std::int32_t x16=0,y16=0,xspUnits=0,yspUnits=0;
+    std::int32_t hp=1;
     bool fixed=false;
     static constexpr std::int32_t unit=65520;
     // gravity 0.1 and 0.2 below the -1 threshold, floor bounce above 0.2
@@ -29,7 +31,7 @@ struct CorpseParticle : CorpseAnimation {
     static constexpr std::int32_t bounceUnits=unit/5,settleUnits=-unit/2,stopUnits=unit*3/10,creepUnits=unit/20,fastUnits=32*unit;
     template<class Random,class Queries>
     bool create(MotionBinary64 px,MotionBinary64 py,bool rip,Random& random,Queries& queries){
-        fixed=false;x16=y16=xspUnits=yspUnits=0;
+        fixed=false;x16=y16=xspUnits=yspUnits=0;hp=rip?1:0;
         return CorpseAnimation::create(px,py,rip,random,queries);
     }
     // Object 263 and inherited 90 Create (CorpseBirth) at whole pixels: the
@@ -43,7 +45,7 @@ struct CorpseParticle : CorpseAnimation {
         if(px< -100000||px>100000||py< -100000||py>100000||!x.assignInteger(px)||!y.assignInteger(py))
             return valid=false;
         random.nextU32();random.nextU32(); // xsp = random(6) - 3, ysp = random(4) - 2
-        if(rip)hitEffect=true;else health={};
+        if(rip)hitEffect=true;else hp=0;
         alarms.set(3,8);
         // -0.5, -0.3, 0, 0.3, 0.5 narrowed to binary32.
         static constexpr std::uint32_t rates[]={0xbf000000u,0xbe99999au,0,0x3e99999au,0x3f000000u};
@@ -75,6 +77,13 @@ struct CorpseParticle : CorpseAnimation {
     }
     // scrDeadBody's hspeed and vspeed writes, Q16.
     void setSpeedsQ16(std::int32_t xsp16,std::int32_t ysp16){xspUnits=units(xsp16);yspUnits=units(ysp16);}
+    // A shot's or blast's bdmg while objHp > 0 (subparentShootable).
+    bool damage(int amount,bool& applied){
+        applied=false;
+        if(amount<0||amount>100000)return false;
+        if(hp<=0)return true;
+        hp-=amount;applied=true;return true;
+    }
     static std::int32_t speedUnits(std::int32_t q16){return units(q16);}
     template<class Events> bool step(bool stopped,Events& events){
         if(!valid)return false;
@@ -166,10 +175,8 @@ private:
             if(!y.assignInteger(py)||!x.assignInteger(px))return false;
             checkRange=4;
             if(events.restInPieces()){
-                if(!active)health=MotionBinary64::fromInteger(1);
-                int order;
-                if(!compareRunnerReal(health,{},order))return false;
-                if(order<=0&&active){
+                if(!active)hp=1;
+                if(hp<=0&&active){
                     if(!events.create(272,px,py))return false;
                     if(events.restInPieces()==2)for(unsigned n=0;n<4;++n)
                         if(!events.create(272,px,py))return false;

@@ -137,7 +137,7 @@ int main(){
         re.rip=fe.rip=rip?1+int(seed%2):0;
         for(unsigned tick=0;tick<200&&!reference.destroyRequested;++tick){
             if(rip&&tick==8)reference.active=fixed.active=true;
-            if(rip&&tick==120)reference.health=fixed.health={};
+            if(rip&&tick==120){reference.health={};fixed.hp=0;}
             check(reference.step(false,re)&&fixed.step(false,fe));
             ++steps;
             const int rx=pixel(reference.x),ry=pixel(reference.y),fx=pixel(fixed.x),fy=pixel(fixed.y);
