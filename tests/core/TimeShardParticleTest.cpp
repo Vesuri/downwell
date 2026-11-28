@@ -31,6 +31,20 @@ int pixel(downwell::RunnerImageValue v){std::int32_t n;checkAt(v.promoted().roun
 std::int32_t q16(N v){downwell::Fixed16 f;checkAt(downwell::Fixed16::fromBinary64(v,f),__LINE__);return f.v;}
 }
 int main(){
+    {   // playerContact from signs against the binary64 speeds' form.
+        unsigned checked=0;
+        const N speeds[]={N{},N{0x80000000u,0},N::fromInteger(3),N::fromInteger(-2),N{0x3f700000u,0},N{0xbf700000u,0}};
+        const int signs[]={0,0,1,-1,1,-1};
+        for(unsigned seed=0;seed<64;++seed)for(unsigned a=0;a<6;++a)for(unsigned b=0;b<6;++b){
+            downwell::TimeShardParticle viaReal,viaSign;
+            downwell::GameMakerRandom r1(seed),r2(seed);
+            check(viaReal.playerContact(speeds[a],speeds[b],r1)&&viaSign.playerContact(signs[a],signs[b],r2));
+            check(viaReal.xsp==viaSign.xsp&&viaReal.ysp==viaSign.ysp&&viaReal.noTouch&&viaSign.noTouch&&
+                  viaReal.alarm2==viaSign.alarm2&&r1.nextU32()==r2.nextU32());
+            ++checked;
+        }
+        std::printf("Time shard contact: %u sign contacts equal to the binary64 speeds\n",checked);
+    }
     // random(7) narrowed to binary32: the native rounding against the VM's
     // binary64 product and its narrowing, on edge words and a stride.
     {

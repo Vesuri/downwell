@@ -167,7 +167,8 @@ public:
         }
         succeeded_=false;return false;
     }
-    template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random,
+    // xsp/ysp are the player's speeds in whatever form the effect reads.
+    template<class Random,class Velocity=MotionBinary64> bool playerContact(Handle handle,Velocity xsp,Velocity ysp,Random& random,
                                              const AlarmBank* worldAlarms=nullptr){
         if(!succeeded_)return false;
         auto* effect=get(handle);

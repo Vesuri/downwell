@@ -122,6 +122,13 @@ struct TimeShardParticle {
         ysp=contactVelocity(playerYsp,random.nextU32());
         noTouch=true;alarm2=5;return true;
     }
+    // The same contact from the speeds' signs only (-1, 0, 1), all it reads.
+    template<class Random> bool playerContact(int xSign,int ySign,Random& random){
+        if(destroyRequested||noTouch)return true;
+        xsp=contactSign(xSign,random.nextU32());
+        ysp=contactSign(ySign,random.nextU32());
+        noTouch=true;alarm2=5;return true;
+    }
     // TimeShardMotion::step on Q16 values. Count returns the live shard
     // population (negative on failure); Outside(effect, retire) tests the
     // OLD published y; Destroy runs once, at the first destroy request.
@@ -195,6 +202,10 @@ struct TimeShardParticle {
     }
 private:
     // random(2) in Q16 with the player's sign; zero speed keeps zero.
+    static std::int32_t contactSign(int sign,std::uint32_t word){
+        const std::int32_t magnitude=std::int32_t(word>>16)*2;
+        return sign<0?-magnitude:sign>0?magnitude:0;
+    }
     static std::int32_t contactVelocity(MotionBinary64 velocity,std::uint32_t word){
         if(velocity.zero())return 0;
         const std::int32_t magnitude=std::int32_t(word>>16)*2;

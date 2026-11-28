@@ -3836,9 +3836,11 @@ bool GameplayWorld::stepLaserBullet(BulletState& bullet,long generationCameraY){
         auto* record=downwell::CompactGuns::append(guns_.trails,guns_.trailEnd);
         if(record){
             record->x=x+240;record->y=y+trail+176;record->sprite=bullet.sprite;record->birth=tick_;
-            GunReal value=GunReal::fromInteger(quarterIndex);
-            if(quarterIndex)value.high-=2u<<20; // exact division by four
-            if(!record->index.assign(value))return run_.effectsSucceeded=false;
+            // image_index quarterIndex / 4, exact in binary32 (at most 8).
+            if(quarterIndex<0||quarterIndex>32)return run_.effectsSucceeded=false;
+            if(!quarterIndex)record->index={};
+            else if(!record->index.assignFixed(std::uint64_t(quarterIndex)<<32,34,false,0))
+                return run_.effectsSucceeded=false;
         } // A full trail store drops only presentation (no RNG or state).
         if(!bullet.wallMet&&quarterIndex>0)--quarterIndex;
         if(trail+8>distance)break;
@@ -4297,8 +4299,9 @@ bool GameplayWorld::collideTimeShards(){
             touched[count++]=handle;
     });
     if(!valid)return run_.effectsSucceeded=false;
-    const auto xsp=exactQ8(player_.speedXFixed());
-    const auto ysp=downwell::MotionBinary64::fromInteger(player_.speedYFifths()); // Only its sign is read.
+    // The shard reads only the signs of the player's xsp and ysp.
+    const long sx=player_.speedXFixed(),sy=player_.speedYFifths();
+    const int xsp=sx<0?-1:sx>0?1:0,ysp=sy<0?-1:sy>0?1:0;
     for(unsigned i=0;i<count;++i)
         if(!timeStop_.shards.playerContact(touched[i],xsp,ysp,enemyRandom_))return run_.effectsSucceeded=false;
     return true;
