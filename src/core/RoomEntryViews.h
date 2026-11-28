@@ -18,10 +18,9 @@ public:
                 PackedRoomView source;
                 if(!pack.roomView(i,slot,source))return false;
                 auto& v=views_[slot];
-                if(!v.x.assign(MotionBinary64::fromInteger(source.x))||
-                   !v.y.assign(MotionBinary64::fromInteger(source.y))||
-                   !v.width.assign(MotionBinary64::fromInteger(source.width))||
-                   !v.height.assign(MotionBinary64::fromInteger(source.height)))return false;
+                // Integers are exact in binary64: one binary32 rounding.
+                if(!v.x.assignInteger(source.x)||!v.y.assignInteger(source.y)||
+                   !v.width.assignInteger(source.width)||!v.height.assignInteger(source.height))return false;
                 v.enabled=source.enabled;
             }
             valid_=true;return true;

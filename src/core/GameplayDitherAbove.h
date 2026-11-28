@@ -98,9 +98,17 @@ public:
     bool beginStepPixels(int cameraX,CameraY cameraY,bool lowSpec,bool ending){
         if(!good_)return false;
         if(!record_.lifetimeId||!record_.active||record_.destroyRequested)return true;
-        if(!pixelYValid_)
+        if(!pixelYValid_){
+#ifdef DOWNWELL_WORLD_ONE_ONLY
+            // World one creates the dither at integers and moves it by whole
+            // pixels, so the cache is always valid; imported fractional or
+            // out-of-range values are not admitted there.
+            return fail();
+#else
             return beginStep([&](MotionBinary64& x){x=MotionBinary64::fromInteger(cameraX);return true;},
                 [&](MotionBinary64& y){y=MotionBinary64::fromInteger(cameraY());return true;},lowSpec,ending);
+#endif
+        }
         RunnerImageValue x;
         if(!x.assignInteger(cameraX)||!position(x,record_.y))return fail();
         // Read camera Y only after X publication, as in the source. The sum
