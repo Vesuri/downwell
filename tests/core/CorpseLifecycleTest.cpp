@@ -10,9 +10,13 @@ struct Events {
     void eatSound(int a,int b,int c,int d){assert(eaten==1&&a==83&&b==80&&c==0&&d==1);++sounds;}
     MotionBinary64 playerY(){assert(reads++==created*2);return MotionBinary64::fromInteger(20+created);}
     MotionBinary64 playerX(){assert(reads++==created*2+1);return MotionBinary64::fromInteger(10+created);}
+    // The alarm's expiry child receives the binary32 builtins.
+    bool create(int object,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
+        assert(object==242&&!x.bits&&!y.bits);corpse.explosionFx=116;
+        id=++created;return created!=fail;
+    }
     bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
-        if(object==242){assert(x.zero()&&y.zero());corpse.explosionFx=116;}
-        else {
+        {
             assert(object==223&&eaten==1&&sounds==1);
             assert(x.high==MotionBinary64::fromInteger(10+created).high);
             assert(y.high==MotionBinary64::fromInteger(20+created).high);

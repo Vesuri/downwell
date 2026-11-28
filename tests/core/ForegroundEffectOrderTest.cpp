@@ -19,9 +19,9 @@ int main(){
         assert(numbers.restoreEmptyBirthSequence({0})&&expiry.restoreEmptyBirthSequence({0}));
         assert(!numbers.restoreEmptyBirthSequence({42})&&!expiry.restoreEmptyBirthSequence({42}));
         RunSession::DamageNumberHooks numberHooks;RunSession::ExpiryHooks expiryHooks;
-        assert(!numbers.create({}, {},numberHooks)&&!expiry.create({}, {},expiryHooks));
+        assert(!numbers.create({}, {},numberHooks)&&!expiry.create(RunnerImageValue{},RunnerImageValue{},expiryHooks));
         assert(numbers.clear(numberHooks)&&expiry.clear(expiryHooks));
-        assert(!numbers.create({}, {},numberHooks)&&!expiry.create({}, {},expiryHooks));
+        assert(!numbers.create({}, {},numberHooks)&&!expiry.create(RunnerImageValue{},RunnerImageValue{},expiryHooks));
     }
     for(unsigned pattern=0;pattern<256;++pattern){
         RunSession run;
@@ -59,7 +59,7 @@ int main(){
     }
     {
         RunSession run;RunSession::ExpiryHooks hooks;
-        assert(run.corpseExpiryEffects.create({}, {},hooks));
+        assert(run.corpseExpiryEffects.create(RunnerImageValue{},RunnerImageValue{},hooks));
         // Unregistered births cannot be silently assigned an arbitrary family order.
         unsigned visits=0;
         assert(!run.visitForegroundEffects([&](const auto&){++visits;return true;},[&](const auto&){++visits;return true;}));

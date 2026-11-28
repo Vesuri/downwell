@@ -31,12 +31,24 @@ public:
     }
     Effect* get(Handle h){return const_cast<Effect*>(static_cast<const NonLoopEffects*>(this)->get(h));}
     template<class Hooks> Handle create(MotionBinary64 x,MotionBinary64 y,Hooks& hooks){
+        RunnerImageValue px,py;
         if(!good_)return 0;
+        if(!px.assign(x)||!py.assign(y)){good_=false;return 0;}
+        return insert(px,py,x,y,hooks);
+    }
+    // Effects whose Create only stores the published binary32 builtins.
+    template<class Hooks> Handle create(RunnerImageValue x,RunnerImageValue y,Hooks& hooks){
+        if(!good_)return 0;
+        return insert(x,y,x,y,hooks);
+    }
+private:
+    template<class Position,class Hooks>
+    Handle insert(RunnerImageValue px,RunnerImageValue py,Position x,Position y,Hooks& hooks){
         if(!next_||count_==Capacity){good_=false;return 0;}
         unsigned index=0;while(index<Capacity&&slots_[index].handle)++index;
         if(index==Capacity){good_=false;return 0;}
         auto& slot=slots_[index];slot.effect={};
-        if(!slot.effect.x.assign(x)||!slot.effect.y.assign(y)){good_=false;return 0;}
+        slot.effect.x=px;slot.effect.y=py;
         // Constructor publication precedes the Create rate assignment.
         slot.effect.imageSpeed={0x3f800000u};slot.handle=next_++;
         for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
@@ -45,6 +57,7 @@ public:
            !slot.effect.create(x,y)){good_=false;return 0;}
         return slot.handle;
     }
+public:
     template<class Hooks> bool setSprite(Handle h,int sprite,unsigned frames,Hooks& hooks){
         auto* effect=get(h);
         if(!effect||!effect->setSprite(sprite,frames,[&](const auto& state){return hooks.sprite(h,state);})){good_=false;return false;}

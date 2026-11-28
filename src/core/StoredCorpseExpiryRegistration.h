@@ -87,8 +87,8 @@ public:
         if(!good_)return false;
         struct Events {
             StoredCorpseExpiryRegistration& owner;Publish& publish;Frames& frames;
-            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
-                return object==242&&owner.create(x,y,id);
+            bool create(int object,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
+                return object==242&&owner.create(x.promoted(),y.promoted(),id);
             }
             bool sprite(unsigned id,int sprite){return owner.sprite(id,sprite,frames(sprite));}
             void destroy(){if(!publish.destroy())owner.fail();}

@@ -10,7 +10,7 @@ struct Events {
     explicit Events(CorpseLifecycle& value):corpse(value){}
     CorpseExpiryEffect child;
     unsigned births=0,sets=0,deaths=0;
-    bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
+    bool create(int object,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
         assert(object==242&&!corpse.destroyRequested);
         ++births;id=1;return child.create(x,y);
     }
@@ -38,7 +38,7 @@ int main(){
     assert(ticks==40);
     assert(events.child.advanceImage()&&events.child.imageIndex.bits==bits(position));
     assert(corpse.advanceAlarm(0,events)&&events.births==1&&events.deaths==1);
-    CorpseExpiryEffect effect;assert(effect.create({},{}));
+    CorpseExpiryEffect effect;assert(effect.create(RunnerImageValue{},RunnerImageValue{}));
     for(unsigned i=0;i<20;++i)assert(effect.advanceImage());
     unsigned publications=0;
     assert(effect.setSprite(116,4,[&](const auto& changed){
@@ -47,7 +47,7 @@ int main(){
     assert(publications==1&&effect.frames==4);
     assert(!effect.setSprite(115,4,[](const auto&){return false;})&&!effect.valid);
     assert(!effect.advanceImage());
-    assert(effect.create({},{}));
+    assert(effect.create(RunnerImageValue{},RunnerImageValue{}));
     assert(!effect.setSprite(159,0,[](const auto&){return true;}));
     std::puts("Corpse expiry: synchronous child creation, 40-frame lifetime, sprite reset and publication failure passed");
 }

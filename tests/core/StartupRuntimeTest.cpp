@@ -1393,7 +1393,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 int area(){return currentArea;}
                 int restInPieces(){return 1;}
                 bool create(int,downwell::MotionBinary64,downwell::MotionBinary64){return false;}
-                bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,std::uint32_t&){return false;}
+                bool create(int,downwell::RunnerImageValue,downwell::RunnerImageValue,std::uint32_t&){return false;}
                 bool sprite(unsigned,int){return false;}
                 void destroy(){if(!output.destroy())good=false;}
             } events{publish,good,runtime->runStage().area};

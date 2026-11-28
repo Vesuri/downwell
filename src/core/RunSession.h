@@ -445,7 +445,7 @@ struct RunSession {
         bool sprite(unsigned,const CorpseExpiryEffect&){return true;}
         bool retire(unsigned,const CorpseExpiryEffect&){return true;}
     };
-    std::uint32_t createCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
+    std::uint32_t createCorpseExpiry(RunnerImageValue x,RunnerImageValue y){
         if(!effectsSucceeded)return 0;
         if(!nextForegroundBirth){effectsSucceeded=false;return 0;}
         ExpiryHooks hooks;
@@ -455,7 +455,9 @@ struct RunSession {
         return child;
     }
     bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
-        return createCorpseExpiry(x,y)!=0;
+        RunnerImageValue px,py;
+        if(!px.assign(x)||!py.assign(y)){effectsSucceeded=false;return false;}
+        return createCorpseExpiry(px,py)!=0;
     }
     // Shared alarm adapter: complete child Create, assign the source-selected
     // sprite, then request parent retirement. The scheduler supplies verified
@@ -465,7 +467,7 @@ struct RunSession {
         if(!effectsSucceeded)return false;
         struct Events {
             RunSession& session;Frames& frames;Destroy& retire;
-            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
+            bool create(int object,RunnerImageValue x,RunnerImageValue y,std::uint32_t& child){
                 if(object!=242)return false;
                 child=session.createCorpseExpiry(x,y);return child!=0;
             }

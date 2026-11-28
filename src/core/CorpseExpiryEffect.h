@@ -8,6 +8,11 @@ struct CorpseExpiryEffect:NonLoopSpriteAnimation {
     std::uint32_t drawBirth=0; // Shared depth -1000 insertion order, assigned by world owner.
     RunnerImageValue x{},y{};
     CorpseExpiryEffect(){imageSpeed={0x3e99999au};spriteId=102;frames=12;}
+    // The corpse's published binary32 position, without a binary64 trip.
+    bool create(RunnerImageValue px,RunnerImageValue py){
+        CorpseExpiryEffect next;next.x=px;next.y=py;
+        *this=next;return valid;
+    }
     bool create(MotionBinary64 px,MotionBinary64 py){
         CorpseExpiryEffect next;
         next.valid=next.x.assign(px)&&next.y.assign(py);

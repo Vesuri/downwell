@@ -133,7 +133,7 @@ public:
         return dispatchPublished(key,[&](auto& state,auto& publish,bool& okay){
             struct Events {
                 Create& createChild;Sprite& setSprite;Publisher& publish;bool& okay;
-                bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){return createChild(object,x,y,child);}
+                bool create(int object,RunnerImageValue x,RunnerImageValue y,std::uint32_t& child){return createChild(object,x.promoted(),y.promoted(),child);}
                 bool sprite(std::uint32_t child,int value){return setSprite(child,value);}
                 void destroy(){okay=publish.destroy()&&okay;}
             } events{create,sprite,publish,okay};

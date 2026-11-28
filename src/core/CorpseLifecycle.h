@@ -34,7 +34,7 @@ struct CorpseLifecycle : CorpseBirth {
         switch(index){
             case 0: {
                 std::uint32_t child=0;
-                if(!events.create(242,x.promoted(),y.promoted(),child)||!child){valid=false;return false;}
+                if(!events.create(242,x,y,child)||!child){valid=false;return false;}
                 myExplosion=child;
                 // Re-read explosionFx after Create; publish via sprite setter.
                 if(!events.sprite(myExplosion,explosionFx)){valid=false;return false;}

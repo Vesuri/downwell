@@ -29,7 +29,7 @@ struct Hooks {
     bool facing(unsigned,const CorpseAnimation&){return true;}
     int area(){return 3;}
     int restInPieces(){return 0;}
-    bool create(int id,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
+    bool create(int id,RunnerImageValue x,RunnerImageValue y,std::uint32_t& child){
         if(id!=242)return false;
         child=++children;return expiry.create(x,y);
     }
